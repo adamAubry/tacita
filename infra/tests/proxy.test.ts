@@ -2,9 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const nginxConf = readFileSync(new URL("../proxy/nginx.conf", import.meta.url), "utf-8");
-const realm: { clients: { clientId: string; redirectUris: string[]; defaultClientScopes: string[] }[] } =
-  JSON.parse(readFileSync(new URL("../keycloak/realm-export.json", import.meta.url), "utf-8"));
-const synapseClient = realm.clients.find((c) => c.clientId === "synapse")!;
+const realm = JSON.parse(
+  readFileSync(new URL("../keycloak/realm-export.json", import.meta.url), "utf-8"),
+);
+const synapseClient = realm.clients.find((c: { clientId: string }) => c.clientId === "synapse");
 
 describe("REQ-INF-10 — reverse proxy TLS avec routes /_matrix, /livekit/jwt, /livekit/sfu", () => {
   it("écoute en TLS", () => {

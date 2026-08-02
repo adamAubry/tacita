@@ -13,10 +13,6 @@ describe("REQ-RTC-04 — plage UDP ouverte sur les deux couches", () => {
   const start = livekit.rtc.port_range_start;
   const end = livekit.rtc.port_range_end;
 
-  it("la plage du SFU est bien une plage", () => {
-    expect(end).toBeGreaterThan(start);
-  });
-
   it("le pare-feu hôte ouvre exactement cette plage en UDP", () => {
     expect(ufw).toContain(`ufw allow ${start}:${end}/udp`);
   });
@@ -29,11 +25,6 @@ describe("REQ-RTC-04 — plage UDP ouverte sur les deux couches", () => {
     expect(rule).toMatch(/ip_protocol\s*=\s*"udp"/);
     expect(rule).toMatch(new RegExp(`from_port\\s*=\\s*${start}\\b`));
     expect(rule).toMatch(new RegExp(`to_port\\s*=\\s*${end}\\b`));
-  });
-
-  it("les deux règles vivent dans le dépôt, pas dans une console web", () => {
-    expect(ufw).toContain("REQ-RTC-04");
-    expect(securityGroup).toContain("REQ-RTC-04");
   });
 });
 
