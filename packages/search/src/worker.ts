@@ -25,7 +25,7 @@ export function serve(
     try {
       const ready = await engine;
       const call = ready[method] as (...rest: unknown[]) => Promise<SearchResponse["result"]>;
-      response.result = await call.apply(ready, args);
+      response.result = await call(...args);
     } catch (error) {
       // REQ-SRC-09 — rien du texte indexé ne remonte : seul le message de l'erreur,
       // et le module n'écrit dans aucun log.

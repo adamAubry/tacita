@@ -1,11 +1,9 @@
-import type { IndexableEvent, SearchHit, SearchStats } from "./engine";
+import type { SearchHit, SearchStats } from "./engine";
 
-/** Méthodes exposées par le worker. Le proxy et le worker partagent ce contrat. */
-export type SearchMethod = "index" | "search" | "stats" | "wipe";
-
+/** Contrat de messages partagé par le proxy (thread principal) et le worker. */
 export interface SearchRequest {
   id: number;
-  method: SearchMethod;
+  method: "index" | "search" | "stats" | "wipe";
   args: unknown[];
 }
 
@@ -14,5 +12,3 @@ export interface SearchResponse {
   result?: void | SearchHit[] | SearchStats;
   error?: string;
 }
-
-export type { IndexableEvent, SearchHit, SearchStats };

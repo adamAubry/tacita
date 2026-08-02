@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
-
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it } from "vitest";
+
+import { packageCode } from "./session-mock";
 
 // Import direct : le moteur ne dépend pas de matrix-js-sdk, ces tests non plus.
 import {
@@ -114,12 +114,7 @@ describe("REQ-SRC-05 — plafond D-01 et éviction des plus anciens", () => {
 
 describe("REQ-SRC-07 — la rotation Megolm n'est pas un événement pour l'index", () => {
   it("aucun code ne réagit à une rotation de session ni ne réindexe", () => {
-    const code = ["engine.ts", "index.ts", "worker.ts", "snapshot.ts", "protocol.ts"]
-      .map((name) => readFileSync(new URL(`../src/${name}`, import.meta.url), "utf-8"))
-      .join("\n")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^[ \t]*\/\/.*$/gm, "");
-    expect(code).not.toMatch(/megolm|RoomKey|sessionId|reindex|réindex/i);
+    expect(packageCode()).not.toMatch(/megolm|RoomKey|sessionId|reindex|réindex/i);
   });
 
   it("seuls la purge et wipe retirent quelque chose de l'index", async () => {

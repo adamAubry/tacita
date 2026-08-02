@@ -122,9 +122,12 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
           db,
           batch.map(({ eventId, ...rest }) => ({ id: eventId, ...rest })),
         );
+        // Purge à chaque lot, pas à la fin : un rattrapage massif ne doit pas tenir
+        // tout l'historique en mémoire avant d'évincer. Sous le plafond, l'appel
+        // court-circuite sur une soustraction.
+        await evict();
         if (offset + BATCH_SIZE < events.length) await yieldTo();
       }
-      await evict();
       await persist();
     },
 

@@ -1,11 +1,16 @@
 import type { Session } from "@tacita/client-core";
 import { MatrixEventEvent, type MatrixEvent } from "matrix-js-sdk";
 
-import type { IndexableEvent, SearchHit, SearchRequest, SearchResponse, SearchStats } from "./protocol";
+import type { IndexableEvent, SearchHit, SearchStats } from "./engine";
+import type { SearchRequest, SearchResponse } from "./protocol";
 
-export { BATCH_SIZE, createEngine, MAX_EVENTS } from "./engine";
-export type { EngineOptions, IndexableEvent, SearchEngine, SearchHit, SearchStats } from "./engine";
-export { serve } from "./worker";
+/**
+ * Ce point d'entrée ne réexporte volontairement ni le moteur ni `serve` : les
+ * réexporter tirerait Orama et l'indexation dans le bundle du thread principal,
+ * ce que le découpage en worker existe précisément pour éviter (REQ-SRC-01).
+ * Le worker s'importe par `@tacita/search/worker`.
+ */
+export type { IndexableEvent, SearchHit, SearchStats } from "./engine";
 
 /** Fenêtre d'accumulation des événements déchiffrés avant un envoi au worker. */
 export const BUFFER_MS = 250;
@@ -42,7 +47,7 @@ function indexable(event: MatrixEvent): IndexableEvent | undefined {
 export function createSearch(session: Session, worker: Worker): Search {
   const pending = new Map<
     number,
-    { resolve: (value: never) => void; reject: (error: Error) => void }
+    { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
   let nextId = 0;
 
@@ -50,14 +55,14 @@ export function createSearch(session: Session, worker: Worker): Search {
     const slot = pending.get(data.id);
     if (!slot) return;
     pending.delete(data.id);
-    if (data.error === undefined) slot.resolve(data.result as never);
+    if (data.error === undefined) slot.resolve(data.result);
     else slot.reject(new Error(data.error));
   };
 
   const call = <T>(method: SearchRequest["method"], args: unknown[]): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const id = nextId++;
-      pending.set(id, { resolve: resolve as (value: never) => void, reject });
+      pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
       worker.postMessage({ id, method, args } satisfies SearchRequest);
     });
 

@@ -1,8 +1,20 @@
+import { readFileSync } from "node:fs";
+
 import type { Session } from "@tacita/client-core";
 import type { MatrixEvent } from "matrix-js-sdk";
 import { vi } from "vitest";
 
 import type { SearchRequest, SearchResponse } from "../src/protocol";
+
+const SOURCES = ["engine.ts", "index.ts", "worker.ts", "snapshot.ts", "protocol.ts"];
+
+/** Les interdits portent sur ce que le package exécute, pas sur ce qu'il documente. */
+export function packageCode(): string {
+  return SOURCES.map((name) => readFileSync(new URL(`../src/${name}`, import.meta.url), "utf-8"))
+    .join("\n")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/.*$/gm, "");
+}
 
 /** Un `MatrixEvent` réduit à ce que le package en lit. */
 export function matrixEvent(

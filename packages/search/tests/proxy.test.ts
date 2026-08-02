@@ -4,8 +4,12 @@ import { IDBFactory } from "fake-indexeddb";
 import { MatrixEventEvent } from "matrix-js-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BUFFER_MS, createSearch, createEngine, serve, type Search } from "../src";
-import { fakeSession, fakeWorker, matrixEvent } from "./session-mock";
+import { BUFFER_MS, createSearch, type Search } from "../src";
+// Moteur et worker s'importent par leur module : le point d'entrée principal ne
+// les réexporte pas, sinon Orama atterrirait dans le bundle du thread principal.
+import { createEngine } from "../src/engine";
+import { serve } from "../src/worker";
+import { fakeSession, fakeWorker, matrixEvent, packageCode } from "./session-mock";
 
 const ROOM = "!salon:tacita.test";
 
@@ -99,9 +103,7 @@ describe("REQ-SRC-03 — aucune recherche n'émet d'appel réseau", () => {
   });
 
   it("aucun code du package n'appelle l'endpoint /search de Synapse", () => {
-    const code = ["engine.ts", "index.ts", "worker.ts", "snapshot.ts", "protocol.ts"]
-      .map((name) => readFileSync(new URL(`../src/${name}`, import.meta.url), "utf-8"))
-      .join("\n");
+    const code = packageCode();
     expect(code).not.toMatch(/_matrix\/client|\/search\b|fetch\(|XMLHttpRequest/);
     expect(code).not.toMatch(/client\.search|searchRoomEvents|backPaginateRoomEventsSearch/);
   });
