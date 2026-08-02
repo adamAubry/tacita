@@ -1,0 +1,243 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { ClientEvent, EventStatus, ReceiptType, RoomEvent } from "matrix-js-sdk";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { Session } from "@tacita/client-core";
+
+import { createReceipts, DELIVERED_EVENT_TYPE, type ReceiptStatus } from "../src/index";
+
+const MOI = "@moi:tacita.test";
+const TOI = "@toi:tacita.test";
+const SALON = "!salon:tacita.test";
+
+type Handler = (...args: never[]) => void;
+
+/** `MatrixClient` réduit à ce que le module en touche. */
+function fakeClient() {
+  const handlers = new Map<string, Set<Handler>>();
+  return {
+    getUserId: () => MOI,
+    sendToDevice: vi.fn(
+      async (_type: string, _content: Map<string, Map<string, { event_ids: string[] }>>) => ({}),
+    ),
+    /** REQ-RCP-05 — présent uniquement pour vérifier qu'il n'est jamais appelé. */
+    encryptAndSendToDevice: vi.fn(async () => {}),
+    sendEvent: vi.fn(async () => ({ event_id: "$x" })),
+    sendReceipt: vi.fn(async () => ({})),
+    on(event: string, handler: Handler) {
+      (handlers.get(event) ?? handlers.set(event, new Set()).get(event)!).add(handler);
+    },
+    off(event: string, handler: Handler) {
+      handlers.get(event)?.delete(handler);
+    },
+    emit(event: string, ...args: unknown[]) {
+      for (const handler of handlers.get(event) ?? []) (handler as (...a: unknown[]) => void)(...args);
+    },
+  };
+}
+
+type FakeClient = ReturnType<typeof fakeClient>;
+
+/** `MatrixEvent` réduit à ce que le module en lit. */
+function fakeEvent(id: string, sender: string, status: EventStatus | null = null) {
+  return { getId: () => id, getSender: () => sender, isState: () => false, status };
+}
+
+/** Insertion en store : le SDK émet `Room.timeline` pour tout événement live. */
+function insert(client: FakeClient, event: ReturnType<typeof fakeEvent>) {
+  client.emit(RoomEvent.Timeline, event, { roomId: SALON }, false, false, { liveEvent: true });
+}
+
+function readReceipt(eventIds: string[], reader: string) {
+  const content = Object.fromEntries(
+    eventIds.map((id) => [id, { [ReceiptType.Read]: { [reader]: { ts: 1 } } }]),
+  );
+  return { getContent: () => content };
+}
+
+function delivered(eventIds: string[]) {
+  return { message: { type: DELIVERED_EVENT_TYPE, sender: TOI, content: { event_ids: eventIds } } };
+}
+
+let client: FakeClient;
+let session: Session;
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  client = fakeClient();
+  session = { client } as unknown as Session;
+});
+
+describe("REQ-RCP-01 — « envoyé » dérivé de l'event_id serveur, `sending` avant", () => {
+  it("passe de sending à sent quand l'écho local reçoit son identifiant", () => {
+    const receipts = createReceipts(session);
+    const seen: [string, ReceiptStatus][] = [];
+    receipts.subscribe((id, status) => seen.push([id, status]));
+
+    insert(client, fakeEvent("~local", MOI, EventStatus.SENDING));
+    expect(receipts.status("~local")).toBe("sending");
+
+    client.emit(RoomEvent.LocalEchoUpdated, fakeEvent("$reel", MOI), { roomId: SALON }, "~local");
+
+    expect(receipts.status("$reel")).toBe("sent");
+    // L'UI n'a que l'identifiant de l'écho tant que le serveur n'a pas répondu.
+    expect(receipts.status("~local")).toBe("sent");
+    expect(seen).toEqual([
+      ["~local", "sending"],
+      ["$reel", "sent"],
+      ["~local", "sent"],
+    ]);
+  });
+
+  it("ne suit pas les messages entrants : ils n'ont pas de statut d'envoi", () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$deToi", TOI));
+    expect(receipts.status("$deToi")).toBeUndefined();
+  });
+});
+
+describe("REQ-RCP-02 — « lu » dérivé des reçus m.read natifs", () => {
+  it("passe à read sur reçu d'un autre utilisateur, ignore le sien", () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$a", MOI));
+
+    client.emit(RoomEvent.Receipt, readReceipt(["$a"], MOI));
+    expect(receipts.status("$a")).toBe("sent");
+
+    client.emit(RoomEvent.Receipt, readReceipt(["$a"], TOI));
+    expect(receipts.status("$a")).toBe("read");
+  });
+});
+
+describe("REQ-RCP-03 — « délivré » émis à l'entrée en store, pas à l'affichage", () => {
+  it("émet un accusé pour un message entrant, jamais pour les siens", async () => {
+    createReceipts(session);
+
+    insert(client, fakeEvent("$deToi", TOI));
+    insert(client, fakeEvent("$deMoi", MOI));
+    // Rien n'est parti avant l'échéance du lot (REQ-RCP-09).
+    expect(client.sendToDevice).not.toHaveBeenCalled();
+
+    await vi.runAllTimersAsync();
+
+    expect(client.sendToDevice).toHaveBeenCalledTimes(1);
+    const [type, contentMap] = client.sendToDevice.mock.calls[0]!;
+    expect(type).toBe(DELIVERED_EVENT_TYPE);
+    // `*` : l'expéditeur n'a pas à deviner lequel de ses appareils écoute.
+    expect(contentMap.get(TOI)!.get("*")).toEqual({ event_ids: ["$deToi"] });
+  });
+});
+
+describe("REQ-RCP-04 — « délivré » au premier appareil atteint, surnuméraires idempotents", () => {
+  it("ne notifie qu'une fois pour deux accusés de deux appareils du même compte", () => {
+    const receipts = createReceipts(session);
+    const seen: ReceiptStatus[] = [];
+    insert(client, fakeEvent("$a", MOI));
+    receipts.subscribe((_id, status) => seen.push(status));
+
+    client.emit(ClientEvent.ReceivedToDeviceMessage, delivered(["$a"]));
+    client.emit(ClientEvent.ReceivedToDeviceMessage, delivered(["$a"]));
+
+    expect(receipts.status("$a")).toBe("delivered");
+    expect(seen).toEqual(["delivered"]);
+  });
+
+  it("ne fait jamais reculer read vers delivered", () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$a", MOI));
+    client.emit(RoomEvent.Receipt, readReceipt(["$a"], TOI));
+
+    client.emit(ClientEvent.ReceivedToDeviceMessage, delivered(["$a"]));
+
+    expect(receipts.status("$a")).toBe("read");
+  });
+});
+
+describe("REQ-RCP-05 — reçu « délivré » volontairement non chiffré", () => {
+  it("part en clair par to-device, jamais par le canal chiffré ni le salon", async () => {
+    createReceipts(session);
+    insert(client, fakeEvent("$deToi", TOI));
+    await vi.runAllTimersAsync();
+
+    expect(client.sendToDevice).toHaveBeenCalled();
+    expect(client.encryptAndSendToDevice).not.toHaveBeenCalled();
+    // `sendEvent` chiffrerait : le SDK ne laisse passer en clair que réactions et redactions.
+    expect(client.sendEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("REQ-RCP-06 — extension non standard documentée, jamais présentée comme native", () => {
+  it("le README nomme la limite au lieu de la masquer", () => {
+    const readme = readFileSync(fileURLToPath(new URL("../README.md", import.meta.url)), "utf8");
+    expect(readme).toContain("Matrix ne définit aucun accusé « délivré »");
+    expect(readme).toContain("non standard");
+    expect(readme).toContain("en clair");
+  });
+});
+
+describe("REQ-RCP-07 — mode masqué : bascule vers m.read.private, pas de coupure", () => {
+  it("choisit le type de reçu selon le mode", async () => {
+    const receipts = createReceipts(session);
+    const event = fakeEvent("$deToi", TOI);
+
+    await receipts.markRead(event as never);
+    expect(client.sendReceipt).toHaveBeenLastCalledWith(event, ReceiptType.Read);
+
+    receipts.setHiddenMode(true);
+    await receipts.markRead(event as never);
+    // Toujours un reçu : il synchronise les compteurs de non-lus entre appareils.
+    expect(client.sendReceipt).toHaveBeenLastCalledWith(event, ReceiptType.ReadPrivate);
+  });
+});
+
+describe("REQ-RCP-08 — mode masqué : « délivré » suspendu, expéditeur bloqué à sent", () => {
+  it("n'émet aucun accusé et abandonne le lot en attente", async () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$deToi", TOI));
+    receipts.setHiddenMode(true);
+
+    await vi.runAllTimersAsync();
+    expect(client.sendToDevice).not.toHaveBeenCalled();
+
+    // Pas de rattrapage à la sortie du mode masqué.
+    receipts.setHiddenMode(false);
+    await vi.runAllTimersAsync();
+    expect(client.sendToDevice).not.toHaveBeenCalled();
+  });
+
+  it("expose l'ambiguïté d'un message resté à sent", () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$a", MOI));
+
+    expect(receipts.status("$a")).toBe("sent");
+    expect(receipts.deliveryUnknowable("$a")).toBe(true);
+
+    client.emit(ClientEvent.ReceivedToDeviceMessage, delivered(["$a"]));
+    expect(receipts.deliveryUnknowable("$a")).toBe(false);
+  });
+});
+
+describe("REQ-RCP-09 — anti-tempête : « délivré » émis par lot", () => {
+  it("groupe un sync de rattrapage en un envoi par destinataire", async () => {
+    createReceipts(session);
+
+    for (const id of ["$m1", "$m2", "$m3"]) insert(client, fakeEvent(id, TOI));
+    await vi.runAllTimersAsync();
+
+    expect(client.sendToDevice).toHaveBeenCalledTimes(1);
+    expect(client.sendToDevice.mock.calls[0]![1].get(TOI)!.get("*")).toEqual({
+      event_ids: ["$m1", "$m2", "$m3"],
+    });
+  });
+
+  it("n'émet plus rien après stop()", async () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$m1", TOI));
+    receipts.stop();
+
+    await vi.runAllTimersAsync();
+    expect(client.sendToDevice).not.toHaveBeenCalled();
+  });
+});

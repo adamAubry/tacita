@@ -1,0 +1,15 @@
+{
+  "name": "@tacita/receipts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@tacita/client-core": "workspace:*",
+    "matrix-js-sdk": "42.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7"
+  }
+}
