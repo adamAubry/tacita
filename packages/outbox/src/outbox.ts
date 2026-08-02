@@ -20,7 +20,6 @@ const HEALTHY: ReadonlySet<SyncState | null> = new Set([SyncState.Prepared, Sync
 export interface OutboxOptions {
   /** Injectable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
-  dbName?: string;
 }
 
 export interface Outbox {
@@ -77,16 +76,13 @@ export async function createOutbox(
   session: Session,
   options: OutboxOptions = {},
 ): Promise<Outbox> {
-  const store = await openOutboxStore(options.indexedDB ?? globalThis.indexedDB, options.dbName);
+  const store = await openOutboxStore(options.indexedDB ?? globalThis.indexedDB);
   const entries = new Map<string, OutboxEntry>();
   const listeners = new Set<() => void>();
 
   // REQ-OBX-01 — réhydratation : la file survit au rechargement de page, ce que le
-  // local echo du SDK ne fait pas. Une entrée « sending » vient d'un onglet tué en
-  // plein envoi ; elle repart en file, le txnId stable écarte le double envoi.
-  for (const entry of await store.all()) {
-    entries.set(entry.txnId, entry.status === "sending" ? { ...entry, status: "queued" } : entry);
-  }
+  // local echo du SDK ne fait pas.
+  for (const entry of await store.all()) entries.set(entry.txnId, entry);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running: Promise<void> | undefined;
@@ -97,13 +93,23 @@ export async function createOutbox(
     for (const listener of listeners) listener();
   };
 
+  /**
+   * Mise à jour visible seulement : `sending` est transitoire et n'a rien à faire
+   * sur disque — au redémarrage, tout ce qui n'est pas parti est `queued` de toute
+   * façon, donc le persister n'achèterait aucune récupération.
+   */
+  const mark = (entry: OutboxEntry): void => {
+    if (disposed) return;
+    entries.set(entry.txnId, entry);
+    notify();
+  };
+
   // Après `dispose`, la base est fermée : toute écriture qui traînait lèverait un
   // InvalidStateError. Les envois en vol se terminent, ils ne persistent plus rien.
   const save = async (entry: OutboxEntry): Promise<void> => {
     if (disposed) return;
-    entries.set(entry.txnId, entry);
     await store.put(entry);
-    notify();
+    mark(entry);
   };
 
   const drop = async (txnId: string): Promise<void> => {
@@ -113,24 +119,30 @@ export async function createOutbox(
     notify();
   };
 
+  /**
+   * Tête de file de chaque salon : les seules entrées qui peuvent partir
+   * (FIFO par salon, REQ-OBX-02). C'est aussi elle qui fixe le prochain réveil —
+   * viser une entrée coincée derrière ferait tourner le timer à vide.
+   */
+  const heads = (): OutboxEntry[] => {
+    const byRoom = new Map<string, OutboxEntry>();
+    for (const entry of [...entries.values()].sort(byQueuedAt)) {
+      if (entry.status !== "failed" && !byRoom.has(entry.roomId)) byRoom.set(entry.roomId, entry);
+    }
+    return [...byRoom.values()];
+  };
+
   const schedule = (): void => {
     if (timer) clearTimeout(timer);
     timer = undefined;
     if (disposed) return;
-    // Seule la tête de file de chaque salon peut partir (FIFO, REQ-OBX-02). C'est
-    // elle qui fixe le prochain réveil : viser une entrée coincée derrière ferait
-    // tourner le timer à vide, puisqu'elle ne partira pas avant sa tête.
-    const heads = new Map<string, number>();
-    for (const entry of [...entries.values()].sort(byQueuedAt)) {
-      if (entry.status === "failed" || heads.has(entry.roomId)) continue;
-      heads.set(entry.roomId, entry.nextAttemptAt);
-    }
-    if (heads.size === 0) return;
-    timer = setTimeout(() => void flush(), Math.max(0, Math.min(...heads.values()) - Date.now()));
+    const due = heads().map((entry) => entry.nextAttemptAt);
+    if (due.length === 0) return;
+    timer = setTimeout(() => void flush(), Math.max(0, Math.min(...due) - Date.now()));
   };
 
   const attempt = async (entry: OutboxEntry): Promise<boolean> => {
-    await save({ ...entry, status: "sending" });
+    mark({ ...entry, status: "sending" });
     try {
       await session.client.sendEvent(
         entry.roomId,

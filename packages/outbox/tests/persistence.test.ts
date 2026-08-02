@@ -47,7 +47,7 @@ describe("REQ-OBX-01 — persistance IndexedDB avant tout réseau, survit au rel
     rechargé.dispose();
   });
 
-  it("une entrée laissée en « sending » par un onglet tué repart en file", async () => {
+  it("le statut « sending » est visible mais n'atteint jamais le disque", async () => {
     let resolveSend: (() => void) | undefined;
     ctx.client.sendEvent.mockImplementation(
       () => new Promise((resolve) => (resolveSend = () => resolve({ event_id: "$ok" }))),
@@ -57,6 +57,7 @@ describe("REQ-OBX-01 — persistance IndexedDB avant tout réseau, survit au rel
     await vi.waitFor(() => expect(outbox.pending(ROOM)[0]?.status).toBe("sending"));
     outbox.dispose(); // onglet fermé en plein envoi
 
+    // Rien à réparer au démarrage : le disque n'a jamais connu que « queued ».
     const rechargé = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB });
     expect(rechargé.pending(ROOM)[0]?.status).toBe("queued");
     resolveSend?.();

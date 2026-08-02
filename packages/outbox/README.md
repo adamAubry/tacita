@@ -43,6 +43,7 @@ outbox.dispose(); // au démontage : coupe le timer et ferme la base
   `M_LIMIT_EXCEEDED` → `failed`, plus aucune tentative automatique. Un serveur
   qui renverrait 400 sur une panne transitoire condamnerait l'entrée au renvoi
   manuel.
-- **Une entrée trouvée en `sending` au démarrage repart en file.** Elle vient
-  d'un onglet tué en plein envoi : le message est peut-être déjà parti. Le
-  `txnId` stable fait que le serveur dédupliquera plutôt que de doubler.
+- **`sending` est un statut d'affichage, jamais persisté.** Un onglet tué en
+  plein envoi laisse donc l'entrée en `queued` sur disque, et elle repart au
+  démarrage suivant — le message est peut-être déjà parti, mais le `txnId`
+  stable fait que le serveur dédupliquera plutôt que de doubler.

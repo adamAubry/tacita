@@ -56,6 +56,5 @@ export function fakeSession(indexedDB: IDBFactory = new IDBFactory()) {
     async runWipes() {
       for (const wipe of wipes.values()) await wipe();
     },
-    wipes,
   };
 }
