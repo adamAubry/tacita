@@ -18,6 +18,9 @@ export type ReceiptStatus = "sending" | "sent" | "delivered" | "read";
 /** Le statut ne recule jamais : un `read` déjà connu n'est pas ramené à `delivered`. */
 const RANK: Record<ReceiptStatus, number> = { sending: 0, sent: 1, delivered: 2, read: 3 };
 
+/** REQ-RCP-09 — fenêtre de regroupement des « délivré ». */
+const DEBOUNCE_MS = 500;
+
 export interface Receipts {
   /** `undefined` = message non suivi (voir « limites » dans README.md). */
   status(eventId: string): ReceiptStatus | undefined;
@@ -36,20 +39,12 @@ export interface Receipts {
   stop(): void;
 }
 
-export interface ReceiptsOptions {
-  /** REQ-RCP-09 — fenêtre de regroupement des « délivré ». */
-  debounceMs?: number;
-}
-
-export function createReceipts(session: Session, options: ReceiptsOptions = {}): Receipts {
-  const { debounceMs = 500 } = options;
+export function createReceipts(session: Session): Receipts {
   const client = session.client;
   const log = createLogger();
   const self = client.getUserId();
 
   const statuses = new Map<string, ReceiptStatus>();
-  /** Écho local → identifiant serveur, pour que l'UI puisse interroger l'ancien id. */
-  const aliases = new Map<string, string>();
   const listeners = new Set<(eventId: string, status: ReceiptStatus) => void>();
 
   /** REQ-RCP-09 — destinataire → événements reçus depuis le dernier envoi. */
@@ -57,17 +52,14 @@ export function createReceipts(session: Session, options: ReceiptsOptions = {}):
   let timer: ReturnType<typeof setTimeout> | undefined;
   let hidden = false;
 
-  const resolve = (eventId: string): string => aliases.get(eventId) ?? eventId;
-
+  /** `seed` : seuls nos propres messages créent une entrée, un accusé isolé n'en crée pas. */
   function advance(eventId: string, next: ReceiptStatus, seed = false): void {
-    const id = resolve(eventId);
-    const current = statuses.get(id);
+    const current = statuses.get(eventId);
     // REQ-RCP-04 — les reçus « délivré » surnuméraires (N appareils par compte)
     // retombent ici et ne changent rien : le premier arrivé fait foi.
     if (current === undefined ? !seed : RANK[next] <= RANK[current]) return;
-    statuses.set(id, next);
-    for (const listener of listeners) listener(id, next);
-    if (id !== eventId) for (const listener of listeners) listener(eventId, next);
+    statuses.set(eventId, next);
+    for (const listener of listeners) listener(eventId, next);
   }
 
   /**
@@ -108,34 +100,28 @@ export function createReceipts(session: Session, options: ReceiptsOptions = {}):
     data: { liveEvent?: boolean },
   ): void => {
     const eventId = event.getId();
-    if (!eventId || removed || toStartOfTimeline || !data.liveEvent || event.isState()) return;
+    const sender = event.getSender();
+    if (!eventId || !sender || removed || toStartOfTimeline || !data.liveEvent || event.isState())
+      return;
 
-    if (event.getSender() === self) {
+    if (sender === self) {
       advance(eventId, ownStatus(event), true);
       return;
     }
 
-    const sender = event.getSender();
-    if (!sender) return;
-    let batch = pending.get(sender);
-    if (!batch) pending.set(sender, (batch = new Set()));
-    batch.add(eventId);
+    pending.set(sender, (pending.get(sender) ?? new Set()).add(eventId));
     // REQ-RCP-09 — un sync de rattrapage insère N messages d'un coup : un seul envoi.
-    timer ??= setTimeout(flush, debounceMs);
+    timer ??= setTimeout(flush, DEBOUNCE_MS);
   };
 
-  /** REQ-RCP-01 — l'écho local reçoit son identifiant serveur. */
+  /**
+   * REQ-RCP-01 — l'écho local reçoit son identifiant serveur. Le SDK réécrit l'id sur
+   * le même `MatrixEvent` : l'UI suit sans que le module ait à tenir de table d'alias.
+   */
   const onLocalEcho = (event: MatrixEvent, _room: unknown, oldEventId?: string): void => {
     const eventId = event.getId();
     if (!eventId || event.getSender() !== self) return;
-    if (oldEventId && oldEventId !== eventId) {
-      aliases.set(oldEventId, eventId);
-      statuses.set(eventId, statuses.get(oldEventId) ?? "sending");
-      statuses.delete(oldEventId);
-      // Notifie sous les deux identifiants : l'UI n'a encore que celui de l'écho.
-      advance(oldEventId, ownStatus(event), true);
-      return;
-    }
+    if (oldEventId) statuses.delete(oldEventId);
     advance(eventId, ownStatus(event), true);
   };
 
@@ -170,21 +156,19 @@ export function createReceipts(session: Session, options: ReceiptsOptions = {}):
   client.on(ClientEvent.ReceivedToDeviceMessage, onToDevice);
 
   return {
-    status: (eventId) => statuses.get(resolve(eventId)),
+    status: (eventId) => statuses.get(eventId),
 
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
 
-    deliveryUnknowable: (eventId) => statuses.get(resolve(eventId)) === "sent",
+    deliveryUnknowable: (eventId) => statuses.get(eventId) === "sent",
 
-    markRead(event) {
+    async markRead(event) {
       // REQ-RCP-07 — pas de désactivation pure : le reçu privé continue de synchroniser
       // les compteurs de non-lus entre les appareils du compte.
-      return client
-        .sendReceipt(event, hidden ? ReceiptType.ReadPrivate : ReceiptType.Read)
-        .then(() => {});
+      await client.sendReceipt(event, hidden ? ReceiptType.ReadPrivate : ReceiptType.Read);
     },
 
     setHiddenMode(next) {

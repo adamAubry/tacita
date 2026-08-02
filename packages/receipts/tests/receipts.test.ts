@@ -22,9 +22,6 @@ function fakeClient() {
     sendToDevice: vi.fn(
       async (_type: string, _content: Map<string, Map<string, { event_ids: string[] }>>) => ({}),
     ),
-    /** REQ-RCP-05 — présent uniquement pour vérifier qu'il n'est jamais appelé. */
-    encryptAndSendToDevice: vi.fn(async () => {}),
-    sendEvent: vi.fn(async () => ({ event_id: "$x" })),
     sendReceipt: vi.fn(async () => ({})),
     on(event: string, handler: Handler) {
       (handlers.get(event) ?? handlers.set(event, new Set()).get(event)!).add(handler);
@@ -82,12 +79,11 @@ describe("REQ-RCP-01 — « envoyé » dérivé de l'event_id serveur, `sending`
     client.emit(RoomEvent.LocalEchoUpdated, fakeEvent("$reel", MOI), { roomId: SALON }, "~local");
 
     expect(receipts.status("$reel")).toBe("sent");
-    // L'UI n'a que l'identifiant de l'écho tant que le serveur n'a pas répondu.
-    expect(receipts.status("~local")).toBe("sent");
+    // L'entrée d'écho est retirée, pas laissée figée à `sending`.
+    expect(receipts.status("~local")).toBeUndefined();
     expect(seen).toEqual([
       ["~local", "sending"],
       ["$reel", "sent"],
-      ["~local", "sent"],
     ]);
   });
 
@@ -156,15 +152,14 @@ describe("REQ-RCP-04 — « délivré » au premier appareil atteint, surnuméra
 });
 
 describe("REQ-RCP-05 — reçu « délivré » volontairement non chiffré", () => {
-  it("part en clair par to-device, jamais par le canal chiffré ni le salon", async () => {
+  it("remet au SDK une charge lisible, sans enveloppe chiffrée", async () => {
     createReceipts(session);
     insert(client, fakeEvent("$deToi", TOI));
     await vi.runAllTimersAsync();
 
-    expect(client.sendToDevice).toHaveBeenCalled();
-    expect(client.encryptAndSendToDevice).not.toHaveBeenCalled();
-    // `sendEvent` chiffrerait : le SDK ne laisse passer en clair que réactions et redactions.
-    expect(client.sendEvent).not.toHaveBeenCalled();
+    // Ce que le serveur verra : des identifiants en clair, jamais de contenu de message.
+    const [, contentMap] = client.sendToDevice.mock.calls[0]!;
+    expect(contentMap.get(TOI)!.get("*")).toEqual({ event_ids: ["$deToi"] });
   });
 });
 
