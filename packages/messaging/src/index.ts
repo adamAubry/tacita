@@ -19,7 +19,6 @@ export {
   createGroupChat,
   getPinnedEvents,
   memberCount,
-  members,
   PINNED_EVENTS_METADATA,
   powerLevelOf,
   setPinnedEvents,

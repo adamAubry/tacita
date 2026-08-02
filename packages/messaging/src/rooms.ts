@@ -2,12 +2,10 @@ import type { Session } from "@tacita/client-core";
 import { EventType, Preset, type ISendEventResponse, type RoomMember } from "matrix-js-sdk";
 
 /** Algorithme Megolm imposé par la spec Matrix pour un salon chiffré. */
-const MEGOLM = "m.megolm.v1.aes-sha2";
-
 const encryptionState = {
   type: EventType.RoomEncryption,
   state_key: "",
-  content: { algorithm: MEGOLM },
+  content: { algorithm: "m.megolm.v1.aes-sha2" },
 };
 
 /**

@@ -40,16 +40,15 @@ export function createTypingIndicator(session: Session): TypingIndicator {
 
   return {
     keystroke(roomId) {
-      const state = rooms.get(roomId);
+      const previous = rooms.get(roomId);
       const now = Date.now();
+      const due = !previous || now - previous.lastSentAt >= THROTTLE_MS;
 
-      if (!state || now - state.lastSentAt >= THROTTLE_MS) {
-        void session.client.sendTyping(roomId, true, SERVER_TIMEOUT_MS);
-      }
+      if (due) void session.client.sendTyping(roomId, true, SERVER_TIMEOUT_MS);
+      if (previous) clearTimeout(previous.idleTimer);
 
-      if (state) clearTimeout(state.idleTimer);
       rooms.set(roomId, {
-        lastSentAt: state && now - state.lastSentAt < THROTTLE_MS ? state.lastSentAt : now,
+        lastSentAt: due ? now : previous.lastSentAt,
         idleTimer: setTimeout(() => emitStop(roomId), IDLE_STOP_MS),
       });
     },

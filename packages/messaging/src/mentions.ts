@@ -27,6 +27,13 @@ export function mentionCandidates(session: Session, roomId: string): MentionCand
   ];
 }
 
+/** `@everyone` est un littéral sans métacaractère : construit une fois, jamais échappé. */
+const EVERYONE_RE = new RegExp(`${EVERYONE}\\b`, "g");
+
+/**
+ * Les libellés viennent du serveur (noms d'affichage) : sans échappement, un pseudo
+ * `a.*` deviendrait un joker qui mentionnerait tout le salon.
+ */
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
@@ -42,7 +49,7 @@ export function parseMentions(
   text: string,
   candidates: MentionCandidate[] = [],
 ): MentionContent {
-  const body = text.replace(new RegExp(`${escape(EVERYONE)}\\b`, "g"), ROOM_MENTION);
+  const body = text.replace(EVERYONE_RE, ROOM_MENTION);
   const mentions: MentionContent["m.mentions"] = {};
 
   if (body !== text) mentions.room = true;

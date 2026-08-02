@@ -41,12 +41,7 @@ async function send(
   txnId?: string,
 ): Promise<ISendEventResponse> {
   await assertEncrypted(session, roomId);
-  return session.client.sendEvent(
-    roomId,
-    type as never,
-    content as never,
-    txnId as string | undefined,
-  );
+  return session.client.sendEvent(roomId, type as never, content as never, txnId);
 }
 
 function textContent(text: string, opts: SendOptions): TextContent {
@@ -93,14 +88,13 @@ export function edit(
   text: string,
   opts: SendOptions = {},
 ): Promise<ISendEventResponse> {
-  const { body, "m.mentions": mentions } = parseMentions(text, opts.mentions);
+  const { body, ...rest } = textContent(text, opts);
   const content: TextContent = {
-    msgtype: MsgType.Text,
+    ...rest,
     body: `* ${body}`,
     "m.new_content": { msgtype: MsgType.Text, body },
     "m.relates_to": { rel_type: RelationType.Replace, event_id: targetEventId },
   };
-  if (Object.keys(mentions).length > 0) content["m.mentions"] = mentions;
   return send(session, roomId, EventType.RoomMessage, content, opts.txnId);
 }
 
@@ -169,12 +163,10 @@ export function messageText(event: MatrixEvent): string {
     .trim();
 }
 
-const roomOf = (session: Session, roomId: string): Room | null => session.client.getRoom(roomId);
-
 /** REQ-MSG-06 — modifiable : seul l'auteur édite, et il doit pouvoir poster. */
 export function canEdit(session: Session, roomId: string, event: MatrixEvent): boolean {
   const userId = session.client.getUserId();
-  const room = roomOf(session, roomId);
+  const room = session.client.getRoom(roomId);
   if (!userId || !room || event.getSender() !== userId) return false;
   return room.currentState.maySendEvent(EventType.RoomMessage, userId);
 }
@@ -182,7 +174,7 @@ export function canEdit(session: Session, roomId: string, event: MatrixEvent): b
 /** REQ-MSG-06 — supprimable : droits de redaction du SDK (auteur ou power level). */
 export function canRedact(session: Session, roomId: string, event: MatrixEvent): boolean {
   const userId = session.client.getUserId();
-  const room = roomOf(session, roomId);
+  const room = session.client.getRoom(roomId);
   if (!userId || !room) return false;
   return room.currentState.maySendRedactionForEvent(event, userId);
 }
