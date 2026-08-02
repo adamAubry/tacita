@@ -65,6 +65,19 @@ importers:
         specifier: ^2.7.0
         version: 2.9.0
 
+  packages/messaging:
+    dependencies:
+      '@tacita/client-core':
+        specifier: workspace:*
+        version: link:../client-core
+      matrix-js-sdk:
+        specifier: 42.0.0
+        version: 42.0.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.7
+        version: 22.20.1
+
 packages:
 
   '@babel/runtime@8.0.0':
