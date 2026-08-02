@@ -3,9 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --experimental-strip-types src/index.ts",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "start": "node --experimental-strip-types src/index.ts"
   },
   "dependencies": {
     "web-push": "^3.6.7"
