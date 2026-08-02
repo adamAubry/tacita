@@ -1,0 +1,53 @@
+# Chemin RTC — spec 02. Overlay du compose de la spec 01 (même projet, même
+# réseau, donc les noms d'hôte attendus par le proxy résolvent) :
+#
+#   docker compose -f docker-compose.yml -f rtc/docker-compose.yml up -d
+#
+name: tacita
+
+services:
+  livekit-sfu:
+    image: livekit/livekit-server@sha256:3497163e15c48fef6e7830c78716f9e9d5edc28abf7aa90b61c86e93bbc306b1 # v1.13.5
+    restart: unless-stopped
+    # ponytail: une seule valeur est templatée et l'image n'a pas envsubst — un
+    # sed au démarrage évite un Dockerfile + entrypoint pour ça.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sed "s|__TURN_DOMAIN__|$$TURN_DOMAIN|" /conf/livekit.yaml > /tmp/livekit.yaml
+        && exec /livekit-server --config /tmp/livekit.yaml
+    environment:
+      TURN_DOMAIN: ${TURN_DOMAIN}
+      LIVEKIT_KEYS: "${LIVEKIT_KEY}: ${LIVEKIT_SECRET}"
+    ports:
+      # REQ-RTC-04 — miroir strict de rtc/firewall/ ; ouvrir ici sans ouvrir là
+      # (ou l'inverse) donne un appel qui se connecte puis coupe à 15-20 s.
+      - "50000-50100:50000-50100/udp"
+      - "7881:7881/tcp"
+      - "${TURN_BIND_IP:?IP dédiée au TURN requise, voir rtc/README.md}:3478:3478/udp"
+      # REQ-RTC-06 — TURN-TLS sur 443, sur une IP dédiée : le reverse proxy occupe
+      # déjà 443 sur l'IP principale.
+      - "${TURN_BIND_IP:?IP dédiée au TURN requise, voir rtc/README.md}:443:443/tcp"
+    volumes:
+      - ./livekit.yaml:/conf/livekit.yaml:ro
+      # même certificat que le proxy : le TURN et le homeserver partagent le domaine
+      - ../proxy/certs:/certs:ro
+
+  # Traduit une identité Matrix en jeton d'accès LiveKit. Le SFU ne fait confiance
+  # qu'aux jetons qu'il signe (REQ-RTC-01) : c'est ici que se joue l'autorisation.
+  lk-jwt-service:
+    image: ghcr.io/element-hq/lk-jwt-service@sha256:29918567e6b7cd920e2853b4cd6848ce01b79947c3d19a9f1ed5b74f0a2a88bf # main, résolu le 2026-08-02 (amont ne publie pas de tag semver)
+    restart: unless-stopped
+    environment:
+      LIVEKIT_URL: wss://${SERVER_NAME}/livekit/sfu
+      LIVEKIT_KEY: ${LIVEKIT_KEY}
+      LIVEKIT_SECRET: ${LIVEKIT_SECRET}
+      # REQ-RTC-03 — restreint au domaine du déploiement. `*` laisserait n'importe
+      # quel homeserver déclencher la création de salles sur notre SFU.
+      LIVEKIT_FULL_ACCESS_HOMESERVERS: ${SERVER_NAME}
+
+  proxy:
+    # REQ-RTC-06 — le TURN-TLS réclame 443 sur son IP : on épingle le proxy sur
+    # l'autre. `!override` remplace la liste de ports au lieu de l'étendre.
+    ports: !override
+      - "${WEB_BIND_IP:?IP publique du proxy requise, voir rtc/README.md}:443:443"

@@ -1,0 +1,40 @@
+# SFU LiveKit — spec 02. Rendu au démarrage par le conteneur : `__TURN_DOMAIN__`
+# est substitué depuis l'environnement (LiveKit n'expande les variables d'env que
+# pour `key_file`, pas pour le reste du fichier — vérifié dans pkg/config/config.go
+# v1.13.5). Les clés API arrivent par l'env `LIVEKIT_KEYS`, jamais dans ce fichier.
+
+port: 7880
+
+rtc:
+  # REQ-RTC-04 — plage ouverte à l'identique sur le pare-feu hôte ET le groupe de
+  # sécurité cloud (voir firewall/). Toute modification ici se répercute dans les
+  # deux fichiers de règles ; les tests vérifient qu'ils ne divergent pas.
+  # ponytail: 101 ports ≈ 50 participants simultanés, très au-dessus de l'usage
+  # visé, et Docker publie un port à la fois (le défaut amont 50000-60000 coûterait
+  # 10 000 règles). Passer en port unique (`udp_port: 7882`) si ça devient étroit.
+  port_range_start: 50000
+  port_range_end: 50100
+  # repli ICE/TCP quand l'UDP sortant est bloqué ; le TURN plus bas couvre le reste
+  tcp_port: 7881
+  # REQ-RTC-02 — le SFU tourne derrière le NAT Docker : sans découverte STUN de
+  # l'IP publique il annoncerait une adresse de bridge injoignable.
+  use_external_ip: true
+
+# REQ-RTC-01 — sans ceci le SFU ouvre une salle pour quiconque s'y présente,
+# court-circuitant lk-jwt-service qui est la seule autorité d'autorisation.
+room:
+  auto_create: false
+
+# REQ-RTC-06 — TURN-TLS sur 443 : dernier recours pour les clients derrière NAT
+# symétrique ou pare-feu sortant strict, où 443/tcp est la seule sortie ouverte.
+# `domain` doit correspondre au CN/SAN du certificat monté.
+turn:
+  enabled: true
+  domain: __TURN_DOMAIN__
+  tls_port: 443
+  udp_port: 3478
+  cert_file: /certs/fullchain.pem
+  key_file: /certs/privkey.pem
+
+logging:
+  level: info
