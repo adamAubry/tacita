@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p infra && tsc -p apps/push-gateway && tsc -p packages/client-core && tsc -p packages/receipts && tsc -p packages/media-pipeline",
+    "typecheck": "tsc -p infra && tsc -p apps/push-gateway && tsc -p packages/client-core && tsc -p packages/receipts && tsc -p packages/media-pipeline && tsc -p packages/calls",
     "lint": "eslint .",
     "prepare": "husky"
   },

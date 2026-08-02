@@ -1,0 +1,52 @@
+# @tacita/calls — appels voix/vidéo (spec 10)
+
+Orchestration côté client des appels MatrixRTC : découverte du focus, URL du widget
+Element Call, état d'appel d'un salon, driver de l'API widget. **Aucun code RTC maison** —
+la négociation, les clés de média et l'appartenance à l'appel vivent entièrement dans
+Element Call. Zéro DOM : le shard UI (spec 11) monte l'iframe, ce package lui donne
+l'URL et le driver.
+
+```ts
+const focus = await discoverFocus(homeserverUrl); // lève RtcFociMissingError
+const { url } = buildCallWidget(session, roomId, { elementCallUrl, parentUrl, widgetId });
+const driver = new CallWidgetDriver(session, roomId); // à passer à ClientWidgetApi
+const call = activeCall(session, roomId); // idle → active → ended
+await hangupLocal(session, roomId);
+```
+
+## ⚠️ Les littéraux MatrixRTC ne sont pas stables
+
+`src/matrixrtc.ts` est le **seul** fichier du package qui porte un littéral de protocole,
+et un test structurel échoue si l'un d'eux réapparaît ailleurs. Chaque valeur y est datée
+et sourcée (`matrix-js-sdk@42.0.0`, `infra/rtc/README.md`).
+
+**Divergence connue** : le brouillon courant de MSC4143 remplace l'événement d'état
+`org.matrix.msc3401.call.member` par des événements *sticky* `m.rtc.member` (MSC4354).
+Element Call et le SDK déployé sont encore sur l'ancien préfixe — c'est donc lui qui est
+implémenté. Le jour où le SDK bascule, `activeCall` cessera de voir les participants sans
+erreur bruyante : le salon affichera simplement « aucun appel ». À revérifier à chaque
+montée de version du SDK ou d'Element Call.
+
+## Limites assumées
+
+- **Un focus périmé ne casse pas, il rend muet.** Sans `rtc_foci` exploitable,
+  `discoverFocus` lève `RtcFociMissingError` avec une `reason` (`well-known-unreachable`,
+  `well-known-absent`, `no-livekit-focus`) : l'UI doit afficher la cause, pas désactiver
+  un bouton en silence.
+- **Le widget reçoit toutes les capacités qu'il demande.** Element Call est notre propre
+  déploiement, dont ce module construit lui-même l'URL : il n'y a pas d'origine tierce à
+  arbitrer, donc pas d'invite utilisateur. Le confinement vient d'ailleurs — `getKnownRooms`
+  et le contrôle de `roomId` du driver limitent le widget au seul salon de l'appel, quelles
+  que soient les capacités accordées.
+- **Une appartenance est ignorée passé 4 h** (`expires` du contenu, sinon le défaut du
+  SDK). Sans ce filtre, un client parti sans nettoyer laisse un salon en « appel en cours »
+  pour toujours. En contrepartie, un appel réellement plus long que sa fenêtre d'expiration
+  disparaît de l'affichage si le participant ne rafraîchit pas son état.
+- **`ended` est un état déduit, pas un événement.** Il n'existe que par contraste avec un
+  `active` observé dans la même session : au rechargement de la page, un appel terminé est
+  indistinguable d'un salon qui n'a jamais eu d'appel — les deux sont `idle`.
+- **Métadonnées d'appel visibles côté serveur** : qui appelle qui, quand, combien de temps.
+  Le média est chiffré par participant (`perParticipantE2EE`), le SFU relaie sans
+  déchiffrer. Voir `infra/rtc/README.md`.
+- **Pas de sonnerie, de refus ni d'appel manqué en V1** (YAGNI, spec 10) : l'état
+  d'appartenance dit déjà qui est là et depuis quand.
