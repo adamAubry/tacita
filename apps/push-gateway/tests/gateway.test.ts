@@ -1,0 +1,148 @@
+import type { AddressInfo } from "node:net";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import webpush from "web-push";
+import { createGateway } from "../src/server.ts";
+
+vi.mock("web-push", () => ({ default: { sendNotification: vi.fn(), setVapidDetails: vi.fn() } }));
+const sendNotification = vi.mocked(webpush.sendNotification);
+
+const VAPID_PUBLIC_KEY = "BK7uT3xk-test-public-key";
+const server = createGateway(VAPID_PUBLIC_KEY);
+const url = (path: string) => `http://127.0.0.1:${(server.address() as AddressInfo).port}${path}`;
+
+beforeAll(() => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve)));
+afterAll(() => new Promise((resolve) => server.close(resolve)));
+afterEach(() => vi.restoreAllMocks());
+
+const device = (pushkey: string) => ({
+  app_id: "org.tacita.web",
+  pushkey,
+  data: { endpoint: pushkey, p256dh: "p256dh-" + pushkey, auth: "auth-" + pushkey },
+});
+
+/** Payload tel que Synapse l'émet : il contient du contenu en clair, la passerelle ne doit rien en relayer. */
+const synapsePayload = (devices: unknown[]) => ({
+  notification: {
+    event_id: "$evt:tacita.chat",
+    room_id: "!room:tacita.chat",
+    type: "m.room.message",
+    sender: "@alice:tacita.chat",
+    sender_display_name: "Alice",
+    room_name: "Vacances",
+    content: { msgtype: "m.text", body: "rendez-vous à 18h" },
+    counts: { unread: 2 },
+    devices,
+  },
+});
+
+const postNotify = (body: unknown) =>
+  fetch(url("/_matrix/push/v1/notify"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+const gone = (statusCode: number) => Object.assign(new Error("dead subscription"), { statusCode });
+
+describe("REQ-PSH-01 — endpoint /_matrix/push/v1/notify conforme", () => {
+  it("relaie un payload Synapse valide vers la subscription et ne rejette rien", async () => {
+    const response = await postNotify(synapsePayload([device("https://push.example/ep1")]));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ rejected: [] });
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification.mock.calls[0]?.[0]).toEqual({
+      endpoint: "https://push.example/ep1",
+      keys: { p256dh: "p256dh-https://push.example/ep1", auth: "auth-https://push.example/ep1" },
+    });
+  });
+
+  it.each([410, 404])("rejette la pushkey quand le push service répond %i", async (statusCode) => {
+    sendNotification.mockRejectedValueOnce(gone(statusCode));
+
+    const response = await postNotify(synapsePayload([device("https://push.example/dead")]));
+
+    await expect(response.json()).resolves.toEqual({ rejected: ["https://push.example/dead"] });
+  });
+
+  it("ne rejette pas sur une panne passagère du push service (500)", async () => {
+    sendNotification.mockRejectedValueOnce(gone(500));
+
+    const response = await postNotify(synapsePayload([device("https://push.example/flaky")]));
+
+    await expect(response.json()).resolves.toEqual({ rejected: [] });
+  });
+
+  it("rejette un pusher sans clés de chiffrement, qu'aucun push ne peut atteindre", async () => {
+    const response = await postNotify(synapsePayload([{ pushkey: "https://push.example/bare" }]));
+
+    await expect(response.json()).resolves.toEqual({ rejected: ["https://push.example/bare"] });
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("n'émet aucun push pour une notification de badge seul (sans event_id)", async () => {
+    const response = await postNotify({
+      notification: { counts: { unread: 3 }, devices: [device("https://push.example/ep1")] },
+    });
+
+    await expect(response.json()).resolves.toEqual({ rejected: [] });
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("répond 400 sur un corps illisible", async () => {
+    const response = await fetch(url("/_matrix/push/v1/notify"), { method: "POST", body: "{" });
+
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("REQ-PSH-02 — le payload sortant ne porte que event_id et room_id", () => {
+  it("n'expose ni expéditeur, ni nom de salon, ni contenu", async () => {
+    await postNotify(synapsePayload([device("https://push.example/ep1")]));
+
+    const payload = JSON.parse(String(sendNotification.mock.calls[0]?.[1]));
+    expect(Object.keys(payload).sort()).toEqual(["event_id", "room_id"]);
+    expect(payload).toEqual({ event_id: "$evt:tacita.chat", room_id: "!room:tacita.chat" });
+  });
+});
+
+describe("REQ-PSH-03 — clé publique VAPID exposée pour l'abonnement client", () => {
+  it("GET /config retourne la clé publique et rien d'autre", async () => {
+    const response = await fetch(url("/config"));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ vapid_public_key: VAPID_PUBLIC_KEY });
+  });
+});
+
+describe("REQ-PSH-04 — aucun contenu utilisateur dans les logs", () => {
+  const spyConsole = () => {
+    const lines: string[] = [];
+    const record = (...args: unknown[]) => void lines.push(args.map((a) => JSON.stringify(a)).join(" "));
+    for (const level of ["log", "info", "warn", "error", "debug"] as const) {
+      vi.spyOn(console, level).mockImplementation(record);
+    }
+    return lines;
+  };
+  const secrets = ["rendez-vous à 18h", "Alice", "@alice:tacita.chat", "Vacances", "p256dh-", "auth-"];
+
+  it("ne logge rien du payload entrant sur un push réussi", async () => {
+    const lines = spyConsole();
+
+    await postNotify(synapsePayload([device("https://push.example/ep1")]));
+
+    expect(lines.join("\n")).not.toMatch(new RegExp(secrets.join("|")));
+  });
+
+  it("ne logge qu'un ID d'événement et un code de statut quand le push échoue", async () => {
+    const lines = spyConsole();
+    sendNotification.mockRejectedValueOnce(gone(410));
+
+    await postNotify(synapsePayload([device("https://push.example/dead")]));
+
+    const logs = lines.join("\n");
+    expect(logs).not.toMatch(new RegExp(secrets.join("|")));
+    expect(logs).toContain("push_failed");
+    expect(logs).toContain("410");
+  });
+});
