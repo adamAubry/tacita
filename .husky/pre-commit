@@ -1,0 +1,4 @@
+npx lint-staged
+# ponytail: full-repo typecheck/test, scope to the changed package via lint-staged once there are enough packages for this to be slow
+pnpm -r --if-present typecheck
+pnpm -r --if-present test

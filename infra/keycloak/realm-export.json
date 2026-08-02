@@ -1,0 +1,43 @@
+{
+  "realm": "tacita",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "webAuthnPolicyPasswordlessRpEntityName": "Tacita",
+  "webAuthnPolicyPasswordlessRpId": "${SERVER_NAME}",
+  "webAuthnPolicyPasswordlessAttestationConveyancePreference": "none",
+  "webAuthnPolicyPasswordlessAuthenticatorAttachment": "platform",
+  "webAuthnPolicyPasswordlessRequireResidentKey": "Yes",
+  "webAuthnPolicyPasswordlessUserVerificationRequirement": "required",
+  "webAuthnPolicyPasswordlessCreateTimeout": 60,
+  "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister": true,
+  "requiredActions": [
+    {
+      "alias": "webauthn-register-passwordless",
+      "name": "Webauthn Register Passwordless",
+      "providerId": "webauthn-register-passwordless",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10,
+      "config": {}
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "synapse",
+      "name": "Synapse",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "secret": "${KEYCLOAK_OIDC_CLIENT_SECRET}",
+      "redirectUris": ["https://${SERVER_NAME}/_synapse/client/oidc/callback"],
+      "webOrigins": ["https://${SERVER_NAME}"],
+      "defaultClientScopes": ["openid", "profile", "email"]
+    }
+  ]
+}

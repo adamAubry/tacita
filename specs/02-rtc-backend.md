@@ -1,0 +1,26 @@
+# SPEC 02 — Backend RTC (LiveKit, lk-jwt-service, TURN, .well-known)
+
+**Package : `infra/rtc/`. Dépendances : spec 01 (reverse proxy). Déployé dès la V1.**
+
+## Livrable
+
+Config-as-code du chemin voix/vidéo : SFU LiveKit auto-hébergé, service d'autorisation `lk-jwt-service` (traduit l'identité Matrix en jeton d'accès LiveKit), relais TURN, fichier `.well-known/matrix/client`. Les clients se connectent au SFU directement en UDP après autorisation.
+
+## Exigences et critères d'acceptation
+
+- **REQ-RTC-01** — LiveKit avec `room.auto_create: false` (sinon le SFU crée des salles pour n'importe qui, indépendamment du service d'autorisation).
+- **REQ-RTC-02** — `use_external_ip: true` (découverte de l'IP publique par STUN).
+- **REQ-RTC-03** — `LIVEKIT_FULL_ACCESS_HOMESERVERS` restreint au domaine du déploiement, jamais `*`.
+- **REQ-RTC-04** — Plage UDP LiveKit ouverte **à la fois** sur le pare-feu hôte et sur le groupe de sécurité cloud ; les deux règles sont dans le code d'infra. (Symptôme d'oubli documenté dans le README : l'appel se connecte puis coupe à 15–20 s.)
+- **REQ-RTC-05** — `.well-known/matrix/client` expose les `rtc_foci` et est servi avec `Access-Control-Allow-Origin` (sans quoi le bouton d'appel reste inerte sans message d'erreur).
+- **REQ-RTC-06** — TURN en TURN-TLS sur le port 443 pour les clients derrière NAT symétrique ou pare-feu strict.
+- **REQ-RTC-07** — README `infra/rtc/README.md` rappelant que les MSC MatrixRTC ne sont pas stabilisés : préfixes d'événements et structure des state keys relus dans la doc courante d'Element Call avant tout usage littéral.
+
+## Méthode et contraintes
+
+- Aucun client RTC maison, aucune couche RTC applicative : le client embarque Element Call en widget (spec 10). Ce module ne livre que l'infra.
+- Hors scope : UI d'appel, logique client, config Synapse générale (spec 01).
+
+## Objectif mesurable
+
+Suite Vitest `infra/rtc/tests/` : parse la config LiveKit et asserte REQ-RTC-01/02/03 ; parse les règles pare-feu/SG et asserte REQ-RTC-04 (plage UDP présente dans les deux) ; parse le `.well-known` rendu et asserte REQ-RTC-05 (rtc_foci + header CORS dans la config proxy) ; asserte REQ-RTC-06 (listener TLS :443). Une describe par REQ, nommée par son ID.
