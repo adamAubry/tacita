@@ -17,7 +17,7 @@ afterEach(() => vi.restoreAllMocks());
 const device = (pushkey: string) => ({
   app_id: "org.tacita.web",
   pushkey,
-  data: { endpoint: pushkey, p256dh: "p256dh-" + pushkey, auth: "auth-" + pushkey },
+  data: { p256dh: "p256dh-" + pushkey, auth: "auth-" + pushkey },
 });
 
 /** Payload tel que Synapse l'émet : il contient du contenu en clair, la passerelle ne doit rien en relayer. */
@@ -89,10 +89,11 @@ describe("REQ-PSH-01 — endpoint /_matrix/push/v1/notify conforme", () => {
     expect(sendNotification).not.toHaveBeenCalled();
   });
 
-  it("répond 400 sur un corps illisible", async () => {
-    const response = await fetch(url("/_matrix/push/v1/notify"), { method: "POST", body: "{" });
+  it.each(["{", "{}"])("répond 400 sur un corps inexploitable (%s)", async (body) => {
+    const response = await fetch(url("/_matrix/push/v1/notify"), { method: "POST", body });
 
     expect(response.status).toBe(400);
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 });
 

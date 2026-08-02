@@ -51,7 +51,6 @@ Web Push, et dans `data` : `url` (celle de cette passerelle), `format:
   "data": {
     "url": "https://push.tacita.chat/_matrix/push/v1/notify",
     "format": "event_id_only",
-    "endpoint": "https://push.services.mozilla.com/wpush/v2/...",
     "p256dh": "<subscription.keys.p256dh>",
     "auth": "<subscription.keys.auth>"
   }

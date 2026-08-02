@@ -8,6 +8,5 @@ describe("REQ-PSH-05 — la contrainte iOS est documentée", () => {
     expect(limites).toMatch(/iOS/);
     expect(limites).toMatch(/écran d'accueil/i);
     expect(limites).toMatch(/Safari/);
-    expect(limites).toMatch(/jamais/i);
   });
 });

@@ -22,14 +22,17 @@ export function createGateway(vapidPublicKey: string) {
     }
 
     if (req.method === "POST" && req.url === "/_matrix/push/v1/notify") {
-      return void readBody(req).then(
-        async (body) => {
-          const notification = (body as { notification?: Notification })?.notification;
-          if (!notification) return json(400, { errcode: "M_BAD_JSON" });
-          json(200, { rejected: await notify(notification) });
-        },
-        () => json(400, { errcode: "M_NOT_JSON" }),
-      );
+      // Un seul chemin d'échec : corps illisible, `notification` absente ou relais en panne → 400.
+      return void readBody(req)
+        .then((body) => {
+          const notification = (body as { notification?: Notification }).notification;
+          if (!notification) throw new Error("notification manquante");
+          return notify(notification);
+        })
+        .then(
+          (rejected) => json(200, { rejected }),
+          () => json(400, { errcode: "M_BAD_JSON" }),
+        );
     }
 
     return json(404, { errcode: "M_UNRECOGNIZED" });

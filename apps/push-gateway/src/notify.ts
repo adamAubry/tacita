@@ -1,7 +1,8 @@
 import webpush from "web-push";
 
-/** Données de pusher enregistrées par le client (spec 11) : la subscription Web Push complète. */
-type PusherData = { endpoint?: string; p256dh?: string; auth?: string };
+/** Données de pusher enregistrées par le client (spec 11) : les clés de la subscription Web Push.
+ *  L'endpoint n'y est pas répété — c'est la `pushkey`, qui identifie déjà la subscription. */
+type PusherData = { p256dh?: string; auth?: string };
 type Device = { pushkey?: string; data?: PusherData };
 
 /** Payload `POST /_matrix/push/v1/notify` de Synapse (champs utilisés seulement). */
@@ -10,11 +11,6 @@ export type Notification = {
   room_id?: string;
   devices?: Device[];
 };
-
-function subscriptionOf(data: PusherData | undefined, pushkey: string) {
-  if (!data?.p256dh || !data.auth) return null;
-  return { endpoint: data.endpoint ?? pushkey, keys: { p256dh: data.p256dh, auth: data.auth } };
-}
 
 /** Relaie une notification Synapse en Web Push ; retourne les pushkeys à supprimer. */
 export async function notify(notification: Notification): Promise<string[]> {
@@ -26,13 +22,13 @@ export async function notify(notification: Notification): Promise<string[]> {
   await Promise.all(
     devices.map(async ({ pushkey, data }) => {
       if (!pushkey) return;
-      const subscription = subscriptionOf(data, pushkey);
-      if (!subscription) {
-        rejected.push(pushkey);
+      if (!data?.p256dh || !data.auth) {
+        rejected.push(pushkey); // pusher inutilisable : aucun push ne peut être chiffré pour lui
         return;
       }
       try {
         // REQ-PSH-02 : event_id et room_id, rien d'autre. Le client déchiffre après réveil.
+        const subscription = { endpoint: pushkey, keys: { p256dh: data.p256dh, auth: data.auth } };
         await webpush.sendNotification(subscription, JSON.stringify({ event_id, room_id }));
       } catch (error) {
         const status = (error as { statusCode?: number }).statusCode;
