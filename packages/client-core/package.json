@@ -1,0 +1,15 @@
+{
+  "name": "@tacita/client-core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "matrix-js-sdk": "42.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "yaml": "^2.7.0"
+  }
+}
