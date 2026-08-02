@@ -119,4 +119,14 @@ describe("REQ-INF-09 — OIDC Keycloak seul fournisseur d'auth", () => {
     expect(provider.idp_id).toBe("keycloak");
     expect(provider.issuer).toContain("/auth/realms/tacita");
   });
+
+  it("Keycloak sert sous le préfixe de l'issuer", () => {
+    // KC_HOSTNAME ne fixe que les URLs annoncées : sans KC_HTTP_RELATIVE_PATH,
+    // Keycloak sert à la racine et l'issuer qu'il publie répond 404.
+    const [provider] = homeserver.oidc_providers;
+    const issuerPath = new URL(provider.issuer.replace("${SERVER_NAME}", "example.org"))
+      .pathname;
+    const [prefix] = issuerPath.split("/realms/");
+    expect(compose.services.keycloak.environment.KC_HTTP_RELATIVE_PATH).toBe(prefix);
+  });
 });

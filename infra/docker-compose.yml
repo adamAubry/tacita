@@ -26,6 +26,9 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HOSTNAME: https://${SERVER_NAME}/auth
+      # REQ-INF-09 — KC_HOSTNAME ne fixe que les URLs annoncées ; sans ceci
+      # Keycloak sert à la racine et l'issuer qu'il publie lui-même est en 404.
+      KC_HTTP_RELATIVE_PATH: /auth
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
       # REQ-INF-09 — résolus par Keycloak lui-même dans le realm importé (placeholders natifs).

@@ -37,7 +37,7 @@
       "secret": "${KEYCLOAK_OIDC_CLIENT_SECRET}",
       "redirectUris": ["https://${SERVER_NAME}/_synapse/client/oidc/callback"],
       "webOrigins": ["https://${SERVER_NAME}"],
-      "defaultClientScopes": ["openid", "profile", "email"]
+      "defaultClientScopes": ["profile", "email"]
     }
   ]
 }
