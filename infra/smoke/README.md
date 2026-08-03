@@ -25,16 +25,19 @@ cd .. && npm run smoke
   session se rouvre, garde le même `device_id`, et l'historique reste déchiffrable
   (REQ-COR-11).
 
+- **Que le login OIDC aboutit** (`login.smoke.test.ts`, REQ-INF-09) : Synapse redirige
+  vers le realm Keycloak, avec PKCE. C'est la découverte OIDC qui était cassée — quatre
+  causes, documentées dans `../README.md` — et c'est elle que la redirection prouve.
+
 ## Ce qu'elle ne couvre pas
 
-**Le tronçon OIDC.** Le jeton vient du secret partagé de REQ-INF-04, pas du flux SSO,
-qui ne fonctionne pas en local — trois causes documentées dans `../README.md`. C'est
-un choix arbitré : un tronçon bloqué ne prend pas en otage la validation de sept
-modules. Le ticket OIDC ajoutera un `describe` nommé `REQ-INF-09` ici même, et c'est
-lui qui fera passer la spec 01 de « non terminée » à « terminée ».
+**Le flux de login complet.** La cible s'arrête à la redirection vers Keycloak : aller
+plus loin exigerait de piloter un formulaire HTML, donc un navigateur, donc Playwright —
+interdit. Le jeton des tests de session vient donc du secret partagé de REQ-INF-04, pas
+du flux SSO.
 
-`seedCredentials` est le seul endroit où la cible triche, et exactement du montant de
-ce tronçon : en production ces trois valeurs viennent de `initSession()`.
+`seedCredentials` est le seul endroit où la cible triche, et exactement du montant de ce
+qui reste : en production ces trois valeurs viennent de `initSession()` après le SSO.
 
 ## Pourquoi elle est hors de la suite par défaut
 

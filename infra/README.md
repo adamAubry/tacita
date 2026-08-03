@@ -71,11 +71,23 @@ joindre le proxy par le nom public.
    réglage `SYNAPSE_IP_RANGE_WHITELIST`, **vide par défaut** : la protection reste entière tant que
    le déploiement n'en a pas besoin. Le symptôme du blocage est un timeout muet, rien dans les logs
    ne mentionne le blocage.
-3. **Le certificat auto-signé n'est pas approuvé — non résolu.** `SSL_CERT_FILE` ne suffit pas :
-   c'est une convention du module `ssl` de Python, et le client HTTP de Synapse est **Twisted**, qui
-   charge sa racine de confiance depuis le magasin OpenSSL du système. Vérifié dans le conteneur.
-   Le correctif serait d'installer le certificat de dev dans `/usr/local/share/ca-certificates/`
-   puis `update-ca-certificates` — donc une modification de l'image, à arbitrer.
+3. **Le certificat auto-signé n'était pas approuvé.** `SSL_CERT_FILE` ne suffit pas : c'est une
+   convention du module `ssl` de Python, et le client HTTP de Synapse est **Twisted**, qui charge sa
+   racine de confiance depuis le magasin OpenSSL du système. Corrigé : le CA de dev est copié dans
+   `/usr/local/share/ca-certificates/` puis `update-ca-certificates` **au démarrage, depuis
+   l'overlay** (D-07 — l'image de production n'est pas modifiée ; l'entrypoint d'origine est
+   conservé, on ne fait que le précéder).
+4. **Le certificat n'avait aucun `subjectAltName`.** Cause profonde, et la seule qui dépassait le
+   login : `generate-dev-certs.sh` ne passait qu'un `/CN=`. `service_identity` — donc Twisted, donc
+   Synapse — refuse un certificat sans SAN, et **tout navigateur moderne aussi, depuis 2017**. Le
+   certificat de dev était donc inutilisable pour la PWA elle-même (REQ-INF-10, contexte sécurisé),
+   et `.env.example` promettait déjà que `TURN_DOMAIN` soit « un SAN du certificat monté » — ce que
+   le script ne pouvait pas tenir. Corrigé : `-addext subjectAltName=…`, avec `TURN_DOMAIN` quand il
+   est défini.
+
+**Vérification.** `infra/smoke/login.smoke.test.ts` assère le 302 vers le realm Keycloak, sous un
+`describe` nommé `REQ-INF-09` — c'est le critère de comportement demandé par le PM. Retirer l'une de
+ces corrections le fait échouer avec « 503 = découverte OIDC injoignable ».
 
 **Ce que ça dit pour la production**, indépendamment du dev : si le déploiement résout
 `SERVER_NAME` vers une adresse interne (hairpin NAT absent, DNS split-horizon), les causes 1 et 2
