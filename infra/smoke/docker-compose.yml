@@ -25,9 +25,11 @@ services:
     # L'entrypoint de production est conservé tel quel, on ne fait que le précéder.
     entrypoint: ["/bin/sh", "-c"]
     command:
+      # `>/dev/null` sur la sortie standard seulement : si l'installation échoue, le
+      # `&&` tue le conteneur, et on veut pouvoir lire pourquoi.
       - >
         cp /conf/dev-ca.pem /usr/local/share/ca-certificates/tacita-dev.crt &&
-        update-ca-certificates >/dev/null 2>&1 &&
+        update-ca-certificates >/dev/null &&
         exec /entrypoint.sh run
     environment:
       # Synapse bloque ses propres requêtes sortantes vers les plages privées
