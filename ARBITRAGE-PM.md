@@ -194,6 +194,22 @@ hypothèse contre un substitut qui la confirme par construction — ici `SSL_CER
 Python quand Synapse parle Twisted). Deux occurrences en une session : c'est la confirmation
 empirique du point 9, pas un incident isolé.
 
+## Suite du 03/08/2026 — deux points signalés avant exécution
+
+**La régression du statut de la spec 01 est un état voulu, annoncé ici : l'ordre ne s'inverse
+pas.** Entre l'option B et le ticket OIDC, la spec 01 passe « non terminée » — c'est la vérité :
+le produit n'est pas connectable. Un tableau rouge qui dit vrai vaut mieux qu'un tableau vert qui
+ment ; séquencer les tâches pour éviter l'affichage serait masquer une limite, ce que l'interdit
+n°13 proscrit pour le produit et qui vaut aussi pour le pilotage. L'amendement n'a pas cassé la
+spec 01, il a révélé qu'elle l'était. La fenêtre reste courte : le ticket OIDC suit immédiatement
+la cible.
+
+**Le commentaire SSRF dans le template est approuvé** — « ne pas activer `url_preview_enabled`
+avec `SYNAPSE_IP_RANGE_WHITELIST` rempli sans restreindre la plage » — à poser en écrivant la
+cible, comme proposé. C'est une ligne de garde-fou, pas une décision : le jour où l'aperçu d'URL
+deviendra une demande produit, il arrivera avec sa propre entrée DECISIONS et cette ligne
+l'attendra.
+
 ## Ordre de marche mis à jour
 
 1. Le point 5 de l'ordre initial (correctif rétention) reste la tâche la plus prioritaire —
