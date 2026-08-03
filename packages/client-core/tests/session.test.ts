@@ -83,6 +83,18 @@ describe("REQ-COR-03 — persistance exclusivement IndexedDB", () => {
     expect(clientOpts().store.startup).toHaveBeenCalledOnce();
   });
 
+  it("le store est démarré après avoir été confié au client, jamais avant", async () => {
+    await initSession(config);
+
+    // Le vrai SDK lève « must be called after assigning it to the client » — mais
+    // seulement en relisant un store existant, donc jamais au premier lancement ni
+    // sur un mock. Seul l'ordre est observable ici ; c'est lui qu'on fige.
+    const clientCréé = createClient.mock.invocationCallOrder.at(-1)!;
+    const storeDémarré = (clientOpts().store.startup as { mock: { invocationCallOrder: number[] } })
+      .mock.invocationCallOrder[0]!;
+    expect(clientCréé).toBeLessThan(storeDémarré);
+  });
+
   it("la crypto persiste elle aussi dans IndexedDB", async () => {
     await initSession(config);
     expect(client.initRustCrypto).toHaveBeenCalledWith({ useIndexedDB: true });

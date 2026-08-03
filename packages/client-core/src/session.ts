@@ -161,7 +161,6 @@ async function buildSession(
     indexedDB: config.indexedDB ?? globalThis.indexedDB,
     dbName: "tacita",
   });
-  await store.startup();
 
   const client = createClient({
     baseUrl: config.homeserverUrl,
@@ -170,6 +169,13 @@ async function buildSession(
     deviceId: credentials.deviceId,
     store,
   });
+
+  // `startup()` **après** l'affectation au client, jamais avant : le SDK lève
+  // « must be called after assigning it to the client » quand il relit un store
+  // existant. Sur une base vierge l'ordre inverse passe — c'est pourquoi ni la
+  // suite sur mocks ni un premier lancement ne le voyaient, et pourquoi seule la
+  // reprise de session (REQ-COR-11) échouait, à chaque fois.
+  await store.startup();
 
   // REQ-COR-01 — vodozemac via le SDK (`initRustCrypto`), libolm interdit.
   // REQ-COR-02 — la crypto est prête avant que quoi que ce soit puisse être envoyé :
@@ -301,13 +307,20 @@ export async function restoreSession(
 
   try {
     return await buildSession(credentials, config, saved);
-  } catch {
+  } catch (error) {
     // Restauration impossible : store crypto corrompu, wasm qui n'a pas chargé,
     // IndexedDB à moitié évincée. On rend `null` sans effacer — un échec de
     // chargement est souvent passager, et l'effacer forcerait un OIDC qui exige le
     // réseau, précisément ce que l'utilisateur hors ligne n'a pas. Si la panne est
     // définitive, l'OIDC réécrira ces credentials de toute façon : les détruire
     // ici n'achèterait rien et coûterait la tentative suivante.
+    //
+    // Mais un `null` muet est indiagnosticable : côté appelant il ne se distingue
+    // pas d'un premier lancement. On journalise la raison — c'est un message
+    // d'erreur technique, jamais du contenu déchiffré (REQ-COR-09).
+    createLogger().error("reprise de session impossible, retour à l'OIDC", {
+      raison: error instanceof Error ? error.message : "erreur inconnue",
+    });
     return null;
   }
 }
