@@ -34,20 +34,36 @@ export async function openOutboxStore(
   };
   const db = await promisify(request);
 
-  const objectStore = (mode: IDBTransactionMode) =>
-    db.transaction(STORE, mode).objectStore(STORE);
+  const reading = () => db.transaction(STORE, "readonly").objectStore(STORE);
+
+  /**
+   * REQ-OBX-01 — « persisté avant toute tentative réseau » veut dire committé : le
+   * `onsuccess` d'une requête précède le commit, qui peut encore avorter. Sur erreur,
+   * `transaction.error` n'est pas encore posé quand `onerror` se déclenche — d'où le
+   * repli, sans lequel on rejetterait avec `null`.
+   */
+  const commit = (mutate: (store: IDBObjectStore) => void): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE, "readwrite");
+      mutate(transaction.objectStore(STORE));
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = transaction.onerror = () =>
+        reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
+    });
 
   return {
-    all: () => promisify(objectStore("readonly").getAll() as IDBRequest<OutboxEntry[]>),
-    put: async (entry) => {
-      await promisify(objectStore("readwrite").put(entry));
-    },
-    remove: async (txnId) => {
-      await promisify(objectStore("readwrite").delete(txnId));
-    },
-    clear: async () => {
-      await promisify(objectStore("readwrite").clear());
-    },
+    // Une lecture qui a réussi a lu un état committé, et elle a besoin du résultat
+    // que `oncomplete` ne porte pas : `promisify` reste le bon outil ici.
+    all: () => promisify(reading().getAll() as IDBRequest<OutboxEntry[]>),
+    put: (entry) => commit((store) => {
+      store.put(entry);
+    }),
+    remove: (txnId) => commit((store) => {
+      store.delete(txnId);
+    }),
+    clear: () => commit((store) => {
+      store.clear();
+    }),
     close: () => db.close(),
   };
 }

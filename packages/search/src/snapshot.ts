@@ -31,17 +31,31 @@ export async function openSnapshot(
   };
   const db = await promisify(request);
 
-  const objectStore = (mode: IDBTransactionMode) =>
-    db.transaction(STORE, mode).objectStore(STORE);
+  const reading = () => db.transaction(STORE, "readonly").objectStore(STORE);
+
+  /**
+   * Le `onsuccess` d'une requête précède le commit de sa transaction, qui peut encore
+   * avorter : sans ça, `clear()` (REQ-SRC-08) résout avant que l'effacement soit
+   * acquis. Sur erreur, `transaction.error` n'est pas encore posé quand `onerror` se
+   * déclenche — d'où le repli, sans lequel on rejetterait avec `null`.
+   */
+  const commit = (mutate: (store: IDBObjectStore) => void): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE, "readwrite");
+      mutate(transaction.objectStore(STORE));
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = transaction.onerror = () =>
+        reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
+    });
 
   return {
-    read: () => promisify(objectStore("readonly").get(KEY) as IDBRequest<RawData | undefined>),
-    write: async (raw) => {
-      await promisify(objectStore("readwrite").put(raw, KEY));
-    },
-    clear: async () => {
-      await promisify(objectStore("readwrite").clear());
-    },
+    read: () => promisify(reading().get(KEY) as IDBRequest<RawData | undefined>),
+    write: (raw) => commit((store) => {
+      store.put(raw, KEY);
+    }),
+    clear: () => commit((store) => {
+      store.clear();
+    }),
     close: () => db.close(),
   };
 }
