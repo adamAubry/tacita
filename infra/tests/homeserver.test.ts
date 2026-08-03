@@ -88,11 +88,13 @@ describe("REQ-INF-06 — taille d'upload maximale", () => {
 });
 
 describe("REQ-INF-07 — rétention illimitée, définie explicitement", () => {
-  it("le bloc retention est présent, activé, sans limite ni purge programmée", () => {
-    expect(homeserver.retention).toBeDefined();
-    expect(homeserver.retention.enabled).toBe(true);
-    expect(homeserver.retention.default_policy.max_lifetime).toBeNull();
-    expect(homeserver.retention.purge_jobs).toEqual([]);
+  // `toEqual` et non `toMatchObject` : c'est l'assertion qui compte. Elle dit à la fois
+  // que le bloc existe (pas d'absence par omission), que la rétention est désactivée, et
+  // que rien d'autre ne traîne dedans. Un `purge_jobs: []` réintroduit par quelqu'un qui
+  // le croit désactivant — ce qu'il n'est pas, il installe un job quotidien par défaut —
+  // fait échouer ce test au lieu de purger l'historique en silence.
+  it("le bloc retention est présent et ne porte que la désactivation", () => {
+    expect(homeserver.retention).toEqual({ enabled: false });
   });
 });
 
