@@ -1,3 +1,4 @@
+import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeEvent, fakeRoom, resetSdk, type ClientMock } from "./mocks";
@@ -8,7 +9,7 @@ vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
 const config: SessionConfig = {
   homeserverUrl: "https://tacita.test",
   loginToken: "loginToken",
-  indexedDB: {} as IDBFactory,
+  indexedDB: new IDBFactory(),
 };
 
 let client: ClientMock;
