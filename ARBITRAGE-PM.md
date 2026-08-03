@@ -276,6 +276,17 @@ modules 06/08/10 qui ne compilent plus se réparent **dans le même merge** (ajo
 à un mock n'est pas un contournement de spec, c'est la spec 04 amendée qui s'applique).
 `review/remediation` ne se merge toujours pas ; elle se supprime une fois les `fix-*` entrées.
 
+## Directive nouvelle : la spec 11 est réalisée par un humain senior, jusqu'à nouvel ordre
+
+Décision produit transmise le 04/08/2026. Conséquence pour les agents dev : **votre livrable
+final n'est plus « commencer la 11 », c'est un socle où tout fonctionne jusqu'à elle.**
+Concrètement : les dix modules mergés et verts, les jonctions auditées, la cible de fumée et le
+tronçon OIDC verts (un humain qui démarre la 11 doit pouvoir se connecter), et les contrats
+d'interface consommés par la 11 (exports, `restoreSession`/`null` → OIDC, libellés d'erreur type
+`TACITA_NOT_ENCRYPTED`, `stats()`, `deliveryUnknowable`) propres et documentés dans les README —
+c'est désormais la porte de sortie du travail agent, pas un à-côté. L'ordre de marche ne change
+pas ; seule sa destination change.
+
 ## La réserve : assumée par le PM
 
 C'est moi qui cadre l'audit auprès d'adam, pas l'auditeur : le périmètre est **les jonctions et
