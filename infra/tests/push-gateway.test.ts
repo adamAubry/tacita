@@ -34,7 +34,9 @@ describe("REQ-INF-14 — la passerelle Web Push est provisionnée par ce module"
     // L'image n'embarque pas pnpm pour une seule dépendance : elle épingle la version
     // en dur. Ce test est ce qui remplace le lockfile — sans lui, l'image dériverait
     // silencieusement de ce qui a été testé.
-    const [, épinglée] = /web-push@(\d+\.\d+\.\d+)/.exec(dockerfile) ?? [];
+    // Ancré sur la ligne d'installation : `web-push@…` apparaît aussi dans les
+    // commentaires du Dockerfile, et lire un commentaire ne prouverait rien.
+    const [, épinglée] = /npm install[^\n]*web-push@(\d+\.\d+\.\d+)/.exec(dockerfile) ?? [];
     const [, résolue] = /^ {2}web-push@(\d+\.\d+\.\d+):/m.exec(lockfile) ?? [];
 
     expect(épinglée).toBeDefined();
