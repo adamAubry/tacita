@@ -145,3 +145,62 @@ hypothèse fausse découverte pendant l'intégration de la 11 ne l'est pas.
 **Rappel de la contrainte qui a tout guidé :** les options étaient de tenir chaque promesse ou de
 la retirer — jamais de la laisser affichée sans la tenir. Les points 2, 3, 5 et 8 sont quatre
 applications de cette même règle.
+
+---
+
+# Addendum du 03/08/2026 — réponse à `ESCALADE-PM-OIDC.md`
+
+La cible de fumée a payé avant d'exister : le login OIDC n'avait jamais été exécuté et ne
+fonctionne pas. C'est exactement le mode de panne pour lequel elle a été financée. Trois
+questions m'étaient posées ; les trois sont tranchées.
+
+## 1. Option retenue : B — la cible s'écrit sans le tronçon OIDC, maintenant
+
+Jeton obtenu par l'API d'administration Synapse ; la cible couvre vraie crypto, vrai IndexedDB,
+vrai Synapse, salon chiffré, envoi/réception, `restoreSession` sans réseau — l'intégralité de ce
+qu'elle a été financée pour valider. Le tronçon OIDC est un **ticket dédié, bloquant pour la
+spec 11** (le shard consomme un `m.login.token` que rien ne sait produire : la 11 ne démarre pas
+tant que la connexion n'aboutit pas).
+
+**Motif, qui fait jurisprudence : un tronçon bloqué ne prend pas en otage la validation de sept
+modules.** On découpe par valeur, pas par complétude. L'option A est refusée **dans sa forme**
+(instruction de dev dans l'image de production — voir D-07), mais son effet reste atteignable :
+la confiance du certificat de dev s'installe **dans l'overlay de fumée** (montage du CA +
+`update-ca-certificates` au démarrage), pas dans le Dockerfile. C'est le contenu du ticket OIDC,
+à faire après B, sans rien jeter.
+
+## 2. Réponse au §3 : `SERVER_NAME` résout publiquement — c'est D-07
+
+Consigné dans `DECISIONS.md` : résolution publique, certificat réel (déjà exigé par REQ-INF-10),
+magasin de confiance de l'image jamais modifié. Les trois causes du 503 sont donc **locales au
+dev** ; un déploiement sans hairpin NAT utilise l'alias réseau et `SYNAPSE_IP_RANGE_WHITELIST` —
+les leviers exacts que l'escalade a livrés, requalifiés de contournements de dev en configuration
+de déploiement documentée. Le README d'infra gagne une vérification de pré-vol : depuis le
+conteneur Synapse, la découverte OIDC répond 200 avant toute création de compte.
+
+**Jurisprudence : aucun besoin de développement ne modifie un artefact de production.** Les
+écarts dev/prod vivent dans des overlays explicites, chargés volontairement.
+
+## 3. REQ-INF-09 : amendée, oui
+
+Critère de comportement ajouté (`specs/01-infra-synapse.md`) : une connexion aboutit, prouvée
+dans la suite de fumée sous un describe `REQ-INF-09`. La règle générale qui en découle : les
+tests de config attestent le contenu des fichiers, la fumée atteste le comportement — « module
+terminé » et « produit qui marche » sont deux portes distinctes, et les modules 06, 08, 10
+hériteront de la seconde quand leur fonction touchera l'infra.
+
+Au passage : l'escalade documente une deuxième occurrence de l'erreur de méthode N3 (valider une
+hypothèse contre un substitut qui la confirme par construction — ici `SSL_CERT_FILE` vérifié en
+Python quand Synapse parle Twisted). Deux occurrences en une session : c'est la confirmation
+empirique du point 9, pas un incident isolé.
+
+## Ordre de marche mis à jour
+
+1. Le point 5 de l'ordre initial (correctif rétention) reste la tâche la plus prioritaire —
+   inchangé.
+2. **La cible de fumée passe devant le reste du backlog dev** (option B) : elle vient de prouver
+   son rendement avant même d'exister.
+3. **Ticket OIDC** ensuite : confiance du CA en overlay, tronçon login ajouté à la fumée,
+   critère REQ-INF-09 vert. **Bloquant pour la spec 11.**
+4. Le reste de l'ordre initial est inchangé (C1 après `fix-n3-n2`, spec 09, REQ-INF-14,
+   puis 06 → 08 → 10 → 11).
