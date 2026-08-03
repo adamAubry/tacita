@@ -53,6 +53,35 @@ variante thumbnail) avec l'access token en en-tête. Aucune URL média publique
 ne doit être supposée. (Rappel : les vignettes de média chiffré ne sont de
 toute façon jamais demandées au serveur — REQ-MED-03, spec 08.)
 
+## Login OIDC — trois causes qui l'empêchent en local, une non résolue
+
+Trouvé en montant la cible de fumée (arbitrage PM, point 9). **Le flux de login n'avait
+jamais été exécuté** : les tests de REQ-INF-09 assertent que le YAML déclare le provider
+et désactive les mots de passe, pas qu'une connexion aboutit. Elle n'aboutit pas.
+
+Symptôme unique et trompeur pour les trois causes : `GET /_matrix/client/v3/login/sso/redirect/…`
+répond **503 « Authentication failed »**, et les logs ne montrent qu'un `OidcDiscoveryError`.
+Synapse lit la découverte OIDC sur `https://${SERVER_NAME}/auth/realms/tacita/…`, donc il doit
+joindre le proxy par le nom public.
+
+1. **Le nom ne résout pas depuis le réseau Docker.** Corrigé par un alias réseau sur le proxy
+   (`smoke/docker-compose.yml`).
+2. **Synapse bloque ses propres requêtes vers les plages privées.** `ip_range_blacklist` contient
+   `172.16.0.0/12` par défaut, et l'alias fait résoudre le nom vers le proxy, qui y est. D'où le
+   réglage `SYNAPSE_IP_RANGE_WHITELIST`, **vide par défaut** : la protection reste entière tant que
+   le déploiement n'en a pas besoin. Le symptôme du blocage est un timeout muet, rien dans les logs
+   ne mentionne le blocage.
+3. **Le certificat auto-signé n'est pas approuvé — non résolu.** `SSL_CERT_FILE` ne suffit pas :
+   c'est une convention du module `ssl` de Python, et le client HTTP de Synapse est **Twisted**, qui
+   charge sa racine de confiance depuis le magasin OpenSSL du système. Vérifié dans le conteneur.
+   Le correctif serait d'installer le certificat de dev dans `/usr/local/share/ca-certificates/`
+   puis `update-ca-certificates` — donc une modification de l'image, à arbitrer.
+
+**Ce que ça dit pour la production**, indépendamment du dev : si le déploiement résout
+`SERVER_NAME` vers une adresse interne (hairpin NAT absent, DNS split-horizon), les causes 1 et 2
+s'appliquent telles quelles. Si `SERVER_NAME` résout publiquement, aucune des trois ne se pose.
+**À trancher : quel est le mode de résolution visé ?**
+
 ## REQ-INF-05 — rate limiting
 
 Défauts relevés dans la doc v1.155.0, configurés ici à ≥ 10× (voir

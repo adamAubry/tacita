@@ -1,0 +1,30 @@
+# Overlay de la cible de fumée (arbitrage PM, point 9). Même patron que rtc/ :
+#
+#   docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
+#
+# Ne contient que ce qu'un déploiement public obtient gratuitement et qu'une pile
+# locale n'a pas. Chacune de ces trois lignes correspond à une panne réelle
+# rencontrée en montant la cible — voir infra/README.md, section « login OIDC ».
+name: tacita
+
+services:
+  proxy:
+    networks:
+      default:
+        aliases:
+          # Synapse lit la découverte OIDC sur https://${SERVER_NAME}/auth/… :
+          # sans cet alias le nom ne résout nulle part depuis le réseau Docker et
+          # tout login répond 503.
+          - ${SERVER_NAME}
+
+  synapse:
+    environment:
+      # Le proxy sert un certificat auto-signé en dev : sans ça la découverte
+      # échoue sur la validation TLS, une fois le nom résolu.
+      SSL_CERT_FILE: /conf/dev-ca.pem
+      # Synapse bloque ses propres requêtes sortantes vers les plages privées
+      # (protection SSRF). L'issuer résolvant vers le proxy — adresse privée — sa
+      # propre découverte est refusée, et le symptôme est un timeout muet.
+      SYNAPSE_IP_RANGE_WHITELIST: '["172.16.0.0/12"]'
+    volumes:
+      - ./proxy/certs/fullchain.pem:/conf/dev-ca.pem:ro

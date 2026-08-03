@@ -111,6 +111,17 @@ media_storage_providers:
 password_config:
   enabled: false
 
+# REQ-INF-09 — Synapse bloque par défaut ses propres requêtes sortantes vers les
+# plages privées (protection SSRF : `ip_range_blacklist` contient 172.16.0.0/12).
+# Dès que l'issuer OIDC résout vers une adresse privée — le cas quand ${SERVER_NAME}
+# pointe sur le proxy à l'intérieur du réseau Docker — la découverte OIDC expire et
+# **tout login répond 503**, sans que rien ne mentionne le blocage dans les logs.
+#
+# Vide par défaut : la protection reste entière. À ne remplir que si le déploiement
+# résout son propre nom en interne, et alors avec la plage la plus étroite possible.
+# Voir infra/README.md.
+ip_range_whitelist: ${SYNAPSE_IP_RANGE_WHITELIST}
+
 oidc_providers:
   - idp_id: keycloak
     idp_name: "Compte"
