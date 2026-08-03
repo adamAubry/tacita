@@ -10,8 +10,10 @@ Interface exportée (contrat, à affiner sans en changer la nature) :
 
 ```ts
 initSession(config): Promise<Session>        // login OIDC token → client démarré, crypto prête
+restoreSession(config): Promise<Session|null> // rouvre la session persistée, sans réseau ; null = passer par l'OIDC
 Session.client: MatrixClient                 // accès contrôlé pour les autres packages
 Session.timeline(roomId): OrderedTimeline    // ordre canonique /sync
+Session.isEncrypted(roomId): Promise<boolean> // prédicat pour les gardes d'envoi (specs 05, 07)
 setupRecoveryKey(): Promise<RecoveryKey>     // backup de clés, obligatoire
 verifyDevice(...)                            // vérification interactive d'appareil
 ```
@@ -27,7 +29,9 @@ verifyDevice(...)                            // vérification interactive d'appa
 - **REQ-COR-07** — Politique client : les clés Megolm ne sont **jamais** partagées avec un appareil non vérifié (réglage SDK correspondant activé et verrouillé).
 - **REQ-COR-08** — Authentification : le module consomme le flux OIDC (fournisseur externe, spec 01) ; il ne stocke aucun mot de passe et n'implémente aucune méthode d'auth propre.
 - **REQ-COR-09** — Aucun contenu déchiffré dans les logs, la télémétrie ou les traces d'erreur du module, y compris en dev : le logger du package filtre structurellement les corps d'événements.
-- **REQ-COR-10** — Déconnexion = wipe complet des données locales (stores SDK + stores applicatifs déclarés par les autres packages via un registre de wipe exposé ici).
+- **REQ-COR-10** — Déconnexion = wipe complet des données locales (stores SDK + stores applicatifs déclarés par les autres packages via un registre de wipe exposé ici). Le wipe couvre aussi les credentials de session persistés (REQ-COR-11) ; ils sont effacés **en premier** — si le reste du wipe échoue, mieux vaut une session locale morte qu'un jeton qui survit à la déconnexion. *(Étendue le 03/08/2026.)*
+- **REQ-COR-11** — `restoreSession(config)` rouvre la session persistée **sans aucun appel réseau** ; l'absence de session locale se signale par `null`, jamais par une erreur. Un échec de restauration rend `null` sans effacer les credentials (une panne passagère — wasm non chargé, éviction partielle — ne doit pas forcer un aller-retour OIDC que l'utilisateur hors ligne ne peut pas faire). Limite assumée, documentée : un jeton restauré n'est pas validé hors ligne ; un jeton révoqué se manifeste par `M_UNKNOWN_TOKEN` au premier appel réseau, que le shard UI (spec 11) route vers l'OIDC. *(Créée le 03/08/2026 — sans elle, les promesses hors ligne de REQ-COR-03, REQ-OBX-01 et REQ-SRC-02 sont intenables.)*
+- **REQ-COR-12** — `Session.isEncrypted(roomId)` expose l'état de chiffrement du salon comme **prédicat** (il rend `false`, il ne lève jamais) pour les gardes d'envoi des autres packages (specs 05 et 07). Tant que l'état du salon est inconnu — avant le premier `/sync` abouti — le prédicat rend `false`. Toute mémorisation s'invalide sur `m.room.encryption` ; jamais de cache permanent : une garde qui ment est pire que pas de garde. *(Créée le 03/08/2026 — support du défaut C1, voir REQ-OBX-09.)*
 
 ## Méthode et contraintes
 

@@ -14,18 +14,19 @@ Config-as-code complète et testée du socle serveur auto-hébergé : `homeserve
 - **REQ-INF-04** — `enable_registration: false` ; script d'admin documenté pour la création manuelle de comptes.
 - **REQ-INF-05** — Rate limiting desserré sur `rc_message`, `rc_login`, `rc_joins`, `rc_invites` (valeurs ≥ 10× les défauts ; les défauts provoquent des `M_LIMIT_EXCEEDED` pris pour des bugs applicatifs).
 - **REQ-INF-06** — `max_upload_size: 200M` (le défaut 50 Mo est insuffisant pour du partage de fichiers).
-- **REQ-INF-07** — Politique de rétention **définie explicitement** dans la config : illimitée, identique DM/groupes (DECISIONS D-02). Le bloc `retention` est présent et commenté, pas absent par omission.
+- **REQ-INF-07** — Politique de rétention **définie explicitement** dans la config : illimitée, identique DM/groupes (DECISIONS D-02, révisée le 03/08/2026). Le bloc `retention` est présent et commenté, pas absent par omission, avec **`enabled: false`**. Motif, vérifié dans la doc Synapse de la version déployée (v1.155) : `enabled: true` avec `purge_jobs` vide installe un **job de purge quotidien par défaut** (« If no configuration is provided for this option, a single job will be set up to delete expired events in every room daily ») et fait honorer les politiques par salon `m.room.retention` — deux chemins de purge que D-02 proscrit.
 - **REQ-INF-08** — Bucket S3 backend média via `s3_storage_provider` ; SSE-S3 activé, **documenté comme défense en profondeur uniquement** (l'opérateur détient ces clés, elles ne protègent pas la confidentialité). Le bucket ne contient que des blobs opaques.
 - **REQ-INF-09** — OIDC externe (Keycloak) seul fournisseur d'authentification devant Synapse : email, pseudo et OAuth gérés dans le realm Keycloak ; WebAuthn/passkeys (authentificateur de plateforme) activés dans Keycloak. Matrix ne gère pas nativement plusieurs méthodes par compte : tout passe par le SSO.
 - **REQ-INF-10** — Reverse proxy TLS obligatoire (getUserMedia exige un contexte sécurisé). Routes : `/_matrix` → Synapse, `/livekit/jwt` → service d'autorisation, `/livekit/sfu` → SFU avec upgrade WebSocket.
 - **REQ-INF-11** — API d'administration Synapse de join forcé désactivée/bloquée au proxy : un admin ne doit pas pouvoir s'ajouter à un DM et recevoir les clés Megolm suivantes. Les DM sont illisibles par l'administrateur.
 - **REQ-INF-12** — Comportement de l'**authenticated media** vérifié sur la version Synapse déployée et consigné dans `infra/README.md` (il a changé récemment et casse les intégrations supposant des URLs média publiques). Le client (spec 08) consomme ce qui est consigné ici.
 - **REQ-INF-13** — Doc `infra/LIMITES.md` : métadonnées en clair côté serveur (qui parle à qui, quand, fréquence, taille des pièces jointes) documentées comme limite assumée.
+- **REQ-INF-14** — La passerelle Web Push (spec 03) est **provisionnée par ce module** : image construite (Dockerfile), service dans `docker-compose.yml` joignable par Synapse (URL du pusher configurée), route reverse proxy exposant au client l'endpoint de config (clé publique VAPID, REQ-PSH-03), variables `VAPID_*` dans `.env.example`. Critère : `docker compose up` démarre la passerelle. *(Créée le 03/08/2026 — la spec 03 livre le service, la spec 01 possède le raccordement ; personne ne le possédait.)*
 
 ## Méthode et contraintes
 
 - Toute valeur par défaut Synapse est lue dans la doc de la version épinglée, jamais supposée. Versions épinglées (digest) dans le compose.
-- Hors scope : LiveKit/TURN/well-known (spec 02), passerelle push (spec 03), tout code client, CI/CD.
+- Hors scope : LiveKit/TURN/well-known (spec 02), le **code** de la passerelle push (spec 03 — son raccordement est ici, REQ-INF-14), tout code client, CI/CD.
 
 ## Objectif mesurable
 
