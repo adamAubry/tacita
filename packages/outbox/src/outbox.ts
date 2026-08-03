@@ -56,15 +56,21 @@ function retryAfterMs(error: unknown): number | undefined {
 }
 
 /**
- * REQ-OBX-04 — un 4xx qui n'est pas du rate-limit ne changera pas d'avis : salon
- * inconnu, droits refusés, contenu rejeté. Réessayer en boucle ne ferait que
- * brûler la batterie. Tout le reste (réseau, 5xx, 429) reste réessayable.
+ * Les 4xx dont le serveur revient : trop vite (429) ou jeton à renouveler. Un jeton
+ * expire par le temps qui passe, pas par le contenu du message — condamner la file
+ * dessus obligerait l'utilisateur à renvoyer chaque entrée à la main après une
+ * simple reconnexion.
+ */
+const RETRYABLE = new Set(["M_LIMIT_EXCEEDED", "M_UNKNOWN_TOKEN", "M_MISSING_TOKEN"]);
+
+/**
+ * REQ-OBX-04 — un 4xx définitif ne changera pas d'avis : salon inconnu, droits
+ * refusés, contenu rejeté. Réessayer en boucle ne ferait que brûler la batterie.
+ * Tout le reste (réseau, 5xx, et les codes ci-dessus) reste réessayable.
  */
 function isPermanent(error: unknown): boolean {
   const status = httpStatusOf(error);
-  return (
-    status !== undefined && status >= 400 && status < 500 && errcodeOf(error) !== "M_LIMIT_EXCEEDED"
-  );
+  return status !== undefined && status >= 400 && status < 500 && !RETRYABLE.has(errcodeOf(error));
 }
 
 /** REQ-OBX-07 — exponentiel, mais le serveur a le dernier mot s'il donne un délai. */
@@ -189,7 +195,12 @@ export async function createOutbox(
    * par l'appelant qui attend.
    */
   function flush(): Promise<void> {
-    if (disposed) return Promise.resolve();
+    // Rien ne part tant que le homeserver ne répond pas. La garde est ici, et pas
+    // dans `pass()`, parce que le `finally` ci-dessous rappelle `schedule()` : une
+    // passe qui sortirait à vide réarmerait un timer à 0 ms, qui rappellerait
+    // `flush`, en boucle. Ici, le timer déjà armé se déclenche une fois sans rien
+    // faire et personne ne le réarme — c'est `onSync` qui relance.
+    if (disposed || !HEALTHY.has(session.client.getSyncState())) return Promise.resolve();
     if (running) {
       rerun = true;
       return running;
