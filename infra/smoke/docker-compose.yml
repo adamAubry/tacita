@@ -2,9 +2,9 @@
 #
 #   docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
 #
-# Ne contient que ce qu'un déploiement public obtient gratuitement et qu'une pile
-# locale n'a pas. Chacune de ces trois lignes correspond à une panne réelle
-# rencontrée en montant la cible — voir infra/README.md, section « login OIDC ».
+# D-07 — aucun besoin de développement ne modifie un artefact de production : tout
+# écart dev/prod vit ici. Chaque ligne correspond à une panne réelle rencontrée en
+# montant la cible — voir infra/README.md, section « login OIDC ».
 name: tacita
 
 services:
@@ -14,7 +14,7 @@ services:
         aliases:
           # Synapse lit la découverte OIDC sur https://${SERVER_NAME}/auth/… :
           # sans cet alias le nom ne résout nulle part depuis le réseau Docker et
-          # tout login répond 503.
+          # tout login répond 503. En production le nom résout publiquement (D-07).
           - ${SERVER_NAME}
 
   synapse:
@@ -28,3 +28,8 @@ services:
       SYNAPSE_IP_RANGE_WHITELIST: '["172.16.0.0/12"]'
     volumes:
       - ./proxy/certs/fullchain.pem:/conf/dev-ca.pem:ro
+    # L'API d'admin est bloquée au proxy (REQ-INF-11) : la cible crée son compte de
+    # test en parlant directement à Synapse. Lié à la boucle locale — jamais exposé
+    # sur une interface publique — et présent dans ce seul overlay.
+    ports:
+      - "127.0.0.1:8008:8008"

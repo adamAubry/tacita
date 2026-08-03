@@ -45,9 +45,21 @@ importers:
 
   infra:
     devDependencies:
+      '@tacita/client-core':
+        specifier: workspace:*
+        version: link:../packages/client-core
+      '@tacita/messaging':
+        specifier: workspace:*
+        version: link:../packages/messaging
       '@types/node':
         specifier: ^22.10.7
         version: 22.20.1
+      fake-indexeddb:
+        specifier: ^6.0.0
+        version: 6.2.5
+      matrix-js-sdk:
+        specifier: 42.0.0
+        version: 42.0.0
       yaml:
         specifier: ^2.7.0
         version: 2.9.0

@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc -p infra && tsc -p packages/client-core && tsc -p packages/messaging && tsc -p packages/outbox && tsc -p packages/search && tsc -p apps/push-gateway",
     "lint": "eslint .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "smoke": "node --env-file=infra/.env node_modules/vitest/vitest.mjs run --config infra/smoke/vitest.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",

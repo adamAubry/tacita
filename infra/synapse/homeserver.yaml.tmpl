@@ -120,6 +120,12 @@ password_config:
 # Vide par défaut : la protection reste entière. À ne remplir que si le déploiement
 # résout son propre nom en interne, et alors avec la plage la plus étroite possible.
 # Voir infra/README.md.
+#
+# GARDE-FOU : ne pas activer `url_preview_enabled` tant que cette liste n'est pas
+# vide, sans avoir d'abord restreint la plage. Aujourd'hui le seul client HTTP
+# sortant de Synapse est la découverte OIDC ; avec l'aperçu d'URL, un utilisateur
+# qui poste un lien ferait requêter l'intérieur du réseau — Postgres, MinIO,
+# Keycloak — par Synapse lui-même. C'est la contrepartie exacte de ce réglage.
 ip_range_whitelist: ${SYNAPSE_IP_RANGE_WHITELIST}
 
 oidc_providers:
