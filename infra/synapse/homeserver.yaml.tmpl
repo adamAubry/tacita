@@ -82,15 +82,22 @@ rc_invites:
 # REQ-INF-06 — le défaut (50M) est insuffisant pour le partage de fichiers.
 max_upload_size: 200M
 
-# REQ-INF-07 — DECISIONS D-02 : rétention illimitée, identique DM/groupes, bloc présent
-# explicitement (pas d'absence par omission). max_lifetime null + purge_jobs vide =
-# aucune purge programmée, jamais.
+# REQ-INF-07 — DECISIONS D-02 (révisée le 03/08/2026) : rétention illimitée, identique
+# DM/groupes. Le bloc est présent explicitement, pas absent par omission — « politique
+# définie » veut dire bloc explicite dans la config, pas fonctionnalité active.
+#
+# `enabled: false`, et surtout pas `true` avec `purge_jobs: []` comme ici auparavant :
+# vérifié dans la doc Synapse v1.155, une liste de purge_jobs vide ne désactive rien.
+# « If no configuration is provided for this option, a single job will be set up to
+# delete expired events in every room daily » — un job de purge quotidien tourne. Et
+# `enabled: true` fait honorer les politiques par salon `m.room.retention` : n'importe
+# quel client standard posant cet événement d'état déclencherait de vraies purges.
+# Deux chemins de suppression que D-02 proscrit.
+#
+# Rien d'autre dans ce bloc : `default_policy` et `purge_jobs` seraient inertes ici, et
+# les laisser rejouerait exactement le malentendu qui a produit le bug.
 retention:
-  enabled: true
-  default_policy:
-    min_lifetime: null
-    max_lifetime: null
-  purge_jobs: []
+  enabled: false
 
 # REQ-INF-08 — backend média S3, blobs opaques uniquement (chiffrement client, spec 08).
 # SSE-S3 activé au niveau du bucket (infra/docker-compose.yml, service minio-init) :
