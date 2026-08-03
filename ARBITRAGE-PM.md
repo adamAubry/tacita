@@ -220,3 +220,66 @@ l'attendra.
    critère REQ-INF-09 vert. **Bloquant pour la spec 11.**
 4. Le reste de l'ordre initial est inchangé (C1 après `fix-n3-n2`, spec 09, REQ-INF-14,
    puis 06 → 08 → 10 → 11).
+
+---
+
+# Addendum du 04/08/2026 — jonctions ou spec 11, et le sort du média
+
+L'ordre de marche dev est épuisé, onze branches attendent, les modules 06/08/10 ont été livrés
+en parallèle sur `main`. Trois questions posées, trois réponses.
+
+## 1. Ni l'un ni l'autre en premier : merges → audit des jonctions → spec 11
+
+**L'ordre est : (a) résorber le stock de relecture, (b) auditer les jonctions sur la `main`
+réellement intégrée, (c) spec 11.** Auditer avant de merger ferait auditer un état qui n'existera
+plus onze merges plus tard ; démarrer la 11 par-dessus des jonctions jamais vérifiées, c'est
+bâtir l'étage sans visiter les fondations — et chaque correction de jonction coûtera plus cher
+une fois qu'elle devra traverser du code d'interface.
+
+**Motif, qui fait jurisprudence : dans ce dépôt, 100 % des défauts critiques trouvés à ce jour
+étaient des jonctions entre modules, zéro était une bavure locale. On audite donc là où le dépôt
+a prouvé qu'il casse.** Et l'audit se limite aux jonctions et aux motifs récurrents — la logique
+métier des modules livrés a déjà été auditée par son auteur ; la refaire serait la redondance
+que deux fils parallèles ont déjà produite.
+
+Le périmètre proposé est approuvé tel quel : points de contact déclarés par les specs, récurrence
+des motifs connus (garde de chiffrement, wipe, commit IndexedDB, hypothèses d'ordre du SDK),
+compatibilité des branches. **La vérification immédiate de ce que les branches cassent au merge :
+oui, lancée sans attendre** — c'est l'entrée du (a).
+
+## 2. Le média est hors périmètre de REQ-OBX-09 **par construction** — pas de défaut, un invariant à verrouiller
+
+Lecture faite du code livré : `media-pipeline` n'émet **aucun événement de salon**. Son seul
+appel réseau est `uploadContent` d'un blob passé **inconditionnellement** par `encryptAttachment`
+(AES-CTR avant upload, quel que soit l'état du salon) ; l'événement qui porte les clés est rendu
+« prêt à `enqueue` » (hors-scope explicite de la spec 08) et passe donc par l'outbox — c'est-à-dire
+par la garde REQ-OBX-09. Le motif C1 était « deux chemins d'envoi d'événements, un gardé, l'autre
+non » ; l'upload d'un blob opaque n'est pas un envoi d'événement, et un blob orphelin dans un
+salon refusé par la garde reste illisible. La jonction est saine **parce que** la spec 08 a mis la
+file hors scope — l'inverse exact du trou C1.
+
+**Ce qui est demandé à l'audit en échange :** transformer cette construction en invariant testé —
+un test nommé REQ-MED-02 assertant qu'aucun `sendEvent`/`sendMessage` n'existe dans
+`media-pipeline` (le pipeline téléverse, il n'envoie jamais). Une construction saine sans garde
+est exactement ce que C1 était avant qu'on le nomme. Au passage, l'audit qualifiera le seul
+`sendEvent` direct restant hors outbox : `calls/driver.ts` (signalisation du widget Element
+Call) — vérifier quels types d'événements il peut émettre et documenter pourquoi il est hors
+file, ou le garder.
+
+## 3. Le stock de relecture est déclaré risque n°1 : fenêtre de merge immédiate
+
+La relecture seniors passe devant tout travail nouveau, audit compris. Ordre d'entrée dans
+`main`, qui respecte les dépendances déjà arbitrées : `pm/arbitrage-2026-08-03` (les contrats
+d'abord) → `fix-c3-c2` → `fix-n3-n2` → `fix-c4` → `fix-retention` → `fix-c1` →
+`fix-src-lifecycle` → `fix-inf14` → `smoke-target` → `fix-oidc`. À chaque entrée, les mocks des
+modules 06/08/10 qui ne compilent plus se réparent **dans le même merge** (ajouter `isEncrypted`
+à un mock n'est pas un contournement de spec, c'est la spec 04 amendée qui s'applique).
+`review/remediation` ne se merge toujours pas ; elle se supprime une fois les `fix-*` entrées.
+
+## La réserve : assumée par le PM
+
+C'est moi qui cadre l'audit auprès d'adam, pas l'auditeur : le périmètre est **les jonctions et
+les motifs récurrents, pas la qualité de ses modules** — ses quatre correctifs d'audit propre en
+sont la preuve. Toute trouvaille arrive comme un filet posé sur l'espace entre les specs, le même
+qui a manqué aux quatre défauts critiques de la veille. Personne n'audite personne : on audite
+l'espace que les contrats ne possèdent pas encore.
