@@ -1,0 +1,16 @@
+{
+  "name": "@tacita/outbox",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@tacita/client-core": "workspace:*",
+    "matrix-js-sdk": "42.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "fake-indexeddb": "^6.0.0"
+  }
+}
