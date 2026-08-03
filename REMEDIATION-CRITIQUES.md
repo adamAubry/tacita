@@ -6,39 +6,52 @@ promus parce qu'ils bloquaient un correctif critique.
 Le point commun : aucun n'est une bavure locale. Ce sont des **jonctions entre modules que
 personne ne possède**. Chaque spec est respectée ; c'est l'espace entre les specs qui ne l'est pas.
 
-**Trois sur quatre sont corrigés, sur trois branches indépendantes poussées pour revue. Rien n'est
-mergé, `main` est intacte et le restera tant que les seniors et le PM n'ont pas statué.** Il reste
-C1, et une liste de points qui demandent un arbitrage — section « À statuer par le CM » en fin de
-document.
+**Cinq défauts sur six sont corrigés, plus quatre chantiers ouverts par l'arbitrage PM du
+03/08/2026. Rien n'est mergé, `main` est intacte et le restera tant que les seniors n'ont pas
+relu.** Il reste C1, dont le prérequis est levé.
+
+L'arbitrage du PM est rendu et poussé (`pm/arbitrage-2026-08-03`) : les neuf points de
+`BRIEF-PM.md` sont tranchés, et les textes de specs correspondants écrits. Le détail de ce qui en
+découle est en §5.
 
 ---
 
 ## 1. État
 
-| # | Défaut | Branche | État |
+| # | Sujet | Branche | État |
 |---|---|---|---|
-| C3 | Écritures IndexedDB résolues avant le commit | `fix-c3-c2` | ✅ corrigé |
-| C2 | Texte en clair réécrit sur disque après déconnexion | `fix-c3-c2` | ✅ corrigé |
-| N3 | Flush de l'outbox avant un sync sain | `fix-n3-n2` | ✅ corrigé |
-| N2 | Jeton expiré classé échec définitif | `fix-n3-n2` | ✅ corrigé |
-| C4 | Aucune reprise de session | `fix-c4` | ✅ corrigé |
+| C3 | Écritures IndexedDB résolues avant le commit | `fix-c3-c2` | ✅ |
+| C2 | Texte en clair réécrit sur disque après déconnexion | `fix-c3-c2` | ✅ |
+| N3 | Flush de l'outbox avant un sync sain | `fix-n3-n2` | ✅ |
+| N2 | Jeton expiré classé échec définitif | `fix-n3-n2` | ✅ |
+| C4 | Aucune reprise de session | `fix-c4` | ✅ |
+| **A2** | **Rétention : `purge_jobs: []` n'empêchait aucune purge** | `fix-retention` | ✅ |
+| **N6+N1** | **Cycle de vie des messages + double horodatage** | `fix-src-lifecycle` | ✅ |
+| **A1** | **Raccordement de la passerelle push** | `fix-inf14` | ✅ |
 | C1 | L'outbox envoie sans la garde de chiffrement | — | ⏳ à faire |
 
 ```
 main f015e56
- ├── fix-c3-c2                  C3, C2, docs        186 tests (185 + 1)
- ├── fix-n3-n2                  N3 + N2             187 tests (185 + 2)
- ├── fix-c4                     C4                  189 tests (185 + 4)
- └── review/remediation         les trois réunies, pour lire l'ensemble d'un bloc
+ ├── fix-c3-c2          C3, C2, docs                     186 tests
+ ├── fix-n3-n2          N3 + N2                          187 tests
+ ├── fix-c4             C4                               189 tests
+ ├── pm/arbitrage-…     specs + DECISIONS + arbitrage    185 tests (aucun code)
+ │    ├── fix-retention       A2 — REQ-INF-07 amendée    185 tests
+ │    ├── fix-src-lifecycle   REQ-SRC-10 + REQ-SRC-05    197 tests (+ fix-c3-c2 en base)
+ │    └── fix-inf14           REQ-INF-14                 192 tests
+ └── review/remediation  tout réuni, pour lire d'un bloc
 ```
 
-Les trois branches `fix-*` partent de `main` et ne se touchent pas : chacune se relit, se valide et
-se merge seule, dans n'importe quel ordre. Les compteurs de tests ne s'additionnent pas — chacun est
-mesuré depuis les 185 tests de `main`.
+Les trois premières `fix-*` partent de `main` et ne se touchent pas. Les trois suivantes partent de
+`pm/arbitrage-2026-08-03`, parce qu'elles **implémentent des exigences qui n'existaient pas avant
+lui** — le contrat voyage avec le code. `fix-src-lifecycle` porte en plus `fix-c3-c2` en base : C2
+touche les mêmes fichiers de `packages/search`.
 
-`review/remediation` ne sert qu'à la revue : elle réunit les trois pour qu'on voie l'ensemble sans
-jongler entre branches. **Ce n'est pas une branche d'intégration — elle ne doit pas être mergée dans
-`main`.** Ce sont les trois branches `fix-*` qui partent, une par une, après arbitrage.
+Les compteurs de tests ne s'additionnent pas : chacun est mesuré sur sa propre branche.
+
+`review/remediation` ne sert qu'à la revue : elle réunit tout pour qu'on voie l'ensemble sans
+jongler. **Ce n'est pas une branche d'intégration — elle ne doit jamais être mergée dans `main`.**
+Ce sont les branches nommées qui partent, dans l'ordre de marche de `ARBITRAGE-PM.md`.
 
 Sur chaque branche : `lint`, `typecheck` et la suite complète passent, hooks de pré-commit inclus.
 `--no-verify` n'a jamais été utilisé.
@@ -273,74 +286,74 @@ garde qui ment est pire que pas de garde.
   l'acceptation de la requête demanderait plus de mécanique de test que le correctif n'a de code.
   Le filet reste les tests existants, qui couvrent le chemin nominal et passent toujours. Dit tel
   quel plutôt que masqué derrière un test décoratif.
-- **Chaque nouveau test a été vérifié en cassant volontairement son correctif.** C2, N3, N2 et C4
-  échouent bien sans leur fix. C'est la seule garantie qu'ils mordent.
+- **Chaque nouveau test a été vérifié en cassant volontairement son correctif.** C2, N3, N2, C4,
+  A2, REQ-SRC-10 et REQ-SRC-05 échouent bien sans leur fix. C'est la seule garantie qu'ils mordent.
+- **Une exception, désormais : REQ-INF-14 est validée sur une pile réelle.** `docker compose up`
+  démarre les six services (tous *healthy*, Synapse compris), `GET /push/config` traverse le proxy
+  TLS et rend la clé du `.env`, un `POST` notify depuis l'extérieur fait 404 chez Synapse sans
+  jamais apparaître dans les logs de la passerelle, et un `POST` notify depuis un autre conteneur
+  rend `{"rejected":[]}`. C'est le premier morceau du projet vérifié autrement que par des mocks.
 
 ---
 
-## 5. À statuer par le CM
+## 5. Arbitrage rendu — ce qui en découle
 
-Rien de ce qui suit n'a été tranché dans le code. Trois points bloquent un merge, les autres
-appellent une décision de priorité.
+Les neuf points de `BRIEF-PM.md` sont tranchés. Décisions et textes exacts :
+**`ARBITRAGE-PM.md`** sur la branche `pm/arbitrage-2026-08-03`, qui porte aussi les amendements de
+`specs/` et de `DECISIONS.md`. Résumé de ce que ça change ici.
 
-### Bloquants pour merger
+### Les trois bloquants sont levés
 
-**1. REQ-OBX-04 — amender ou revert N2.** La spec 07 dit « Échec définitif (4xx non-ratelimit) →
-`failed` ». Le code dit désormais « 4xx définitif », en excluant aussi `M_UNKNOWN_TOKEN`. Le texte
-et le code divergent. Formulation proposée : « Échec définitif (4xx qui ne se résout ni par
-l'attente ni par un renouvellement de jeton) → `failed` ». **Sans cet amendement, `fix-n3-n2` ne
-doit pas partir.** `specs/07-outbox.md` n'a pas été touché.
+| # | Décision | Débloque |
+|---|---|---|
+| 1 | `REQ-OBX-04` amendée, pas de revert. `failed` veut dire « l'utilisateur doit agir », jamais « la session a expiré ». | `fix-n3-n2` |
+| 2 | `REQ-COR-11` créée, `REQ-COR-10` étendue, `restoreSession` et `isEncrypted` entrent au contrat de la spec 04. | `fix-c4` |
+| 3 | `D-06` ratifiée : jeton en clair assumé, relèvement (pickle + déverrouillage) renvoyé à une spec post-V1. | `fix-c4` |
 
-**2. REQ-COR-11 — exigence nouvelle à créer.** La reprise de session n'existe dans aucune spec.
-Proposition : « REQ-COR-11 — `restoreSession()` rouvre la session persistée sans aucun appel
-réseau ; l'absence de session locale se signale par `null` et non par une erreur. » Plus une
-extension de REQ-COR-10 : le wipe couvre les credentials. **Sans ça, `fix-c4` ne doit pas partir.**
-`specs/04-client-core.md` n'a pas été touché.
+**Jurisprudence posée par le point 1**, qui vaut pour les modules restants : *une erreur se classe
+par sa résolubilité, pas par sa classe HTTP.*
 
-**3. D-06 — stockage du jeton d'accès en clair.** Décision prise en séance et à ratifier. Le fait
-qui la motive : `initRustCrypto` tourne **sans clé de pickle**, donc l'état crypto — clés Megolm
-comprises — est déjà en clair dans IndexedDB. **Conséquence à assumer explicitement : qui a accès au
-profil du navigateur a accès au compte et à l'historique déchiffrable.** La limite est documentée
-dans `packages/client-core/README.md`. Relever le niveau suppose une clé de pickle sur le store
-crypto *et* un écran de déverrouillage à chaque ouverture : décision produit, qui touche la spec 11,
-et qui mérite sa propre spec plutôt que d'être glissée dans C4. `DECISIONS.md` n'a pas été touché.
+### Les six priorités
 
-### Arbitrages de priorité
+| # | Décision | Suite |
+|---|---|---|
+| 4 | C1 : on ne finance pas la preuve d'exploitabilité, on finance le correctif. `REQ-COR-12` et `REQ-OBX-09` créées. | ⏳ après merge de `fix-n3-n2` |
+| 5 | `REQ-SRC-10` créée : l'index suit le cycle de vie des messages. | ✅ `fix-src-lifecycle` |
+| 6 | Spec 09 amendée : `tsIndexed` pour l'éviction, `tsOrigin` pour `stats()`. | ✅ `fix-src-lifecycle` |
+| 7 | La spec 01 prend le raccordement de la passerelle push, `REQ-INF-14` créée. | ✅ `fix-inf14` |
+| 8 | **D-02 révisée** — décision inchangée, moyen corrigé. | ✅ `fix-retention` |
+| 9 | Cible de fumée financée, `restoreSession` après rechargement ajouté au périmètre. | ⏳ avant la spec 11 |
 
-**4. C1 est-il plus exploitable que je ne l'estime ?** Je l'ai classé « exposition faible » parce que
-le serveur force le chiffrement sur tout nouveau salon. Si les seniors voient un chemin qui crée un
-salon non chiffré (invitation externe, salon créé hors `createDirectMessage`, migration), C1 remonte
-en tête de liste.
+**Le point 8 mérite d'être lu.** J'avais classé la rétention en *amélioration* (« à vérifier sur la
+version déployée »). Le PM a fait la vérification : `enabled: true` avec `purge_jobs: []` installe
+un **job de purge quotidien par défaut** et fait honorer les politiques par salon
+`m.room.retention`. C'était le seul point du dépôt capable de détruire des données, et je l'avais
+rangé au mauvais étage. **Un « à vérifier » sur un chemin de suppression n'est pas une
+amélioration : c'est un critique tant que la vérification n'est pas faite.**
 
-**5. N6 — la recherche retrouve les messages supprimés.** L'index n'écoute que `Decrypted` : une
-redaction ne retire pas le document, une édition en ajoute un second sans retirer l'ancien. La
-recherche rend donc le texte de messages supprimés et l'ancienne version des messages édités. **Ni
-la spec 09 ni le code ne traitent le cas** — c'est autant un trou de spec qu'un bug. « Supprimer un
-message » qui laisse le texte trouvable est une promesse produit non tenue.
+### Deux défauts trouvés en implémentant, absents de l'audit initial
 
-**6. N1 — `ts` porte deux sémantiques dans l'index.** Le moteur documente « horodatage local
-d'indexation, sert à l'éviction » ; le code y met `origin_server_ts`. Conséquence : une pagination
-arrière insère des documents anciens, que l'éviction supprime en premier — **le rattrapage
-s'auto-évince**. Or `stats()` a besoin, lui, de `origin_server_ts` pour afficher la période couverte
-(REQ-SRC-06). Deux besoins, un champ. Correctif : deux champs, donc amendement de la spec 09.
+**Les scripts shell cassaient tout conteneur sur un checkout Windows.** Trouvé en validant
+REQ-INF-14 avec un vrai `docker compose up` : Synapse redémarrait en boucle sur `exec
+/entrypoint.sh: no such file or directory` — alors que le fichier existe. Le shebang était
+`#!/bin/sh` suivi d'un CR, donc le noyau cherchait un binaire dont le nom se termine par un retour
+chariot. Cause : `core.autocrlf=true` et **aucun `.gitattributes` dans le dépôt**. Corrigé sur
+`fix-inf14` par une ligne (`* text=auto eol=lf`). Ça bloquait le critère de REQ-INF-14 et ça aurait
+bloqué la cible de fumée du point 9.
 
-**7. A1 — la passerelle push n'est déployée nulle part.** Pas de Dockerfile, absente de
-`infra/docker-compose.yml`, aucune route nginx, aucune variable `VAPID_*` dans `.env.example`. La
-spec 03 la déclare « service Node autonome », la spec 01 ne la provisionne pas : **personne ne
-possède le raccordement.** Le module est terminé et inutilisable en l'état. Qui le prend ?
+**Un lot d'indexation pouvait échouer en entier.** Introduit par le correctif du point 5 lui-même :
+les éditions étant désormais indexées sous l'identifiant de leur cible, un message et son édition
+livrés dans la même rafale de sync produisent deux entrées pour un seul identifiant. Orama refuse
+la seconde insertion et rejette **tout le lot**, pas seulement le doublon — sur un rattrapage de
+pagination arrière, des centaines de messages jamais indexés. Corrigé sur `fix-src-lifecycle`.
 
-**8. A2 — `retention.enabled: true` contre l'intention de D-02.** D-02 dit « ne jamais purger ».
-Activer la rétention ouvre la porte aux politiques par salon (`m.room.retention`), et il reste à
-vérifier sur la v1.155 déployée que `purge_jobs: []` est bien respecté comme liste vide et non
-remplacé par un job par défaut. CLAUDE.md impose de relire la doc de la version déployée : c'est ce
-cas. Le test REQ-INF-07 assère le contenu du YAML, pas le comportement de Synapse.
+### Reste ouvert
 
-**9. A5 — financer une cible de fumée avant la spec 11 ?** Voir « Limites de la vérification ». Sept
-modules seront intégrés d'un coup, validés jusque-là par des mocks. Une seule cible — `docker
-compose up`, login OIDC, envoi/réception dans un salon chiffré, en Vitest contre un Synapse
-éphémère — rendrait le risque visible maintenant plutôt qu'à l'intégration.
-
----
+- **C1** — prérequis levé (`fix-n3-n2`), contrats posés (`REQ-COR-12`, `REQ-OBX-09`). À faire après
+  le merge de `fix-n3-n2` : la garde touche les trois `session-mock.ts`, la faire avant produirait
+  des conflits sur des fichiers en cours de relecture.
+- **Cible de fumée** (point 9) — avant tout démarrage de la spec 11.
+- **Modules restants**, dans l'ordre fixé : 06 → 08 → 10 → 11.
 
 ## 6. Fichiers touchés
 
@@ -377,10 +390,48 @@ packages/client-core/tests/timeline.test.ts  modifié   IDBFactory réelle
 pnpm-lock.yaml                               modifié   fake-indexeddb
 ```
 
-### Jamais touchés, volontairement
+### `pm/arbitrage-2026-08-03` — 1 commit, écrit par le PM
 ```
-specs/           contrats — amendements 1, 2 et 6 à faire par le CM
-DECISIONS.md     territoire PM — D-06 à consigner
+ARBITRAGE-PM.md            créé      décisions + motifs + ordre de marche
+DECISIONS.md               modifié   D-02 révisée, D-06 créée
+specs/01-infra-synapse.md  modifié   REQ-INF-07 amendée, REQ-INF-14 créée
+specs/04-client-core.md    modifié   REQ-COR-10 étendue, REQ-COR-11 et 12 créées
+specs/07-outbox.md         modifié   REQ-OBX-04 amendée, REQ-OBX-09 créée
+specs/09-search.md         modifié   REQ-SRC-05 précisée, REQ-SRC-10 créée
+```
+
+### `fix-retention` — 1 commit, sur la branche PM
+```
+infra/synapse/homeserver.yaml.tmpl   modifié   enabled: false, purge_jobs et default_policy retirés
+infra/tests/homeserver.test.ts       modifié   toEqual sur le bloc entier
+```
+
+### `fix-src-lifecycle` — 2 commits, sur la branche PM + fix-c3-c2
+```
+packages/search/src/engine.ts          modifié   tsIndexed/tsOrigin, upsert, remove, déduplication de lot
+packages/search/src/index.ts           modifié   éditions sous l'id cible, hook RoomEvent.Redaction
+packages/search/src/protocol.ts        modifié   méthode remove
+packages/search/README.md              modifié   3 affirmations devenues fausses
+packages/search/tests/engine.test.ts   modifié   7 tests ajoutés
+packages/search/tests/proxy.test.ts    modifié   4 tests ajoutés
+packages/search/tests/session-mock.ts  modifié   éditions et redactions
+```
+
+### `fix-inf14` — 4 commits, sur la branche PM
+```
+apps/push-gateway/Dockerfile      créé      digest épinglé, version vérifiée par test
+infra/docker-compose.yml          modifié   service push-gateway, sans ports publiés
+infra/proxy/nginx.conf            modifié   location = /push/config, et rien d'autre
+infra/.env.example                modifié   VAPID_SUBJECT / PUBLIC_KEY / PRIVATE_KEY
+infra/README.md                   modifié   section REQ-INF-14 + digest au tableau
+infra/tests/push-gateway.test.ts  créé      7 tests
+.gitattributes                    créé      * text=auto eol=lf — voir §5
+```
+
+### Jamais touchés par moi, volontairement
+```
+specs/           contrats — amendés par le PM sur sa branche, jamais par moi
+DECISIONS.md     territoire PM — idem
 CLAUDE.md        inchangé
 main             f015e56, alignée sur origin/main
 ```
