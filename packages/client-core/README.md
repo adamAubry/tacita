@@ -5,7 +5,8 @@ reçoivent le `MatrixClient` via `initSession` : **aucun autre package n'importe
 matrix-js-sdk** pour la session.
 
 ```ts
-const session = await initSession({ homeserverUrl, loginToken });
+// Au démarrage : rouvrir la session locale, sans réseau. `null` = passer par l'OIDC.
+const session = (await restoreSession({ homeserverUrl })) ?? (await initSession({ homeserverUrl, loginToken }));
 
 session.client; // accès contrôlé pour les autres packages
 session.timeline(roomId).events(); // ordre canonique /sync
@@ -31,6 +32,20 @@ await session.logout(); // révocation + wipe complet
 
 ## Limites assumées
 
+- **Le jeton d'accès est stocké en clair.** `restoreSession` le relit depuis
+  IndexedDB (base `tacita-session`) pour rouvrir la session sans réseau. Il n'est
+  pas chiffré, et ce n'est pas un oubli : `initRustCrypto` tourne sans clé de
+  pickle, donc l'état crypto voisin — clés Megolm comprises — est déjà en clair
+  dans la même IndexedDB. Chiffrer le seul jeton en laissant les clés à côté
+  présenterait une garantie que le module n'offre pas. **Conséquence : qui a accès
+  au profil du navigateur a accès au compte et à l'historique déchiffrable.**
+  Relever le niveau suppose une clé de pickle sur le store crypto *et* un écran de
+  déverrouillage à chaque ouverture — décision produit, à consigner en `DECISIONS.md`
+  (D-06) avant d'être implémentée.
+- **Un jeton restauré n'est pas validé.** Le valider demanderait le réseau, ce que
+  `restoreSession` existe pour éviter. Un jeton révoqué se manifeste par un
+  `M_UNKNOWN_TOKEN` au premier appel : c'est au shard UI (spec 11) de router vers
+  l'OIDC à ce moment-là.
 - **L'override par salon prime sur la politique globale.** REQ-COR-07 verrouille
   `globalBlacklistUnverifiedDevices`, mais le SDK consulte d'abord
   `Room.getBlacklistUnverifiedDevices()` et ne retombe sur le réglage global que

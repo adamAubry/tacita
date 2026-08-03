@@ -1,16 +1,16 @@
 import { readFileSync } from "node:fs";
+import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createClient, IndexedDBStore, resetSdk, type ClientMock, type CryptoMock } from "./mocks";
-import { initSession, type SessionConfig } from "../src";
+import { initSession, restoreSession, type SessionConfig } from "../src";
 
 vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
 
-const config: SessionConfig = {
-  homeserverUrl: "https://tacita.test",
-  loginToken: "loginToken-emis-par-keycloak",
-  indexedDB: {} as IDBFactory,
-};
+// Le store SDK est mocké, mais celui des credentials est du vrai IndexedDB : c'est
+// lui qu'on teste en REQ-COR-11. Neuf à chaque test, sinon les sessions débordent
+// de l'un sur l'autre.
+let config: SessionConfig;
 
 const readSrc = (name: string) => readFileSync(new URL(`../src/${name}`, import.meta.url), "utf-8");
 const sources = ["index.ts", "logger.ts", "session.ts"].map(readSrc).join("\n");
@@ -19,13 +19,18 @@ const sources = ["index.ts", "logger.ts", "session.ts"].map(readSrc).join("\n");
 const code = sources.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
 /** Options passées au client définitif (le premier `createClient` ne sert qu'au login). */
-const clientOpts = () => createClient.mock.calls[1]![0] as { store: { startup: unknown } };
+const clientOpts = () => createClient.mock.calls.at(-1)![0] as { store: { startup: unknown } };
 
 let crypto: CryptoMock;
 let client: ClientMock;
 
 beforeEach(() => {
   ({ crypto, client } = resetSdk());
+  config = {
+    homeserverUrl: "https://tacita.test",
+    loginToken: "loginToken-emis-par-keycloak",
+    indexedDB: new IDBFactory(),
+  };
 });
 
 describe("REQ-COR-01 — crypto vodozemac via initRustCrypto, libolm interdit", () => {
@@ -136,6 +141,52 @@ describe("REQ-COR-08 — authentification déléguée au flux OIDC externe", () 
 
   it("le module n'implémente ni ne stocke aucun mot de passe", () => {
     expect(code).not.toMatch(/password/i);
+  });
+});
+
+describe("REQ-COR-11 — reprise de session sans réseau", () => {
+  it("rouvre la session précédente sans repasser par le flux OIDC", async () => {
+    await initSession(config);
+
+    // Rechargement de page : objets SDK neufs, même IndexedDB. C'est aussi ce qui
+    // rend la crypto neuve — `initSession` verrouille la sienne, et la reverrouiller
+    // lèverait (REQ-COR-07).
+    ({ crypto, client } = resetSdk());
+
+    const reprise = await restoreSession(config);
+
+    expect(reprise).not.toBeNull();
+    // L'assertion qui compte : aucune requête de login, donc aucun réseau requis.
+    expect(client.loginRequest).not.toHaveBeenCalled();
+    expect(clientOpts()).toMatchObject({
+      accessToken: "syt_access",
+      userId: "@luca:tacita.test",
+      deviceId: "DEVICE1",
+    });
+  });
+
+  it("rend null quand aucune session locale n'existe, sans rien tenter", async () => {
+    expect(await restoreSession(config)).toBeNull();
+    expect(client.loginRequest).not.toHaveBeenCalled();
+    expect(client.startClient).not.toHaveBeenCalled();
+  });
+
+  it("la déconnexion referme la porte : plus rien à reprendre", async () => {
+    const session = await initSession(config);
+    await session.logout();
+
+    expect(await restoreSession(config)).toBeNull();
+  });
+
+  it("des credentials inexploitables sont effacés plutôt que propagés", async () => {
+    await initSession(config);
+    client.initRustCrypto.mockRejectedValueOnce(new Error("store crypto corrompu"));
+
+    // Ni exception, ni session bancale : l'UI n'a qu'un chemin, l'OIDC.
+    expect(await restoreSession(config)).toBeNull();
+    // Et l'entrée morte n'est pas restée : la tentative suivante ne la rejoue pas.
+    expect(await restoreSession(config)).toBeNull();
+    expect(client.initRustCrypto).toHaveBeenCalledTimes(2);
   });
 });
 
