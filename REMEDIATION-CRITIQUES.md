@@ -354,6 +354,7 @@ packages/search/src/index.ts            modifié   C2
 packages/search/src/worker.ts           modifié   C2
 packages/search/tests/proxy.test.ts     modifié   C2 — 1 test ajouté (REQ-SRC-08)
 REMEDIATION-CRITIQUES.md                créé      ce document
+BRIEF-PM.md                             créé      mise en contexte + arbitrages, pour le PM
 correctif/                              créé      trace de la revue, doublonne packages/
 ```
 
