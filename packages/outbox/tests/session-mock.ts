@@ -19,10 +19,13 @@ export const networkError = () => new Error("fetch failed");
  */
 export function fakeSession(indexedDB: IDBFactory = new IDBFactory()) {
   let txnCounter = 0;
+  // Sain par défaut : la plupart des tests n'ont rien à dire sur la connectivité.
+  let syncState: string | null = "SYNCING";
   const wipes = new Map<string, () => Promise<void> | void>();
   const syncListeners: ((state: string, previous: string | null) => void)[] = [];
 
   const client = {
+    getSyncState: vi.fn(() => syncState),
     makeTxnId: vi.fn(() => `txn-${txnCounter++}`),
     sendEvent: vi.fn(
       async (_roomId: string, _type: string, _content: object, txnId?: string) => ({
@@ -49,8 +52,12 @@ export function fakeSession(indexedDB: IDBFactory = new IDBFactory()) {
     session: session as unknown as Session,
     client,
     indexedDB,
-    /** Rejoue une transition d'état de sync (reconnexion). */
+    /**
+     * Rejoue une transition d'état de sync (reconnexion). Appelée avant
+     * `createOutbox`, elle ne fait que poser l'état : personne n'écoute encore.
+     */
     emitSync(state: string, previous: string | null) {
+      syncState = state;
       for (const listener of [...syncListeners]) listener(state, previous);
     },
     async runWipes() {
