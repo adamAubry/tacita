@@ -1,8 +1,9 @@
 # infra — socle serveur (spec 01)
 
 Config-as-code : PostgreSQL, Synapse, Keycloak (OIDC + WebAuthn), MinIO (S3),
-reverse proxy nginx. Hors scope : LiveKit/TURN/well-known (spec 02), passerelle
-push (spec 03).
+reverse proxy nginx, et le **raccordement** de la passerelle Web Push (REQ-INF-14).
+Hors scope : LiveKit/TURN/well-known (spec 02), le *code* de la passerelle push
+(spec 03).
 
 ## Démarrage
 
@@ -28,6 +29,12 @@ docker compose exec synapse register_new_matrix_user \
 | Keycloak | 26.7.0 | `sha256:0f198be2…` |
 | nginx | 1.27-alpine | `sha256:65645c7b…` |
 | MinIO | RELEASE.2025-09-07 | `sha256:14cea493…` |
+| push-gateway (base Node) | 22-alpine | **non épinglé** — voir ci-dessous |
+
+**Le seul écart à la règle des digests** : `apps/push-gateway/Dockerfile` part de
+`node:22-alpine` par tag. Résoudre le digest (`docker buildx imagetools inspect
+node:22-alpine`) et le reporter dans le Dockerfile et ce tableau **avant tout
+déploiement**.
 
 Digests complets dans `docker-compose.yml`, résolus via `docker buildx imagetools
 inspect` au moment de l'écriture (2026-08-02) — à revérifier avant tout bump de
@@ -52,6 +59,47 @@ authentifiés (`/_matrix/client/v1/media/download/{serverName}/{mediaId}` et
 variante thumbnail) avec l'access token en en-tête. Aucune URL média publique
 ne doit être supposée. (Rappel : les vignettes de média chiffré ne sont de
 toute façon jamais demandées au serveur — REQ-MED-03, spec 08.)
+
+## REQ-INF-14 — passerelle Web Push
+
+Le service de la spec 03 est construit et démarré par ce compose. Il n'a **aucun
+port publié** : `/_matrix/push/v1/notify` n'a pas d'authentification (la
+subscription complète arrive dans le payload de Synapse), et le publier sur
+l'hôte ferait de la passerelle un relais de push ouvert. Seule sort la clé
+publique VAPID, par le proxy.
+
+**Ce que le client (spec 11) doit faire :**
+
+1. Lire la clé publique sur `https://<SERVER_NAME>/push/config` →
+   `{"vapid_public_key": "…"}`.
+2. S'abonner au Web Push du navigateur avec cette clé.
+3. Enregistrer le pusher auprès de Synapse, `POST /_matrix/client/v3/pushers` :
+
+```json
+{
+  "kind": "http",
+  "app_id": "org.tacita.web",
+  "pushkey": "<endpoint de la PushSubscription>",
+  "app_display_name": "Tacita",
+  "device_display_name": "Navigateur",
+  "lang": "fr",
+  "data": {
+    "url": "http://push-gateway:8008/_matrix/push/v1/notify",
+    "format": "event_id_only",
+    "p256dh": "<clé p256dh de la subscription>",
+    "auth": "<clé auth de la subscription>"
+  }
+}
+```
+
+L'URL du pusher est **le nom interne du service**, pas une URL publique : c'est
+Synapse qui appelle cette URL, depuis le réseau du compose. Passer par le proxy
+public ferait sortir puis rentrer la requête pour rien, et obligerait à exposer
+un endpoint sans authentification.
+
+`p256dh` et `auth` sont les clés de la `PushSubscription` du navigateur ; la
+passerelle en a besoin pour chiffrer le push (sans elles, elle rejette la
+pushkey — REQ-PSH-01).
 
 ## REQ-INF-05 — rate limiting
 
