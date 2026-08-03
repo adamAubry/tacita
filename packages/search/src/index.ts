@@ -1,5 +1,5 @@
 import type { Session } from "@tacita/client-core";
-import { MatrixEventEvent, type MatrixEvent } from "matrix-js-sdk";
+import { MatrixEventEvent, RoomEvent, type MatrixEvent } from "matrix-js-sdk";
 
 import type { IndexableEvent, SearchHit, SearchStats } from "./engine";
 import type { SearchRequest, SearchResponse } from "./protocol";
@@ -26,14 +26,29 @@ export interface Search {
   dispose(): void;
 }
 
-/** Ce qu'on retient d'un événement déchiffré. Rien d'autre n'entre dans l'index. */
+/**
+ * Ce qu'on retient d'un événement déchiffré. Rien d'autre n'entre dans l'index.
+ *
+ * REQ-SRC-10 — une édition n'est pas un nouveau message : elle est indexée sous
+ * l'identifiant de **sa cible**, avec le texte de `m.new_content`. Le moteur remplace
+ * alors le document existant, et l'ancienne version cesse d'être trouvable. Indexer
+ * l'édition telle quelle laisserait deux documents, dont un au corps « * texte ».
+ */
 function indexable(event: MatrixEvent): IndexableEvent | undefined {
-  const body: unknown = event.getContent().body;
-  const eventId = event.getId();
-  const roomId = event.getRoomId();
-  if (!eventId || !roomId || typeof body !== "string" || body.length === 0) return undefined;
   if (event.getType() !== "m.room.message" || event.isDecryptionFailure()) return undefined;
-  return { eventId, roomId, sender: event.getSender() ?? "", ts: event.getTs(), body };
+
+  const content = event.getContent();
+  const relation = content["m.relates_to"] as { rel_type?: unknown; event_id?: unknown } | undefined;
+  const edited = relation?.rel_type === "m.replace";
+  const source = edited ? (content["m.new_content"] as { body?: unknown } | undefined) : content;
+
+  const eventId = edited ? relation?.event_id : event.getId();
+  const body: unknown = source?.body;
+  const roomId = event.getRoomId();
+  if (typeof eventId !== "string" || !roomId) return undefined;
+  if (typeof body !== "string" || body.length === 0) return undefined;
+
+  return { eventId, roomId, sender: event.getSender() ?? "", tsOrigin: event.getTs(), body };
 }
 
 /**
@@ -90,6 +105,21 @@ export function createSearch(session: Session, worker: Worker): Search {
   };
   session.client.on(MatrixEventEvent.Decrypted, onDecrypted);
 
+  /**
+   * REQ-SRC-10 — une suppression retire le document. Pas de tampon ici : une redaction
+   * est une action utilisateur isolée, pas une rafale de sync, et la faire attendre
+   * laisserait le texte trouvable pendant la fenêtre d'accumulation.
+   *
+   * ponytail: un retrait qui échoue n'est pas retenté — le document reste trouvable
+   * jusqu'au prochain `wipe()`. Brancher une reprise le jour où le shard UI (spec 11)
+   * expose un canal d'erreur ; ce package n'en a aucun aujourd'hui.
+   */
+  const onRedaction = (event: MatrixEvent): void => {
+    const target = event.getAssociatedId();
+    if (target) void call<void>("remove", [[target]]);
+  };
+  session.client.on(RoomEvent.Redaction, onRedaction);
+
   /** Ce qui n'est pas encore parti au worker. Le wipe doit l'oublier autant que dispose. */
   const resetBuffer = (): void => {
     if (timer) clearTimeout(timer);
@@ -118,6 +148,7 @@ export function createSearch(session: Session, worker: Worker): Search {
     dispose() {
       resetBuffer();
       session.client.off(MatrixEventEvent.Decrypted, onDecrypted);
+      session.client.off(RoomEvent.Redaction, onRedaction);
       pending.clear();
       worker.terminate();
     },

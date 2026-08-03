@@ -15,11 +15,11 @@ import {
 const ROOM = "!salon:tacita.test";
 const AUTRE = "!autre:tacita.test";
 
-const event = (n: number, body: string, roomId = ROOM, ts = n): IndexableEvent => ({
+const event = (n: number, body: string, roomId = ROOM, tsOrigin = n): IndexableEvent => ({
   eventId: `$e${n}`,
   roomId,
   sender: "@luca:tacita.test",
-  ts,
+  tsOrigin,
   body,
 });
 
@@ -109,6 +109,77 @@ describe("REQ-SRC-05 — plafond D-01 et éviction des plus anciens", () => {
       oldestTs: 1_000,
       newestTs: 5_000,
     });
+  });
+
+  it("évince par ordre d'indexation, pas par date d'origine : un rattrapage survit", async () => {
+    const petit = await createEngine({ indexedDB: new IDBFactory(), maxEvents: 2 });
+
+    // D'abord deux messages récents, puis un rattrapage d'historique ancien — c'est
+    // l'ordre réel d'une pagination arrière.
+    await petit.index([event(1, "alpha", ROOM, 9_000), event(2, "bravo", ROOM, 9_500)]);
+    await petit.index([event(3, "charlie", ROOM, 1_000)]);
+
+    // Évincer par `tsOrigin` sortirait « charlie », qu'on vient de télécharger : le
+    // rattrapage s'auto-évincerait et ne servirait à rien.
+    expect((await petit.search("charlie")).map((hit) => hit.eventId)).toEqual(["$e3"]);
+    expect(await petit.search("alpha")).toEqual([]);
+    expect((await petit.stats()).oldestTs).toBe(1_000);
+    petit.close();
+  });
+});
+
+describe("REQ-SRC-10 — l'index suit le cycle de vie des messages", () => {
+  it("un événement retiré n'est plus trouvable", async () => {
+    await engine.index([event(1, "secret"), event(2, "anodin")]);
+    await engine.remove(["$e1"]);
+
+    expect(await engine.search("secret")).toEqual([]);
+    expect((await engine.search("anodin")).map((hit) => hit.eventId)).toEqual(["$e2"]);
+    expect((await engine.stats()).size).toBe(1);
+  });
+
+  it("le retrait survit au rechargement : le texte ne revient pas", async () => {
+    await engine.index([event(1, "secret")]);
+    await engine.remove(["$e1"]);
+    engine.close();
+
+    const rechargé = await createEngine({ indexedDB });
+    expect(await rechargé.search("secret")).toEqual([]);
+    rechargé.close();
+  });
+
+  it("retirer un identifiant inconnu ne casse rien", async () => {
+    await engine.index([event(1, "anodin")]);
+    await expect(engine.remove(["$jamais-vu"])).resolves.toBeUndefined();
+    expect((await engine.stats()).size).toBe(1);
+  });
+
+  it("réindexer un identifiant connu remplace le document au lieu d'en ajouter un", async () => {
+    await engine.index([event(1, "version initiale")]);
+    await engine.index([event(1, "version corrigée")]);
+
+    expect((await engine.stats()).size).toBe(1);
+    expect(await engine.search("initiale")).toEqual([]);
+    expect((await engine.search("corrigée")).map((hit) => hit.eventId)).toEqual(["$e1"]);
+  });
+
+  it("un message et son édition dans le même lot ne cassent pas l'indexation", async () => {
+    // Cas courant : une rafale de sync livre le message et son édition ensemble, et
+    // l'édition porte l'identifiant de sa cible — donc deux entrées, un seul id.
+    await engine.index([event(1, "version initiale"), event(1, "version corrigée")]);
+
+    expect((await engine.stats()).size).toBe(1);
+    expect(await engine.search("initiale")).toEqual([]);
+    expect((await engine.search("corrigée")).map((hit) => hit.eventId)).toEqual(["$e1"]);
+  });
+
+  it("un remplacement garde la date d'origine du message, pas celle de la correction", async () => {
+    await engine.index([event(1, "version initiale", ROOM, 1_000)]);
+    await engine.index([event(1, "version corrigée", ROOM, 9_000)]);
+
+    // Les bornes affichées décrivent la période des messages couverts, pas celle de
+    // leurs corrections.
+    expect(await engine.stats()).toMatchObject({ oldestTs: 1_000, newestTs: 1_000 });
   });
 });
 

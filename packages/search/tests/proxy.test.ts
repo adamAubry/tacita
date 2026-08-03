@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { IDBFactory } from "fake-indexeddb";
-import { MatrixEventEvent } from "matrix-js-sdk";
+import { MatrixEventEvent, RoomEvent } from "matrix-js-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BUFFER_MS, createSearch, type Search } from "../src";
@@ -9,7 +9,7 @@ import { BUFFER_MS, createSearch, type Search } from "../src";
 // les réexporte pas, sinon Orama atterrirait dans le bundle du thread principal.
 import { createEngine } from "../src/engine";
 import { serve } from "../src/worker";
-import { fakeSession, fakeWorker, matrixEvent, packageCode } from "./session-mock";
+import { fakeSession, fakeWorker, matrixEvent, packageCode, redactionOf } from "./session-mock";
 
 const ROOM = "!salon:tacita.test";
 
@@ -37,7 +37,7 @@ describe("REQ-SRC-01 — indexation et requêtes déportées dans le worker", ()
       eventId: "$e1",
       roomId: ROOM,
       sender: "@luca:tacita.test",
-      ts: 1,
+      tsOrigin: 1,
       body: "rendez-vous au parc",
     });
 
@@ -91,7 +91,7 @@ describe("REQ-SRC-03 — aucune recherche n'émet d'appel réseau", () => {
       eventId: "$e1",
       roomId: ROOM,
       sender: "@luca:tacita.test",
-      ts: 1,
+      tsOrigin: 1,
       body: "hors ligne",
     });
     await search.search("hors ligne");
@@ -112,8 +112,8 @@ describe("REQ-SRC-03 — aucune recherche n'émet d'appel réseau", () => {
 describe("REQ-SRC-06 — le périmètre couvert est exposé pour l'UI", () => {
   it("stats donne de quoi dire « historique téléchargé », pas « tout l'historique »", async () => {
     await search.index([
-      { eventId: "$e1", roomId: ROOM, sender: "@luca:tacita.test", ts: 1_000, body: "un" },
-      { eventId: "$e2", roomId: ROOM, sender: "@luca:tacita.test", ts: 9_000, body: "deux" },
+      { eventId: "$e1", roomId: ROOM, sender: "@luca:tacita.test", tsOrigin: 1_000, body: "un" },
+      { eventId: "$e2", roomId: ROOM, sender: "@luca:tacita.test", tsOrigin: 9_000, body: "deux" },
     ]);
 
     expect(await search.stats()).toEqual({
@@ -131,6 +131,47 @@ describe("REQ-SRC-06 — le périmètre couvert est exposé pour l'UI", () => {
   });
 });
 
+describe("REQ-SRC-10 — l'index suit le cycle de vie des messages", () => {
+  it("une suppression retire le texte de l'index", async () => {
+    ctx.emitDecrypted(matrixEvent("$e1", ROOM, "à supprimer"));
+    await vi.waitFor(async () => expect((await search.stats()).size).toBe(1));
+
+    ctx.emitRedaction(redactionOf("$e1"));
+
+    await vi.waitFor(async () => expect(await search.search("supprimer")).toEqual([]));
+    expect((await search.stats()).size).toBe(0);
+  });
+
+  it("une édition remplace le message : l'ancienne version cesse d'être trouvable", async () => {
+    ctx.emitDecrypted(matrixEvent("$e1", ROOM, "rendez-vous au parc"));
+    await vi.waitFor(async () => expect((await search.stats()).size).toBe(1));
+
+    // L'édition porte son propre event_id ; c'est sa cible qui doit être remplacée.
+    ctx.emitDecrypted(matrixEvent("$e2", ROOM, "rendez-vous au musée", { replaces: "$e1" }));
+
+    await vi.waitFor(async () => expect(await search.search("parc")).toEqual([]));
+    // Un seul document, sous l'identifiant du message d'origine — pas un second au
+    // corps « * rendez-vous au musée ».
+    expect((await search.stats()).size).toBe(1);
+    expect((await search.search("musée")).map((hit) => hit.eventId)).toEqual(["$e1"]);
+  });
+
+  it("supprimer un message que l'index n'a jamais vu ne casse rien", async () => {
+    ctx.emitDecrypted(matrixEvent("$e1", ROOM, "anodin"));
+    await vi.waitFor(async () => expect((await search.stats()).size).toBe(1));
+
+    ctx.emitRedaction(redactionOf("$jamais-indexé"));
+
+    await vi.waitFor(async () => expect((await search.stats()).size).toBe(1));
+    expect((await search.search("anodin")).map((hit) => hit.eventId)).toEqual(["$e1"]);
+  });
+
+  it("dispose détache aussi le hook de suppression", () => {
+    search.dispose();
+    expect(ctx.client.off).toHaveBeenCalledWith(RoomEvent.Redaction, expect.any(Function));
+  });
+});
+
 describe("REQ-SRC-08 — wipe enregistré au registre de la Session", () => {
   it("s'enregistre sous le nom search et vide l'index quand il est appelé", async () => {
     expect(ctx.session.registerWipe).toHaveBeenCalledWith("search", expect.any(Function));
@@ -139,7 +180,7 @@ describe("REQ-SRC-08 — wipe enregistré au registre de la Session", () => {
       eventId: "$e1",
       roomId: ROOM,
       sender: "@luca:tacita.test",
-      ts: 1,
+      tsOrigin: 1,
       body: "secret",
     });
     await ctx.runWipes();
