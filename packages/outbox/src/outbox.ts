@@ -61,7 +61,7 @@ function retryAfterMs(error: unknown): number | undefined {
  * dessus obligerait l'utilisateur à renvoyer chaque entrée à la main après une
  * simple reconnexion.
  */
-const RETRYABLE = new Set(["M_LIMIT_EXCEEDED", "M_UNKNOWN_TOKEN", "M_MISSING_TOKEN"]);
+const RETRYABLE = new Set(["M_LIMIT_EXCEEDED", "M_UNKNOWN_TOKEN"]);
 
 /**
  * REQ-OBX-04 — un 4xx définitif ne changera pas d'avis : salon inconnu, droits
@@ -94,6 +94,7 @@ export async function createOutbox(
   let running: Promise<void> | undefined;
   let rerun = false;
   let disposed = false;
+  let synced = HEALTHY.has(session.client.getSyncState());
 
   const notify = () => {
     for (const listener of listeners) listener();
@@ -200,7 +201,7 @@ export async function createOutbox(
     // passe qui sortirait à vide réarmerait un timer à 0 ms, qui rappellerait
     // `flush`, en boucle. Ici, le timer déjà armé se déclenche une fois sans rien
     // faire et personne ne le réarme — c'est `onSync` qui relance.
-    if (disposed || !HEALTHY.has(session.client.getSyncState())) return Promise.resolve();
+    if (disposed || !synced) return Promise.resolve();
     if (running) {
       rerun = true;
       return running;
@@ -219,8 +220,16 @@ export async function createOutbox(
 
   // Connectivité prise de l'état de sync de la Session : `navigator.onLine` dit
   // seulement qu'une interface réseau existe, pas que le homeserver répond.
+  //
+  // L'état est retenu ici plutôt que relu par `getSyncState()` au moment du flush :
+  // relire supposerait que le SDK a déjà publié le nouvel état quand il émet
+  // l'événement. Si l'ordre était l'inverse, le flush de reconnexion verrait encore
+  // l'ancien état et la file ne repartirait jamais — une panne qu'aucun test sur
+  // Session mockée ne peut voir, puisque c'est le mock qui fixe l'ordre. Ici,
+  // l'argument de l'événement fait foi.
   const onSync = (state: SyncState, previous: SyncState | null): void => {
-    if (HEALTHY.has(state) && !HEALTHY.has(previous)) void flush();
+    synced = HEALTHY.has(state);
+    if (synced && !HEALTHY.has(previous)) void flush();
   };
   session.client.on(ClientEvent.Sync, onSync);
 

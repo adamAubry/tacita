@@ -25,7 +25,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const sentTxnIds = () => ctx.client.sendEvent.mock.calls.map((call) => call[3]);
+const sentTxnIds = (from = ctx) => from.client.sendEvent.mock.calls.map((call) => call[3]);
 
 describe("REQ-OBX-02 — à la reconnexion, la file part en FIFO par salon", () => {
   it("envoie dans l'ordre de mise en file", async () => {
@@ -75,6 +75,13 @@ describe("REQ-OBX-02 — à la reconnexion, la file part en FIFO par salon", () 
     // Ni envoi tenté, ni entrée marquée failed : elle attend la reconnexion.
     expect(horsLigne.client.sendEvent).not.toHaveBeenCalled();
     expect(file.pending(ROOM)[0]?.status).toBe("queued");
+
+    // Et elle part bien à la reconnexion : sans cette moitié, une garde trop
+    // stricte passerait le test ci-dessus en bloquant la file pour toujours.
+    horsLigne.emitSync("SYNCING", "ERROR");
+    await file.flush();
+    expect(sentTxnIds(horsLigne)).toEqual(["t1"]);
+    expect(file.pending(ROOM)).toEqual([]);
     file.dispose();
   });
 
