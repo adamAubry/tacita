@@ -25,7 +25,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const sentTxnIds = () => ctx.client.sendEvent.mock.calls.map((call) => call[3]);
+const sentTxnIds = (from = ctx) => from.client.sendEvent.mock.calls.map((call) => call[3]);
 
 describe("REQ-OBX-02 — à la reconnexion, la file part en FIFO par salon", () => {
   it("envoie dans l'ordre de mise en file", async () => {
@@ -62,6 +62,27 @@ describe("REQ-OBX-02 — à la reconnexion, la file part en FIFO par salon", () 
     expect(sentTxnIds()).toContain("t3");
     expect(outbox.pending(ROOM).map((entry) => entry.txnId)).toEqual(["t1", "t2"]);
     expect(outbox.pending(AUTRE)).toEqual([]);
+  });
+
+  it("ne tente rien tant que le homeserver ne répond pas, et ne condamne personne", async () => {
+    const horsLigne = fakeSession();
+    horsLigne.emitSync("ERROR", null); // en panne avant même que la file existe
+    const file = await createOutbox(horsLigne.session, { indexedDB: horsLigne.indexedDB });
+
+    await file.enqueue(ROOM, message("un"), "t1");
+    await file.flush();
+
+    // Ni envoi tenté, ni entrée marquée failed : elle attend la reconnexion.
+    expect(horsLigne.client.sendEvent).not.toHaveBeenCalled();
+    expect(file.pending(ROOM)[0]?.status).toBe("queued");
+
+    // Et elle part bien à la reconnexion : sans cette moitié, une garde trop
+    // stricte passerait le test ci-dessus en bloquant la file pour toujours.
+    horsLigne.emitSync("SYNCING", "ERROR");
+    await file.flush();
+    expect(sentTxnIds(horsLigne)).toEqual(["t1"]);
+    expect(file.pending(ROOM)).toEqual([]);
+    file.dispose();
   });
 
   it("ne flushe pas sur une transition qui reste dans un état sain", async () => {
@@ -123,6 +144,16 @@ describe("REQ-OBX-04 — statuts queued/sending/failed, retry et remove", () => 
     vi.setSystemTime(Date.now() + APRÈS_LE_BACKOFF);
     await outbox.flush();
     expect(ctx.client.sendEvent).not.toHaveBeenCalled();
+  });
+
+  it("un 401 de jeton reste réessayable, contrairement à un droit refusé", async () => {
+    ctx.client.sendEvent.mockRejectedValue(matrixError("M_UNKNOWN_TOKEN", 401));
+    await outbox.enqueue(ROOM, message("un"), "t1");
+    await outbox.flush();
+
+    // Un jeton expire avec le temps, pas à cause du message : le condamner
+    // obligerait à renvoyer toute la file à la main après une reconnexion.
+    expect(outbox.pending(ROOM)[0]?.status).toBe("queued");
   });
 
   it("un 5xx reste réessayable", async () => {

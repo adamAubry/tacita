@@ -56,15 +56,21 @@ function retryAfterMs(error: unknown): number | undefined {
 }
 
 /**
- * REQ-OBX-04 — un 4xx qui n'est pas du rate-limit ne changera pas d'avis : salon
- * inconnu, droits refusés, contenu rejeté. Réessayer en boucle ne ferait que
- * brûler la batterie. Tout le reste (réseau, 5xx, 429) reste réessayable.
+ * Les 4xx dont le serveur revient : trop vite (429) ou jeton à renouveler. Un jeton
+ * expire par le temps qui passe, pas par le contenu du message — condamner la file
+ * dessus obligerait l'utilisateur à renvoyer chaque entrée à la main après une
+ * simple reconnexion.
+ */
+const RETRYABLE = new Set(["M_LIMIT_EXCEEDED", "M_UNKNOWN_TOKEN"]);
+
+/**
+ * REQ-OBX-04 — un 4xx définitif ne changera pas d'avis : salon inconnu, droits
+ * refusés, contenu rejeté. Réessayer en boucle ne ferait que brûler la batterie.
+ * Tout le reste (réseau, 5xx, et les codes ci-dessus) reste réessayable.
  */
 function isPermanent(error: unknown): boolean {
   const status = httpStatusOf(error);
-  return (
-    status !== undefined && status >= 400 && status < 500 && errcodeOf(error) !== "M_LIMIT_EXCEEDED"
-  );
+  return status !== undefined && status >= 400 && status < 500 && !RETRYABLE.has(errcodeOf(error));
 }
 
 /** REQ-OBX-07 — exponentiel, mais le serveur a le dernier mot s'il donne un délai. */
@@ -88,6 +94,7 @@ export async function createOutbox(
   let running: Promise<void> | undefined;
   let rerun = false;
   let disposed = false;
+  let synced = HEALTHY.has(session.client.getSyncState());
 
   const notify = () => {
     for (const listener of listeners) listener();
@@ -189,7 +196,12 @@ export async function createOutbox(
    * par l'appelant qui attend.
    */
   function flush(): Promise<void> {
-    if (disposed) return Promise.resolve();
+    // Rien ne part tant que le homeserver ne répond pas. La garde est ici, et pas
+    // dans `pass()`, parce que le `finally` ci-dessous rappelle `schedule()` : une
+    // passe qui sortirait à vide réarmerait un timer à 0 ms, qui rappellerait
+    // `flush`, en boucle. Ici, le timer déjà armé se déclenche une fois sans rien
+    // faire et personne ne le réarme — c'est `onSync` qui relance.
+    if (disposed || !synced) return Promise.resolve();
     if (running) {
       rerun = true;
       return running;
@@ -208,8 +220,16 @@ export async function createOutbox(
 
   // Connectivité prise de l'état de sync de la Session : `navigator.onLine` dit
   // seulement qu'une interface réseau existe, pas que le homeserver répond.
+  //
+  // L'état est retenu ici plutôt que relu par `getSyncState()` au moment du flush :
+  // relire supposerait que le SDK a déjà publié le nouvel état quand il émet
+  // l'événement. Si l'ordre était l'inverse, le flush de reconnexion verrait encore
+  // l'ancien état et la file ne repartirait jamais — une panne qu'aucun test sur
+  // Session mockée ne peut voir, puisque c'est le mock qui fixe l'ordre. Ici,
+  // l'argument de l'événement fait foi.
   const onSync = (state: SyncState, previous: SyncState | null): void => {
-    if (HEALTHY.has(state) && !HEALTHY.has(previous)) void flush();
+    synced = HEALTHY.has(state);
+    if (synced && !HEALTHY.has(previous)) void flush();
   };
   session.client.on(ClientEvent.Sync, onSync);
 
