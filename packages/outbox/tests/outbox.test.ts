@@ -188,6 +188,50 @@ describe("REQ-OBX-04 — statuts queued/sending/failed, retry et remove", () => 
   });
 });
 
+describe("REQ-OBX-09 — rien ne part vers un salon non chiffré", () => {
+  it("aucun envoi n'est émis, et l'entrée est condamnée avec son propre code", async () => {
+    ctx.session.isEncrypted = vi.fn(async () => false);
+    await outbox.enqueue(ROOM, message("un"), "t1");
+    await outbox.flush();
+
+    // Le critère de la REQ : pas « l'envoi a échoué », mais « aucun envoi n'a eu
+    // lieu ». Un message en clair parti est une fuite irréversible.
+    expect(ctx.client.sendEvent).not.toHaveBeenCalled();
+    expect(outbox.pending(ROOM)[0]).toMatchObject({
+      status: "failed",
+      errcode: "TACITA_NOT_ENCRYPTED",
+    });
+  });
+
+  it("ne repasse pas par le chemin de retry : la condition ne changera pas seule", async () => {
+    ctx.session.isEncrypted = vi.fn(async () => false);
+    await outbox.enqueue(ROOM, message("un"), "t1");
+    await outbox.flush();
+
+    vi.setSystemTime(Date.now() + APRÈS_LE_BACKOFF);
+    await outbox.flush();
+
+    // `failed` sort de la boucle de réessai : une seule consultation, pas une par
+    // réveil du timer.
+    expect(ctx.session.isEncrypted).toHaveBeenCalledOnce();
+    expect(ctx.client.sendEvent).not.toHaveBeenCalled();
+  });
+
+  it("un salon redevenu chiffré part au renvoi manuel", async () => {
+    ctx.session.isEncrypted = vi.fn(async () => false);
+    await outbox.enqueue(ROOM, message("un"), "t1");
+    await outbox.flush();
+    expect(outbox.pending(ROOM)[0]?.status).toBe("failed");
+
+    // L'utilisateur agit, la condition a changé : rien ne doit rester bloqué.
+    ctx.session.isEncrypted = vi.fn(async () => true);
+    await outbox.retry("t1");
+
+    expect(sentTxnIds()).toEqual(["t1"]);
+    expect(outbox.pending(ROOM)).toEqual([]);
+  });
+});
+
 describe("REQ-OBX-05 — les entrées portent de quoi fusionner avec la timeline", () => {
   it("expose txnId, roomId, contenu, statut et ordre FIFO", async () => {
     ctx.client.sendEvent.mockRejectedValue(new Error("hors ligne"));

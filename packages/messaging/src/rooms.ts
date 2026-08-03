@@ -15,8 +15,11 @@ const encryptionState = {
  * chaque écriture plutôt que de faire confiance à une config distante.
  */
 export async function assertEncrypted(session: Session, roomId: string): Promise<void> {
-  const crypto = session.client.getCrypto();
-  if (!crypto || !(await crypto.isEncryptionEnabledInRoom(roomId))) {
+  // Le prédicat vit dans la Session (spec 04, REQ-COR-12) : la file d'envoi de la
+  // spec 07 a besoin de la même garde, et deux copies d'un contrôle de sécurité
+  // dérivent. Ici on lève, parce que c'est ce que les appelants de ce package
+  // attendent ; l'outbox, elle, consulte le prédicat directement.
+  if (!(await session.isEncrypted(roomId))) {
     throw new Error(`salon ${roomId} non chiffré : envoi refusé`);
   }
 }
