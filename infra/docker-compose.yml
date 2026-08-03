@@ -99,6 +99,24 @@ services:
       - ./synapse/homeserver.yaml.tmpl:/conf/homeserver.yaml.tmpl:ro
       - synapse-data:/data
 
+  # REQ-INF-14 — la spec 03 livre le service, la spec 01 le provisionne : sans ça, la
+  # passerelle est terminée et injoignable. Synapse la contacte par son nom sur le
+  # réseau du compose ; l'URL à enregistrer côté client est dans README.md.
+  #
+  # Aucun `ports:` volontairement. `/_matrix/push/v1/notify` n'a pas d'authentification
+  # (spec 03 : la subscription complète arrive dans le payload de Synapse) — publié sur
+  # l'hôte, il ferait de la passerelle un relais de push ouvert. Seule la clé publique
+  # VAPID sort, par le proxy.
+  push-gateway:
+    build:
+      context: ..
+      dockerfile: apps/push-gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+
   # REQ-INF-10 — seul point d'entrée TLS ; routes /_matrix, /livekit/jwt, /livekit/sfu
   # (backends /livekit/* provisionnés par la spec 02, absents tant qu'elle n'est pas déployée).
   proxy:
@@ -107,6 +125,7 @@ services:
     depends_on:
       - synapse
       - keycloak
+      - push-gateway
     ports:
       - "443:443"
     volumes:
