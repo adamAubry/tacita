@@ -163,6 +163,16 @@ describe("REQ-SRC-10 — l'index suit le cycle de vie des messages", () => {
     expect((await engine.search("corrigée")).map((hit) => hit.eventId)).toEqual(["$e1"]);
   });
 
+  it("un message et son édition dans le même lot ne cassent pas l'indexation", async () => {
+    // Cas courant : une rafale de sync livre le message et son édition ensemble, et
+    // l'édition porte l'identifiant de sa cible — donc deux entrées, un seul id.
+    await engine.index([event(1, "version initiale"), event(1, "version corrigée")]);
+
+    expect((await engine.stats()).size).toBe(1);
+    expect(await engine.search("initiale")).toEqual([]);
+    expect((await engine.search("corrigée")).map((hit) => hit.eventId)).toEqual(["$e1"]);
+  });
+
   it("un remplacement garde la date d'origine du message, pas celle de la correction", async () => {
     await engine.index([event(1, "version initiale", ROOM, 1_000)]);
     await engine.index([event(1, "version corrigée", ROOM, 9_000)]);

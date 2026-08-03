@@ -164,11 +164,19 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
     // pas monopoliser le worker d'un bloc.
     async index(events) {
       for (let offset = 0; offset < events.length; offset += BATCH_SIZE) {
-        const batch = events.slice(offset, offset + BATCH_SIZE);
+        // Un même identifiant peut apparaître deux fois dans un lot : une rafale de
+        // sync livre souvent un message et son édition ensemble, et l'édition porte
+        // l'identifiant de sa cible. Orama refuse deux insertions du même id et
+        // rejetterait le lot entier — la dernière version l'emporte.
+        const batch = new Map<string, IndexableEvent>();
+        for (const event of events.slice(offset, offset + BATCH_SIZE)) {
+          batch.set(event.eventId, event);
+        }
+
         const fresh: IndexedDocument[] = [];
         const replaced: IndexedDocument[] = [];
 
-        for (const { eventId, ...rest } of batch) {
+        for (const { eventId, ...rest } of batch.values()) {
           const previous = getByID(db, eventId) as IndexedDocument | undefined;
           // REQ-SRC-10 — réindexer un événement connu **remplace** son document au lieu
           // d'en créer un second. C'est ce qui fait qu'une édition ne laisse pas
