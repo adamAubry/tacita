@@ -178,15 +178,18 @@ describe("REQ-COR-11 — reprise de session sans réseau", () => {
     expect(await restoreSession(config)).toBeNull();
   });
 
-  it("des credentials inexploitables sont effacés plutôt que propagés", async () => {
+  it("un échec de restauration rend null sans détruire ce qui pourrait resservir", async () => {
     await initSession(config);
-    client.initRustCrypto.mockRejectedValueOnce(new Error("store crypto corrompu"));
+    ({ crypto, client } = resetSdk());
+    client.initRustCrypto.mockRejectedValueOnce(new Error("wasm indisponible"));
 
     // Ni exception, ni session bancale : l'UI n'a qu'un chemin, l'OIDC.
     expect(await restoreSession(config)).toBeNull();
-    // Et l'entrée morte n'est pas restée : la tentative suivante ne la rejoue pas.
-    expect(await restoreSession(config)).toBeNull();
-    expect(client.initRustCrypto).toHaveBeenCalledTimes(2);
+
+    // Mais la panne était passagère. Effacer les credentials aurait force un OIDC,
+    // donc du réseau — ce que l'utilisateur hors ligne n'a justement pas.
+    ({ crypto, client } = resetSdk());
+    expect(await restoreSession(config)).not.toBeNull();
   });
 });
 

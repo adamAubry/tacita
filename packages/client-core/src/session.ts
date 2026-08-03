@@ -112,7 +112,8 @@ async function openCredentials(indexedDB: IDBFactory) {
   };
 }
 
-type Credentials = Awaited<ReturnType<typeof openCredentials>>;
+/** Le magasin, pas les credentials : `saved.read()`, pas `saved.accessToken`. */
+type CredentialStore = Awaited<ReturnType<typeof openCredentials>>;
 
 function requireCrypto(client: MatrixClient): CryptoApi {
   const crypto = client.getCrypto();
@@ -150,7 +151,7 @@ function lockUnverifiedDeviceBlacklist(crypto: CryptoApi): void {
 async function buildSession(
   credentials: StoredCredentials,
   config: Omit<SessionConfig, "loginToken">,
-  saved: Credentials,
+  saved: CredentialStore,
 ): Promise<Session> {
   const log = createLogger();
 
@@ -301,10 +302,12 @@ export async function restoreSession(
   try {
     return await buildSession(credentials, config, saved);
   } catch {
-    // Credentials présents mais inexploitables : `device_id` dont les clés ne
-    // correspondent plus, store crypto corrompu, IndexedDB évincée à moitié. On
-    // efface et on renvoie vers l'OIDC — propager laisserait l'app sans issue.
-    await saved.clear();
+    // Restauration impossible : store crypto corrompu, wasm qui n'a pas chargé,
+    // IndexedDB à moitié évincée. On rend `null` sans effacer — un échec de
+    // chargement est souvent passager, et l'effacer forcerait un OIDC qui exige le
+    // réseau, précisément ce que l'utilisateur hors ligne n'a pas. Si la panne est
+    // définitive, l'OIDC réécrira ces credentials de toute façon : les détruire
+    // ici n'achèterait rien et coûterait la tentative suivante.
     return null;
   }
 }
