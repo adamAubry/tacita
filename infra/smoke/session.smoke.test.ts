@@ -1,12 +1,18 @@
 import "fake-indexeddb/auto";
 
 import { IDBFactory } from "fake-indexeddb";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { restoreSession, type Session } from "@tacita/client-core";
 import { createGroupChat, messages, sendText } from "@tacita/messaging";
 
-import { HOMESERVER, registerAccount, uniqueLocalpart, until, type Account } from "./harness";
+import { HOMESERVER, registerAccount, uniqueLocalpart, type Account } from "./harness";
+
+/**
+ * Le défaut de `vi.waitFor` est d'une seconde : ici on attend un aller-retour
+ * réseau et un tour de `/sync`, pas un timer qu'on pourrait avancer.
+ */
+const ATTENTE = { timeout: 30_000, interval: 250 };
 
 /**
  * Cible de fumée — arbitrage PM du 03/08/2026, point 9, option B.
@@ -62,10 +68,11 @@ describe("Fumée — chiffrement de bout en bout contre un vrai Synapse", () => 
 
     // REQ-MSG-02 / REQ-INF-03 — pas « la config dit que ça devrait être chiffré »,
     // mais « le serveur a bien enregistré l'événement d'état, et le SDK le voit ».
-    const chiffré = await until("le salon soit vu comme chiffré", async () =>
-      (await session.client.getCrypto()!.isEncryptionEnabledInRoom(salon)) || undefined,
+    await vi.waitFor(
+      async () =>
+        expect(await session.client.getCrypto()!.isEncryptionEnabledInRoom(salon)).toBe(true),
+      ATTENTE,
     );
-    expect(chiffré).toBe(true);
   });
 
   it("un message envoyé revient déchiffré par le flux /sync", async () => {
@@ -74,9 +81,11 @@ describe("Fumée — chiffrement de bout en bout contre un vrai Synapse", () => 
 
     // Le tour complet : chiffré sur l'appareil, stocké chiffré par Synapse, rendu
     // par /sync, déchiffré ici. C'est le seul test du dépôt qui l'exerce.
-    const reçu = await until(`le message ${event_id} revienne`, () =>
-      messages(session, salon).find((event) => event.getId() === event_id),
-    );
+    const reçu = await vi.waitFor(() => {
+      const trouvé = messages(session, salon).find((event) => event.getId() === event_id);
+      if (!trouvé) throw new Error(`le message ${event_id} n'est pas encore revenu par /sync`);
+      return trouvé;
+    }, ATTENTE);
 
     expect(reçu.getContent().body).toBe(texte);
     // REQ-COR-02 — ce que Synapse a stocké est `m.room.encrypted`, pas le texte.
@@ -101,10 +110,11 @@ describe("Fumée — REQ-COR-11, la session se rouvre sans réseau", () => {
       // Le même appareil, donc les mêmes clés Megolm : l'historique reste lisible.
       // Un device_id neuf le rendrait indéchiffrable — c'est ce que C4 évite.
       expect(rechargée!.client.getDeviceId()).toBe(session.client.getDeviceId());
-      const après = await until("l'historique soit rechargé", () => {
+      const après = await vi.waitFor(() => {
         const timeline = messages(rechargée!, salon);
-        return timeline.length >= avant ? timeline : undefined;
-      });
+        if (timeline.length < avant) throw new Error("l'historique n'est pas encore rechargé");
+        return timeline;
+      }, ATTENTE);
       expect(après.at(-1)!.getContent().body).toMatch(/rendez-vous au parc/);
     } finally {
       rechargée!.client.stopClient();

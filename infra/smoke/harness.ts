@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 /**
  * Ce qu'il faut pour parler à une pile réelle. Rien de métier ici : la cible teste
@@ -62,22 +62,5 @@ function requireSharedSecret(): string {
 
 /** Un localpart neuf par exécution : Synapse refuse de recréer un compte. */
 export const uniqueLocalpart = (prefix: string): string =>
-  `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  `${prefix}${randomUUID().replace(/-/g, "").slice(0, 10)}`;
 
-/**
- * Attend qu'une condition devienne vraie. `vi.waitFor` ne convient pas ici : le
- * délai vient du réseau et de /sync, pas de timers qu'on pourrait avancer.
- */
-export async function until<T>(
-  what: string,
-  probe: () => T | undefined | Promise<T | undefined>,
-  timeoutMs = 30_000,
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const value = await probe();
-    if (value !== undefined && value !== false) return value;
-    if (Date.now() > deadline) throw new Error(`délai dépassé en attendant : ${what}`);
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-}
