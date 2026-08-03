@@ -1,9 +1,13 @@
-# correctif/ — C3 et C2
+# correctif/ — C3 et C2 (archive)
 
-Fichiers corrigés, **prêts à copier par-dessus les originaux**. Rien n'est commité, rien n'est
-appliqué : `packages/` est intact sur `main` (`f015e56`).
+> **Ce dossier est une trace, plus une zone de transit.** Les correctifs ont été appliqués dans
+> `packages/` et commités sur cette branche (`05f22aa` pour C3, `98e0065` pour C2). Ce qu'il y a
+> ici est identique à ce qui est en place : c'est l'état déposé avant application, conservé pour
+> que la revue puisse voir ce qui a été proposé sans dérouler l'historique.
+>
+> Supprimable sans perte le jour où la branche est mergée.
 
-Détail du raisonnement : `REMEDIATION-CRITIQUES.md` à la racine, sections C3 et C2.
+Détail du raisonnement et conséquences : `REMEDIATION-CRITIQUES.md` à la racine, sections C3 et C2.
 
 ## Contenu
 
@@ -15,13 +19,7 @@ correctif/packages/search/src/worker.ts         C2
 correctif/packages/search/tests/proxy.test.ts   C2 — un test ajouté
 ```
 
-Les chemins sous `correctif/` sont ceux de destination. Appliquer :
-
-```sh
-cp -r correctif/packages/. packages/
-rm -r correctif
-npm run typecheck && npm test
-```
+Les chemins sous `correctif/` sont ceux de destination — déjà appliqués tels quels.
 
 ## Specs concernées
 

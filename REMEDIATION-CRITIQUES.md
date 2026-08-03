@@ -1,431 +1,227 @@
 # Remédiation des bugs critiques — note aux seniors
 
-Audit du 03/08/2026 sur `main` (`f015e56`). Quatre défauts critiques, un par module ou presque.
-Ce document dit **quoi corriger, comment, ce que ça casse, et dans quel ordre**. Il ne corrige rien.
+Audit du 03/08/2026 sur `main` (`f015e56`). Quatre défauts critiques, plus deux non critiques
+promus parce qu'ils bloquaient un correctif critique.
 
-Le point commun des quatre : aucun n'est une bavure locale. Ce sont des **jonctions entre modules
-que personne ne possède**. Chaque spec est respectée ; c'est l'espace entre les specs qui ne l'est pas.
-Deux conséquences pratiques :
+Le point commun : aucun n'est une bavure locale. Ce sont des **jonctions entre modules que
+personne ne possède**. Chaque spec est respectée ; c'est l'espace entre les specs qui ne l'est pas.
 
-1. **Chaque correctif touche un contrat exporté → la spec s'amende avant le code.** CLAUDE.md :
-   « les specs sont exécutables, le code les implémente, jamais l'inverse ». Les IDs de REQ proposés
-   plus bas sont à valider par le PM, pas à inventer dans la PR.
-2. **Une branche par correctif, sur le modèle des branches `spec-NN-*` existantes.** Le hook de
-   pré-commit lance `typecheck` + `test` sur tout le dépôt : deux correctifs qui touchent
-   `Session` en parallèle bloqueront mutuellement leurs commits.
+**Trois sur quatre sont corrigés, sur trois branches locales indépendantes. Rien n'est poussé,
+rien n'est mergé, `main` est intacte.** Il reste C1, et une liste de points qui demandent un
+arbitrage — section « À statuer par le CM » en fin de document.
 
 ---
 
-## Ordre d'exécution recommandé
+## 1. État
+
+| # | Défaut | Branche | État |
+|---|---|---|---|
+| C3 | Écritures IndexedDB résolues avant le commit | `fix-c3-c2` | ✅ corrigé |
+| C2 | Texte en clair réécrit sur disque après déconnexion | `fix-c3-c2` | ✅ corrigé |
+| N3 | Flush de l'outbox avant un sync sain | `fix-n3-n2` | ✅ corrigé |
+| N2 | Jeton expiré classé échec définitif | `fix-n3-n2` | ✅ corrigé |
+| C4 | Aucune reprise de session | `fix-c4` | ✅ corrigé |
+| C1 | L'outbox envoie sans la garde de chiffrement | — | ⏳ à faire |
 
 ```
-C3 ─┐ (isolés, modules différents, parallélisables)
-C2 ─┘
-      N3 ──> C4 ──> C1
-      (prérequis)   (dépend du refactor C4)
+main f015e56
+ ├── fix-c3-c2   3 commits   C3, C2, docs        186 tests (185 + 1)
+ ├── fix-n3-n2   2 commits   N3+N2, revue        187 tests (185 + 2)
+ └── fix-c4      2 commits   C4, revue           189 tests (185 + 4)
 ```
 
-| # | Correctif | Modules | Dépend de | Taille |
-|---|---|---|---|---|
-| C3 | Commit IndexedDB | `outbox`, `search` | — | S |
-| C2 | Wipe vs tampon de recherche | `search` | — | S |
-| N3 | Flush initial de l'outbox | `outbox` | — | XS |
-| C4 | Reprise de session | `client-core` (+ PM) | — | L |
-| C1 | Garde de chiffrement dans l'outbox | `client-core`, `outbox` | **N3**, C4 | M |
+Les trois branches partent de `main` et ne se touchent pas : chacune se relit, se valide et se
+merge seule, dans n'importe quel ordre. Les compteurs de tests ne s'additionnent pas — chacun est
+mesuré depuis les 185 tests de `main`.
 
-**Pourquoi C1 en dernier alors que c'est le trou de sécurité ?** Deux raisons, développées en §C1 :
-poser la garde avant d'avoir corrigé N3 transforme un risque théorique en panne certaine au
-démarrage ; et C1 comme C4 modifient l'interface `Session`, autant refactorer `session.ts` une fois.
-Si le PM veut C1 tout de suite, **N3 est le seul prérequis dur** — C4 n'est qu'une économie de refactor.
+Sur chaque branche : `lint`, `typecheck` et la suite complète passent, hooks de pré-commit inclus.
+`--no-verify` n'a jamais été utilisé.
 
 ---
 
-## C3 — Les écritures IndexedDB résolvent avant le commit
+## 2. Ce qui a été corrigé
 
-`packages/outbox/src/store.ts:6-10` · `packages/search/src/snapshot.ts:7-11`
+Pour chaque défaut : le bug, pourquoi ce correctif-là, et ce que ça change pour la suite.
 
-### Le défaut
+### C3 — Les écritures IndexedDB résolvaient avant le commit
+`packages/outbox/src/store.ts` · `packages/search/src/snapshot.ts` — branche `fix-c3-c2`
 
-`promisify()` résout sur `request.onsuccess`. Cet événement signale que la **requête** a été acceptée
-par le store, pas que la **transaction** est committée sur disque. Une transaction IndexedDB peut
-encore avorter après ce point (quota, fermeture de la base, erreur d'une autre requête de la même
-transaction).
+**Le bug.** `promisify()` résolvait sur `request.onsuccess`, qui signale que la *requête* a été
+acceptée — pas que la *transaction* est committée. Une transaction peut encore avorter après ce
+point. REQ-OBX-01 promet « persisté en IndexedDB **avant** toute tentative réseau » : `await
+save(entry)` rendait la main avant le commit, donc une fermeture d'onglet dans cette fenêtre
+perdait un message que l'UI avait déjà affiché comme mis en file. C'est exactement la garantie que
+la spec 07 existe pour fournir.
 
-REQ-OBX-01 promet « persisté en IndexedDB **avant** toute tentative réseau ». `await save(entry)`
-(`outbox.ts:238`) rend la main avant le commit : fermeture d'onglet dans cette fenêtre = message
-perdu, alors que l'UI l'a affiché comme mis en file. C'est exactement le manque que le module
-existe pour combler — le local echo du SDK échoue déjà sur ce point, c'est la justification de la spec 07.
+**Le correctif.** Un helper `commit(mutate)` dans chacun des deux fichiers : il ouvre la
+transaction, applique la mutation, et résout sur `oncomplete`. Les lectures gardent `promisify` —
+elles ont besoin du résultat, et une lecture réussie a lu un état committé.
 
-### Le correctif
+Le rejet retombe sur `transaction.error ?? new Error(...)`. Ce repli n'est pas décoratif :
+`transaction.error` n'est pas encore posé quand `onerror` se déclenche (il l'est pendant l'abort,
+qui suit). Sans lui on rejetait avec `null`, et `errcodeOf()` côté outbox lit `.errcode` sur ce
+qu'il reçoit — `TypeError` sur `null`, à l'intérieur d'un `catch`.
 
-Un helper d'écriture, dans **chacun des deux fichiers**. Les **lectures** gardent `promisify` (elles
-ont besoin du résultat, et une lecture qui a réussi a lu un état committé) ; les écritures ne s'en
-servent plus du tout :
+**Conséquences.**
+- Les écritures sont plus lentes : `enqueue()` attend un vrai commit avant de rendre la main.
+  C'est le comportement voulu, mais c'est mesurable sur mobile bas de gamme.
+- **`search` paie le plus cher** : `engine.index()` appelle `persist()` en fin de chaque appel, qui
+  sérialise tout l'index. Attendre son commit à chaque vague de sync rend urgent le `ponytail:`
+  déjà posé dans `engine.ts` (débattre l'écriture derrière un timer). Non traité ici, à ouvrir.
+- Pas de test dédié — voir « Limites de la vérification » plus bas.
 
-```ts
-const write = (fn: (store: IDBObjectStore) => void): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    fn(tx.objectStore(STORE));
-    tx.oncomplete = () => resolve();
-    tx.onabort = tx.onerror = () => reject(tx.error);
-  });
-```
+### C2 — Du texte en clair pouvait se réécrire sur disque après la déconnexion
+`packages/search/src/index.ts` · `packages/search/src/worker.ts` — branche `fix-c3-c2`
 
-Les trois méthodes d'écriture deviennent des one-liners :
+**Le bug.** Deux courses, même cause : le wipe ne connaissait pas ce qui était en vol.
 
-```ts
-put:    (entry) => write((s) => { s.put(entry); }),
-remove: (txnId) => write((s) => { s.delete(txnId); }),
-clear:  ()      => write((s) => { s.clear(); }),
-```
+1. Le tampon du thread principal n'était vidé que par `dispose()`, pas par le wipe. Séquence :
+   événements déchiffrés accumulés → déconnexion → le worker vide l'index et efface le snapshot →
+   250 ms plus tard le timer se déclenche, réindexe ce qu'il retenait, et `persist()` réécrit le
+   snapshot.
+2. `scope.onmessage` était `async` sans sérialisation : un `wipe` reçu pendant qu'un `index`
+   déroulait ses lots s'exécutait entre deux `await`, puis la boucle reprenait et repersistait.
 
-Idem `write` / `clear` côté search. Net : **moins de lignes qu'aujourd'hui**, `objectStore()` et le
-`async` des trois méthodes disparaissent.
+Dans les deux cas, du contenu déchiffré subsistait en IndexedDB après une déconnexion. Viole
+REQ-SRC-08 et l'interdit absolu n°8 de CLAUDE.md.
 
-**Pourquoi dupliquer le helper plutôt que factoriser dans un `@tacita/idb` ?** Huit lignes par
-fichier contre une arête de dépendance supplémentaire entre packages et une entrée à déclarer dans
-deux specs. La duplication est moins chère ici. À reconsidérer au troisième store IndexedDB.
+**Le correctif.** `resetBuffer()` extrait de `dispose()` et appelé aussi par `wipe()`, **avant** de
+poster le wipe au worker. Et les messages du worker s'enchaînent dans une file
+(`queue = queue.then(...)`) : deux lignes qui suppriment la *classe* de bugs plutôt que l'instance
+connue. Les requêtes se disputaient déjà une seule base Orama — il n'y avait pas de parallélisme
+réel à perdre.
 
-### Impacts
-
-- **`packages/outbox/src/store.ts`** : les quatre méthodes changent de forme. Aucun appelant ne
-  change (`OutboxStore` garde sa signature).
-- **`packages/search/src/snapshot.ts`** : idem.
-- Aucune interface publique modifiée. Aucun autre module touché.
-
-### Effets secondaires
-
-- **Les écritures deviennent plus lentes.** `enqueue()` attend désormais un vrai commit avant de
-  rendre la main : l'écho optimiste de l'UI apparaît quelques millisecondes plus tard. C'est le
-  comportement voulu, mais c'est un changement mesurable sur mobile bas de gamme.
-- **`search` paie le plus cher.** `engine.index()` appelle `persist()` en fin de chaque appel
-  (`engine.ts:131`), qui sérialise **tout** l'index. Attendre son commit à chaque vague de sync rend
-  urgent le `ponytail:` déjà posé en `engine.ts:98-101` (débattre l'écriture derrière un timer).
-  Ne pas traiter dans cette PR, mais ouvrir le ticket : C3 dégrade un coût déjà signalé comme
-  provisoire.
-- **Churn de tests attendu dans `outbox/tests/persistence.test.ts`.** Attendre `oncomplete` ajoute
-  un tour de boucle d'événements. Les tests utilisent des fake timers avec `toFake: ["setTimeout",
-  "clearTimeout", "Date"]` en gardant `setImmediate` réel (voir le commentaire `outbox.test.ts:19`,
-  fake-indexeddb en dépend) — ça reste valable, mais certains `await` supplémentaires seront
-  nécessaires. **Si un test se met à expirer, c'est fake-indexeddb qui attend un `setImmediate`
-  réel, pas un deadlock applicatif.**
-- **La forme des erreurs change.** Un quota dépassé arrive maintenant par `tx.error` et non plus par
-  `request.error`. Rien ne filtre sur le message aujourd'hui ; à vérifier avant de merger.
-
-### Validation
-
-Test à ajouter (`outbox/tests/persistence.test.ts`) : `enqueue()` puis, **sans laisser passer de
-tour de boucle supplémentaire**, rouvrir le store et vérifier que l'entrée est lisible. Avec le code
-actuel il est difficile de faire échouer ce test de façon déterministe avec fake-indexeddb — c'est
-attendu : le correctif ferme une fenêtre de course, il ne change pas le chemin nominal. Documenter
-ce point dans la PR plutôt que de fabriquer un test qui ne prouve rien.
-
----
-
-## C2 — Du texte en clair peut se réécrire sur disque après la déconnexion
-
-`packages/search/src/index.ts:74-95` · `packages/search/src/worker.ts:23` · `packages/search/src/engine.ts:118-132`
-
-### Le défaut
-
-Deux courses distinctes, même cause : le wipe ne connaît pas ce qui est en vol.
-
-**Course 1 — le tampon du thread principal.** `createSearch` accumule les événements déchiffrés dans
-`buffer` et les poste au worker 250 ms plus tard (`BUFFER_MS`). `registerWipe("search", wipe)`
-(ligne 95) ne vide **ni `buffer` ni `timer`** ; seul `dispose()` le fait (lignes 104-106).
-
-```
-événements déchiffrés → buffer rempli, timer armé
-  → logout() → wipes exécutés → le worker vide l'index et efface le snapshot
-    → 250 ms plus tard, le timer se déclenche → index(batch)
-      → engine.index() réinsère ET termine par persist() → snapshot réécrit sur disque
-```
-
-**Course 2 — l'entrelacement dans le worker.** `scope.onmessage` est `async` sans sérialisation
-(`worker.ts:23`) : un `wipe` reçu pendant qu'un `index()` déroule sa boucle de lots s'exécute entre
-deux `await`. La boucle reprend ensuite et repersiste.
-
-Résultat dans les deux cas : du contenu déchiffré subsiste en IndexedDB après une déconnexion.
-Viole REQ-SRC-08 et l'interdit absolu n°8 de CLAUDE.md. Le test REQ-SRC-08 actuel ne le voit pas :
-il indexe, wipe, vérifie — sans rien laisser en vol.
-
-### Le correctif
-
-**Course 1 — trois lignes.** Extraire ce que `dispose()` fait déjà et l'appeler aussi depuis le wipe :
-
-```ts
-const resetBuffer = (): void => {
-  if (timer) clearTimeout(timer);
-  timer = undefined;
-  buffer = [];
-};
-
-const wipe = async () => { resetBuffer(); await call<void>("wipe", []); };
-```
-
-L'ordre compte : vider le tampon **avant** de poster le wipe, sinon un `drain()` peut se glisser entre.
-
-**Course 2 — sérialiser le worker.** Une ligne dans `worker.ts` :
-
-```ts
-let queue: Promise<void> = Promise.resolve();
-scope.onmessage = (event) => { queue = queue.then(() => handle(event)); };
-```
-
-Préférer ça à un garde d'époque dans le moteur : ça supprime **la classe** de bugs (tout
-entrelacement futur `index`/`wipe`/`search`) au lieu de patcher l'instance connue. Les requêtes se
-disputaient déjà une seule base Orama — il n'y a pas de parallélisme réel à perdre.
-
-### Impacts
-
-- **`packages/search/src/index.ts`** : `wipe` n'est plus l'alias direct de `call("wipe")`. `dispose()`
-  réutilise `resetBuffer()`. Interface publique inchangée.
-- **`packages/search/src/worker.ts`** : le corps du handler passe dans une fonction `handle`, le
-  handler devient synchrone et enchaîne. `serve()` garde sa signature — les tests qui l'appellent
-  à la main (`proxy.test.ts:25`) continuent de fonctionner.
-- **`packages/search/src/engine.ts`** : inchangé. C'est le point de ce choix.
-
-### Effets secondaires
-
-- **Une recherche peut désormais attendre derrière une indexation.** C'est le prix de la
-  sérialisation. Avec `BATCH_SIZE = 500` les lots sont petits, mais un `index()` porte **tous** ses
+**Conséquences.**
+- **Une recherche peut désormais attendre derrière une indexation.** Un `index()` porte tous ses
   lots dans un seul message : un rattrapage de 50 000 événements bloque la barre de recherche
-  pendant toute sa durée, là où l'entrelacement actuel la laissait passer.
-  **Seuil de bascule :** si la spec 11 constate une latence visible, découper côté proxy (un message
-  par lot au lieu d'un message par appel) rend la main entre les lots sans réintroduire la course.
-  À noter dans la PR comme dette assumée, avec un `ponytail:`.
-- **`wipe()` est public** (`Search.wipe`) : l'UI qui l'appellerait directement bénéficie de la même
-  protection. Aucune régression.
-- **Aucun impact sur D-05.** Ce correctif ne touche pas à la politique de réindexation : il garantit
-  seulement que `wipe()` fait ce qu'il annonce.
+  pendant toute sa durée. Marqué d'un `ponytail:` dans `worker.ts`. Seuil de bascule : si la spec 11
+  constate une latence visible, découper côté proxy (un message par lot) rend la main sans
+  réintroduire la course.
+- `wipe()` étant public, une UI qui l'appellerait directement bénéficie de la même protection.
 
-### Validation
+### N3 — L'outbox flushait avant que `/sync` soit sain
+`packages/outbox/src/outbox.ts` — branche `fix-n3-n2`
 
-Test à ajouter (`search/tests/proxy.test.ts`, sous REQ-SRC-08) : émettre des événements déchiffrés,
-**déclencher les wipes avant `BUFFER_MS`**, avancer les timers au-delà, puis vérifier
-`stats().size === 0` **et** que le snapshot relu depuis une nouvelle instance de moteur est vide.
-Le second point est le vrai test : c'est la persistance qui pose le problème, pas l'état mémoire.
+Non critique à l'origine. Promu parce que c'est un **prérequis dur de C1**, et parce que C4 le rend
+systématique : sans reprise de session il n'existait pas de chemin « rechargement », donc le bug
+était presque inatteignable. C4 crée exactement ce chemin.
 
----
+**Le bug.** `schedule()` armait un flush à 0 ms dès la construction : la file partait avant que
+`/sync` ait atteint `Prepared`. `onSync` ne servait qu'aux transitions ultérieures, et `pass()` ne
+consultait jamais l'état de sync.
 
-## N3 — Flush initial de l'outbox sans attendre un sync sain
+**Le correctif.** Une garde dans `flush()`, point de passage unique de `enqueue`, `retry`, `onSync`,
+du timer et de l'API publique.
 
-`packages/outbox/src/outbox.ts:223`
+**Pas dans `pass()`** : le `finally` de `flush()` rappelle `schedule()`, donc une passe sortant à
+vide réarmerait un timer à 0 ms, qui rappellerait `flush`, en boucle. Placée dans `flush()`, la
+garde coupe avant le `finally` : le timer déjà armé se déclenche une fois sans rien faire, personne
+ne le réarme, et c'est `onSync` qui relance.
 
-Non critique en soi, **prérequis dur de C1**. Traité ici pour cette raison.
+**Point de conception non évident.** L'état de sync est **retenu dans une variable** mise à jour
+depuis l'argument de l'événement, et non relu par `getSyncState()` au moment du flush. Relire
+supposerait que le SDK a déjà publié le nouvel état quand il émet `ClientEvent.Sync`. Si l'ordre
+était l'inverse, le flush de reconnexion verrait encore l'ancien état et **la file ne repartirait
+jamais**. Aucun test sur Session mockée ne peut voir cette panne : c'est le mock qui fixe l'ordre.
+`getSyncState()` n'est plus lu qu'une fois, à la construction, hors de toute question de timing.
 
-### Le défaut
+**Conséquences.**
+- `await outbox.flush()` peut résoudre sans rien avoir tenté. C'était déjà vrai quand tout était en
+  backoff, ça devient fréquent. Les tests qui montent une outbox doivent poser un état de sync sain
+  sur le mock — `getSyncState` a été ajouté au mock, défaut `SYNCING`.
+- Moins de bruit réseau hors ligne : les tentatives vouées à l'échec ne sont plus émises.
 
-`schedule()` est appelé à la construction. Les entrées réhydratées ont un `nextAttemptAt` dans le
-passé, donc le `setTimeout` part à 0 ms : la file s'envoie avant que `/sync` ait atteint `Prepared`.
-`onSync` ne sert qu'aux transitions ultérieures, et `pass()` ne consulte jamais l'état de sync.
+### N2 — Un jeton expiré condamnait toute la file
+`packages/outbox/src/outbox.ts` — branche `fix-n3-n2`
 
-### Le correctif
+**Le bug.** `isPermanent()` classait définitif tout 4xx sauf `M_LIMIT_EXCEEDED`. Un
+`401 M_UNKNOWN_TOKEN` (jeton expiré, soft logout) est un 4xx : **toute la file passait `failed` en
+une passe** et exigeait un renvoi manuel, entrée par entrée, par l'utilisateur.
 
-Une garde, dans `flush()` — le point de passage unique de `enqueue`, `retry`, `onSync`, du timer et
-de l'API publique :
+**Le correctif.** Un jeu `RETRYABLE = { M_LIMIT_EXCEEDED, M_UNKNOWN_TOKEN }` — généralisation de la
+forme existante, pas une nouvelle mécanique.
 
-```ts
-const healthy = () => HEALTHY.has(session.client.getSyncState());
+**Conséquences.**
+- N2 et N3 se composent : un jeton invalide fait sortir le SDK des états sains, donc la garde N3
+  empêche même de tenter. Le backoff ne tourne pas à vide.
+- `M_MISSING_TOKEN` avait été ajouté puis retiré : le soft logout rend `M_UNKNOWN_TOKEN`, pas
+  celui-là. Aucun chemin connu, aucun test — donc dehors.
+- **Ce correctif dévie du texte de REQ-OBX-04** (voir « À statuer par le CM »).
 
-function flush(): Promise<void> {
-  if (disposed || !healthy()) return Promise.resolve();
-  // ...inchangé
-}
-```
+### C4 — Aucune reprise de session
+`packages/client-core/` — branche `fix-c4`
 
-**Ne pas la mettre dans `pass()`** : `flush()` appelle `schedule()` dans son `finally`, qui réarme un
-`setTimeout(0)` puisque `nextAttemptAt` est dans le passé, qui rappelle `flush()`, qui sort
-aussitôt... et rearme. Boucle de timers à vide tant que le client est hors ligne. Placée dans
-`flush()`, la garde coupe avant le `finally` : le timer déjà armé se déclenche une fois, ne fait
-rien, et rien ne le réarme — c'est `onSync` qui relance, comme aujourd'hui.
+**Le bug.** `initSession` exigeait un `loginToken` OIDC frais à chaque appel, rien ne persistait les
+credentials, et `localStorage` est interdit. Trois modules livrés reposaient donc sur une
+persistance locale qu'aucun chemin ne savait rouvrir :
 
-### Effets secondaires
-
-- **Un `await outbox.flush()` peut ne rien tenter** et résoudre sans avoir envoyé. C'est déjà le cas
-  quand tout est en backoff, mais ça devient beaucoup plus fréquent. Les tests qui appellent
-  `flush()` après avoir monté l'outbox devront poser un état de sync sain sur le mock
-  (`outbox/tests/session-mock.ts` n'expose pas `getSyncState` aujourd'hui — à ajouter).
-- Le comportement hors ligne ne change pas : les tentatives échouaient et partaient en backoff,
-  elles ne sont maintenant plus tentées du tout. Moins de bruit réseau, même résultat.
-
----
-
-## C4 — Aucune reprise de session
-
-`packages/client-core/src/session.ts:10-21, 77-103`
-
-Le plus gros, et le seul qui exige un arbitrage PM avant d'écrire du code.
-
-### Le défaut
-
-`SessionConfig` exige un `loginToken` OIDC frais. Rien ne persiste `access_token` / `user_id` /
-`device_id`, `localStorage` est interdit (interdit n°2), et il n'existe aucun `restoreSession()`.
-
-Trois modules livrés reposent sur une persistance locale qu'aucun chemin ne sait rouvrir :
-
-| Promesse | Où | Pourquoi elle ne tient pas |
+| Promesse | Où | Pourquoi elle ne tenait pas |
 |---|---|---|
-| « historique consultable hors ligne » | REQ-COR-03 | rouvrir la session exige un aller-retour OIDC |
-| « la file survit au rechargement » | REQ-OBX-01 | la file survit, mais rien ne peut la vider sans session |
-| « l'index survit au rechargement » | REQ-SRC-02 | l'index survit, mais l'app ne s'ouvre pas hors ligne |
+| « historique consultable hors ligne » | REQ-COR-03 | rouvrir la session exigeait un aller-retour OIDC |
+| « la file survit au rechargement » | REQ-OBX-01 | la file survivait, rien ne pouvait la vider |
+| « l'index survit au rechargement » | REQ-SRC-02 | l'index survivait, l'app ne s'ouvrait pas |
 
-Aucune spec ne possède ce raccordement : la 04 dit « cycle de vie du `MatrixClient` » sans le
-détailler, la 11 n'est pas écrite.
-
-### Décision PM requise avant tout code
-
-**Où vit le jeton d'accès, et sous quelle protection ?**
-
-Le fait à poser sur la table : `initRustCrypto({ useIndexedDB: true })` est appelé **sans clé de
-pickle** (`session.ts:110`). L'état crypto — dont les clés Megolm — est donc **déjà** en clair dans
-IndexedDB. Y ajouter le jeton d'accès ne baisse pas le niveau de protection réel ; chiffrer le seul
-jeton en laissant les clés à côté serait de la mise en scène, ce que l'interdit n°13 proscrit.
-
-Trois options, à trancher par le PM et à consigner en `DECISIONS.md` (D-06) :
-
-1. **Jeton en clair en IndexedDB, aligné sur l'état crypto existant.** Cohérent, honnête, à
-   documenter dans `LIMITES.md` : quiconque a accès au profil du navigateur a accès au compte.
-2. **Clé de pickle sur la crypto *et* chiffrement du jeton**, dérivée d'un secret utilisateur
-   (déverrouillage à chaque ouverture). Protège réellement, mais ajoute un écran de saisie à chaque
-   démarrage — décision produit, pas technique.
-3. **Pas de reprise du tout**, et on assume que l'app exige du réseau à chaque ouverture. Alors il
-   faut **retirer** les promesses hors ligne de REQ-COR-03, REQ-OBX-01 et REQ-SRC-02, qui ne sont
-   pas tenables sans elle.
-
-Le reste de cette section suppose l'option 1 ou 2 ; la mécanique est la même, seule la couche de
-chiffrement diffère.
-
-### Le correctif
-
-**Pas de nouveau fichier.** Un object store, une clé fixe, trois opérations : ~25 lignes en bas de
-`session.ts`, sur le patron de `outbox/src/store.ts` (et avec le helper `write` de C3). Un fichier
-séparé pour trois fonctions privées coûte plus qu'il ne range.
+**Le correctif.** `restoreSession(config)` relit les credentials en IndexedDB et reconstruit la
+session sans réseau ; la queue commune aux deux entrées passe dans `buildSession`.
 
 ```ts
-interface StoredCredentials { accessToken: string; userId: string; deviceId: string }
+const session = (await restoreSession({ homeserverUrl })) ?? (await initSession({ homeserverUrl, loginToken }));
 ```
 
-Trois champs, pas quatre : `homeserverUrl` vient déjà de la config de l'appelant, le stocker
-supposerait un jour plusieurs homeservers — un seul `SERVER_NAME` est déployé.
+`null` n'est pas une erreur : c'est « aucune session locale, passe par l'OIDC », le signal
+qu'attend la spec 11.
 
-**Refactor de `session.ts`** — extraire la queue commune des deux chemins d'entrée :
+**Choix de conception.**
+- **Jeton stocké en clair.** `initRustCrypto` tourne sans clé de pickle, donc l'état crypto voisin —
+  clés Megolm comprises — l'est déjà. Chiffrer le seul jeton en laissant les clés à côté
+  présenterait une garantie que le module n'offre pas (interdit n°13). **À ratifier par le CM.**
+- **`logout()` efface les credentials en premier** : si le reste échoue, mieux vaut une session
+  locale morte qu'un jeton qui survit à la déconnexion.
+- **Un échec de restauration rend `null` sans rien effacer.** Le réflexe inverse — effacer les
+  credentials douteux — refaisait le bug de N2 : un `initRustCrypto` qui échoue parce que le wasm
+  n'a pas chargé est souvent passager, et effacer forcerait un OIDC, donc du réseau, précisément ce
+  que l'utilisateur hors ligne n'a pas. Si la panne est définitive, l'OIDC réécrira ces credentials
+  de toute façon.
+- **~50 lignes de store dans `session.ts`**, pas de fichier séparé. Marqué d'un `ponytail:` : c'est
+  la 3ᵉ copie du motif open/commit IndexedDB, à factoriser une fois C3 et C4 tous deux sur `main`.
+  Refactorer à cheval sur deux branches coûterait plus que la duplication.
 
-```ts
-async function buildSession(credentials: StoredCredentials, config): Promise<Session>
-// = tout ce qui suit le login aujourd'hui : IndexedDBStore, createClient,
-//   initRustCrypto, lockUnverifiedDeviceBlacklist, startClient, objet Session
-
-export async function initSession(config: SessionConfig): Promise<Session>
-// loginRequest → persist → buildSession
-
-export async function restoreSession(config: Omit<SessionConfig, "loginToken">): Promise<Session | null>
-// read() → null si absent → buildSession
-```
-
-`Omit<SessionConfig, "loginToken">` plutôt qu'un type `RestoreConfig` : rien à maintenir en double.
-
-`null` est le signal « va faire l'OIDC » pour la spec 11. Pas d'exception : l'absence de session
-n'est pas une erreur, c'est le premier lancement.
-
-**`logout()`** efface les credentials **en premier**, avant `client.logout(true)`. Le commentaire
-existant (`session.ts:160-162`) pose déjà la règle : « l'effacement local ne dépend d'aucune
-réussite réseau ». Si on efface après, un échec du wipe laisse un jeton stocké déjà révoqué côté
-serveur — le pire des deux mondes.
-
-### Impacts
-
-- **`packages/client-core/`** : un fichier neuf, `session.ts` réorganisé, deux exports de plus dans
-  `index.ts` (`restoreSession`, `StoredCredentials`).
-- **`packages/client-core/package.json`** : `fake-indexeddb` en devDependency (comme `outbox` et
-  `search`).
-- **`packages/client-core/tests/mocks.ts`** : `resetSdk()` doit fournir un `IDBFactory` de test. Le
-  mock actuel remplace tout matrix-js-sdk ; le store de credentials, lui, doit tourner sur un vrai
-  fake-indexeddb, sinon on teste un mock contre un mock.
-- **Aucun consommateur cassé** : `initSession` garde sa signature. `messaging`, `outbox` et `search`
-  ne voient rien.
-- **Spec 04 à amender** : REQ-COR-11 (reprise de session sans réseau) + REQ-COR-10 étendue
-  (le wipe couvre les credentials).
-
-### Effets secondaires
-
-- **Un jeton restauré peut être invalide** (révoqué, expiré, soft logout). Le valider par un
-  `whoami()` exigerait du réseau — ce qui détruit l'objectif hors ligne. **Choix à faire
-  explicitement : restaurer optimistement, et laisser la spec 11 router vers l'OIDC quand le SDK
-  remonte `M_UNKNOWN_TOKEN`.** Ne pas laisser ce choix implicite dans le code.
-- **Ce scénario est exactement N2.** Un jeton restauré invalide produit des 401 sur les envois ;
-  `isPermanent()` (`outbox.ts:63`) classe tout 4xx comme définitif, donc **toute la file passe
-  `failed` en une passe** et exige un renvoi manuel entrée par entrée. C4 rend N2 systématique au
-  lieu d'occasionnel. Corriger N2 dans la même PR ou juste après — pas plus tard.
-- **`device_id` réutilisé entre sessions.** C'est voulu (l'identité crypto de l'appareil est
-  attachée au `device_id`, en changer force une nouvelle vérification), mais ça veut dire qu'un
-  store de credentials corrompu ou partiellement effacé laisse un client avec un `device_id` dont
-  les clés ne correspondent plus. `restoreSession` doit traiter « credentials présents mais
-  `initRustCrypto` échoue » comme un échec de restauration : effacer et rendre `null`, pas propager.
-- **Deux bases IndexedDB de plus dans le budget de stockage** (`tacita`, `tacita-outbox`,
-  `tacita-search`, + credentials). Sous pression disque, le navigateur peut évincer l'origine entière :
-  la reprise de session échoue alors proprement (`read()` rend `undefined` → `null` → OIDC). Vérifier
-  que c'est bien le comportement obtenu, et non une exception.
-
-### Validation
-
-- REQ-COR-11 : `initSession` → fermer → `restoreSession` sur le même `IDBFactory` → session
-  utilisable, **sans que `loginRequest` ait été rappelé** (c'est l'assertion qui compte).
-- `restoreSession` sur un store vide → `null`, aucun appel réseau.
-- REQ-COR-10 étendue : après `logout()`, `restoreSession` rend `null`.
-- Échec d'`initRustCrypto` à la restauration → `null` et store effacé.
+**Conséquences.**
+- **Un jeton restauré n'est pas validé** — le valider demanderait le réseau. Un jeton révoqué se
+  manifeste par un `M_UNKNOWN_TOKEN` au premier appel, que la spec 11 doit router vers l'OIDC.
+  C'est exactement le scénario de N2 : **C4 sans N2 condamnerait toute la file d'envoi au premier
+  démarrage avec un jeton périmé.** Les deux branches vont ensemble.
+- `REQ-COR-11` est une **exigence nouvelle** : la spec 04 doit être amendée.
+- `fake-indexeddb` ajouté en devDependency de `client-core` ; `pnpm-lock.yaml` modifié.
+- Une base IndexedDB de plus (`tacita-session`). Sous pression disque, le navigateur peut évincer
+  l'origine : la reprise échoue alors proprement en `null` → OIDC.
 
 ---
 
-## C1 — L'outbox envoie sans la garde de chiffrement
+## 3. Ce qui reste : C1
 
 `packages/outbox/src/outbox.ts:147` · `packages/messaging/src/rooms.ts:17-22`
 
-### Le défaut
+**Le bug.** `messaging` fait passer tout envoi par une fonction unique qui appelle
+`assertEncrypted()` — c'est REQ-MSG-02, dont la justification est explicite dans `rooms.ts` : « un
+envoi en clair est une fuite irréversible : on vérifie côté client avant chaque écriture plutôt que
+de faire confiance à une config distante ». **L'outbox appelle `sendEvent()` en direct, sans aucune
+vérification.**
 
-`messaging` fait passer **tout** envoi par une fonction unique qui appelle `assertEncrypted()`
-(`messages.ts:36-45`) — c'est REQ-MSG-02, et sa justification est explicite en `rooms.ts:11-16` :
-« un envoi en clair est une fuite irréversible : on vérifie côté client avant chaque écriture plutôt
-que de faire confiance à une config distante ».
+L'exposition est faible aujourd'hui (le serveur force `encryption_enabled_by_default_for_room_type:
+all`) — mais c'est précisément la confiance que REQ-MSG-02 refuse d'accorder, et quand la spec 11
+branchera l'UI sur l'outbox, ce sera **le** chemin d'envoi principal, celui sans garde.
 
-L'outbox appelle `session.client.sendEvent()` en direct. Aucune vérification, ni à l'`enqueue`, ni à
-l'`attempt`.
-
-L'exposition est faible aujourd'hui (le serveur force
-`encryption_enabled_by_default_for_room_type: all`) — mais c'est précisément la confiance que
-REQ-MSG-02 refuse d'accorder. Et quand la spec 11 branchera l'UI sur l'outbox, ce sera **le** chemin
-d'envoi principal, celui sans garde.
-
-### Le correctif
-
-**Remonter la garde dans `client-core`, pas la dupliquer.** Trois options examinées :
+**Le correctif prévu.** Remonter la garde dans `client-core` plutôt que la dupliquer :
 
 | Option | Verdict |
 |---|---|
-| `outbox` importe `assertEncrypted` de `@tacita/messaging` | ✗ crée une arête `outbox → messaging` que la spec 00 interdit sans déclaration, et la spec 07 ne déclare que la 04 |
-| Dupliquer les quatre lignes dans `outbox` | ✗ deux copies d'un contrôle de sécurité dérivent |
-| **Ajouter `isEncrypted(roomId)` à l'interface `Session`** | ✓ un seul endroit, aucune arête nouvelle, les deux packages dépendent déjà de la 04 |
+| `outbox` importe depuis `@tacita/messaging` | ✗ arête que la spec 00 interdit sans déclaration |
+| Dupliquer les quatre lignes | ✗ deux copies d'un contrôle de sécurité dérivent |
+| **`isEncrypted(roomId)` sur l'interface `Session`** | ✓ un seul endroit, aucune arête nouvelle |
 
-`messaging/rooms.ts` garde son export : `assertEncrypted` devient une ligne au-dessus du prédicat.
-Aucun appelant de `messaging` ne bouge.
-
-**Où appeler la garde dans l'outbox : dans `attempt()`, pas dans `enqueue()`.** La file est différée
-par nature — l'état de chiffrement au moment de la mise en file n'est pas celui au moment de
-l'envoi. Un appel dans `enqueue()` en plus, pour un échec rapide côté UI, est optionnel ; celui de
-`attempt()` est obligatoire.
-
-### Le piège à ne pas manquer
-
-Le réflexe est de mettre `await session.assertEncrypted(...)` en tête du `try` de `attempt()`.
-**Ne pas faire ça.** L'échec tombe alors dans le `catch` (`outbox.ts:155-170`) et y est traité comme
-une erreur d'envoi : `errcodeOf()` d'une `Error` nue rend `"network"`, `isPermanent()` rend `false`
-faute de `httpStatus`, donc
-
-> l'entrée réessaie indéfiniment, avec backoff, sur une condition qui ne changera jamais.
-
-Le contrôle va **avant** le `try`, avec son propre échec — quatre lignes, aucun type d'erreur à
-créer, aucun changement à `isPermanent()` :
+Un **prédicat**, pas un `assertEncrypted` qui lève. Raison : le contrôle va **avant** le `try` de
+`attempt()`, avec son propre échec.
 
 ```ts
 if (!(await session.isEncrypted(entry.roomId))) {
@@ -434,72 +230,150 @@ if (!(await session.isEncrypted(entry.roomId))) {
 }
 ```
 
-D'où la forme à exposer sur `Session` : un prédicat `isEncrypted(roomId)`, pas un `assertEncrypted`
-qui lève. `messaging/rooms.ts` garde son `assertEncrypted` (il lève, c'est ce que ses appelants
-attendent) et devient une ligne au-dessus du prédicat.
+Mettre `await assertEncrypted(...)` en tête du `try` serait le réflexe, et le piège : l'échec
+tomberait dans le `catch`, où `errcodeOf()` d'une `Error` nue rend `"network"` et `isPermanent()`
+rend `false` faute de `httpStatus` — **l'entrée réessaierait indéfiniment sur une condition qui ne
+changera jamais.** `messaging/rooms.ts` garde son `assertEncrypted`, qui devient une ligne au-dessus
+du prédicat.
 
-### Pourquoi N3 est un prérequis dur
+**Prérequis : N3, déjà fait.** `isEncrypted` lit l'état du salon, inconnu avant la fin du premier
+`/sync` — la fonction rend alors `false`. Avec l'ancien flush immédiat au montage, C1 aurait marqué
+toute la file `failed` à chaque rechargement. La branche `fix-n3-n2` lève ce blocage ; **C1 ne doit
+pas être mergé sans elle.**
 
-`isEncrypted` appelle `crypto.isEncryptionEnabledInRoom(roomId)`, qui lit l'état du salon.
-**Avant la fin du premier `/sync`, cet état peut être inconnu — la fonction rend `false`.**
+**Impacts attendus.** Une méthode de plus sur `Session` → **les trois** `session-mock.ts` (outbox,
+messaging, search) doivent la fournir, sinon toute la suite passe au rouge d'un coup. Specs 04 et 07
+à amender.
 
-Or `schedule()` déclenche aujourd'hui un flush immédiat au montage (N3). Enchaînement au
-rechargement de page :
-
-```
-outbox réhydraté → flush immédiat → état du salon pas encore synchronisé
-  → assertEncrypted rend false → toutes les entrées marquées failed
-    → l'utilisateur doit renvoyer chaque message à la main
-```
-
-**Poser C1 sans N3 transforme un risque théorique en panne certaine à chaque rechargement.**
-C'est la seule dépendance non négociable de ce plan.
-
-### Impacts
-
-- **`packages/client-core/src/session.ts`** : une méthode de plus sur `Session`. Toute implémentation
-  ou tout mock de `Session` doit la fournir — `outbox/tests/session-mock.ts`,
-  `messaging/tests/session-mock.ts`, `search/tests/session-mock.ts` : **les trois** doivent renvoyer
-  « chiffré » par défaut, sinon toute la suite passe au rouge d'un coup.
-- **`packages/messaging/src/rooms.ts`** : `assertEncrypted` devient une délégation. REQ-MSG-02 reste
-  couverte par les tests existants, sans les modifier.
-- **`packages/outbox/src/outbox.ts`** : appel dans `attempt()` + branche de classification.
-- **Specs à amender** : 04 (REQ-COR-12, la Session expose la garde) et 07 (REQ-OBX-09, aucun envoi
-  de la file sans vérification côté client).
-
-### Effets secondaires
-
-- **Un appel crypto de plus par tentative d'envoi.** `isEncryptionEnabledInRoom` lit un état déjà en
-  mémoire, le coût est négligeable — mais il est désormais sur le chemin chaud d'un flush de 50
-  entrées. Si ça se voit, mémoriser par `roomId` **avec invalidation sur `m.room.encryption`**,
-  jamais un cache permanent : la garde qui ment est pire que pas de garde.
-- **Nouveau mode d'échec visible pour l'utilisateur.** Un salon non chiffré produit maintenant un
-  `failed` définitif au lieu d'un envoi silencieux. C'est l'objectif, mais la spec 11 doit prévoir
-  le libellé — sinon l'UI affichera « échec » sans dire pourquoi, et l'utilisateur retentera en boucle.
-- **`retry()` sur une entrée bloquée par la garde reboucle** sur le même échec tant que le salon
-  n'est pas chiffré. Acceptable (c'est une action manuelle), mais le message d'erreur doit être
-  explicite, pas un code générique.
-
-### Validation
-
-- REQ-OBX-09 : session mockée rendant « non chiffré » → `flush()` → `sendEvent` **jamais appelé**, et
-  l'entrée est `failed` avec l'errcode dédié.
-- Non-régression N3 : état de sync non sain → `flush()` ne tente rien et ne marque **rien** `failed`.
-- REQ-MSG-02 : la suite `messaging` existante doit rester verte sans modification. Si elle bouge,
-  c'est que la délégation a changé le comportement — à investiguer, pas à ajuster.
+**Effets secondaires attendus.** Nouveau mode d'échec visible : un salon non chiffré produit un
+`failed` définitif au lieu d'un envoi silencieux — la spec 11 doit prévoir le libellé, sinon l'UI
+affichera « échec » sans dire pourquoi. Un appel crypto de plus par tentative ; si ça se voit,
+mémoriser par `roomId` **avec invalidation sur `m.room.encryption`**, jamais un cache permanent : la
+garde qui ment est pire que pas de garde.
 
 ---
 
-## Ce que ce plan ne traite pas
+## 4. Limites de la vérification
 
-Volontairement hors périmètre, à planifier après :
+À lire avant de considérer ces bugs « fermés ».
 
-- **N2** (401 classé définitif) — sauf s'il part avec C4, où il devient systématique. Le faire là.
-- **N1** (`ts` porte deux sémantiques dans l'index de recherche) — bug de données réel, mais aucune
-  perte ni fuite ; attend son tour.
-- **A1** (passerelle push déployée nulle part) — bloquant pour le ship, pas pour la correction des
-  critiques. Demande un arbitrage : spec 01 la provisionne, ou spec 03 se dote d'un Dockerfile.
-- **A5** (suite entièrement à base de mocks) — le vrai angle mort. Les quatre correctifs ci-dessus
-  seront validés par des tests qui ne touchent ni le vrai SDK, ni un vrai Worker, ni Synapse.
-  C4 en particulier — la reprise de session — ne sera réellement prouvée qu'à l'intégration de la
-  spec 11. À garder en tête au moment de déclarer ces bugs « corrigés ».
+- **La suite est intégralement à base de mocks.** Aucun test n'exécute le vrai matrix-js-sdk, un
+  vrai `Worker`, un vrai IndexedDB (fake-indexeddb), ni Synapse. Les tests infra parsent les YAML :
+  ils attestent du contenu des fichiers, pas de leur interprétation par le serveur. **C4 en
+  particulier — la reprise de session — ne sera réellement prouvée qu'à l'intégration de la spec
+  11.** Le point de conception N3 sur l'ordre d'émission du SDK illustre le risque : le mock
+  confirme ce qu'on lui a fait dire.
+- **C3 n'a pas de test dédié.** Reproduire de façon déterministe une transaction qui avorte après
+  l'acceptation de la requête demanderait plus de mécanique de test que le correctif n'a de code.
+  Le filet reste les tests existants, qui couvrent le chemin nominal et passent toujours. Dit tel
+  quel plutôt que masqué derrière un test décoratif.
+- **Chaque nouveau test a été vérifié en cassant volontairement son correctif.** C2, N3, N2 et C4
+  échouent bien sans leur fix. C'est la seule garantie qu'ils mordent.
+
+---
+
+## 5. À statuer par le CM
+
+Rien de ce qui suit n'a été tranché dans le code. Trois points bloquent un merge, les autres
+appellent une décision de priorité.
+
+### Bloquants pour merger
+
+**1. REQ-OBX-04 — amender ou revert N2.** La spec 07 dit « Échec définitif (4xx non-ratelimit) →
+`failed` ». Le code dit désormais « 4xx définitif », en excluant aussi `M_UNKNOWN_TOKEN`. Le texte
+et le code divergent. Formulation proposée : « Échec définitif (4xx qui ne se résout ni par
+l'attente ni par un renouvellement de jeton) → `failed` ». **Sans cet amendement, `fix-n3-n2` ne
+doit pas partir.** `specs/07-outbox.md` n'a pas été touché.
+
+**2. REQ-COR-11 — exigence nouvelle à créer.** La reprise de session n'existe dans aucune spec.
+Proposition : « REQ-COR-11 — `restoreSession()` rouvre la session persistée sans aucun appel
+réseau ; l'absence de session locale se signale par `null` et non par une erreur. » Plus une
+extension de REQ-COR-10 : le wipe couvre les credentials. **Sans ça, `fix-c4` ne doit pas partir.**
+`specs/04-client-core.md` n'a pas été touché.
+
+**3. D-06 — stockage du jeton d'accès en clair.** Décision prise en séance et à ratifier. Le fait
+qui la motive : `initRustCrypto` tourne **sans clé de pickle**, donc l'état crypto — clés Megolm
+comprises — est déjà en clair dans IndexedDB. **Conséquence à assumer explicitement : qui a accès au
+profil du navigateur a accès au compte et à l'historique déchiffrable.** La limite est documentée
+dans `packages/client-core/README.md`. Relever le niveau suppose une clé de pickle sur le store
+crypto *et* un écran de déverrouillage à chaque ouverture : décision produit, qui touche la spec 11,
+et qui mérite sa propre spec plutôt que d'être glissée dans C4. `DECISIONS.md` n'a pas été touché.
+
+### Arbitrages de priorité
+
+**4. C1 est-il plus exploitable que je ne l'estime ?** Je l'ai classé « exposition faible » parce que
+le serveur force le chiffrement sur tout nouveau salon. Si les seniors voient un chemin qui crée un
+salon non chiffré (invitation externe, salon créé hors `createDirectMessage`, migration), C1 remonte
+en tête de liste.
+
+**5. N6 — la recherche retrouve les messages supprimés.** L'index n'écoute que `Decrypted` : une
+redaction ne retire pas le document, une édition en ajoute un second sans retirer l'ancien. La
+recherche rend donc le texte de messages supprimés et l'ancienne version des messages édités. **Ni
+la spec 09 ni le code ne traitent le cas** — c'est autant un trou de spec qu'un bug. « Supprimer un
+message » qui laisse le texte trouvable est une promesse produit non tenue.
+
+**6. N1 — `ts` porte deux sémantiques dans l'index.** Le moteur documente « horodatage local
+d'indexation, sert à l'éviction » ; le code y met `origin_server_ts`. Conséquence : une pagination
+arrière insère des documents anciens, que l'éviction supprime en premier — **le rattrapage
+s'auto-évince**. Or `stats()` a besoin, lui, de `origin_server_ts` pour afficher la période couverte
+(REQ-SRC-06). Deux besoins, un champ. Correctif : deux champs, donc amendement de la spec 09.
+
+**7. A1 — la passerelle push n'est déployée nulle part.** Pas de Dockerfile, absente de
+`infra/docker-compose.yml`, aucune route nginx, aucune variable `VAPID_*` dans `.env.example`. La
+spec 03 la déclare « service Node autonome », la spec 01 ne la provisionne pas : **personne ne
+possède le raccordement.** Le module est terminé et inutilisable en l'état. Qui le prend ?
+
+**8. A2 — `retention.enabled: true` contre l'intention de D-02.** D-02 dit « ne jamais purger ».
+Activer la rétention ouvre la porte aux politiques par salon (`m.room.retention`), et il reste à
+vérifier sur la v1.155 déployée que `purge_jobs: []` est bien respecté comme liste vide et non
+remplacé par un job par défaut. CLAUDE.md impose de relire la doc de la version déployée : c'est ce
+cas. Le test REQ-INF-07 assère le contenu du YAML, pas le comportement de Synapse.
+
+**9. A5 — financer une cible de fumée avant la spec 11 ?** Voir « Limites de la vérification ». Sept
+modules seront intégrés d'un coup, validés jusque-là par des mocks. Une seule cible — `docker
+compose up`, login OIDC, envoi/réception dans un salon chiffré, en Vitest contre un Synapse
+éphémère — rendrait le risque visible maintenant plutôt qu'à l'intégration.
+
+---
+
+## 6. Fichiers touchés
+
+Inventaire par branche. Tout est local, rien n'est poussé.
+
+### `fix-c3-c2` — 3 commits
+```
+packages/outbox/src/store.ts            modifié   C3
+packages/search/src/snapshot.ts         modifié   C3
+packages/search/src/index.ts            modifié   C2
+packages/search/src/worker.ts           modifié   C2
+packages/search/tests/proxy.test.ts     modifié   C2 — 1 test ajouté (REQ-SRC-08)
+REMEDIATION-CRITIQUES.md                créé      ce document
+correctif/                              créé      trace de la revue, doublonne packages/
+```
+
+### `fix-n3-n2` — 2 commits
+```
+packages/outbox/src/outbox.ts           modifié   N3 + N2
+packages/outbox/tests/outbox.test.ts    modifié   2 tests ajoutés (REQ-OBX-02, REQ-OBX-04)
+packages/outbox/tests/session-mock.ts   modifié   getSyncState ajouté au mock
+```
+
+### `fix-c4` — 2 commits
+```
+packages/client-core/src/session.ts          modifié   C4 — store credentials, buildSession, restoreSession
+packages/client-core/src/index.ts            modifié   export de restoreSession
+packages/client-core/README.md               modifié   2 limites assumées documentées
+packages/client-core/package.json            modifié   fake-indexeddb en devDependency
+packages/client-core/tests/session.test.ts   modifié   4 tests ajoutés (REQ-COR-11)
+packages/client-core/tests/recovery.test.ts  modifié   IDBFactory réelle
+packages/client-core/tests/timeline.test.ts  modifié   IDBFactory réelle
+pnpm-lock.yaml                               modifié   fake-indexeddb
+```
+
+### Jamais touchés, volontairement
+```
+specs/           contrats — amendements 1, 2 et 6 à faire par le CM
+DECISIONS.md     territoire PM — D-06 à consigner
+CLAUDE.md        inchangé
+main             f015e56, alignée sur origin/main
+```
