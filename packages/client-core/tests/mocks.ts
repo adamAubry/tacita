@@ -32,6 +32,7 @@ function makeCrypto() {
   return {
     globalBlacklistUnverifiedDevices: false,
     getActiveSessionBackupVersion: vi.fn(async (): Promise<string | null> => "1"),
+    isEncryptionEnabledInRoom: vi.fn(async (_roomId: string) => true),
     createRecoveryKeyFromPassphrase: vi.fn(async () => ({
       privateKey: new Uint8Array(32),
       encodedPrivateKey: "EsTb ABCD EFGH",

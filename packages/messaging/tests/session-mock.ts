@@ -58,7 +58,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     },
   };
 
-  const crypto = { isEncryptionEnabledInRoom: vi.fn(async () => true) };
+  const crypto = { isEncryptionEnabledInRoom: vi.fn(async (_roomId: string) => true) };
 
   const client = {
     getUserId: vi.fn(() => "@luca:tacita.test"),
@@ -88,6 +88,16 @@ export function fakeSession(options: FakeRoomOptions = {}) {
 
   const session = {
     client,
+    // REQ-COR-12 — le prédicat **dérive** du crypto comme dans la vraie Session, au
+    // lieu de rendre `true` en dur : les tests qui simulent un salon non chiffré le
+    // font en pilotant le crypto, et c'est ce couplage-là qu'ils doivent exercer.
+    isEncrypted: vi.fn(async (roomId: string) => {
+      try {
+        return (await client.getCrypto()?.isEncryptionEnabledInRoom(roomId)) ?? false;
+      } catch {
+        return false;
+      }
+    }),
     timeline: vi.fn((_roomId: string) => ({ events: () => timelineEvents })),
   };
 

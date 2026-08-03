@@ -137,6 +137,30 @@ describe("REQ-COR-07 — clés Megolm jamais partagées avec un appareil non vé
   });
 });
 
+describe("REQ-COR-12 — l'état de chiffrement est un prédicat, pas une assertion", () => {
+  it("rend true quand le SDK dit que le salon est chiffré", async () => {
+    crypto.isEncryptionEnabledInRoom.mockResolvedValue(true);
+    const session = await initSession(config);
+    expect(await session.isEncrypted("!salon:tacita.test")).toBe(true);
+  });
+
+  it("rend false plutôt que de lever quand l'état du salon est inconnu", async () => {
+    // Avant le premier /sync abouti, le SDK peut lever. Dans le doute, on n'envoie
+    // pas : c'est un prédicat, il ne remonte jamais d'exception à la garde d'envoi.
+    crypto.isEncryptionEnabledInRoom.mockRejectedValue(new Error("état non chargé"));
+    const session = await initSession(config);
+    await expect(session.isEncrypted("!inconnu:tacita.test")).resolves.toBe(false);
+  });
+
+  it("ne mémorise rien : une garde qui ment est pire que pas de garde", async () => {
+    crypto.isEncryptionEnabledInRoom.mockResolvedValue(true);
+    const session = await initSession(config);
+    await session.isEncrypted("!salon:tacita.test");
+    await session.isEncrypted("!salon:tacita.test");
+    expect(crypto.isEncryptionEnabledInRoom).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("REQ-COR-08 — authentification déléguée au flux OIDC externe", () => {
   it("consomme le jeton de connexion et construit le client avec ses credentials", async () => {
     await initSession(config);

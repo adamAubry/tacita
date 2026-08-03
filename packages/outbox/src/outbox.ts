@@ -11,6 +11,14 @@ import { openOutboxStore } from "./store";
  */
 const EVENT_TYPE = "m.room.message";
 
+/**
+ * REQ-OBX-09 — code d'échec propre au refus d'envoyer en clair. Il n'appartient pas
+ * à l'espace de noms Matrix : c'est nous qui refusons, pas le serveur. Le shard UI
+ * (spec 11) doit lui donner un libellé qui dise pourquoi, sinon l'utilisateur voit
+ * « échec » et réessaie en boucle.
+ */
+export const NOT_ENCRYPTED = "TACITA_NOT_ENCRYPTED";
+
 export const BASE_BACKOFF_MS = 1_000;
 export const MAX_BACKOFF_MS = 60_000;
 
@@ -149,6 +157,24 @@ export async function createOutbox(
   };
 
   const attempt = async (entry: OutboxEntry): Promise<boolean> => {
+    // REQ-OBX-09 — rien ne part vers un salon non chiffré. Le contrôle est ici et
+    // non à l'enqueue : la file est différée par nature, l'état du salon au moment
+    // de la mise en file n'est pas celui de l'envoi.
+    //
+    // Et il est **avant** le `try`, pas dedans : dans le `catch`, `errcodeOf` d'une
+    // erreur nue rendrait "network" et `isPermanent` rendrait `false` faute de
+    // `httpStatus` — l'entrée réessaierait indéfiniment sur une condition qui ne
+    // changera pas.
+    if (!(await session.isEncrypted(entry.roomId))) {
+      await save({
+        ...entry,
+        status: "failed",
+        attempts: entry.attempts + 1,
+        errcode: NOT_ENCRYPTED,
+      });
+      return false;
+    }
+
     mark({ ...entry, status: "sending" });
     try {
       await session.client.sendEvent(

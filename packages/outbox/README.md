@@ -30,6 +30,17 @@ outbox.dispose(); // au démontage : coupe le timer et ferme la base
   transaction, même `event_id` côté serveur. `retry()` remet le backoff à zéro,
   pas l'identifiant.
 
+## Rien ne part en clair (REQ-OBX-09)
+
+Avant chaque tentative, la file consulte `Session.isEncrypted(roomId)` (spec 04,
+REQ-COR-12). Si le salon n'est pas chiffré, l'entrée passe `failed` avec le code
+`TACITA_NOT_ENCRYPTED` **sans aucun appel réseau** — un message en clair parti est
+une fuite irréversible, et le prédicat rend `false` tant que l'état est inconnu.
+
+Ce code ne vient pas de Matrix : c'est nous qui refusons, pas le serveur. Le shard
+UI (spec 11) doit lui donner un libellé qui dise pourquoi, sinon l'utilisateur voit
+« échec » et réessaie en boucle.
+
 ## Limites assumées
 
 - **Seul `m.room.message` est mis en file.** C'est le seul type qui se compose
