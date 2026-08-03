@@ -207,7 +207,11 @@ export async function saveOriginal(
   original: Blob,
   filename: string,
 ): Promise<void> {
-  await (env.saveViaFilePicker ?? env.saveViaDownload)(original, filename);
+  // Appel via `env` : détacher la méthode lui ferait perdre son `this` si l'app
+  // implémente `MediaEnvironment` avec une classe.
+  await (env.saveViaFilePicker
+    ? env.saveViaFilePicker(original, filename)
+    : env.saveViaDownload(original, filename));
 }
 
 /**

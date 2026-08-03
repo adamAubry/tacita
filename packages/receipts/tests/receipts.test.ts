@@ -54,6 +54,15 @@ function readReceipt(eventIds: string[], reader: string) {
   return { getContent: () => content };
 }
 
+/** La timeline telle que le SDK l'a accumulée depuis `/sync`. */
+function fakeRoom(...eventIds: string[]) {
+  return {
+    getLiveTimeline: () => ({
+      getEvents: () => eventIds.map((id) => ({ getId: () => id })),
+    }),
+  };
+}
+
 function delivered(eventIds: string[]) {
   return { message: { type: DELIVERED_EVENT_TYPE, sender: TOI, content: { event_ids: eventIds } } };
 }
@@ -87,6 +96,17 @@ describe("REQ-RCP-01 — « envoyé » dérivé de l'event_id serveur, `sending`
     ]);
   });
 
+  it("ne fait pas reculer un statut acquis quand l'écho est ré-émis sans nouvel id", () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$a", MOI));
+    client.emit(ClientEvent.ReceivedToDeviceMessage, delivered(["$a"]));
+
+    // Le SDK ré-émet aussi l'écho local sur un simple changement de statut d'envoi.
+    client.emit(RoomEvent.LocalEchoUpdated, fakeEvent("$a", MOI), { roomId: SALON }, "$a");
+
+    expect(receipts.status("$a")).toBe("delivered");
+  });
+
   it("ne suit pas les messages entrants : ils n'ont pas de statut d'envoi", () => {
     const receipts = createReceipts(session);
     insert(client, fakeEvent("$deToi", TOI));
@@ -99,10 +119,29 @@ describe("REQ-RCP-02 — « lu » dérivé des reçus m.read natifs", () => {
     const receipts = createReceipts(session);
     insert(client, fakeEvent("$a", MOI));
 
-    client.emit(RoomEvent.Receipt, readReceipt(["$a"], MOI));
+    client.emit(RoomEvent.Receipt, readReceipt(["$a"], MOI), fakeRoom("$a"));
     expect(receipts.status("$a")).toBe("sent");
 
-    client.emit(RoomEvent.Receipt, readReceipt(["$a"], TOI));
+    client.emit(RoomEvent.Receipt, readReceipt(["$a"], TOI), fakeRoom("$a"));
+    expect(receipts.status("$a")).toBe("read");
+  });
+
+  it("marque lu tout ce qui précède : « m.read » vaut « lu jusqu'ici »", () => {
+    const receipts = createReceipts(session);
+    for (const id of ["$a1", "$a2", "$a3"]) insert(client, fakeEvent(id, MOI));
+
+    // Le reçu ne pointe que le dernier message.
+    client.emit(RoomEvent.Receipt, readReceipt(["$a3"], TOI), fakeRoom("$a1", "$a2", "$a3"));
+
+    expect(["$a1", "$a2", "$a3"].map(receipts.status)).toEqual(["read", "read", "read"]);
+  });
+
+  it("ne remonte rien pour un reçu hors de la timeline chargée", () => {
+    const receipts = createReceipts(session);
+    insert(client, fakeEvent("$a", MOI));
+
+    client.emit(RoomEvent.Receipt, readReceipt(["$a"], TOI), fakeRoom("$autre"));
+
     expect(receipts.status("$a")).toBe("read");
   });
 });
@@ -143,7 +182,7 @@ describe("REQ-RCP-04 — « délivré » au premier appareil atteint, surnuméra
   it("ne fait jamais reculer read vers delivered", () => {
     const receipts = createReceipts(session);
     insert(client, fakeEvent("$a", MOI));
-    client.emit(RoomEvent.Receipt, readReceipt(["$a"], TOI));
+    client.emit(RoomEvent.Receipt, readReceipt(["$a"], TOI), fakeRoom("$a"));
 
     client.emit(ClientEvent.ReceivedToDeviceMessage, delivered(["$a"]));
 

@@ -220,6 +220,18 @@ describe("REQ-MED-05 — original non compressé conservé sur l'appareil de l'a
     await saveOriginal(withPicker, original, "IMG_0001.heic");
     expect(withPicker.saveViaFilePicker).toHaveBeenCalledWith(original, "IMG_0001.heic");
     expect(withPicker.saveViaDownload).not.toHaveBeenCalled();
+
+    // L'adaptateur a le droit de s'appuyer sur son `this` : la méthode ne doit pas être
+    // détachée de `env` avant d'être appelée.
+    const stateful = {
+      ...fakeEnv(),
+      saved: [] as string[],
+      async saveViaFilePicker(_blob: Blob, filename: string) {
+        this.saved.push(filename);
+      },
+    };
+    await saveOriginal(stateful, original, "IMG_0002.heic");
+    expect(stateful.saved).toEqual(["IMG_0002.heic"]);
   });
 
   it("reste hors du chemin d'envoi : le destinataire n'a que la version compressée", async () => {
@@ -277,6 +289,14 @@ describe("REQ-MED-08 — vérification du hash puis déchiffrement local", () =>
     const { ciphertext, keys } = await encryptAttachment(clear, env);
 
     expect(await decryptAttachment(ciphertext, keys, env.subtle)).toEqual(clear);
+  });
+
+  it("accepte une empreinte paddée : la spec dit non paddé, les clients font ce qu'ils veulent", async () => {
+    const clear = bytes("média venu d'un autre client");
+    const { ciphertext, keys } = await encryptAttachment(clear, env);
+    const padded = { ...keys, hashes: { sha256: `${keys.hashes.sha256}==` } };
+
+    expect(await decryptAttachment(ciphertext, padded, env.subtle)).toEqual(clear);
   });
 
   it("rejette un blob altéré avant toute tentative de déchiffrement", async () => {

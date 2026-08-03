@@ -5,6 +5,7 @@ import {
   RoomEvent,
   type MatrixEvent,
   type ReceivedToDeviceMessage,
+  type Room,
 } from "matrix-js-sdk";
 
 /**
@@ -121,12 +122,38 @@ export function createReceipts(session: Session): Receipts {
   const onLocalEcho = (event: MatrixEvent, _room: unknown, oldEventId?: string): void => {
     const eventId = event.getId();
     if (!eventId || event.getSender() !== self) return;
-    if (oldEventId) statuses.delete(oldEventId);
+    // L'événement est aussi ré-émis sans changement d'identifiant (simple changement de
+    // statut d'envoi) : effacer l'entrée dans ce cas ferait reculer un `delivered` déjà
+    // acquis vers `sent`, en contournant la garde de monotonie d'`advance`.
+    if (oldEventId && oldEventId !== eventId) statuses.delete(oldEventId);
     advance(eventId, ownStatus(event), true);
   };
 
+  /**
+   * Un reçu `m.read` vaut « lu jusqu'ici », pas « ce message-ci est lu » : tout ce qui
+   * précède l'événement pointé est lu aussi. Sans ce parcours, un message plus ancien
+   * que le dernier reçu resterait affiché `delivered` indéfiniment.
+   *
+   * L'ordre parcouru est celui du flux `/sync` tel que le SDK l'a accumulé — jamais un
+   * tri par `origin_server_ts`.
+   */
+  function markReadUpTo(room: Room | undefined, eventId: string): void {
+    const events = room?.getLiveTimeline().getEvents() ?? [];
+    const upTo = events.findIndex((event) => event.getId() === eventId);
+    if (upTo === -1) {
+      // Reçu portant sur un événement hors de la timeline chargée : rien à remonter.
+      advance(eventId, "read");
+      return;
+    }
+    for (const event of events.slice(0, upTo + 1)) {
+      const id = event.getId();
+      // `advance` ignore les identifiants non suivis : seuls nos propres messages bougent.
+      if (id) advance(id, "read");
+    }
+  }
+
   /** REQ-RCP-02 — « lu » vient des reçus `m.read` natifs. */
-  const onReceipt = (event: MatrixEvent): void => {
+  const onReceipt = (event: MatrixEvent, room: Room): void => {
     const content = event.getContent() as Record<
       string,
       Record<string, Record<string, unknown> | undefined> | undefined
@@ -135,7 +162,7 @@ export function createReceipts(session: Session): Receipts {
       if (!byType) continue;
       const readers = byType[ReceiptType.Read];
       if (readers && Object.keys(readers).some((userId) => userId !== self)) {
-        advance(eventId, "read");
+        markReadUpTo(room, eventId);
       }
     }
   };

@@ -50,6 +50,14 @@ const unbase64 = (value: string): Bytes =>
 const sha256 = async (subtle: SubtleCrypto, data: Bytes): Promise<string> =>
   base64(new Uint8Array(await subtle.digest("SHA-256", data)));
 
+/**
+ * La spec Matrix décrit ces empreintes en base64 **non paddé**, mais elle décrit ce que
+ * les clients devraient émettre, pas ce qu'ils émettent : un `=` final suffirait sinon à
+ * faire rejeter un média parfaitement valide envoyé par un autre client. La comparaison
+ * se fait donc sur une forme normalisée des deux côtés.
+ */
+const unpadded = (value: string): string => value.replace(/=+$/, "");
+
 export interface CryptoEnvironment {
   subtle: SubtleCrypto;
   getRandomValues(bytes: Uint8Array): void;
@@ -90,7 +98,9 @@ export async function decryptAttachment(
   keys: FileKeys,
   subtle: SubtleCrypto,
 ): Promise<Bytes> {
-  if ((await sha256(subtle, ciphertext)) !== keys.hashes.sha256) throw new MediaIntegrityError();
+  if ((await sha256(subtle, ciphertext)) !== unpadded(keys.hashes.sha256 ?? "")) {
+    throw new MediaIntegrityError();
+  }
 
   const key = await subtle.importKey("jwk", keys.key, AES, false, ["decrypt"]);
   return new Uint8Array(
