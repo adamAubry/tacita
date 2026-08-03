@@ -28,7 +28,10 @@ découle est en §5.
 | **A2** | **Rétention : `purge_jobs: []` n'empêchait aucune purge** | `fix-retention` | ✅ |
 | **N6+N1** | **Cycle de vie des messages + double horodatage** | `fix-src-lifecycle` | ✅ |
 | **A1** | **Raccordement de la passerelle push** | `fix-inf14` | ✅ |
+| **A5** | **Cible de fumée contre une pile réelle** | `smoke-target` | ✅ |
+| **—** | **`IndexedDBStore.startup()` appelé trop tôt** — trouvé par la cible | `fix-c4` | ✅ |
 | C1 | L'outbox envoie sans la garde de chiffrement | — | ⏳ à faire |
+| — | Ticket OIDC : le login ne fonctionne pas | — | ⏳ à faire |
 
 ```
 main f015e56
@@ -38,9 +41,14 @@ main f015e56
  ├── pm/arbitrage-…     specs + DECISIONS + arbitrage    185 tests (aucun code)
  │    ├── fix-retention       A2 — REQ-INF-07 amendée    185 tests
  │    ├── fix-src-lifecycle   REQ-SRC-10 + REQ-SRC-05    197 tests (+ fix-c3-c2 en base)
- │    └── fix-inf14           REQ-INF-14                 192 tests
+ │    ├── fix-inf14           REQ-INF-14                 192 tests
+ │    └── smoke-target        cible de fumée             189 + 5 de fumée (+ fix-c4 en base)
  └── review/remediation  tout réuni, pour lire d'un bloc
 ```
+
+`fix-c4` porte **190** tests depuis le portage du correctif `startup()` et de son test
+d'ordre (§2). `smoke-target` a deux compteurs : la suite par défaut, et `npm run smoke`,
+qui exige une pile Docker debout et ne tourne pas au pré-commit.
 
 Les trois premières `fix-*` partent de `main` et ne se touchent pas. Les trois suivantes partent de
 `pm/arbitrage-2026-08-03`, parce qu'elles **implémentent des exigences qui n'existaient pas avant
@@ -217,7 +225,52 @@ qu'attend la spec 11.
 
 ---
 
-## 3. Ce qui reste : C1
+### A5 — La cible de fumée, et le bug qu'elle a trouvé au premier lancement
+`infra/smoke/` — branche `smoke-target`
+
+**Ce qu'elle fait.** Cinq assertions contre une pile réelle, lancées par `npm run smoke` :
+crypto Rust réellement chargée (`getVersion()` doit dire vodozemac), salon effectivement
+chiffré côté serveur, tour complet chiffrement → Synapse → `/sync` → déchiffrement avec
+vérification que le wire content est `m.room.encrypted` et ne contient pas le texte, et
+reprise de session sur le même IndexedDB sans jeton fourni.
+
+Hors de la suite par défaut : elle exige Docker debout, et le hook de pré-commit lance la
+suite complète à chaque commit. Config à part, suffixe `*.smoke.test.ts`, exclusion de
+`smoke/**` dans `infra/vitest.config.ts`.
+
+**Le bug qu'elle a trouvé, en une exécution.**
+
+```
+« IndexedDBStore.startup must be called after assigning it to the client, not before! »
+```
+
+`buildSession` appelait `store.startup()` **avant** `createClient()`. Le SDK ne lève ce
+message qu'en **relisant un store existant** : sur une base vierge, l'ordre inverse passe.
+Donc un premier lancement marchait, la suite sur mocks aussi — et **seule la reprise de
+session échouait, systématiquement**.
+
+Le code vient de la spec 04 d'origine : **le défaut est sur `main` depuis le début**, il
+touche `initSession` autant que `restoreSession`, et il rendait REQ-COR-11
+structurellement intenable. Aucun des 189 tests ne pouvait le voir — le mock
+d'`IndexedDBStore` a un `startup` qui ne fait rien.
+
+**Deux corrections induites**, portées sur `fix-c4` et non sur `smoke-target` : c'est
+`fix-c4` qui se merge en premier, l'y laisser aurait posé le bug sur `main`.
+
+- L'ordre est inversé dans `buildSession`, plus un test de non-régression sous REQ-COR-03.
+  Les mocks ne voient pas le bug, mais ils voient l'**ordre d'invocation** : c'est lui
+  qu'on fige.
+- `restoreSession` journalise la raison de son `null`. Un `null` muet est
+  indiagnosticable — côté appelant il ne se distingue pas d'un premier lancement, et
+  c'est ce qui m'empêchait de voir le bug ci-dessus.
+
+**Ce que la cible ne couvre pas :** le tronçon OIDC. Choix arbitré (option B) — un
+tronçon bloqué ne prend pas en otage la validation de sept modules. `seedCredentials` est
+le seul endroit où elle triche, et exactement du montant de ce tronçon.
+
+---
+
+## 3. Ce qui reste
 
 `packages/outbox/src/outbox.ts:147` · `packages/messaging/src/rooms.ts:17-22`
 
@@ -288,7 +341,12 @@ garde qui ment est pire que pas de garde.
   quel plutôt que masqué derrière un test décoratif.
 - **Chaque nouveau test a été vérifié en cassant volontairement son correctif.** C2, N3, N2, C4,
   A2, REQ-SRC-10 et REQ-SRC-05 échouent bien sans leur fix. C'est la seule garantie qu'ils mordent.
-- **Une exception, désormais : REQ-INF-14 est validée sur une pile réelle.** `docker compose up`
+- **Ce paragraphe n'est plus entièrement vrai, et c'est le progrès de la session.** La cible
+  de fumée (§2, A5) exécute désormais la vraie crypto Rust, un vrai IndexedDB et un vrai
+  Synapse. Elle a trouvé un bug que 189 tests ne pouvaient pas voir, à sa première
+  exécution. Ce qui reste sur mocks : tout le reste, y compris `initSession` et le tronçon
+  OIDC.
+- **REQ-INF-14 est elle aussi validée sur une pile réelle.** `docker compose up`
   démarre les six services (tous *healthy*, Synapse compris), `GET /push/config` traverse le proxy
   TLS et rend la clé du `.env`, un `POST` notify depuis l'extérieur fait 404 chez Synapse sans
   jamais apparaître dans les logs de la passerelle, et un `POST` notify depuis un autre conteneur
@@ -352,8 +410,39 @@ pagination arrière, des centaines de messages jamais indexés. Corrigé sur `fi
 - **C1** — prérequis levé (`fix-n3-n2`), contrats posés (`REQ-COR-12`, `REQ-OBX-09`). À faire après
   le merge de `fix-n3-n2` : la garde touche les trois `session-mock.ts`, la faire avant produirait
   des conflits sur des fichiers en cours de relecture.
-- **Cible de fumée** (point 9) — avant tout démarrage de la spec 11.
+- **Ticket OIDC** — voir §5bis. Bloquant pour la spec 11.
 - **Modules restants**, dans l'ordre fixé : 06 → 08 → 10 → 11.
+
+---
+
+## 5bis. Le login OIDC ne fonctionne pas
+
+Trouvé en montant la cible de fumée, et c'est la trouvaille la plus lourde de la session.
+`GET /_matrix/client/v3/login/sso/redirect` répond **503**. Personne ne peut se connecter
+à Tacita aujourd'hui. Détail complet : `ESCALADE-PM-OIDC.md`, et `infra/README.md` section
+« Login OIDC ».
+
+**Pourquoi ça n'avait pas été vu :** les tests de REQ-INF-09 vérifiaient que le YAML
+déclare le provider et désactive les mots de passe. Pas qu'une connexion aboutit.
+
+| # | Cause | État |
+|---|---|---|
+| 1 | `SERVER_NAME` ne résout pas depuis le réseau Docker | ✅ alias réseau, overlay |
+| 2 | Synapse refuse ses requêtes sortantes vers les plages privées (SSRF) | ✅ `SYNAPSE_IP_RANGE_WHITELIST`, vide par défaut |
+| 3 | Certificat auto-signé non approuvé | ⏳ ticket OIDC |
+
+Sur le point 3, je m'étais trompé une première fois : `SSL_CERT_FILE` est une convention du
+module `ssl` de Python, or le client HTTP de Synapse est **Twisted**, qui prend sa racine de
+confiance dans OpenSSL. J'avais validé un chemin de code que Synapse n'emprunte pas — la
+même erreur de méthode que l'épisode N3.
+
+**Arbitré par le PM** : D-07 (résolution publique en production, donc les trois causes sont
+locales au dev), REQ-INF-09 gagne un critère de comportement, et le CA de dev s'installera
+par montage dans l'overlay — **jamais dans l'image**.
+
+**Conséquence assumée et déclarée : la spec 01 s'affiche « non terminée » jusqu'au ticket
+OIDC**, parce que c'est la vérité. Séquencer pour garder le tableau vert serait masquer une
+limite.
 
 ## 6. Fichiers touchés
 
@@ -426,6 +515,23 @@ infra/.env.example                modifié   VAPID_SUBJECT / PUBLIC_KEY / PRIVAT
 infra/README.md                   modifié   section REQ-INF-14 + digest au tableau
 infra/tests/push-gateway.test.ts  créé      7 tests
 .gitattributes                    créé      * text=auto eol=lf — voir §5
+```
+
+### `smoke-target` — 5 commits, sur la branche PM + fix-c4
+```
+infra/smoke/session.smoke.test.ts    créé      5 assertions contre une pile réelle
+infra/smoke/harness.ts               créé      compte de test par le secret partagé
+infra/smoke/vitest.config.ts         créé      hors suite par défaut
+infra/smoke/docker-compose.yml       créé      overlay des écarts dev/prod (D-07)
+infra/smoke/README.md                créé      ce qu'elle prouve, ce qu'elle ne prouve pas
+infra/vitest.config.ts               créé      exclusion de smoke/**
+infra/synapse/homeserver.yaml.tmpl   modifié   ip_range_whitelist + garde-fou url_preview
+infra/docker-compose.yml             modifié   la variable, vide par défaut
+infra/.env.example                   modifié   la variable, documentée
+infra/README.md                      modifié   section « Login OIDC »
+infra/package.json                   modifié   deps de la cible
+package.json                         modifié   script `smoke`
+ESCALADE-PM-OIDC.md                  créé      l'escalade et ses trois options
 ```
 
 ### Jamais touchés par moi, volontairement
