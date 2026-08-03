@@ -6,9 +6,10 @@ promus parce qu'ils bloquaient un correctif critique.
 Le point commun : aucun n'est une bavure locale. Ce sont des **jonctions entre modules que
 personne ne possède**. Chaque spec est respectée ; c'est l'espace entre les specs qui ne l'est pas.
 
-**Trois sur quatre sont corrigés, sur trois branches locales indépendantes. Rien n'est poussé,
-rien n'est mergé, `main` est intacte.** Il reste C1, et une liste de points qui demandent un
-arbitrage — section « À statuer par le CM » en fin de document.
+**Trois sur quatre sont corrigés, sur trois branches indépendantes poussées pour revue. Rien n'est
+mergé, `main` est intacte et le restera tant que les seniors et le PM n'ont pas statué.** Il reste
+C1, et une liste de points qui demandent un arbitrage — section « À statuer par le CM » en fin de
+document.
 
 ---
 
@@ -25,14 +26,19 @@ arbitrage — section « À statuer par le CM » en fin de document.
 
 ```
 main f015e56
- ├── fix-c3-c2   3 commits   C3, C2, docs        186 tests (185 + 1)
- ├── fix-n3-n2   2 commits   N3+N2, revue        187 tests (185 + 2)
- └── fix-c4      2 commits   C4, revue           189 tests (185 + 4)
+ ├── fix-c3-c2                  C3, C2, docs        186 tests (185 + 1)
+ ├── fix-n3-n2                  N3 + N2             187 tests (185 + 2)
+ ├── fix-c4                     C4                  189 tests (185 + 4)
+ └── review/remediation         les trois réunies, pour lire l'ensemble d'un bloc
 ```
 
-Les trois branches partent de `main` et ne se touchent pas : chacune se relit, se valide et se
-merge seule, dans n'importe quel ordre. Les compteurs de tests ne s'additionnent pas — chacun est
+Les trois branches `fix-*` partent de `main` et ne se touchent pas : chacune se relit, se valide et
+se merge seule, dans n'importe quel ordre. Les compteurs de tests ne s'additionnent pas — chacun est
 mesuré depuis les 185 tests de `main`.
+
+`review/remediation` ne sert qu'à la revue : elle réunit les trois pour qu'on voie l'ensemble sans
+jongler entre branches. **Ce n'est pas une branche d'intégration — elle ne doit pas être mergée dans
+`main`.** Ce sont les trois branches `fix-*` qui partent, une par une, après arbitrage.
 
 Sur chaque branche : `lint`, `typecheck` et la suite complète passent, hooks de pré-commit inclus.
 `--no-verify` n'a jamais été utilisé.
@@ -338,7 +344,7 @@ compose up`, login OIDC, envoi/réception dans un salon chiffré, en Vitest cont
 
 ## 6. Fichiers touchés
 
-Inventaire par branche. Tout est local, rien n'est poussé.
+Inventaire par branche. Tout est poussé sur `origin` pour revue ; rien n'est mergé.
 
 ### `fix-c3-c2` — 3 commits
 ```
