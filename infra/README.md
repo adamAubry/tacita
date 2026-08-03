@@ -29,12 +29,7 @@ docker compose exec synapse register_new_matrix_user \
 | Keycloak | 26.7.0 | `sha256:0f198be2…` |
 | nginx | 1.27-alpine | `sha256:65645c7b…` |
 | MinIO | RELEASE.2025-09-07 | `sha256:14cea493…` |
-| push-gateway (base Node) | 22-alpine | **non épinglé** — voir ci-dessous |
-
-**Le seul écart à la règle des digests** : `apps/push-gateway/Dockerfile` part de
-`node:22-alpine` par tag. Résoudre le digest (`docker buildx imagetools inspect
-node:22-alpine`) et le reporter dans le Dockerfile et ce tableau **avant tout
-déploiement**.
+| push-gateway (base Node) | 22-alpine (2026-08-03) | `sha256:c610fcdf…` |
 
 Digests complets dans `docker-compose.yml`, résolus via `docker buildx imagetools
 inspect` au moment de l'écriture (2026-08-02) — à revérifier avant tout bump de

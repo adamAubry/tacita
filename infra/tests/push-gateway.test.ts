@@ -24,6 +24,12 @@ describe("REQ-INF-14 — la passerelle Web Push est provisionnée par ce module"
     });
   });
 
+  it("l'image de base est épinglée par digest, comme les autres du compose", () => {
+    // Un tag est mutable : `node:22-alpine` de la semaine prochaine n'est pas celui
+    // qui a été testé. Même règle que pour les images du compose.
+    expect(dockerfile).toMatch(/^FROM node@sha256:[0-9a-f]{64}$/m);
+  });
+
   it("la version de web-push installée est celle que le lockfile a résolue", () => {
     // L'image n'embarque pas pnpm pour une seule dépendance : elle épingle la version
     // en dur. Ce test est ce qui remplace le lockfile — sans lui, l'image dériverait
