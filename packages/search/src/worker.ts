@@ -20,7 +20,7 @@ export function serve(
   // tout de suite ; l'erreur reste rendue à l'appelant au premier appel.
   engine.catch(() => {});
 
-  scope.onmessage = async ({ data: { id, method, args } }) => {
+  const handle = async ({ id, method, args }: SearchRequest): Promise<void> => {
     const response: SearchResponse = { id };
     try {
       const ready = await engine;
@@ -32,6 +32,20 @@ export function serve(
       response.error = error instanceof Error ? error.message : "erreur inconnue";
     }
     scope.postMessage(response);
+  };
+
+  /**
+   * REQ-SRC-08 — les requêtes se sérialisent. Un `wipe` qui s'exécutait entre deux lots
+   * d'un `index` en cours laissait la boucle reprendre et `persist()` réécrire ce que
+   * le wipe venait d'effacer. Elles se disputaient déjà une seule base Orama : il n'y a
+   * aucun parallélisme réel à perdre.
+   *
+   * ponytail: file globale. Un `index` de rattrapage fait attendre une recherche
+   * derrière lui ; découper l'indexation en un message par lot si ça devient visible.
+   */
+  let queue: Promise<void> = Promise.resolve();
+  scope.onmessage = ({ data }) => {
+    queue = queue.then(() => handle(data));
   };
 }
 

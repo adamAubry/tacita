@@ -90,8 +90,23 @@ export function createSearch(session: Session, worker: Worker): Search {
   };
   session.client.on(MatrixEventEvent.Decrypted, onDecrypted);
 
-  const wipe = () => call<void>("wipe", []);
-  // REQ-SRC-08 — l'index est du contenu déchiffré : la déconnexion l'efface.
+  /** Ce qui n'est pas encore parti au worker. Le wipe doit l'oublier autant que dispose. */
+  const resetBuffer = (): void => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    buffer = [];
+  };
+
+  /**
+   * REQ-SRC-08 — l'index est du contenu déchiffré : la déconnexion l'efface. Le tampon
+   * se vide **avant** que le wipe parte, sinon son timer se déclenche après coup,
+   * réindexe ce qu'il retenait, et le `persist()` du moteur réécrit du clair sur disque
+   * une fois l'utilisateur déconnecté.
+   */
+  const wipe = async (): Promise<void> => {
+    resetBuffer();
+    await call<void>("wipe", []);
+  };
   session.registerWipe("search", wipe);
 
   return {
@@ -101,9 +116,7 @@ export function createSearch(session: Session, worker: Worker): Search {
     wipe,
 
     dispose() {
-      if (timer) clearTimeout(timer);
-      timer = undefined;
-      buffer = [];
+      resetBuffer();
       session.client.off(MatrixEventEvent.Decrypted, onDecrypted);
       pending.clear();
       worker.terminate();

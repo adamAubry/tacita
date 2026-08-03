@@ -148,6 +148,19 @@ describe("REQ-SRC-08 — wipe enregistré au registre de la Session", () => {
     expect((await search.stats()).size).toBe(0);
   });
 
+  it("un événement encore en tampon au moment du wipe n'atterrit pas dans l'index", async () => {
+    // Timers réels : le va-et-vient avec le worker en dépend, et c'est justement le
+    // délai du tampon qu'on veut voir s'écouler pour de bon.
+    ctx.emitDecrypted(matrixEvent("$e1", ROOM, "secret"));
+    await ctx.runWipes(); // wipe pendant la fenêtre d'accumulation
+    await new Promise((resolve) => setTimeout(resolve, BUFFER_MS + 50));
+
+    // Sans purge du tampon, le timer se déclenche après le wipe, réindexe, et le
+    // persist() du moteur réécrit du clair sur disque une fois déconnecté.
+    expect((await search.stats()).size).toBe(0);
+    expect(await search.search("secret")).toEqual([]);
+  });
+
   it("dispose détache le hook de déchiffrement", () => {
     search.dispose();
     expect(ctx.client.off).toHaveBeenCalledWith(MatrixEventEvent.Decrypted, expect.any(Function));
