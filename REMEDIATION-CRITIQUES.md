@@ -31,7 +31,7 @@ découle est en §5.
 | **A5** | **Cible de fumée contre une pile réelle** | `smoke-target` | ✅ |
 | **—** | **`IndexedDBStore.startup()` appelé trop tôt** — trouvé par la cible | `fix-c4` | ✅ |
 | C1 | L'outbox envoie sans la garde de chiffrement | — | ⏳ à faire |
-| — | Ticket OIDC : le login ne fonctionne pas | — | ⏳ à faire |
+| **—** | **Ticket OIDC : quatre causes, dont un certificat sans SAN** | `fix-oidc` | ✅ |
 
 ```
 main f015e56
@@ -410,39 +410,48 @@ pagination arrière, des centaines de messages jamais indexés. Corrigé sur `fi
 - **C1** — prérequis levé (`fix-n3-n2`), contrats posés (`REQ-COR-12`, `REQ-OBX-09`). À faire après
   le merge de `fix-n3-n2` : la garde touche les trois `session-mock.ts`, la faire avant produirait
   des conflits sur des fichiers en cours de relecture.
-- **Ticket OIDC** — voir §5bis. Bloquant pour la spec 11.
+- **Ticket OIDC** — fait, voir §5bis.
 - **Modules restants**, dans l'ordre fixé : 06 → 08 → 10 → 11.
 
 ---
 
-## 5bis. Le login OIDC ne fonctionne pas
+## 5bis. Le login OIDC — cassé, puis réparé
 
 Trouvé en montant la cible de fumée, et c'est la trouvaille la plus lourde de la session.
-`GET /_matrix/client/v3/login/sso/redirect` répond **503**. Personne ne peut se connecter
-à Tacita aujourd'hui. Détail complet : `ESCALADE-PM-OIDC.md`, et `infra/README.md` section
-« Login OIDC ».
+`GET /_matrix/client/v3/login/sso/redirect` répondait **503** : personne ne pouvait se
+connecter à Tacita. Détail : `ESCALADE-PM-OIDC.md` et `infra/README.md` § « Login OIDC ».
 
-**Pourquoi ça n'avait pas été vu :** les tests de REQ-INF-09 vérifiaient que le YAML
-déclare le provider et désactive les mots de passe. Pas qu'une connexion aboutit.
+**Pourquoi ça n'avait pas été vu :** les tests de REQ-INF-09 vérifiaient que le YAML déclare
+le provider et désactive les mots de passe. Pas qu'une connexion aboutit.
 
 | # | Cause | État |
 |---|---|---|
 | 1 | `SERVER_NAME` ne résout pas depuis le réseau Docker | ✅ alias réseau, overlay |
 | 2 | Synapse refuse ses requêtes sortantes vers les plages privées (SSRF) | ✅ `SYNAPSE_IP_RANGE_WHITELIST`, vide par défaut |
-| 3 | Certificat auto-signé non approuvé | ⏳ ticket OIDC |
+| 3 | Certificat auto-signé non approuvé par Twisted | ✅ CA installé au démarrage, depuis l'overlay |
+| 4 | **Le certificat n'avait aucun `subjectAltName`** | ✅ `-addext subjectAltName` |
 
-Sur le point 3, je m'étais trompé une première fois : `SSL_CERT_FILE` est une convention du
-module `ssl` de Python, or le client HTTP de Synapse est **Twisted**, qui prend sa racine de
-confiance dans OpenSSL. J'avais validé un chemin de code que Synapse n'emprunte pas — la
-même erreur de méthode que l'épisode N3.
+**La cause 4 dépassait le login.** `generate-dev-certs.sh` ne passait qu'un `/CN=`.
+`service_identity` refuse un tel certificat — donc Twisted, donc Synapse — et **tout
+navigateur moderne aussi, depuis 2017**. Le certificat de dev était donc inutilisable pour la
+PWA elle-même, alors que REQ-INF-10 exige un contexte sécurisé pour `getUserMedia`. Et
+`.env.example` promettait déjà que `TURN_DOMAIN` soit « un SAN du certificat monté » — une
+promesse que le script ne pouvait pas tenir.
 
-**Arbitré par le PM** : D-07 (résolution publique en production, donc les trois causes sont
-locales au dev), REQ-INF-09 gagne un critère de comportement, et le CA de dev s'installera
-par montage dans l'overlay — **jamais dans l'image**.
+**Sur la cause 3, je m'étais trompé une première fois** : j'avais posé `SSL_CERT_FILE` et
+vérifié depuis le conteneur en Python — HTTP 200. Mais c'est une convention du module `ssl`
+de Python, or le client HTTP de Synapse est **Twisted**, qui prend sa racine de confiance
+dans OpenSSL. J'avais validé un chemin de code que Synapse n'emprunte pas — même erreur de
+méthode que l'épisode N3. Le diagnostic n'a abouti qu'en interrogeant le service **avec
+Twisted lui-même**.
 
-**Conséquence assumée et déclarée : la spec 01 s'affiche « non terminée » jusqu'au ticket
-OIDC**, parce que c'est la vérité. Séquencer pour garder le tableau vert serait masquer une
-limite.
+**Arbitré par le PM** : D-07 (résolution publique en production, donc ces causes sont locales
+au dev), et le CA de dev s'installe par montage dans l'overlay — **jamais dans l'image**.
+
+**REQ-INF-09 a désormais son critère de comportement** : `infra/smoke/login.smoke.test.ts`
+assère le 302 vers le realm Keycloak, le `client_id` et `code_challenge_method=S256`. Vérifié
+en retirant le CA de l'overlay : il échoue avec « 503 = découverte OIDC injoignable ».
+**La spec 01 franchit donc les deux portes** — config verte et fumée verte.
 
 ## 6. Fichiers touchés
 
