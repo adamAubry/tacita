@@ -1,4 +1,15 @@
-import { count, create, insertMultiple, load, remove, save, search } from "@orama/orama";
+import {
+  count,
+  create,
+  getByID,
+  insertMultiple,
+  load,
+  remove,
+  removeMultiple,
+  save,
+  search,
+  updateMultiple,
+} from "@orama/orama";
 
 import { openSnapshot, type Snapshot } from "./snapshot";
 
@@ -19,7 +30,9 @@ const schema = {
   // ce qui est voulu : chercher un mot ne doit pas matcher un identifiant.
   roomId: "enum",
   sender: "enum",
-  ts: "number",
+  // Deux horodatages, deux usages, jamais interchangeables (spec 09).
+  tsIndexed: "number",
+  tsOrigin: "number",
   body: "string",
 } as const;
 
@@ -27,10 +40,28 @@ export interface IndexableEvent {
   eventId: string;
   roomId: string;
   sender: string;
-  /** Horodatage local d'indexation : sert à l'ordre d'éviction, pas au tri d'affichage. */
-  ts: number;
+  /**
+   * `origin_server_ts`. Sert **uniquement** aux bornes de `stats()` (REQ-SRC-06) :
+   * jamais à trier, jamais à évincer (interdit n°6).
+   */
+  tsOrigin: number;
   body: string;
 }
+
+/**
+ * Le document tel qu'il vit dans l'index. `tsIndexed` est posé ici et jamais par
+ * l'appelant : c'est l'ordre d'indexation locale, **seul** critère d'éviction (D-01).
+ * Évincer par `tsOrigin` ferait qu'un rattrapage d'historique — qui insère par
+ * définition des événements anciens — s'auto-évincerait au premier plafond atteint.
+ */
+type IndexedDocument = {
+  id: string;
+  roomId: string;
+  sender: string;
+  tsIndexed: number;
+  tsOrigin: number;
+  body: string;
+};
 
 export interface SearchHit extends IndexableEvent {
   score: number;
@@ -60,6 +91,8 @@ export interface EngineOptions {
 
 export interface SearchEngine {
   index(events: IndexableEvent[]): Promise<void>;
+  /** REQ-SRC-10 — retire les documents redactés. Les identifiants inconnus sont ignorés. */
+  remove(eventIds: string[]): Promise<void>;
   search(query: string, roomId?: string): Promise<SearchHit[]>;
   stats(): Promise<SearchStats>;
   wipe(): Promise<void>;
@@ -72,14 +105,15 @@ const toHit = (hit: { id: string; score: number; document: Record<string, unknow
   eventId: hit.id,
   roomId: hit.document.roomId as string,
   sender: hit.document.sender as string,
-  ts: hit.document.ts as number,
+  tsOrigin: hit.document.tsOrigin as number,
   body: hit.document.body as string,
   score: hit.score,
 });
 
+/** REQ-SRC-06 — bornes affichées : la date d'origine, celle qui parle à l'utilisateur. */
 const edgeTs = async (db: Database, order: "ASC" | "DESC"): Promise<number | null> => {
-  const results = await search(db, { limit: 1, sortBy: { property: "ts", order } });
-  return (results.hits[0]?.document.ts as number | undefined) ?? null;
+  const results = await search(db, { limit: 1, sortBy: { property: "tsOrigin", order } });
+  return (results.hits[0]?.document.tsOrigin as number | undefined) ?? null;
 };
 
 export async function createEngine(options: EngineOptions): Promise<SearchEngine> {
@@ -101,13 +135,26 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
    */
   const persist = () => snapshot.write(save(db));
 
-  /** DECISIONS D-01 — au-delà du plafond, les plus anciens sortent. */
+  /**
+   * `tsIndexed` doit être **strictement croissant** : un lot entier s'insère dans la
+   * même milliseconde, et `Date.now()` seul laisserait l'ordre d'éviction arbitraire à
+   * l'intérieur d'un lot — donc pas FIFO, ce que D-01 exige. Un compteur qui ne recule
+   * jamais départage les ex aequo sans cesser d'être un horodatage.
+   *
+   * ponytail: repart de l'horloge à chaque ouverture plutôt que du maximum stocké.
+   * Une horloge qui recule entre deux sessions fausserait l'ordre d'éviction ; relire
+   * le maximum de l'index au chargement le jour où ça compte.
+   */
+  let lastIndexed = 0;
+  const nextIndexedAt = (): number => (lastIndexed = Math.max(Date.now(), lastIndexed + 1));
+
+  /** DECISIONS D-01 — au-delà du plafond, les premiers indexés sortent. */
   const evict = async (): Promise<void> => {
     const excess = count(db) - maxEvents;
     if (excess <= 0) return;
     const oldest = await search(db, {
       limit: excess,
-      sortBy: { property: "ts", order: "ASC" },
+      sortBy: { property: "tsIndexed", order: "ASC" },
     });
     for (const hit of oldest.hits) await remove(db, hit.id);
   };
@@ -118,16 +165,51 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
     async index(events) {
       for (let offset = 0; offset < events.length; offset += BATCH_SIZE) {
         const batch = events.slice(offset, offset + BATCH_SIZE);
-        await insertMultiple(
-          db,
-          batch.map(({ eventId, ...rest }) => ({ id: eventId, ...rest })),
-        );
+        const fresh: IndexedDocument[] = [];
+        const replaced: IndexedDocument[] = [];
+
+        for (const { eventId, ...rest } of batch) {
+          const previous = getByID(db, eventId) as IndexedDocument | undefined;
+          // REQ-SRC-10 — réindexer un événement connu **remplace** son document au lieu
+          // d'en créer un second. C'est ce qui fait qu'une édition ne laisse pas
+          // l'ancienne version trouvable (le proxy indexe une édition sous l'identifiant
+          // de sa cible), et ça rend le re-déchiffrement d'un événement inoffensif.
+          //
+          // Les deux horodatages restent ceux du premier passage : l'éviction suit
+          // l'ordre d'indexation (D-01), et les bornes de stats() la date d'origine du
+          // message — pas celle de sa dernière correction.
+          if (previous) {
+            replaced.push({ ...previous, ...rest, tsOrigin: previous.tsOrigin });
+          } else {
+            fresh.push({ id: eventId, ...rest, tsIndexed: nextIndexedAt() });
+          }
+        }
+
+        if (fresh.length > 0) await insertMultiple(db, fresh);
+        if (replaced.length > 0) {
+          await updateMultiple(
+            db,
+            replaced.map((document) => document.id),
+            replaced,
+          );
+        }
+
         // Purge à chaque lot, pas à la fin : un rattrapage massif ne doit pas tenir
         // tout l'historique en mémoire avant d'évincer. Sous le plafond, l'appel
         // court-circuite sur une soustraction.
         await evict();
         if (offset + BATCH_SIZE < events.length) await yieldTo();
       }
+      await persist();
+    },
+
+    // REQ-SRC-10 — le texte d'un message supprimé ne doit plus être trouvable. Les
+    // identifiants inconnus sont filtrés : on redacte aussi des messages que l'index
+    // n'a jamais vus (média, échec de déchiffrement), ce n'est pas une erreur.
+    async remove(eventIds) {
+      const known = eventIds.filter((eventId) => getByID(db, eventId));
+      if (known.length === 0) return;
+      await removeMultiple(db, known);
       await persist();
     },
 

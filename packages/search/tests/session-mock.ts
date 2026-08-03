@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import type { Session } from "@tacita/client-core";
-import type { MatrixEvent } from "matrix-js-sdk";
+import { MatrixEventEvent, RoomEvent, type MatrixEvent } from "matrix-js-sdk";
 import { vi } from "vitest";
 
 import type { SearchRequest, SearchResponse } from "../src/protocol";
@@ -21,17 +21,32 @@ export function matrixEvent(
   eventId: string,
   roomId: string,
   body: string,
-  options: { failed?: boolean; type?: string } = {},
+  options: { failed?: boolean; type?: string; ts?: number; replaces?: string } = {},
 ): MatrixEvent {
+  // REQ-SRC-10 — une édition porte la relation `m.replace` et le texte réel dans
+  // `m.new_content` ; le `body` de premier niveau n'est qu'un repli « * texte ».
+  const content = options.replaces
+    ? {
+        body: `* ${body}`,
+        "m.new_content": { body },
+        "m.relates_to": { rel_type: "m.replace", event_id: options.replaces },
+      }
+    : { body };
+
   return {
     getId: () => eventId,
     getRoomId: () => roomId,
     getSender: () => "@luca:tacita.test",
     getType: () => options.type ?? "m.room.message",
-    getTs: () => 1_000,
-    getContent: () => ({ body }),
+    getTs: () => options.ts ?? 1_000,
+    getContent: () => content,
     isDecryptionFailure: () => options.failed ?? false,
   } as unknown as MatrixEvent;
+}
+
+/** Un événement de redaction : le package n'en lit que la cible. */
+export function redactionOf(targetEventId: string): MatrixEvent {
+  return { getAssociatedId: () => targetEventId } as unknown as MatrixEvent;
 }
 
 /**
@@ -64,15 +79,19 @@ export function fakeWorker() {
 
 export function fakeSession() {
   const wipes = new Map<string, () => Promise<void> | void>();
-  const decryptedListeners: ((event: MatrixEvent) => void)[] = [];
+  // Deux flux distincts : le package écoute le déchiffrement et les redactions, et
+  // confondre les deux ferait passer un test qui n'a rien branché.
+  const listeners = new Map<string, ((event: MatrixEvent) => void)[]>();
+  const listenersOf = (name: string) => listeners.get(name) ?? listeners.set(name, []).get(name)!;
 
   const client = {
-    on: vi.fn((_event: string, listener: (event: MatrixEvent) => void) => {
-      decryptedListeners.push(listener);
+    on: vi.fn((event: string, listener: (event: MatrixEvent) => void) => {
+      listenersOf(event).push(listener);
     }),
-    off: vi.fn((_event: string, listener: (event: MatrixEvent) => void) => {
-      const index = decryptedListeners.indexOf(listener);
-      if (index >= 0) decryptedListeners.splice(index, 1);
+    off: vi.fn((event: string, listener: (event: MatrixEvent) => void) => {
+      const registered = listenersOf(event);
+      const index = registered.indexOf(listener);
+      if (index >= 0) registered.splice(index, 1);
     }),
   };
 
@@ -87,7 +106,10 @@ export function fakeSession() {
     session: session as unknown as Session,
     client,
     emitDecrypted(event: MatrixEvent) {
-      for (const listener of [...decryptedListeners]) listener(event);
+      for (const listener of [...listenersOf(MatrixEventEvent.Decrypted)]) listener(event);
+    },
+    emitRedaction(event: MatrixEvent) {
+      for (const listener of [...listenersOf(RoomEvent.Redaction)]) listener(event);
     },
     async runWipes() {
       for (const wipe of wipes.values()) await wipe();

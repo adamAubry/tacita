@@ -3,7 +3,7 @@ import type { SearchHit, SearchStats } from "./engine";
 /** Contrat de messages partagé par le proxy (thread principal) et le worker. */
 export interface SearchRequest {
   id: number;
-  method: "index" | "search" | "stats" | "wipe";
+  method: "index" | "remove" | "search" | "stats" | "wipe";
   args: unknown[];
 }
 
