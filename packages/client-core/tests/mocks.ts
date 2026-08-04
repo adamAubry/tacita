@@ -7,8 +7,8 @@ import { vi } from "vitest";
  *   vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
  *
  * L'état est reconstruit à chaque test via `resetSdk()` : `initSession` verrouille
- * `globalBlacklistUnverifiedDevices` en non-configurable (REQ-COR-07), un objet
- * partagé entre tests serait donc figé dès le premier.
+ * `setDeviceIsolationMode` en non-configurable (REQ-COR-07), un objet partagé entre
+ * tests serait donc figé dès le premier.
  */
 
 export type CryptoMock = ReturnType<typeof makeCrypto>;
@@ -30,7 +30,15 @@ export const sdkModule = () => ({ createClient, IndexedDBStore });
 
 function makeCrypto() {
   return {
-    globalBlacklistUnverifiedDevices: false,
+    /**
+     * REQ-COR-07 — `initSession` pose le mode puis remplace la méthode par le verrou
+     * (`defineProperty`). Le spy ne survit donc pas à l'appel : on retient le mode
+     * appliqué dans un champ, qui lui reste lisible.
+     */
+    isolationMode: undefined as unknown,
+    setDeviceIsolationMode: vi.fn(function (this: CryptoMock, mode: unknown) {
+      this.isolationMode = mode;
+    }),
     getActiveSessionBackupVersion: vi.fn(async (): Promise<string | null> => "1"),
     isEncryptionEnabledInRoom: vi.fn(async (_roomId: string) => true),
     createRecoveryKeyFromPassphrase: vi.fn(async () => ({

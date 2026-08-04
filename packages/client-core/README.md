@@ -46,12 +46,31 @@ await session.logout(); // révocation + wipe complet
   `restoreSession` existe pour éviter. Un jeton révoqué se manifeste par un
   `M_UNKNOWN_TOKEN` au premier appel : c'est au shard UI (spec 11) de router vers
   l'OIDC à ce moment-là.
-- **L'override par salon prime sur la politique globale.** REQ-COR-07 verrouille
-  `globalBlacklistUnverifiedDevices`, mais le SDK consulte d'abord
-  `Room.getBlacklistUnverifiedDevices()` et ne retombe sur le réglage global que
-  s'il vaut `null` (`rust-crypto/RoomEncryptor`). Aucun package Tacita n'appelle
-  `Room.setBlacklistUnverifiedDevices` ; c'est une discipline de code, pas une
-  garantie que le SDK impose.
+- **La confiance vient de l'identité, pas d'une vérification appareil par appareil**
+  (D-08). REQ-COR-07 verrouille le mode `OnlySignedDevicesIsolationMode` : les clés
+  Megolm ne partent qu'aux appareils que leur propriétaire a signés de son identité
+  cross-signing, et un événement venu d'un appareil non signé reste illisible. Comme
+  REQ-COR-06 impose ce bootstrap à l'inscription, aucune étape supplémentaire n'est
+  demandée à l'utilisateur.
+  **Conséquence découverte en fumée, à connaître côté UI :** sans identité
+  cross-signing, un compte ne peut pas chiffrer *du tout* — la crypto Rust rejette
+  l'envoi (« Encryption failed because cross-signing is not set up on your account »).
+  Le bootstrap n'est donc plus seulement la condition pour être lu, c'est la condition
+  pour écrire. L'étape bloquante de REQ-UI-04 n'est pas un confort : la sauter rend le
+  client muet.
+  **Ce que ce modèle ne couvre pas, et qu'il faut dire à l'utilisateur :** si le
+  compte d'un correspondant est entièrement compromis — ses secrets cross-signing
+  avec — l'attaquant peut signer un appareil à lui, et ses signatures deviennent
+  menteuses. Épingler l'identité par vérification interactive (SAS/QR) est la parade ;
+  elle est hors V1, spec dédiée post-V1. En attendant, une **réinitialisation
+  d'identité** d'un correspondant fait lever le chiffrement : l'UI (spec 11) doit
+  exiger une confirmation explicite avant tout nouvel envoi vers lui, pas un
+  avertissement ignorable.
+  Corollaire : l'override par salon (`Room.setBlacklistUnverifiedDevices`) n'a plus
+  d'emprise — le SDK documente `globalBlacklistUnverifiedDevices` comme *ignoré* dans
+  ce mode. L'ancienne rédaction verrouillait ce drapeau ; elle exigeait des appareils
+  *vérifiés* alors que rien n'outillait la vérification, et deux utilisateurs réels ne
+  pouvaient pas se lire.
 - **`setupRecoveryKey()` ne rend une clé que si elle a été générée ici.** Si le
   secret storage a déjà été provisionné ailleurs, l'appel échoue plutôt que de
   rendre une clé qui n'ouvrirait rien.

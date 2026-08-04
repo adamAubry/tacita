@@ -47,6 +47,14 @@ beforeAll(async () => {
   const restaurée = await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: disque });
   expect(restaurée, "restoreSession n'a pas rendu de session").not.toBeNull();
   session = restaurée!;
+
+  // REQ-COR-06 / D-08 — sous le mode « appareils signés uniquement », un compte sans
+  // identité cross-signing ne peut pas chiffrer *du tout* : la crypto Rust rejette
+  // avec « Encryption failed because cross-signing is not set up on your account ».
+  // Le bootstrap n'est donc plus seulement la condition pour être *lu*, c'est la
+  // condition pour *écrire*. L'onboarding l'impose déjà (l'UI bloque tant que le
+  // backup n'est pas configuré) ; ce test doit passer par le même chemin.
+  await session.setupRecoveryKey();
 });
 
 afterAll(async () => {

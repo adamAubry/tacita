@@ -1,4 +1,10 @@
 import { createClient, IndexedDBStore, type MatrixClient, type MatrixEvent } from "matrix-js-sdk";
+// La racine du SDK n'exporte pas les classes de `crypto-api` (seulement des types) et
+// ce mode est une *valeur*, pas un type : le sous-chemin est le seul accès. Module
+// léger, aucun wasm tiré avec lui.
+// ponytail: casse si le SDK réorganise ses chemins ; repasser à la racine le jour où
+// elle réexporte crypto-api.
+import { OnlySignedDevicesIsolationMode } from "matrix-js-sdk/lib/crypto-api";
 
 import { createLogger } from "./logger";
 
@@ -132,23 +138,35 @@ function requireCrypto(client: MatrixClient): CryptoApi {
   return crypto;
 }
 
+/** Type de l'argument, dérivé du SDK plutôt que réimporté. */
+type DeviceIsolationMode = Parameters<CryptoApi["setDeviceIsolationMode"]>[0];
+
 /**
- * REQ-COR-07 — les clés Megolm ne sont jamais partagées avec un appareil non
- * vérifié. Le réglage est activé puis verrouillé : toute tentative ultérieure de
- * le désarmer lève, plutôt que d'échouer en silence.
+ * REQ-COR-07 (D-08) — les clés Megolm ne sont partagées qu'avec les appareils que
+ * leur propriétaire a signés de son identité cross-signing. Le mode est posé puis
+ * verrouillé : toute tentative de le desserrer lève, plutôt que d'échouer en silence.
  *
- * Limite assumée : le SDK laisse un override par salon
- * (`Room.setBlacklistUnverifiedDevices`) qui prime sur ce réglage global — aucun
- * package Tacita ne l'appelle, voir README.md.
+ * Ce que ce mode déclenche dans le SDK, vérifié sur la version épinglée (42.0.0) :
+ * `CollectStrategy.identityBasedStrategy()` au chiffrement — la confiance portée sur
+ * l'identité, mot pour mot ce que D-08 décide — et `TrustRequirement.CrossSignedOrLegacy`
+ * au déchiffrement, donc un événement venu d'un appareil non signé reste illisible.
+ *
+ * Le verrou ne porte **plus** sur `globalBlacklistUnverifiedDevices` : la doc du SDK
+ * dit « Ignored when deviceIsolationMode is OnlySignedDevicesIsolationMode ». L'ancien
+ * verrou protégeait donc un drapeau devenu sans effet, et le drapeau lui-même exigeait
+ * des appareils *vérifiés* — la rédaction que D-08 a écartée. Corollaire : l'override
+ * par salon (`Room.setBlacklistUnverifiedDevices`) ne mord plus non plus.
  */
-function lockUnverifiedDeviceBlacklist(crypto: CryptoApi): void {
-  crypto.globalBlacklistUnverifiedDevices = true;
-  Object.defineProperty(crypto, "globalBlacklistUnverifiedDevices", {
-    get: () => true,
-    set: () => {
-      throw new Error("REQ-COR-07 : la politique d'appareils non vérifiés est verrouillée");
+function lockSignedDevicesOnly(crypto: CryptoApi): void {
+  crypto.setDeviceIsolationMode(new OnlySignedDevicesIsolationMode());
+  Object.defineProperty(crypto, "setDeviceIsolationMode", {
+    value: (mode: DeviceIsolationMode) => {
+      if (!(mode instanceof OnlySignedDevicesIsolationMode)) {
+        throw new Error("REQ-COR-07 : le mode d'isolation des appareils est verrouillé");
+      }
     },
     configurable: false,
+    writable: false,
     enumerable: true,
   });
 }
@@ -223,7 +241,7 @@ async function buildSession(
     useIndexedDB: true,
     cryptoDatabasePrefix: `matrix-js-sdk-${credentials.deviceId}`,
   });
-  lockUnverifiedDeviceBlacklist(requireCrypto(client));
+  lockSignedDevicesOnly(requireCrypto(client));
 
   // REQ-COR-05 — ouvre la boucle /sync, du long-polling HTTP.
   await client.startClient({ initialSyncLimit: 20 });
