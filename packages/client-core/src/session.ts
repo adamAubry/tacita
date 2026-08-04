@@ -71,6 +71,20 @@ export interface Session {
    * serait.
    */
   identityResetOf(userId: string): Promise<boolean>;
+  /**
+   * REQ-COR-07 / D-08 — la confirmation explicite que l'exigence demande à l'UI, rendue
+   * effective : elle épingle la nouvelle identité de cet utilisateur comme authentique,
+   * et les envois vers lui repartent.
+   *
+   * Le pendant de `identityResetOf`. Sans lui, le shard détecterait la réinitialisation
+   * sans pouvoir la lever autrement qu'en appelant le crypto lui-même — de la logique
+   * métier dans la spec 11, que la spec 00 interdit.
+   *
+   * **Lève**, contrairement à `identityResetOf` : sur notre propre identifiant, ou sur
+   * un utilisateur dont on n'a aucune identité. Une confirmation qui échoue en silence
+   * ferait débloquer l'UI alors que le chiffrement refusera toujours.
+   */
+  confirmIdentityOf(userId: string): Promise<void>;
   /** REQ-COR-10 — un package déclare ici comment effacer ses propres stores. */
   registerWipe(name: string, wipe: () => Promise<void> | void): void;
   logout(): Promise<void>;
@@ -322,6 +336,18 @@ async function buildSession(
         // panne passagère du crypto — un déni de service pour un gain nul.
         return false;
       }
+    },
+
+    confirmIdentityOf(userId) {
+      // `pinCurrentUserIdentity` — « accepting it as genuine » côté SDK. C'est le geste
+      // qui rend effective la confirmation exigée par REQ-COR-07 ; sans lui, l'UI
+      // pourrait détecter la réinitialisation sans jamais la lever.
+      //
+      // **Ce n'est pas un prédicat, et il ne rattrape rien.** Une confirmation qui
+      // échoue en silence laisserait l'UI débloquer l'envoi alors que le crypto
+      // refusera toujours. Le SDK lève dans deux cas — sur notre propre identifiant, et
+      // sur un utilisateur dont on n'a aucune identité — et l'UI doit les voir.
+      return requireCrypto(client).pinCurrentUserIdentity(userId);
     },
 
     registerWipe(name, wipe) {

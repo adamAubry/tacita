@@ -180,6 +180,23 @@ describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signé
     await expect(session.identityResetOf("@bob:tacita.test")).resolves.toBe(false);
   });
 
+  it("confirmIdentityOf épingle la nouvelle identité : l'envoi peut repartir", async () => {
+    const session = await initSession(config);
+    await session.confirmIdentityOf("@bob:tacita.test");
+    expect(crypto.pinCurrentUserIdentity).toHaveBeenCalledWith("@bob:tacita.test");
+  });
+
+  it("une confirmation qui échoue le dit, plutôt que de laisser l'UI débloquer", async () => {
+    // Le SDK lève sur notre propre identifiant, ou sur un utilisateur sans identité
+    // connue. Avaler l'erreur ferait croire à l'UI que l'envoi est rouvert alors que le
+    // chiffrement refusera toujours — c'est le contraire de l'interdit n°13.
+    crypto.pinCurrentUserIdentity.mockRejectedValueOnce(new Error("identité inconnue"));
+    const session = await initSession(config);
+    await expect(session.confirmIdentityOf("@inconnu:tacita.test")).rejects.toThrow(
+      /identité inconnue/,
+    );
+  });
+
   it("le contrat V1 n'annonce plus de vérification interactive", () => {
     // D-08 renvoie SAS/QR au post-V1, dans sa spec dédiée. Un exporté sans appelant sur
     // un chemin de clés est un piège : interdit n°13, on n'annonce pas ce qu'on ne rend

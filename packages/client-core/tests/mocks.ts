@@ -57,6 +57,7 @@ function makeCrypto() {
     getUserVerificationStatus: vi.fn(async (_userId: string) => ({
       needsUserApproval: false,
     })),
+    pinCurrentUserIdentity: vi.fn(async (_userId: string) => {}),
   };
 }
 
