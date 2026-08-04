@@ -294,3 +294,81 @@ les motifs récurrents, pas la qualité de ses modules** — ses quatre correcti
 sont la preuve. Toute trouvaille arrive comme un filet posé sur l'espace entre les specs, le même
 qui a manqué aux quatre défauts critiques de la veille. Personne n'audite personne : on audite
 l'espace que les contrats ne possèdent pas encore.
+
+---
+
+# Addendum du 04/08/2026 (suite) — fix-multi-session, ordre de la file, incident shell
+
+## 1. Extraction approuvée — l'onboarding cassé ne fait pas la queue derrière un README
+
+Vérifié sur pièces : sans le callback `getSecretStorageKey`, `bootstrapSecretStorage` lève et
+**aucune inscription ne peut aboutir** (REQ-COR-06, la porte d'entrée du produit) ; et le
+préfixe crypto fixe interdit deux identités dans un même profil. Ce sont des correctifs de
+production, pas du confort.
+
+Décision : les deux correctifs `session.ts` + leurs tests unitaires sortent sur une branche
+`fix-onboarding` partant de `fix-c4` (leur seule vraie dépendance, celle qui a créé
+`buildSession`). Elle entre dans la file **immédiatement après `fix-c4`**. Le test de fumée à
+deux personnes reste sur la branche empilée, avec sa dépendance à `smoke-target`.
+
+**Motif, qui fait jurisprudence : la position d'un correctif dans la file se décide par sa
+criticité et ses dépendances réelles, jamais par l'accident de la branche où il est né.** Un
+empilement de commodité n'est pas un ordre de merge.
+
+## 2. Le reste de la file ne bouge pas
+
+D'accord avec le dev : le tri final est identique, l'ordre ne compte qu'en merge partiel, et
+réordonner invaliderait une relecture peut-être commencée. On ne touche pas aux dix premières.
+
+## 3. Le point docs : résolu par l'ordre, et il s'inverse
+
+`docs-tracabilite` entre **en dernier** — une carte du dépôt décrit un état mergé, elle ne le
+précède pas. Avec l'extraction, `fix-onboarding` sera dans `main` avant que la carte n'arrive :
+la séparation rend le README **plus** exact au moment où il atterrit, pas moins. L'objection
+du dev jouait donc pour sa propre proposition.
+
+## 4. Incident shell : signalement exemplaire, et une règle d'équipe
+
+Trois occurrences le même jour du même motif — un enchaînement où l'échec ne s'arrête pas
+(`;` au lieu de `&&`, résolution automatique commitée avec ses marqueurs). Le signalement
+spontané est exactement la culture voulue ; la réparation (résolveur dans un fichier, boucle
+jusqu'à stabilité, assertion bruyante) est la bonne forme.
+
+Règle d'équipe, effective immédiatement : **tout script qui mute l'état git échoue vite et
+fort** — `&&` ou `set -e`, jamais `;` entre une commande faillible et un `git add`/`commit`,
+et une assertion finale qui casse s'il reste un marqueur de conflit. Un one-liner qui touche
+git est un script comme un autre.
+
+---
+
+# Addendum du 04/08/2026 (suite) — REQ-COR-07 : la troisième voie
+
+L'escalade posait deux options : tenir la garantie (parcours SAS/QR à construire) ou
+l'assouplir en TOFU. **Ni l'une ni l'autre : D-08 porte la confiance sur l'identité
+cross-signing.** REQ-COR-07 est amendée, pas abrogée.
+
+Le raisonnement tient en trois faits déjà dans les contrats :
+1. REQ-COR-06 impose le bootstrap cross-signing à l'inscription → tout appareil légitime est
+   signé par son propriétaire.
+2. Partager avec les seuls appareils signés rend le produit fonctionnel **sans** parcours SAS —
+   le trou de spec disparaît au lieu d'être comblé par un module de plus.
+3. Un appareil injecté par le serveur ne porte pas la signature du propriétaire et ne reçoit
+   rien : la menace que REQ-INF-11 traite reste couverte. C'est ce que le TOFU brut aurait cédé,
+   et pourquoi il est refusé.
+
+Une réinitialisation d'identité **bloque l'envoi jusqu'à confirmation explicite** — le seul
+morceau d'UI requis (un dialogue, pas un parcours), à la charge de la spec 11. SAS/QR devient le
+chemin de relèvement post-V1, spec dédiée, pour épingler les identités.
+
+**Conditions d'acceptation côté dev :**
+- Mécanisme SDK vérifié sur la version épinglée (mode d'isolation « appareils signés uniquement »
+  de la crypto Rust) ; s'il ne l'exprime pas, escalade avant d'implémenter — pas d'à-peu-près sur
+  un chemin de clés.
+- Les tests de fumée à deux personnes passent au vert **par le chemin produit** — plus aucun
+  `setDeviceVerified()` dans les tests ; le test « rien n'est lisible » se retourne : un appareil
+  **non signé** ne reçoit toujours rien.
+- La limite (compromission du compte d'un correspondant) documentée côté utilisateur,
+  interdit n°13.
+
+Oui pour `ESCALADE-PM-VERIFICATION.md` sur la branche : une escalade tranchée mérite sa trace
+hors d'un message de commit — y référencer D-08 et le présent addendum.
