@@ -156,6 +156,37 @@ describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signé
     ).not.toThrow();
   });
 
+  it("identityResetOf rend true quand le SDK signale un changement d'identité", async () => {
+    crypto.getUserVerificationStatus.mockResolvedValue({ needsUserApproval: true });
+    const session = await initSession(config);
+
+    // D-08 — l'UI (spec 11) bloque l'envoi vers cet utilisateur jusqu'à confirmation
+    // explicite. Le module remonte l'état ; il ne décide pas de l'écran.
+    await expect(session.identityResetOf("@bob:tacita.test")).resolves.toBe(true);
+    expect(crypto.getUserVerificationStatus).toHaveBeenCalledWith("@bob:tacita.test");
+  });
+
+  it("rend false dans le cas normal, sans rien exiger de l'UI", async () => {
+    const session = await initSession(config);
+    await expect(session.identityResetOf("@bob:tacita.test")).resolves.toBe(false);
+  });
+
+  it("est un prédicat : il ne lève jamais, et le repli n'affaiblit rien", async () => {
+    // Repli permissif assumé : la protection vient du mode d'isolation, qui fait lever
+    // le chiffrement à l'envoi si l'identité a changé. Replier sur `true` bloquerait
+    // tout envoi à la moindre panne passagère du crypto, pour un gain nul.
+    crypto.getUserVerificationStatus.mockRejectedValue(new Error("crypto pas prête"));
+    const session = await initSession(config);
+    await expect(session.identityResetOf("@bob:tacita.test")).resolves.toBe(false);
+  });
+
+  it("le contrat V1 n'annonce plus de vérification interactive", () => {
+    // D-08 renvoie SAS/QR au post-V1, dans sa spec dédiée. Un exporté sans appelant sur
+    // un chemin de clés est un piège : interdit n°13, on n'annonce pas ce qu'on ne rend
+    // pas. La spec 04 a perdu la ligne en même temps.
+    expect(code).not.toMatch(/verifyDevice|requestDeviceVerification/);
+  });
+
   it("le module ne s'appuie plus sur le drapeau que ce mode rend inopérant", () => {
     // Le SDK documente « Ignored when deviceIsolationMode is
     // OnlySignedDevicesIsolationMode » : verrouiller `globalBlacklistUnverifiedDevices`

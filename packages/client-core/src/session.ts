@@ -11,7 +11,6 @@ import { createLogger } from "./logger";
 /** Types dérivés du SDK : pas de réimport de sous-chemins internes. */
 export type CryptoApi = NonNullable<ReturnType<MatrixClient["getCrypto"]>>;
 export type RecoveryKey = Awaited<ReturnType<CryptoApi["createRecoveryKeyFromPassphrase"]>>;
-export type VerificationRequest = Awaited<ReturnType<CryptoApi["requestDeviceVerification"]>>;
 
 export interface SessionConfig {
   /** Homeserver Synapse (spec 01), derrière le proxy TLS. */
@@ -61,7 +60,17 @@ export interface Session {
   isEncrypted(roomId: string): Promise<boolean>;
   recoveryRequired(): Promise<boolean>;
   setupRecoveryKey(): Promise<RecoveryKey>;
-  verifyDevice(userId: string, deviceId: string): Promise<VerificationRequest>;
+  /**
+   * REQ-COR-07 / D-08 — `true` quand cet utilisateur a **changé d'identité** depuis
+   * qu'on l'a vue pour la première fois. Ses anciennes signatures ne valent alors plus
+   * rien, et l'UI (spec 11) doit exiger une confirmation explicite avant tout nouvel
+   * envoi vers lui — pas un avertissement ignorable.
+   *
+   * Le membre existe pour que le shard n'ait **rien à dériver lui-même** : la spec 00
+   * lui interdit toute logique métier, et lire `needsUserApproval` sur le crypto en
+   * serait.
+   */
+  identityResetOf(userId: string): Promise<boolean>;
   /** REQ-COR-10 — un package déclare ici comment effacer ses propres stores. */
   registerWipe(name: string, wipe: () => Promise<void> | void): void;
   logout(): Promise<void>;
@@ -296,8 +305,23 @@ async function buildSession(
       return generated;
     },
 
-    verifyDevice(userId, deviceId) {
-      return requireCrypto(client).requestDeviceVerification(userId, deviceId);
+    async identityResetOf(userId) {
+      try {
+        const statut = await requireCrypto(client).getUserVerificationStatus(userId);
+        return statut.needsUserApproval;
+      } catch {
+        // Prédicat, comme `isEncrypted` : il ne remonte jamais d'exception à l'UI.
+        //
+        // Le repli est `false` — permissif — et c'est délibéré : **la protection ne
+        // dépend pas de ce prédicat**. Si l'identité a réellement changé,
+        // `OnlySignedDevicesIsolationMode` fait lever le chiffrement au moment de
+        // l'envoi, que l'UI ait affiché son dialogue ou non. Ce membre sert à
+        // *expliquer* le blocage, pas à le produire.
+        //
+        // Replier sur `true` bloquerait tout envoi vers cet utilisateur à la moindre
+        // panne passagère du crypto — un déni de service pour un gain nul.
+        return false;
+      }
     },
 
     registerWipe(name, wipe) {
