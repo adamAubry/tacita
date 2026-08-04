@@ -347,3 +347,37 @@ describe("REQ-COR-10 — déconnexion = wipe complet des données locales", () =
     expect(client.clearStores).toHaveBeenCalledOnce();
   });
 });
+
+describe("spec 00 — le croquis de la spec 04 ne ment pas sur l'interface livrée", () => {
+  /**
+   * Ce garde vient d'un défaut observé **deux fois le 04/08/2026**, dans les deux sens :
+   * le croquis annonçait `verifyDevice`, que D-08 avait retiré du contrat ; puis
+   * `confirmIdentityOf` a été livrée avant d'être écrite. Un croquis d'interface est un
+   * document accessoire — la jurisprudence PM dit que l'exigence l'emporte — mais un
+   * accessoire qui ment est ce que le développeur lit en premier.
+   */
+  const spec = readFileSync(new URL("../../../specs/04-client-core.md", import.meta.url), "utf-8");
+  const declarés = [...spec.matchAll(/^Session\.([a-zA-Z]+)/gm)].map((m) => m[1]!);
+  const interfaceSession = readSrc("session.ts").match(
+    /export interface Session \{[\s\S]*?\n\}/,
+  )![0];
+
+  /** Les membres réellement déclarés. Sans regex construite : dans un template
+   *  literal, `\s` s'écrase en `s` — le premier jet de ce garde est tombé dessus. */
+  const membresRéels = interfaceSession
+    .split("\n")
+    .map((ligne) => ligne.trim().replace(/^readonly /, ""))
+    .filter((ligne) => /^[a-zA-Z]+[(:]/.test(ligne))
+    .map((ligne) => ligne.split(/[(:]/)[0]!);
+
+  it("chaque membre annoncé par le croquis existe dans l'interface", () => {
+    expect(declarés.length).toBeGreaterThan(0); // le croquis a bien été lu
+    for (const membre of declarés) {
+      expect(membresRéels, `le croquis annonce ${membre}, absent de Session`).toContain(membre);
+    }
+  });
+
+  it("le croquis n'annonce rien que D-08 a retiré du contrat V1", () => {
+    expect(spec).not.toMatch(/^Session\.verifyDevice/m);
+  });
+});
