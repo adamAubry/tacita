@@ -39,7 +39,7 @@ specs, pas un oubli.
 
 | Paquet | Ce qu'il vous donne | REQ-UI servies |
 |---|---|---|
-| `@tacita/client-core` | `initSession`, `restoreSession`, `Session` (client, timeline, isEncrypted, recoveryRequired, setupRecoveryKey, registerWipe, logout) | 01, 04, 17 |
+| `@tacita/client-core` | `initSession`, `restoreSession`, `Session` (client, timeline, isEncrypted, recoveryRequired, setupRecoveryKey, identityResetOf, confirmIdentityOf, registerWipe, logout) | 01, 04, 17 |
 | `@tacita/messaging` | `sendText`, `reply`, `edit`, `redact`, `react`, `messages`, `subscribe`, `canEdit`, `canRedact`, `createDirectMessage`, `createGroupChat`, `memberCount`, `getPinnedEvents`, `setPinnedEvents`, `parseMentions`, `mentionCandidates`, `createTypingIndicator` | 05–12 |
 | `@tacita/outbox` | `createOutbox`, `Outbox` (enqueue/retry/remove/pending/subscribe), `OutboxEntry`, `NOT_ENCRYPTED` | 06, 17 |
 | `@tacita/receipts` | `createReceipts`, `ReceiptStatus`, `DELIVERED` | 13 |
@@ -79,21 +79,34 @@ Quand un correspondant réinitialise son identité, ses anciennes signatures ne 
 rien. D-08 exige que **l'envoi vers lui soit bloqué jusqu'à confirmation explicite dans
 l'UI** — pas un avertissement qu'on peut ignorer.
 
-**Attention, ce n'est pas qu'un écran.** `Session` **n'expose aujourd'hui aucun état de
-réinitialisation d'identité** (vérifié : l'interface n'a que `client`, `timeline`,
-`isEncrypted`, `recoveryRequired`, `setupRecoveryKey`, `verifyDevice`, `registerWipe`,
-`logout`). Le signal existe côté SDK — `OnlySignedDevicesIsolationMode` fait lever le
-chiffrement dans ce cas — mais **personne ne l'a remonté dans `client-core`**.
+**Les deux membres dont vous avez besoin existent** — ils ont été ajoutés le 04/08/2026,
+après que ce dossier a signalé le trou (arbitrage PM, branche `fix-identity-reset`) :
 
-Donc : soit vous le remontez vous-même dans `client-core` (et c'est de la spec 04, pas de la
-11), soit vous le demandez. **Ce n'est pas à mettre dans le shard** : `specs/11-ui-shard.md`
-dit que le shard ne contient aucune logique métier, et que toute logique découverte pendant
-l'UI remonte dans le paquet concerné.
+```ts
+await session.identityResetOf(userId);  // true → bloquer l'envoi, expliquer pourquoi
+await session.confirmIdentityOf(userId); // la confirmation ; lève si elle échoue
+```
 
-### 4.2 `verifyDevice()` est du code mort jusqu'au post-V1
+Le second **lève**, contrairement au premier, et c'est délibéré : le SDK refuse sur votre
+propre identifiant et sur un utilisateur sans identité connue. Ne l'avalez pas — une
+confirmation ratée qui rouvre l'UI promet un envoi que le chiffrement refusera de toute
+façon.
 
-L'API existe et est testée, mais D-08 renvoie la vérification interactive après la V1.
-Ne construisez pas d'écran dessus. Sa suppression est un arbitrage PM en attente.
+Le premier ne lève jamais et replie sur `false`. **La protection ne dépend pas de lui** :
+c'est `OnlySignedDevicesIsolationMode` qui fait lever le chiffrement à l'envoi. Ces membres
+servent à *expliquer* le blocage, pas à le produire — n'en faites pas votre garde.
+
+Vous n'avez donc **rien à dériver du crypto vous-même**, et c'est le point :
+`specs/11-ui-shard.md` interdit toute logique métier dans le shard. Si vous vous surprenez à
+appeler `session.client.getCrypto()`, c'est le signal qu'un membre manque à la spec 04 —
+demandez-le plutôt que de le contourner. C'est exactement ce qui s'est passé ici.
+
+### 4.2 Il n'y a pas de `verifyDevice()` — ne le cherchez pas
+
+D-08 renvoie la vérification interactive (SAS/QR) au post-V1, dans une spec dédiée qui
+définira sa propre interface. L'API a été **retirée** du contrat le 04/08/2026 : un exporté
+sans appelant sur un chemin de clés est un piège, et l'interdit n°13 veut qu'on n'annonce
+aucune capacité qu'on ne rend pas. Détail : `ARBITRAGE-PM.md`, addendum du 04/08.
 
 ---
 
