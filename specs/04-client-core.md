@@ -14,9 +14,13 @@ restoreSession(config): Promise<Session|null> // rouvre la session persistée, s
 Session.client: MatrixClient                 // accès contrôlé pour les autres packages
 Session.timeline(roomId): OrderedTimeline    // ordre canonique /sync
 Session.isEncrypted(roomId): Promise<boolean> // prédicat pour les gardes d'envoi (specs 05, 07)
-setupRecoveryKey(): Promise<RecoveryKey>     // backup de clés, obligatoire
-verifyDevice(...)                            // vérification interactive d'appareil
+setupRecoveryKey(): Promise<RecoveryKey>     // backup de clés, obligatoire — amorce le cross-signing (D-08)
+Session.identityResetOf(userId): Promise<boolean> // REQ-COR-07/D-08 — envoi bloqué jusqu'à confirmation UI
 ```
+
+Pas de `verifyDevice` : D-08 renvoie la vérification interactive (SAS/QR) au post-V1, dans sa
+spec dédiée, qui définira sa propre interface. *(Retiré le 04/08/2026 — le contrat n'annonce
+aucune capacité que le produit ne rend pas, interdit n°13.)*
 
 ## Exigences et critères d'acceptation
 
@@ -26,7 +30,7 @@ verifyDevice(...)                            // vérification interactive d'appa
 - **REQ-COR-04** — `OrderedTimeline` restitue l'ordre du flux **/sync** (ordre canonique). Tout tri par `origin_server_ts` est interdit — l'horodatage est indicatif seulement.
 - **REQ-COR-05** — Transport temps réel = long-polling HTTP sur `/sync`. Aucun code ni doc ne le décrit comme du WebSocket.
 - **REQ-COR-06** — **Clé de récupération E2EE obligatoire à l'inscription** : `setupRecoveryKey()` fait partie du flux d'onboarding et l'état « backup configuré » est exposé pour que l'UI bloque tant qu'il ne l'est pas (sans elle, l'utilisateur perd son historique à chaque nouvel appareil — première cause d'abandon des déploiements Matrix).
-- **REQ-COR-07** — Politique client : les clés Megolm ne sont **jamais** partagées avec un appareil que son propriétaire n'a pas signé (cross-signing). Mode d'isolation « appareils signés uniquement » de la crypto Rust, activé et verrouillé — mécanisme exact à vérifier sur la version épinglée du SDK ; s'il ne sait pas l'exprimer, escalade avant d'implémenter. La signature d'identité existe pour tout utilisateur légitime : REQ-COR-06 rend le bootstrap cross-signing obligatoire à l'inscription. Une **réinitialisation d'identité** (nouvelle clé maîtresse) est exposée par le module comme un état bloquant par utilisateur ; l'UI (spec 11) exige une confirmation explicite avant tout nouvel envoi vers cet utilisateur. La vérification interactive (SAS/QR) est hors V1 — spec dédiée post-V1. *(Amendée le 04/08/2026, D-08 : l'ancienne rédaction exigeait une vérification manuelle par appareil qu'aucune spec ne fournissait — deux utilisateurs réels ne pouvaient pas se lire.)*
+- **REQ-COR-07** — Politique client : les clés Megolm ne sont **jamais** partagées avec un appareil que son propriétaire n'a pas signé (cross-signing). Mode d'isolation « appareils signés uniquement » de la crypto Rust, activé et verrouillé — mécanisme exact à vérifier sur la version épinglée du SDK ; s'il ne sait pas l'exprimer, escalade avant d'implémenter. La signature d'identité existe pour tout utilisateur légitime : REQ-COR-06 rend le bootstrap cross-signing obligatoire à l'inscription. Une **réinitialisation d'identité** (nouvelle clé maîtresse) est exposée par le module comme un état bloquant par utilisateur ; l'UI (spec 11) exige une confirmation explicite avant tout nouvel envoi vers cet utilisateur. Critère : cet état est un membre de `Session` (`identityResetOf(userId)`) — le shard UI ne dérive aucun état crypto lui-même (spec 00 : zéro logique métier dans le shard). La vérification interactive (SAS/QR) est hors V1 — spec dédiée post-V1, et `verifyDevice` ne fait donc pas partie du contrat V1. *(Amendée le 04/08/2026, D-08 : l'ancienne rédaction exigeait une vérification manuelle par appareil qu'aucune spec ne fournissait — deux utilisateurs réels ne pouvaient pas se lire. Critère d'exposition précisé le 04/08/2026.)*
 - **REQ-COR-08** — Authentification : le module consomme le flux OIDC (fournisseur externe, spec 01) ; il ne stocke aucun mot de passe et n'implémente aucune méthode d'auth propre.
 - **REQ-COR-09** — Aucun contenu déchiffré dans les logs, la télémétrie ou les traces d'erreur du module, y compris en dev : le logger du package filtre structurellement les corps d'événements.
 - **REQ-COR-10** — Déconnexion = wipe complet des données locales (stores SDK + stores applicatifs déclarés par les autres packages via un registre de wipe exposé ici). Le wipe couvre aussi les credentials de session persistés (REQ-COR-11) ; ils sont effacés **en premier** — si le reste du wipe échoue, mieux vaut une session locale morte qu'un jeton qui survit à la déconnexion. *(Étendue le 03/08/2026.)*
