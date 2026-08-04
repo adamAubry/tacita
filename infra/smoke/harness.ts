@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
+import { request as httpsRequest } from "node:https";
 
 /**
  * Ce qu'il faut pour parler à une pile réelle. Rien de métier ici : la cible teste
@@ -58,6 +59,41 @@ function requireSharedSecret(): string {
     );
   }
   return secret;
+}
+
+/** Nom public du déploiement, celui que porte le certificat et `public_baseurl`. */
+export const SERVER_NAME = process.env.SERVER_NAME ?? "chat.example.org";
+
+/**
+ * Un GET sur le proxy public, sans suivre les redirections.
+ *
+ * `fetch` ne convient pas : le nom public ne résout nulle part sur la machine de
+ * dev, et le certificat est auto-signé. `node:https` accepte les deux réglages —
+ * on vise 127.0.0.1 en annonçant le vrai nom (SNI + en-tête `Host`).
+ *
+ * `rejectUnauthorized: false` ne masque rien de ce qui est testé : la confiance TLS
+ * qui compte ici est celle de **Synapse envers Keycloak**, à l'intérieur du réseau,
+ * pas celle de ce client envers le proxy.
+ */
+export function getViaProxy(path: string): Promise<{ status: number; location: string | null }> {
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(
+      {
+        host: "127.0.0.1",
+        port: 443,
+        path,
+        servername: SERVER_NAME,
+        headers: { Host: SERVER_NAME },
+        rejectUnauthorized: false,
+      },
+      (response) => {
+        response.resume(); // le corps ne nous intéresse pas, mais il faut le drainer
+        resolve({ status: response.statusCode ?? 0, location: response.headers.location ?? null });
+      },
+    );
+    request.on("error", reject);
+    request.end();
+  });
 }
 
 /** Un localpart neuf par exécution : Synapse refuse de recréer un compte. */
