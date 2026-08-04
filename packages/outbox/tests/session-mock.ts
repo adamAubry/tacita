@@ -43,6 +43,9 @@ export function fakeSession(indexedDB: IDBFactory = new IDBFactory()) {
 
   const session = {
     client,
+    // REQ-COR-12 — chiffré par défaut : la plupart des tests n'ont rien à dire
+    // là-dessus, un salon non chiffré est le cas exceptionnel à poser exprès.
+    isEncrypted: vi.fn(async (_roomId: string) => true),
     registerWipe: vi.fn((name: string, wipe: () => Promise<void> | void) => {
       wipes.set(name, wipe);
     }),

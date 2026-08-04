@@ -78,6 +78,8 @@ export function fakeSession() {
 
   const session = {
     client,
+    // REQ-COR-12 — la recherche n'envoie rien, mais elle consomme le même contrat.
+    isEncrypted: vi.fn(async (_roomId: string) => true),
     registerWipe: vi.fn((name: string, wipe: () => Promise<void> | void) => {
       wipes.set(name, wipe);
     }),

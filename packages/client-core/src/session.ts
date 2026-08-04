@@ -44,6 +44,15 @@ export interface Session {
    * (spec 11) bloque dessus : sans clé de récupération, l'historique est perdu au
    * premier nouvel appareil.
    */
+  /**
+   * REQ-COR-12 — état de chiffrement du salon, en **prédicat** : il rend `false`,
+   * il ne lève jamais. Les gardes d'envoi des specs 05 et 07 s'appuient dessus.
+   *
+   * `false` tant que l'état est inconnu — avant le premier `/sync` abouti, ou si la
+   * crypto n'est pas là. C'est le sens qu'on veut : dans le doute, on n'envoie pas.
+   * Aucune mémorisation ici ; une garde qui ment est pire que pas de garde.
+   */
+  isEncrypted(roomId: string): Promise<boolean>;
   recoveryRequired(): Promise<boolean>;
   setupRecoveryKey(): Promise<RecoveryKey>;
   verifyDevice(userId: string, deviceId: string): Promise<VerificationRequest>;
@@ -228,6 +237,17 @@ async function buildSession(
       return {
         events: () => client.getRoom(roomId)?.getLiveTimeline().getEvents() ?? [],
       };
+    },
+
+    // REQ-COR-12 — prédicat, pas assertion : un salon dont on ne sait rien est traité
+    // comme non chiffré. Le SDK peut lever si l'état n'est pas encore chargé, d'où le
+    // `catch` — c'est le seul endroit où une exception vaut « je ne sais pas ».
+    async isEncrypted(roomId) {
+      try {
+        return (await client.getCrypto()?.isEncryptionEnabledInRoom(roomId)) ?? false;
+      } catch {
+        return false;
+      }
     },
 
     async recoveryRequired() {
