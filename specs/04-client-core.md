@@ -10,8 +10,10 @@ Interface exportée (contrat, à affiner sans en changer la nature) :
 
 ```ts
 initSession(config): Promise<Session>        // login OIDC token → client démarré, crypto prête
+restoreSession(config): Promise<Session|null> // rouvre la session persistée, sans réseau ; null = passer par l'OIDC
 Session.client: MatrixClient                 // accès contrôlé pour les autres packages
 Session.timeline(roomId): OrderedTimeline    // ordre canonique /sync
+Session.isEncrypted(roomId): Promise<boolean> // prédicat pour les gardes d'envoi (specs 05, 07)
 setupRecoveryKey(): Promise<RecoveryKey>     // backup de clés, obligatoire
 verifyDevice(...)                            // vérification interactive d'appareil
 ```
@@ -24,10 +26,12 @@ verifyDevice(...)                            // vérification interactive d'appa
 - **REQ-COR-04** — `OrderedTimeline` restitue l'ordre du flux **/sync** (ordre canonique). Tout tri par `origin_server_ts` est interdit — l'horodatage est indicatif seulement.
 - **REQ-COR-05** — Transport temps réel = long-polling HTTP sur `/sync`. Aucun code ni doc ne le décrit comme du WebSocket.
 - **REQ-COR-06** — **Clé de récupération E2EE obligatoire à l'inscription** : `setupRecoveryKey()` fait partie du flux d'onboarding et l'état « backup configuré » est exposé pour que l'UI bloque tant qu'il ne l'est pas (sans elle, l'utilisateur perd son historique à chaque nouvel appareil — première cause d'abandon des déploiements Matrix).
-- **REQ-COR-07** — Politique client : les clés Megolm ne sont **jamais** partagées avec un appareil non vérifié (réglage SDK correspondant activé et verrouillé).
+- **REQ-COR-07** — Politique client : les clés Megolm ne sont **jamais** partagées avec un appareil que son propriétaire n'a pas signé (cross-signing). Mode d'isolation « appareils signés uniquement » de la crypto Rust, activé et verrouillé — mécanisme exact à vérifier sur la version épinglée du SDK ; s'il ne sait pas l'exprimer, escalade avant d'implémenter. La signature d'identité existe pour tout utilisateur légitime : REQ-COR-06 rend le bootstrap cross-signing obligatoire à l'inscription. Une **réinitialisation d'identité** (nouvelle clé maîtresse) est exposée par le module comme un état bloquant par utilisateur ; l'UI (spec 11) exige une confirmation explicite avant tout nouvel envoi vers cet utilisateur. La vérification interactive (SAS/QR) est hors V1 — spec dédiée post-V1. *(Amendée le 04/08/2026, D-08 : l'ancienne rédaction exigeait une vérification manuelle par appareil qu'aucune spec ne fournissait — deux utilisateurs réels ne pouvaient pas se lire.)*
 - **REQ-COR-08** — Authentification : le module consomme le flux OIDC (fournisseur externe, spec 01) ; il ne stocke aucun mot de passe et n'implémente aucune méthode d'auth propre.
 - **REQ-COR-09** — Aucun contenu déchiffré dans les logs, la télémétrie ou les traces d'erreur du module, y compris en dev : le logger du package filtre structurellement les corps d'événements.
-- **REQ-COR-10** — Déconnexion = wipe complet des données locales (stores SDK + stores applicatifs déclarés par les autres packages via un registre de wipe exposé ici).
+- **REQ-COR-10** — Déconnexion = wipe complet des données locales (stores SDK + stores applicatifs déclarés par les autres packages via un registre de wipe exposé ici). Le wipe couvre aussi les credentials de session persistés (REQ-COR-11) ; ils sont effacés **en premier** — si le reste du wipe échoue, mieux vaut une session locale morte qu'un jeton qui survit à la déconnexion. *(Étendue le 03/08/2026.)*
+- **REQ-COR-11** — `restoreSession(config)` rouvre la session persistée **sans aucun appel réseau** ; l'absence de session locale se signale par `null`, jamais par une erreur. Un échec de restauration rend `null` sans effacer les credentials (une panne passagère — wasm non chargé, éviction partielle — ne doit pas forcer un aller-retour OIDC que l'utilisateur hors ligne ne peut pas faire). Limite assumée, documentée : un jeton restauré n'est pas validé hors ligne ; un jeton révoqué se manifeste par `M_UNKNOWN_TOKEN` au premier appel réseau, que le shard UI (spec 11) route vers l'OIDC. *(Créée le 03/08/2026 — sans elle, les promesses hors ligne de REQ-COR-03, REQ-OBX-01 et REQ-SRC-02 sont intenables.)*
+- **REQ-COR-12** — `Session.isEncrypted(roomId)` expose l'état de chiffrement du salon comme **prédicat** (il rend `false`, il ne lève jamais) pour les gardes d'envoi des autres packages (specs 05 et 07). Tant que l'état du salon est inconnu — avant le premier `/sync` abouti — le prédicat rend `false`. Toute mémorisation s'invalide sur `m.room.encryption` ; jamais de cache permanent : une garde qui ment est pire que pas de garde. *(Créée le 03/08/2026 — support du défaut C1, voir REQ-OBX-09.)*
 
 ## Méthode et contraintes
 
