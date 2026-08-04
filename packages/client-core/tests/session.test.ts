@@ -37,7 +37,9 @@ describe("REQ-COR-01 — crypto vodozemac via initRustCrypto, libolm interdit", 
   it("initSession initialise la crypto Rust", async () => {
     await initSession(config);
     expect(client.initRustCrypto).toHaveBeenCalledOnce();
-    expect(client.initRustCrypto).toHaveBeenCalledWith({ useIndexedDB: true });
+    expect(client.initRustCrypto).toHaveBeenCalledWith(
+      expect.objectContaining({ useIndexedDB: true }),
+    );
   });
 
   it("aucune session n'est rendue si la crypto n'est pas disponible", async () => {
@@ -95,9 +97,17 @@ describe("REQ-COR-03 — persistance exclusivement IndexedDB", () => {
     expect(clientCréé).toBeLessThan(storeDémarré);
   });
 
-  it("la crypto persiste elle aussi dans IndexedDB", async () => {
+  it("la crypto persiste elle aussi dans IndexedDB, dans un magasin par appareil", async () => {
     await initSession(config);
-    expect(client.initRustCrypto).toHaveBeenCalledWith({ useIndexedDB: true });
+
+    // Le nom du magasin est dérivé du `device_id` et non laissé au défaut fixe du
+    // SDK : un magasin de clés appartient à un appareil, pas à un navigateur. Sans
+    // ça, deux identités dans le même profil se marchent dessus et le SDK refuse
+    // d'ouvrir un magasin qui appartient à quelqu'un d'autre.
+    expect(client.initRustCrypto).toHaveBeenCalledWith({
+      useIndexedDB: true,
+      cryptoDatabasePrefix: "matrix-js-sdk-DEVICE1",
+    });
   });
 
   it("aucun code du module ne touche localStorage ni sessionStorage", () => {

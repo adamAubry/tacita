@@ -171,12 +171,34 @@ async function buildSession(
     dbName: "tacita",
   });
 
+  /**
+   * REQ-COR-06 — la clé de récupération que `setupRecoveryKey()` vient de générer.
+   * Le SDK ne la conserve pas : il rappelle l'application chaque fois qu'il doit
+   * déverrouiller le secret storage pour y écrire. Sans ce rappel,
+   * `bootstrapSecretStorage` lève « No getSecretStorageKey callback supplied » et
+   * **aucune inscription ne peut aboutir**.
+   *
+   * Elle ne vit qu'en mémoire, le temps de la session : la persister reviendrait à
+   * garder la clé qui déverrouille tout à côté de ce qu'elle protège, et
+   * `client-core/README.md` promet qu'elle n'est jamais persistée.
+   */
+  let recoveryKey: RecoveryKey | undefined;
+
   const client = createClient({
     baseUrl: config.homeserverUrl,
     accessToken: credentials.accessToken,
     userId: credentials.userId,
     deviceId: credentials.deviceId,
     store,
+    cryptoCallbacks: {
+      getSecretStorageKey: async ({ keys }) => {
+        // Rien à rendre tant qu'aucune clé n'a été générée dans cette session : le
+        // SDK bascule alors sur son propre chemin d'erreur, ce qui est correct.
+        const privateKey = recoveryKey?.privateKey;
+        const [keyId] = Object.keys(keys);
+        return privateKey && keyId ? [keyId, privateKey] : null;
+      },
+    },
   });
 
   // `startup()` **après** l'affectation au client, jamais avant : le SDK lève
@@ -191,7 +213,16 @@ async function buildSession(
   // le client n'est rendu à l'appelant qu'après cette étape, donc aucun contenu ne
   // peut sortir en clair. Olm pour la négociation entre appareils, Megolm pour les
   // salons, rotation des sessions : gérés nativement par le SDK, rien à réécrire.
-  await client.initRustCrypto({ useIndexedDB: true });
+  // `cryptoDatabasePrefix` dérivé du `device_id` plutôt que le défaut fixe du SDK :
+  // le magasin de clés appartient à un appareil, pas à un navigateur. Au rechargement
+  // le `device_id` est le même, donc les clés sont retrouvées ; deux identités dans le
+  // même profil ne se marchent plus dessus. Sans ça, le SDK refuse d'ouvrir un magasin
+  // qui appartient à quelqu'un d'autre — « the account in the store doesn't match the
+  // account in the constructor ».
+  await client.initRustCrypto({
+    useIndexedDB: true,
+    cryptoDatabasePrefix: `matrix-js-sdk-${credentials.deviceId}`,
+  });
   lockUnverifiedDeviceBlacklist(requireCrypto(client));
 
   // REQ-COR-05 — ouvre la boucle /sync, du long-polling HTTP.
@@ -232,6 +263,9 @@ async function buildSession(
         setupNewKeyBackup: true,
         createSecretStorageKey: async () => {
           generated = await crypto.createRecoveryKeyFromPassphrase();
+          // Publiée aussitôt pour `getSecretStorageKey` : le SDK la redemande dans
+          // la foulée, à l'intérieur de ce même `bootstrapSecretStorage`.
+          recoveryKey = generated;
           return generated;
         },
       });
