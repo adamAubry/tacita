@@ -35,6 +35,8 @@ describe("REQ-COR-07 (D-08) — la fumée à deux personnes passe par le chemin 
   it("le cas négatif repose sur un appareil non signé, pas sur une absence de vérification", () => {
     // Le piège que ce garde ferme : `ouvrir()` signe par défaut. Un cas négatif
     // construit sans `signe: false` passerait au vert pour la mauvaise raison.
+    // ponytail: garde par chaîne de caractères — renommer le paramètre donne une
+    // fausse alerte. Assumé : la fausse alerte se lit et se corrige, l'inverse non.
     expect(code).toMatch(/signe:\s*false/);
   });
 });

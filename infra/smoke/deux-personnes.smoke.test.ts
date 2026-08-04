@@ -13,9 +13,8 @@ import { HOMESERVER, registerAccount, uniqueLocalpart, type Account } from "./ha
  *
  * Ce que la cible existante ne couvre pas : elle valide un utilisateur qui se parle
  * à lui-même — même appareil, mêmes clés. Le partage de clés Megolm entre appareils
- * distincts n'a jamais été exercé, alors que REQ-COR-07 verrouille
- * `globalBlacklistUnverifiedDevices` : les clés ne sont **jamais** partagées avec un
- * appareil non vérifié.
+ * distincts n'y est jamais exercé, alors que REQ-COR-07 le restreint aux appareils
+ * signés par leur propriétaire (D-08, mode `OnlySignedDevicesIsolationMode`).
  *
  * Si ce fichier échoue, la question n'est pas « le test est-il bon » mais « deux
  * personnes peuvent-elles se parler ».
@@ -135,7 +134,7 @@ describe("Fumée — deux personnes distinctes dans un salon chiffré", () => {
     await sendText(alice.session, room_id, texte);
 
     // Le point qui décide de tout : Bob a-t-il reçu la clé de session ?
-    // REQ-COR-07 interdit de la partager avec un appareil non vérifié.
+    // REQ-COR-07 la réserve aux appareils signés par leur propriétaire.
     const reçu = await vi.waitFor(() => {
       const trouvé = messages(bob.session, room_id).find(
         (event) => event.getContent().body === texte,

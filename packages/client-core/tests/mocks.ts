@@ -39,7 +39,6 @@ function makeCrypto() {
     setDeviceIsolationMode: vi.fn(function (this: CryptoMock, mode: unknown) {
       this.isolationMode = mode;
     }),
-    globalBlacklistUnverifiedDevices: false,
     getActiveSessionBackupVersion: vi.fn(async (): Promise<string | null> => "1"),
     isEncryptionEnabledInRoom: vi.fn(async (_roomId: string) => true),
     createRecoveryKeyFromPassphrase: vi.fn(async () => ({
