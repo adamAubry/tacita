@@ -1,5 +1,5 @@
 import type { Session } from "@tacita/client-core";
-import type { ICreateRoomOpts } from "matrix-js-sdk";
+import type { ICreateRoomOpts, MatrixEvent } from "matrix-js-sdk";
 import { vi } from "vitest";
 
 /** Un `MatrixEvent` réduit à ce que le package en lit. */
@@ -98,8 +98,15 @@ export function fakeSession(options: FakeRoomOptions = {}) {
         return false;
       }
     }),
-    timeline: vi.fn((_roomId: string) => ({ events: () => timelineEvents })),
-  };
+    // La conversion est ici, et nulle part ailleurs : les tests posent des faux
+    // événements réduits à ce que `messages()` en lit, alors que le contrat rend des
+    // `MatrixEvent`. C'est le `satisfies` ci-dessous qui a révélé l'écart — le mock
+    // annonçait `unknown[]`, et personne ne le voyait.
+    timeline: vi.fn((_roomId: string) => ({ events: () => timelineEvents as MatrixEvent[] })),
+    // Audit des jonctions — voir le mock de `search` pour le raisonnement : le double
+    // cast plus bas désactive la vérification structurelle, `satisfies` la rétablit
+    // sur les membres applicatifs. Le `client` reste un faux assumé.
+  } satisfies { client: unknown } & Partial<Omit<Session, "client">>;
 
   return {
     session: session as unknown as Session,

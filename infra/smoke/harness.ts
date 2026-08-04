@@ -75,7 +75,9 @@ export const SERVER_NAME = process.env.SERVER_NAME ?? "chat.example.org";
  * qui compte ici est celle de **Synapse envers Keycloak**, à l'intérieur du réseau,
  * pas celle de ce client envers le proxy.
  */
-export function getViaProxy(path: string): Promise<{ status: number; location: string | null }> {
+export function getViaProxy(
+  path: string,
+): Promise<{ status: number; location: string | null; body: string }> {
   return new Promise((resolve, reject) => {
     const request = httpsRequest(
       {
@@ -87,12 +89,59 @@ export function getViaProxy(path: string): Promise<{ status: number; location: s
         rejectUnauthorized: false,
       },
       (response) => {
-        response.resume(); // le corps ne nous intéresse pas, mais il faut le drainer
-        resolve({ status: response.statusCode ?? 0, location: response.headers.location ?? null });
+        // Le corps est collecté au lieu d'être jeté : REQ-INF-14 doit prouver que
+        // `/push/config` rend la clé du `.env`, pas seulement qu'il répond 200.
+        let corps = "";
+        response.setEncoding("utf8");
+        response.on("data", (morceau: string) => (corps += morceau));
+        response.on("end", () =>
+          resolve({
+            status: response.statusCode ?? 0,
+            location: response.headers.location ?? null,
+            body: corps,
+          }),
+        );
       },
     );
     request.on("error", reject);
     request.end();
+  });
+}
+
+/**
+ * POST à travers le proxy TLS. Nécessaire pour REQ-INF-14 : l'endpoint de notification
+ * de la passerelle est un POST, et un GET dessus rend un 404 même quand la route existe
+ * — l'assertion « pas exposé » passerait alors au vert sans rien prouver.
+ */
+export function postViaProxy(
+  path: string,
+  corps: unknown,
+): Promise<{ status: number; body: string }> {
+  const charge = JSON.stringify(corps);
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(
+      {
+        method: "POST",
+        host: "127.0.0.1",
+        port: 443,
+        path,
+        servername: SERVER_NAME,
+        headers: {
+          Host: SERVER_NAME,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(charge),
+        },
+        rejectUnauthorized: false,
+      },
+      (response) => {
+        let reponse = "";
+        response.setEncoding("utf8");
+        response.on("data", (morceau: string) => (reponse += morceau));
+        response.on("end", () => resolve({ status: response.statusCode ?? 0, body: reponse }));
+      },
+    );
+    request.on("error", reject);
+    request.end(charge);
   });
 }
 

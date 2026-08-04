@@ -10,6 +10,7 @@
     "matrix-js-sdk": "42.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7"
+    "@types/node": "^22.10.7",
+    "@tacita/outbox": "workspace:*"
   }
 }

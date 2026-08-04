@@ -58,7 +58,16 @@ export interface MediaEnvironment extends CryptoEnvironment {
   connection?: NetworkInformation;
 }
 
-export interface AttachmentContent {
+/**
+ * Audit des jonctions — **`type` et non `interface`, délibérément.** La spec 08 promet
+ * que « le pipeline produit un contenu prêt à `enqueue` » (spec 07), or `enqueue` prend
+ * un `Record<string, unknown>` : une `interface` n'a pas d'index signature implicite,
+ * un alias de type si. En `interface`, la passation déclarée **ne compilait pas**, et
+ * personne ne pouvait le voir — aucun paquet ne dépend des deux, il n'existait aucun
+ * site de compilation. Le shard de la spec 11 l'aurait découvert au premier envoi de
+ * photo. `packages/outbox/tests/jonction-media.test-d.ts` est ce site.
+ */
+export type AttachmentContent = {
   msgtype: "m.image" | "m.video" | "m.audio" | "m.file";
   body: string;
   info: Record<string, unknown>;
@@ -66,7 +75,7 @@ export interface AttachmentContent {
   file: EncryptedFile;
   "org.matrix.msc1767.audio"?: { duration: number; waveform: number[] };
   "org.matrix.msc3245.voice"?: Record<string, never>;
-}
+};
 
 type Kind = "image" | "video" | "audio" | "file";
 

@@ -29,6 +29,17 @@ montée de version du SDK ou d'Element Call.
 
 ## Limites assumées
 
+- **Le driver envoie directement, sans passer par la file d'envoi** (spec 07). Seul
+  endroit du dépôt, hors `messaging` et `outbox` lui-même, à appeler `client.sendEvent`.
+  C'est voulu et imposé par REQ-CAL-05 : `WidgetDriver.sendEvent` de `matrix-widget-api`
+  doit rendre l'`eventId` **à l'appelant, de façon synchrone**, et Element Call s'en sert
+  pour suivre son propre état d'appartenance. Une file différée par nature ne peut pas
+  tenir ce contrat — l'événement partirait plus tard, ou jamais.
+  Conséquence assumée : les événements d'appartenance RTC ne survivent pas à une coupure
+  réseau, contrairement aux messages. C'est le bon compromis — une appartenance périmée
+  n'a aucune valeur (elle expire en 4 h, voir plus bas), alors qu'un message, si.
+  Relevé pendant l'audit des jonctions : le contournement était juste, mais écrit nulle
+  part. Un relecteur pouvait le prendre pour un oubli et « corriger » vers l'outbox.
 - **Un focus périmé ne casse pas, il rend muet.** Sans `rtc_foci` exploitable,
   `discoverFocus` lève `RtcFociMissingError` avec une `reason` (`well-known-unreachable`,
   `well-known-absent`, `no-livekit-focus`) : l'UI doit afficher la cause, pas désactiver

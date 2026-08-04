@@ -105,6 +105,9 @@ importers:
         specifier: 42.0.0
         version: 42.0.0
     devDependencies:
+      '@tacita/outbox':
+        specifier: workspace:*
+        version: link:../outbox
       '@types/node':
         specifier: ^22.10.7
         version: 22.20.1

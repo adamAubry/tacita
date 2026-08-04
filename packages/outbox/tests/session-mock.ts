@@ -49,7 +49,10 @@ export function fakeSession(indexedDB: IDBFactory = new IDBFactory()) {
     registerWipe: vi.fn((name: string, wipe: () => Promise<void> | void) => {
       wipes.set(name, wipe);
     }),
-  };
+    // Audit des jonctions — voir le mock de `search` pour le raisonnement : le double
+    // cast plus bas désactive la vérification structurelle, `satisfies` la rétablit
+    // sur les membres applicatifs. Le `client` reste un faux assumé.
+  } satisfies { client: unknown } & Partial<Omit<Session, "client">>;
 
   return {
     session: session as unknown as Session,

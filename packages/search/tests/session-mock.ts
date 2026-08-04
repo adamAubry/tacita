@@ -102,7 +102,12 @@ export function fakeSession() {
     registerWipe: vi.fn((name: string, wipe: () => Promise<void> | void) => {
       wipes.set(name, wipe);
     }),
-  };
+    // Audit des jonctions — le double cast plus bas désactive toute vérification :
+    // une signature de `Session` qui dérive ne casserait rien à la compilation, et
+    // l'échec deviendrait un `undefined is not a function` à l'exécution. `satisfies`
+    // ancre les membres applicatifs sur le vrai contrat. Le `client` en est exclu :
+    // c'est un faux assumé, exiger un vrai `MatrixClient` demanderait 357 propriétés.
+  } satisfies { client: unknown } & Partial<Omit<Session, "client">>;
 
   return {
     session: session as unknown as Session,
