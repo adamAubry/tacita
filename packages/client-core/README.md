@@ -12,7 +12,8 @@ session.client; // accès contrôlé pour les autres packages
 session.timeline(roomId).events(); // ordre canonique /sync
 await session.recoveryRequired(); // true tant que le backup n'est pas configuré
 await session.setupRecoveryKey(); // clé à afficher une fois, puis à oublier
-await session.verifyDevice(userId, deviceId);
+await session.identityResetOf(userId); // true = envoi bloqué jusqu'à confirmation UI
+await session.confirmIdentityOf(userId); // la confirmation, qui lève si elle échoue
 session.registerWipe("outbox", () => db.clear());
 await session.logout(); // révocation + wipe complet
 ```

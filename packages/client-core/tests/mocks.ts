@@ -51,9 +51,13 @@ function makeCrypto() {
         await opts.createSecretStorageKey?.();
       },
     ),
-    requestDeviceVerification: vi.fn(async (userId: string, deviceId: string) => ({
-      transactionId: `${userId}/${deviceId}`,
+    // REQ-COR-07 / D-08 — `needsUserApproval` est le signal du SDK pour « cet
+    // utilisateur a changé d'identité depuis qu'on l'a vue ». Faux par défaut : le cas
+    // normal est qu'il ne se passe rien.
+    getUserVerificationStatus: vi.fn(async (_userId: string) => ({
+      needsUserApproval: false,
     })),
+    pinCurrentUserIdentity: vi.fn(async (_userId: string) => {}),
   };
 }
 

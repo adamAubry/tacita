@@ -4,7 +4,6 @@ export type {
   RecoveryKey,
   Session,
   SessionConfig,
-  VerificationRequest,
 } from "./session";
 
 export { createLogger, eventRef } from "./logger";

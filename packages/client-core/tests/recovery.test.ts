@@ -1,7 +1,7 @@
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetSdk, type ClientMock, type CryptoMock } from "./mocks";
+import { resetSdk, type CryptoMock } from "./mocks";
 import { initSession, type SessionConfig } from "../src";
 
 vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
@@ -13,10 +13,9 @@ const config: SessionConfig = {
 };
 
 let crypto: CryptoMock;
-let client: ClientMock;
 
 beforeEach(() => {
-  ({ crypto, client } = resetSdk());
+  ({ crypto } = resetSdk());
 });
 
 describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscription", () => {
@@ -50,10 +49,4 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
     await expect(session.setupRecoveryKey()).rejects.toThrow(/aucune clé de récupération/);
   });
 
-  it("verifyDevice délègue la vérification interactive au SDK", async () => {
-    const session = await initSession(config);
-    await session.verifyDevice("@luca:tacita.test", "DEVICE2");
-    expect(crypto.requestDeviceVerification).toHaveBeenCalledWith("@luca:tacita.test", "DEVICE2");
-    expect(client.getCrypto).toHaveBeenCalled();
-  });
 });

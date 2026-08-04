@@ -372,3 +372,35 @@ chemin de relèvement post-V1, spec dédiée, pour épingler les identités.
 
 Oui pour `ESCALADE-PM-VERIFICATION.md` sur la branche : une escalade tranchée mérite sa trace
 hors d'un message de commit — y référencer D-08 et le présent addendum.
+
+---
+
+# Addendum du 04/08/2026 (suite) — `verifyDevice` : retirer, et combler l'inverse
+
+**Décision : retirer.** Le croquis d'interface ne fait pas foi contre une exigence ; REQ-COR-07
+tranche, et la ligne 18 de la spec 04 était le vestige d'un contrat que D-08 a changé. Un
+exporté public sans appelant, qu'une décision a repoussé, n'est pas un actif : c'est un piège
+posé sur un chemin de clés, à deux lignes de `setupRecoveryKey()` dans le README. Le dossier de
+reprise le signale, mais un dossier se lit une fois et une signature de type se lit tous les
+jours — l'argument du dev est le bon.
+
+**La contrepartie, qui est le vrai sujet.** Le même contrat expose une API dont personne n'a
+besoin et **omet celle que D-08 exige** : `Session` ne remonte aujourd'hui aucun état de
+réinitialisation d'identité (§4.1 du dossier de reprise). C'est le même défaut sous ses deux
+faces. Le geste doit donc être symétrique, dans **une seule branche** :
+
+- `verifyDevice` sort de `Session`, de son implémentation, du README et du test.
+- `identityResetOf(userId)` entre, avec son test nommé `REQ-COR-07`. Le signal existe côté SDK
+  (`OnlySignedDevicesIsolationMode` fait lever le chiffrement) ; le remonter est le travail de
+  la spec 04, **pas** du shard — la spec 00 interdit toute logique métier dans la 11. Laisser ce
+  trou, c'est garantir que le senior l'implémentera au mauvais étage.
+
+`specs/04-client-core.md` est amendée dans ce sens sur `pm/arbitrage-verifydevice` (croquis
+d'interface + critère d'exposition dans REQ-COR-07). **Motif, qui fait jurisprudence : quand un
+document accessoire contredit une exigence, c'est l'exigence qui gagne — et on vérifie dans le
+même geste si le contrat omet ce que la décision impose. La contradiction visible cache souvent
+l'omission qui coûte cher.**
+
+Le test qui vivait sous `REQ-COR-06` disparaît avec l'API ; s'il en restait un, il devrait de
+toute façon nommer son exigence (spec 00) — un test rangé sous une exigence qui ne parle pas de
+lui est un défaut de traçabilité, pas un détail de forme.
