@@ -1,0 +1,10 @@
+# Tout ce dépôt finit dans des conteneurs Linux ou dans Node : les fins de ligne
+# restent en LF dans la copie de travail, quel que soit le système du développeur.
+#
+# Sans ça, un checkout Windows avec `core.autocrlf=true` rend les scripts shell en
+# CRLF. Le shebang devient `#!/bin/sh\r`, le noyau cherche un binaire nommé `/bin/sh\r`
+# qui n'existe pas, et le conteneur meurt sur « exec /entrypoint.sh: no such file or
+# directory » — un message qui désigne le mauvais fichier et coûte une heure à
+# diagnostiquer. Synapse (`infra/synapse/entrypoint.sh`) et le script de certs de
+# développement étaient tous deux dans ce cas.
+* text=auto eol=lf
