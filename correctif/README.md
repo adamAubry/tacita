@@ -1,23 +1,34 @@
-# correctif/ — C3 et C2 (archive)
+# correctif/ — instantané C3 et C2 du 03/08/2026 · ⚠️ NE PAS LIRE COMME COURANT
 
-> **Ce dossier est une trace, plus une zone de transit.** Les correctifs ont été appliqués dans
-> `packages/` et commités sur cette branche (`05f22aa` pour C3, `98e0065` pour C2). Ce qu'il y a
-> ici est identique à ce qui est en place : c'est l'état déposé avant application, conservé pour
-> que la revue puisse voir ce qui a été proposé sans dérouler l'historique.
+> ## ⚠️ Ce dossier est un instantané daté, partiellement périmé par construction
 >
-> Supprimable sans perte le jour où la branche est mergée.
+> Il fige les fichiers de C3 et C2 **tels que déposés le 03/08/2026, avant application**.
+> Il n'a jamais vocation à suivre le code. Deux de ses cinq fichiers ont déjà divergé,
+> parce que `fix-src-lifecycle` (REQ-SRC-10) les a retouchés après coup :
+>
+> | Fichier | État au 04/08/2026 |
+> |---|---|
+> | `packages/outbox/src/store.ts` | identique à `packages/` |
+> | `packages/search/src/snapshot.ts` | identique à `packages/` |
+> | `packages/search/src/worker.ts` | identique à `packages/` |
+> | `packages/search/src/index.ts` | **PÉRIMÉ** — la version vivante est dans `packages/` |
+> | `packages/search/tests/proxy.test.ts` | **PÉRIMÉ** — idem |
+>
+> **La source de vérité est toujours `packages/`.** Ce dossier ne sert qu'à répondre à la
+> question « qu'est-ce qui avait été proposé, et pourquoi », sans dérouler l'historique git.
+>
+> **Il est conservé délibérément.** La version précédente de cet avertissement disait
+> « identique à ce qui est en place » — vrai à l'écriture, faux douze heures plus tard.
+> C'est exactement le mode de panne d'une copie, et la raison pour laquelle le README
+> racine pointe au lieu de recopier.
+>
+> Pour comparer vous-même :
+> `git diff --no-index correctif/packages/search/src/index.ts packages/search/src/index.ts`
 
-Détail du raisonnement et conséquences : `REMEDIATION-CRITIQUES.md` à la racine, sections C3 et C2.
+Raisonnement, conséquences et suites : `REMEDIATION-CRITIQUES.md` à la racine, sections C3
+et C2. Les correctifs eux-mêmes sont commités en `05f22aa` (C3) et `98e0065` (C2).
 
 ## Contenu
-
-```
-correctif/packages/outbox/src/store.ts          C3
-correctif/packages/search/src/snapshot.ts       C3
-correctif/packages/search/src/index.ts          C2
-correctif/packages/search/src/worker.ts         C2
-correctif/packages/search/tests/proxy.test.ts   C2 — un test ajouté
-```
 
 Les chemins sous `correctif/` sont ceux de destination — déjà appliqués tels quels.
 
