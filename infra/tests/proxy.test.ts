@@ -60,3 +60,24 @@ describe("REQ-INF-11 — API d'admin de join forcé bloquée au proxy", () => {
     expect(adminBlock).toMatch(/return\s+404/);
   });
 });
+
+describe("REQ-INF-14 — le certificat de dev couvre le nom que Synapse appelle", () => {
+  const script = readFileSync(new URL("../proxy/generate-dev-certs.sh", import.meta.url), "utf-8");
+
+  it("le script lit SERVER_NAME dans .env, au lieu de retomber sur localhost", () => {
+    // Le README fait lancer le script juste après `cp .env.example .env`, sans rien
+    // exporter. Sans cette lecture, le certificat portait `CN=localhost` alors que
+    // Synapse appelle `chat.example.org` : un subjectAltName juste, sur le mauvais nom
+    // — la panne que REQ-INF-14 venait de corriger, revenue par la porte d'à côté.
+    // ponytail: garde par chaîne ; la preuve réelle est le certificat régénéré, que
+    // seule la cible de fumée exerce. Celui-ci empêche la régression silencieuse.
+    expect(script).toMatch(/ENV_FILE=/);
+    expect(script).toMatch(/SERVER_NAME="\$\{SERVER_NAME:-\$\(lire_env SERVER_NAME\)\}"/);
+    expect(script).toMatch(/TURN_DOMAIN="\$\{TURN_DOMAIN:-\$\(lire_env TURN_DOMAIN\)\}"/);
+  });
+
+  it("subjectAltName reste posé, avec TURN_DOMAIN quand il est défini", () => {
+    expect(script).toMatch(/-addext "subjectAltName=/);
+    expect(script).toMatch(/\$\{TURN_DOMAIN:\+,DNS:\$TURN_DOMAIN\}/);
+  });
+});
