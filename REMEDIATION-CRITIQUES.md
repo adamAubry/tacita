@@ -453,6 +453,67 @@ assère le 302 vers le realm Keycloak, le `client_id` et `code_challenge_method=
 en retirant le CA de l'overlay : il échoue avec « 503 = découverte OIDC injoignable ».
 **La spec 01 franchit donc les deux portes** — config verte et fumée verte.
 
+## 5ter. Audit des jonctions — la liste d'entrée
+
+Phase suivante après les merges (arbitrage PM : *auditer avant de merger, c'est auditer un
+état qui n'existera plus onze merges plus tard*). Deux entrées déjà connues, trouvées en
+vérifiant autre chose. Elles sont ici parce que sans elles, la phase repart de zéro.
+
+**1. Six mocks que le compilateur ne vérifie contre aucun contrat.**
+`receipts`, `media-pipeline`, `calls`, `messaging`, `outbox`, `search` construisent tous
+leur `Session` de test en `as unknown as Session`. Le double cast **désactive la
+vérification structurelle** : ajouter un membre à l'interface `Session` ne casse rien à la
+compilation. Le jour où un module *appelle* un membre que son mock n'a pas, l'échec est un
+`undefined is not a function` à l'exécution, pas une erreur de compilation.
+
+Trouvé en prédisant l'inverse : j'annonçais que `isEncrypted` (REQ-COR-12) casserait les
+trois mocks d'adam au merge. Rien n'a cassé, et la raison était pire que la prédiction.
+Correctif : une ligne par mock (`satisfies Partial<Session>` ou typage direct).
+
+**2. La passerelle push est vérifiée, mais la preuve n'est pas rejouable.**
+En livrant REQ-INF-14, la chaîne réelle a été exercée à la main : `/push/config` à travers
+le proxy TLS rendant la clé du `.env`, un `POST notify` inter-conteneurs rendant
+`{"rejected":[]}`, et la confirmation que la même requête venue de l'extérieur n'atteint
+jamais la passerelle. **C'était du curl, pas un test.** `infra/tests/push-gateway.test.ts`
+assère le contenu des fichiers, pas le comportement.
+
+Par la règle des deux portes (REQ-INF-09 amendée), REQ-INF-14 n'a donc franchi que la
+première. Correctif : deux assertions dans la fumée, le helper `getViaProxy` existe déjà.
+
+---
+
+## 5quater. Triple contrôle du 04/08/2026
+
+L'état intégré (`verif-merge`) a été vérifié trois fois par trois passes de méthodes
+différentes : construction et falsification (auteur), reproduction (PM), puis contrôles
+portant sur ce que les deux premières n'avaient pas touchées. Ce que la troisième a trouvé :
+
+**Le compte-rendu était le maillon faible, pas le code.** J'avais annoncé « deux conflits »
+au merge. Le diff combiné (`git diff-tree --cc`) montre **cinq merges ayant combiné du
+contenu**, dont trois que git a fusionnés seul — donc que je n'ai jamais vus :
+`pnpm-lock.yaml` deux fois, et `packages/search/tests/session-mock.ts` depuis `fix-c1` et
+`fix-src-lifecycle` qui l'éditaient tous deux. Un lockfile mal fusionné installe
+silencieusement de mauvaises versions ; un mock mal fusionné perd une moitié sans rien
+faire rougir. Vérifiés depuis : `pnpm install --frozen-lockfile` passe, et le mock porte
+bien les deux apports. **Les fusions silencieuses sont précisément celles qu'on ne
+rapporte pas.**
+
+**Le départ à froid n'avait jamais été fait.** Les deux premières passes ont lancé la fumée
+contre une pile chaude. Volumes détruits, certificats supprimés, procédure du README
+rejouée depuis zéro : six services sains, 6/6 de fumée. Ça tranche une question restée
+ouverte — Synapse précharge la découverte OIDC à son démarrage, avant que le proxy
+existe ; l'échec de ce préchargement **est bien réessayé** et non mis en cache
+définitivement. La procédure documentée fonctionne telle qu'elle est écrite.
+
+**Deux de mes quatre contrôles étaient mal spécifiés au premier jet** — `git branch
+--contains` ne distingue pas les commits de merge du bruit, `--stat` sur un merge diffe
+contre le premier parent et non contre l'ensemble. Corrigés en cours de route. Si je
+m'étais arrêté au premier résultat de chacun, j'aurais conclu deux fois de travers : une
+fois en alarmiste, une fois en rassurant. C'est le contrôle corrigé qui a trouvé les
+fusions silencieuses.
+
+---
+
 ## 6. Fichiers touchés
 
 Inventaire par branche. Tout est poussé sur `origin` pour revue ; rien n'est mergé.
