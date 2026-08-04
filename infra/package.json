@@ -4,6 +4,10 @@
   "type": "module",
   "devDependencies": {
     "@types/node": "^22.10.7",
-    "yaml": "^2.7.0"
+    "yaml": "^2.7.0",
+    "@tacita/client-core": "workspace:*",
+    "@tacita/messaging": "workspace:*",
+    "fake-indexeddb": "^6.0.0",
+    "matrix-js-sdk": "42.0.0"
   }
 }
