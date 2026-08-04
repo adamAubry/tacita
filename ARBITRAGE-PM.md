@@ -338,3 +338,37 @@ Règle d'équipe, effective immédiatement : **tout script qui mute l'état git 
 fort** — `&&` ou `set -e`, jamais `;` entre une commande faillible et un `git add`/`commit`,
 et une assertion finale qui casse s'il reste un marqueur de conflit. Un one-liner qui touche
 git est un script comme un autre.
+
+---
+
+# Addendum du 04/08/2026 (suite) — REQ-COR-07 : la troisième voie
+
+L'escalade posait deux options : tenir la garantie (parcours SAS/QR à construire) ou
+l'assouplir en TOFU. **Ni l'une ni l'autre : D-08 porte la confiance sur l'identité
+cross-signing.** REQ-COR-07 est amendée, pas abrogée.
+
+Le raisonnement tient en trois faits déjà dans les contrats :
+1. REQ-COR-06 impose le bootstrap cross-signing à l'inscription → tout appareil légitime est
+   signé par son propriétaire.
+2. Partager avec les seuls appareils signés rend le produit fonctionnel **sans** parcours SAS —
+   le trou de spec disparaît au lieu d'être comblé par un module de plus.
+3. Un appareil injecté par le serveur ne porte pas la signature du propriétaire et ne reçoit
+   rien : la menace que REQ-INF-11 traite reste couverte. C'est ce que le TOFU brut aurait cédé,
+   et pourquoi il est refusé.
+
+Une réinitialisation d'identité **bloque l'envoi jusqu'à confirmation explicite** — le seul
+morceau d'UI requis (un dialogue, pas un parcours), à la charge de la spec 11. SAS/QR devient le
+chemin de relèvement post-V1, spec dédiée, pour épingler les identités.
+
+**Conditions d'acceptation côté dev :**
+- Mécanisme SDK vérifié sur la version épinglée (mode d'isolation « appareils signés uniquement »
+  de la crypto Rust) ; s'il ne l'exprime pas, escalade avant d'implémenter — pas d'à-peu-près sur
+  un chemin de clés.
+- Les tests de fumée à deux personnes passent au vert **par le chemin produit** — plus aucun
+  `setDeviceVerified()` dans les tests ; le test « rien n'est lisible » se retourne : un appareil
+  **non signé** ne reçoit toujours rien.
+- La limite (compromission du compte d'un correspondant) documentée côté utilisateur,
+  interdit n°13.
+
+Oui pour `ESCALADE-PM-VERIFICATION.md` sur la branche : une escalade tranchée mérite sa trace
+hors d'un message de commit — y référencer D-08 et le présent addendum.
