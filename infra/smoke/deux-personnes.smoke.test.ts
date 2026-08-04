@@ -26,17 +26,27 @@ const ATTENTE = { timeout: 30_000, interval: 250 };
 let alice: { compte: Account; session: Session };
 let bob: { compte: Account; session: Session };
 
-async function ouvrir(prefixe: string): Promise<{ compte: Account; session: Session }> {
+/**
+ * `signe: false` saute `setupRecoveryKey()` et rend donc un appareil **non signé**
+ * par son propriétaire. C'est un état que le parcours produit n'autorise pas
+ * (REQ-COR-06 rend le bootstrap obligatoire à l'inscription) — il ne sert qu'à
+ * fabriquer l'intrus du test négatif.
+ */
+async function ouvrir(
+  prefixe: string,
+  { signe = true }: { signe?: boolean } = {},
+): Promise<{ compte: Account; session: Session }> {
   const compte = await registerAccount(uniqueLocalpart(prefixe));
   const disque = new IDBFactory(); // un appareil distinct = un disque distinct
   await semer(disque, compte);
   const session = await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: disque });
   if (!session) throw new Error(`session ${prefixe} non ouverte`);
 
-  // REQ-COR-06 — le parcours d'inscription impose la clé de récupération, qui
-  // amorce le cross-signing. Sans elle, l'appareil n'est même pas signé par son
-  // propre propriétaire : on testerait un cas que le produit n'autorise pas.
-  await session.setupRecoveryKey();
+  // REQ-COR-06 — le parcours d'inscription impose la clé de récupération, qui amorce
+  // le cross-signing. C'est elle qui rend l'appareil signé, donc digne des clés
+  // Megolm (D-08) : le produit n'a besoin de rien d'autre pour que deux personnes
+  // se parlent.
+  if (signe) await session.setupRecoveryKey();
   return { compte, session };
 }
 
@@ -45,12 +55,18 @@ beforeAll(async () => {
   bob = await ouvrir("bob");
 });
 
-describe("REQ-COR-07 — sans vérification préalable, rien n'est lisible", () => {
-  it("le message d'un appareil non vérifié arrive chiffré et le reste", async () => {
-    // Paire neuve : les autres tests marquent les appareils vérifiés, et cet
-    // état-là est justement ce qu'on veut ne pas avoir ici.
+describe("REQ-COR-07 — un appareil non signé reste illisible (D-08)", () => {
+  it("le message d'un appareil que son propriétaire n'a pas signé arrive chiffré et le reste", async () => {
+    // L'intrus est le **destinataire** : Dave n'a pas amorcé son cross-signing, son
+    // appareil ne porte donc aucune signature de son propriétaire. C'est la forme
+    // qu'a un appareil injecté côté serveur — celui contre lequel REQ-INF-11 protège,
+    // et la protection que le TOFU par appareil aurait cédée.
+    //
+    // Carol, elle, est signée : sous D-08 un expéditeur sans identité cross-signing
+    // ne peut pas chiffrer du tout (« Encryption failed because cross-signing is not
+    // set up on your account »), le test ne prouverait donc rien de la réception.
     const carol = await ouvrir("carol");
-    const dave = await ouvrir("dave");
+    const dave = await ouvrir("dave", { signe: false });
 
     const { room_id } = await createDirectMessage(carol.session, dave.compte.userId);
     await dave.session.client.joinRoom(room_id);
@@ -61,12 +77,13 @@ describe("REQ-COR-07 — sans vérification préalable, rien n'est lisible", () 
 
     await sendText(carol.session, room_id, `illisible ${Date.now()}`);
 
-    // Ce test épingle une **limitation connue et voulue**, pas un bug : REQ-COR-07
-    // dit « jamais » et l'applique. Tant qu'aucun parcours de vérification n'existe
-    // (spec 11), deux utilisateurs ne peuvent pas communiquer.
+    // Ce test épingle la garantie que D-08 **conserve** : la confiance se porte sur
+    // l'identité, donc un appareil sans signature de son propriétaire ne reçoit rien.
+    // C'est ce que le TOFU par appareil aurait cédé, et la raison pour laquelle
+    // l'arbitrage l'a refusé.
     //
-    // S'il passe au rouge, ce n'est pas lui qu'il faut réparer : c'est que
-    // quelqu'un a affaibli REQ-COR-07, et ça se décide au PM.
+    // S'il passe au rouge, ce n'est pas lui qu'il faut réparer : c'est que le mode
+    // d'isolation a été desserré, et ça se décide au PM.
     const échec = await vi.waitFor(() => {
       const chiffré = dave.session.client
         .getRoom(room_id)
@@ -109,16 +126,11 @@ describe("Fumée — deux personnes distinctes dans un salon chiffré", () => {
       ATTENTE,
     );
 
-    // Diagnostic : REQ-COR-07 refuse de chiffrer pour un appareil non vérifié. On
-    // simule ici ce que la vérification interactive ferait — sans elle, le message
-    // part illisible. C'est le geste qu'aucune spec n'attribue à personne.
-    await alice.session.client
-      .getCrypto()!
-      .setDeviceVerified(bob.compte.userId, bob.compte.deviceId, true);
-    await bob.session.client
-      .getCrypto()!
-      .setDeviceVerified(alice.compte.userId, alice.compte.deviceId, true);
-
+    // Aucun geste de vérification ici, et c'est tout l'enjeu : sous D-08, la
+    // signature posée par `setupRecoveryKey()` à l'inscription suffit. La version
+    // précédente de ce test appelait `setDeviceVerified()` des deux côtés — elle
+    // simulait une UI que personne n'avait en charge, et masquait le fait que le
+    // produit livré ne laissait pas deux personnes se parler.
     const texte = `bonjour Bob ${Date.now()}`;
     await sendText(alice.session, room_id, texte);
 

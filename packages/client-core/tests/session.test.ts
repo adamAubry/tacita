@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
 import { IDBFactory } from "fake-indexeddb";
+import {
+  AllDevicesIsolationMode,
+  OnlySignedDevicesIsolationMode,
+} from "matrix-js-sdk/lib/crypto-api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createClient, IndexedDBStore, resetSdk, type ClientMock, type CryptoMock } from "./mocks";
@@ -128,21 +132,36 @@ describe("REQ-COR-05 — /sync est du long-polling HTTP, jamais du WebSocket", (
   });
 });
 
-describe("REQ-COR-07 — clés Megolm jamais partagées avec un appareil non vérifié", () => {
-  it("le réglage est activé", async () => {
+describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signés (D-08)", () => {
+  it("le mode d'isolation « appareils signés uniquement » est posé", async () => {
     await initSession(config);
-    expect(crypto.globalBlacklistUnverifiedDevices).toBe(true);
+    expect(crypto.isolationMode).toBeInstanceOf(OnlySignedDevicesIsolationMode);
   });
 
-  it("le réglage est verrouillé : toute tentative de désarmement lève", async () => {
+  it("le mode est verrouillé : tout desserrage lève", async () => {
     await initSession(config);
-    expect(() => {
-      crypto.globalBlacklistUnverifiedDevices = false;
-    }).toThrow(/REQ-COR-07/);
-    expect(crypto.globalBlacklistUnverifiedDevices).toBe(true);
+
+    // `AllDevicesIsolationMode` est l'autre mode du SDK : celui qui repartagerait
+    // avec des appareils non signés. C'est exactement ce que D-08 refuse.
+    expect(() => crypto.setDeviceIsolationMode(new AllDevicesIsolationMode(false))).toThrow(
+      /REQ-COR-07/,
+    );
+    expect(crypto.isolationMode).toBeInstanceOf(OnlySignedDevicesIsolationMode);
   });
 
-  it("le module n'appelle jamais l'override par salon qui primerait dessus", () => {
+  it("reposer le même mode ne lève pas : le verrou vise le desserrage, pas l'idempotence", async () => {
+    await initSession(config);
+    expect(() =>
+      crypto.setDeviceIsolationMode(new OnlySignedDevicesIsolationMode()),
+    ).not.toThrow();
+  });
+
+  it("le module ne s'appuie plus sur le drapeau que ce mode rend inopérant", () => {
+    // Le SDK documente « Ignored when deviceIsolationMode is
+    // OnlySignedDevicesIsolationMode » : verrouiller `globalBlacklistUnverifiedDevices`
+    // donnerait une garantie que le SDK n'applique pas. L'override par salon qui
+    // primait dessus perd son emprise par la même occasion.
+    expect(code).not.toMatch(/globalBlacklistUnverifiedDevices/);
     expect(code).not.toMatch(/setBlacklistUnverifiedDevices/);
   });
 });

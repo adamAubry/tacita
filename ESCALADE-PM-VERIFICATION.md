@@ -9,7 +9,8 @@ exigence.
 | Ouverte | 03/08/2026, en répondant à « deux utilisateurs distincts peuvent-ils échanger un message lisible ? » |
 | Tranchée | 04/08/2026 — `DECISIONS.md` **D-08**, addendum `ARBITRAGE-PM.md` « REQ-COR-07 : la troisième voie » |
 | Effet | `specs/04-client-core.md` REQ-COR-07 **amendée**, pas abrogée |
-| Reste à faire | implémentation + fumée par le chemin produit — voir §4 |
+| Implémentée | 04/08/2026, branche `fix-d08` — conditions (a) à (d) levées, voir §4 |
+| Reste à faire | (e) le dialogue de réinitialisation d'identité, à la spec 11 |
 
 ---
 
@@ -81,7 +82,7 @@ d'Element Web, recommandé par MSC4153.
 
 **Pas d'escalade requise : la voie est ouverte.**
 
-### ⚠️ (b) Piège d'implémentation — le verrou actuel s'oppose à D-08
+### ✅ (b) Piège d'implémentation — **traité sur `fix-d08`**
 
 Trouvé en vérifiant (a). `packages/client-core/src/session.ts`, `lockUnverifiedDeviceBlacklist()` :
 
@@ -110,26 +111,39 @@ Le test `REQ-COR-07 — le réglage est verrouillé : toute tentative de désarm
 (`packages/client-core/tests/session.test.ts`) devra suivre : il épingle aujourd'hui le mécanisme
 hérité.
 
-**Question ouverte, tranchée par la fumée et non par la lecture :** l'interaction exacte entre les
-deux réglages quand ils sont posés ensemble. Elle se règle empiriquement contre le vrai Synapse —
-règle des deux portes.
+**Question qui était ouverte, refermée par la lecture :** l'interaction entre les deux réglages.
+Le SDK la documente quatre fois dans `rust-crypto/RoomEncryptor.js` — `globalBlacklistUnverifiedDevices`
+est *« Ignored when deviceIsolationMode is OnlySignedDevicesIsolationMode »*. Ma crainte qu'il
+continue à tout bloquer était donc infondée ; le drapeau est simplement sans effet, ce qui rendait
+l'ancien verrou trompeur plutôt que dangereux. Le verrou a été déplacé sur `setDeviceIsolationMode`.
 
-### ⬜ (c) Fumée verte par le chemin produit — à faire
+### ✅ (c) Fumée verte par le chemin produit — **fait**
 
-`infra/smoke/deux-personnes.smoke.test.ts` doit passer **sans un seul `setDeviceVerified()`**.
-Et le test « sans vérification préalable, rien n'est lisible » se retourne : ce n'est plus
-l'absence de vérification manuelle qui bloque, c'est l'absence de **signature**. Un appareil non
-signé ne reçoit toujours rien — c'est ce qui prouve que REQ-INF-11 tient encore.
+`fix-d08`, 04/08/2026 : **10/10 verts contre un vrai Synapse, plus aucun `setDeviceVerified()`.**
+Alice et Bob se parlent dans les deux sens grâce à la seule signature posée par
+`setupRecoveryKey()` à l'inscription.
 
-Attention à la construction du cas négatif : `ouvrir()` appelle `setupRecoveryKey()`, qui amorce
-le cross-signing. Un appareil fabriqué par ce chemin est *signé*. Produire un appareil non signé
-demande un autre montage — sans quoi le test se retournerait au vert pour la mauvaise raison.
+**Découverte au passage, qui a cassé deux tests avant d'être comprise :** sous ce mode, un compte
+sans identité cross-signing **ne peut pas chiffrer du tout** — *« Encryption failed because
+cross-signing is not set up on your account »*. Le bootstrap de REQ-COR-06 n'est donc plus
+seulement la condition pour être *lu*, c'est la condition pour *écrire*. L'étape bloquante de
+REQ-UI-04 n'est pas un confort : la sauter rend le client muet. Consigné dans le README de
+`client-core`.
 
-### ⬜ (d) Limite documentée côté utilisateur — à faire
+Conséquence sur le cas négatif : l'intrus ne peut pas être l'expéditeur (il échouerait à l'envoi
+et le test ne prouverait rien de la réception). C'est le **destinataire** qui est non signé — ce
+qui modélise mieux la menace de REQ-INF-11, un appareil injecté côté serveur.
+
+Un garde permanent accompagne la cible : `infra/tests/smoke-chemin-produit.test.ts` échoue si un
+`setDeviceVerified` réapparaît, si `setupRecoveryKey()` disparaît, ou si le cas négatif cesse de
+construire un appareil non signé. Il tourne sans Docker — première des deux portes.
+
+### ✅ (d) Limite documentée côté utilisateur — **fait**
 
 Ce que D-08 cède : la compromission complète du compte d'un correspondant rend ses signatures
 menteuses. Interdit n°13 — la limite se documente, elle ne se masque pas. Parade et chemin de
-relèvement : SAS/QR, spec dédiée post-V1.
+relèvement : SAS/QR, spec dédiée post-V1. Consigné dans `packages/client-core/README.md`, section
+des limites connues, avec la conséquence UI de la contrainte découverte en (c).
 
 ### ⬜ (e) Le dialogue de réinitialisation d'identité — spec 11
 
