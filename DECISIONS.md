@@ -12,9 +12,13 @@ L'application remplace les DM Instagram : l'historique complet est une attente p
 
 **Révision 03/08/2026 — la décision est inchangée, le moyen change.** La formulation initiale (« retention activée, pas de purge programmée ») reposait sur une hypothèse fausse, vérifiée dans la doc Synapse v1.155 : `retention.enabled: true` avec `purge_jobs: []` installe un **job de purge quotidien par défaut**, et fait honorer les politiques par salon `m.room.retention` — deux chemins de purge que cette décision proscrit. Le moyen devient : bloc `retention` présent, commenté, **`enabled: false`**. « Politique définie » signifie bloc explicite dans la config, pas fonctionnalité active.
 
-## D-03 — Transcodage vocal iOS
-**Décision : transcodage WASM vers Ogg/Opus obligatoire, format de sortie unique.**
-Un format propriétaire MP4/AAC rendrait les vocaux iPhone illisibles par tout client Matrix standard et créerait deux chemins de lecture. Le coût WASM est payé une fois, à l'envoi, sur l'appareil de l'auteur.
+## D-03 — Format de sortie des vocaux
+**Décision : Ogg/Opus, format de sortie unique, quel que soit le navigateur d'origine.**
+Un format propriétaire MP4/AAC rendrait les vocaux iPhone illisibles par tout client Matrix standard et créerait deux chemins de lecture. Le coût du transcodage est payé une fois, à l'envoi, sur l'appareil de l'auteur.
+
+**Révision 06/08/2026 — la décision est inchangée, le moyen se rouvre (escalade E-10).** Le titre initial disait « transcodage WASM vers Ogg/Opus obligatoire » et laissait croire que le WASM était lié. **C'est le format qui l'est, et lui seul** : le motif écrit ci-dessus ne parle que de lisibilité par les autres clients. Le WASM était le moyen connu au moment de la décision, pas sa fin. Toute implémentation qui produit de l'Ogg/Opus respecte D-03, y compris sans WASM.
+
+**Où vit le transcodage — tranché avec la révision.** Muxeurs et encodeurs prennent des octets et rendent des octets : ils n'ont aucun DOM et vivent dans `packages/media-pipeline`, dont la spec 08 sanctionne déjà le WASM. Le shard ne garde que les appels navigateur (`MediaRecorder`, `WebCodecs`) dans son `MediaEnvironment`. **REQ-UI-02 n'est pas amendée** : on n'ouvre une liste close que lorsqu'il n'existe aucun autre lieu — c'était le cas de `@stylexjs/stylex`, peer dependency d'Astryx ; ce n'est pas le cas d'un codec. Détail et branches dans `specs/ui/ESCALATIONS.md` § E-10.
 
 ## D-04 — Seuils de compression adaptative
 **Décision : deux profils réseau, détectés via Network Information API (`effectiveType`), profil « bon réseau » par défaut si l'API est absente (Safari).**

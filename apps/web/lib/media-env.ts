@@ -17,9 +17,19 @@ import type { MediaEnvironment, Raster } from "@tacita/media-pipeline";
  * encodeur. Le détail est dans ESCALATIONS § E-10 — c'est ce qui rend l'arbitrage ouvert
  * plutôt que joué d'avance.
  *
- * L'UI ne propose pas ces deux chemins tant que le transcodage n'existe pas : c'est la
- * seule façon honnête de ne pas afficher une fonction qui échouerait (interdit n°13).
- * Escalade au PM en cours, voir `specs/ui/ESCALATIONS.md` § E-10.
+ * L'UI ne propose pas ces deux chemins tant qu'ils ne sont pas couverts : c'est la seule
+ * façon honnête de ne pas afficher une fonction qui échouerait (interdit n°13).
+ *
+ * **Arbitré (E-10, 06/08/2026) : encodage dans le shard, empaquetage dans le paquet.** Le
+ * remuxage WebM → Ogg vit désormais dans `@tacita/media-pipeline` et ne passe plus par ici
+ * — Chrome et Edge sont couverts. Restent :
+ *
+ * - `transcodeAudio`, appelé pour le seul chemin Safari/iOS (MP4/AAC → Opus). Il lève tant
+ *   que le spike E-10 n'a pas dit si `WebCodecs` encode l'Opus sur les iOS ciblés ; selon
+ *   sa réponse, l'implémentation sera un `AudioEncoder` ici, ou un encodeur WASM **dans le
+ *   paquet** — jamais une dépendance d'`apps/web`, REQ-UI-02 restant close ;
+ * - `transcodeVideo`, en attente du muxeur MP4 du paquet. Aucune asymétrie navigateur là :
+ *   la vidéo s'allume dès qu'il est écrit.
  */
 export class TranscodageIndisponible extends Error {
   constructor(quoi: "video" | "audio") {

@@ -48,5 +48,13 @@ la spec 11, pas une hypothèse à valider dans le code de ce package.
 - **Tout accès média passe par les endpoints authentifiés** (`/_matrix/client/v1/media/…`).
   Les anciens endpoints v3 répondent 404 depuis Synapse v1.146 — voir `infra/README.md`,
   REQ-INF-12. Aucune URL média publique n'est supposée nulle part.
+- **Le remuxage WebM → Ogg ne réencode rien, et c'est le but.** Le flux Opus que produit
+  Chrome est déjà celui qu'on envoie ; seul son conteneur change. Aucune perte, aucun
+  encodeur. En revanche, **le chemin Safari/iOS (MP4/AAC) reste ouvert** : lui demande un
+  vrai encodage, que `transcodeAudio` porte et que le spike E-10 doit encore situer
+  (`WebCodecs` natif, ou encodeur WASM dans ce paquet).
+- **Le muxeur Ogg et le lecteur WebM sont écrits à la main, et volontairement étroits.**
+  Le lecteur ne démuxe pas Matroska : il sort une piste audio Opus et son `OpusHead`, rien
+  d'autre. Un bloc lacé le fait lever plutôt que de produire un vocal muet.
 - **Un hash invalide rejette le média, sans repli.** Pas de « meilleur effort » : un blob
   altéré n'est pas déchiffré du tout, et l'erreur ne transporte ni clé, ni octets, ni URL.

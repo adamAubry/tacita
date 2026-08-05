@@ -1,0 +1,93 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sonde E-10 — encodage Opus</title>
+
+<!--
+  Spike E-10, approuvé par le PM le 06/08/2026. Répond à **une** question : Safari sait-il
+  produire de l'Opus, et à partir de quelle version d'iOS.
+
+  Ce n'est ni un test ni un harnais — c'est une mesure, à faire tourner à la main sur
+  appareil réel puis à consigner dans `specs/ui/ESCALATIONS.md` § E-10. L'interdit n°12
+  ferme le navigateur piloté à la suite de tests ; il n'interdit pas d'ouvrir une page et
+  de lire un résultat.
+
+  Ordre imposé par l'arbitrage, et respecté ici : `isTypeSupported` d'abord — c'est la
+  mesure la moins chère, et si elle est vraie la question entière disparaît.
+
+  Usage : servir ce fichier (`npx serve infra/smoke`, ou n'importe quel serveur statique)
+  et l'ouvrir sur l'appareil à mesurer. Safari refuse `MediaRecorder` et `WebCodecs` sur
+  `file://`.
+-->
+
+<style>
+  body { font: 15px system-ui, sans-serif; margin: 2rem auto; max-width: 40rem; padding: 0 1rem; }
+  h1 { font-size: 1.2rem; }
+  td, th { text-align: left; padding: 0.35rem 0.75rem 0.35rem 0; vertical-align: top; }
+  code { font: 13px ui-monospace, monospace; }
+  .oui { color: #155e4d; font-weight: 600; }
+  .non { color: #b3352c; font-weight: 600; }
+</style>
+
+<h1>Sonde E-10 — encodage Opus</h1>
+<p id="agent"></p>
+<table id="resultats"></table>
+<p>À recopier dans <code>ESCALATIONS.md § E-10</code>, avec la version exacte du système.</p>
+
+<script type="module">
+  const lignes = [];
+
+  const ajouter = (question, reponse, detail = "") =>
+    lignes.push({ question, reponse, detail });
+
+  // 1. La mesure la moins chère : MediaRecorder produit-il directement de l'Ogg/Opus ?
+  //    Si oui, ni remuxage ni encodeur ne sont nécessaires sur cette plateforme.
+  const typesRecorder = [
+    "audio/ogg;codecs=opus",
+    "audio/webm;codecs=opus",
+    "audio/mp4",
+  ];
+  for (const type of typesRecorder) {
+    ajouter(
+      `MediaRecorder.isTypeSupported("${type}")`,
+      typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type),
+    );
+  }
+
+  // 2. Seulement si la première est fausse : WebCodecs sait-il encoder de l'Opus ?
+  //    C'est cette réponse qui ouvre ou ferme la voie « aucune dépendance » sur Safari.
+  if (typeof AudioEncoder === "undefined") {
+    ajouter("AudioEncoder", false, "API absente");
+  } else {
+    for (const [debit, canaux] of [
+      [24_000, 1],
+      [32_000, 2],
+    ]) {
+      try {
+        const { supported, config } = await AudioEncoder.isConfigSupported({
+          codec: "opus",
+          sampleRate: 48_000,
+          numberOfChannels: canaux,
+          bitrate: debit,
+        });
+        ajouter(
+          `AudioEncoder opus ${canaux} canal(aux) @ ${debit / 1000} kb/s`,
+          supported,
+          config ? JSON.stringify(config) : "",
+        );
+      } catch (erreur) {
+        ajouter(`AudioEncoder opus ${canaux} canal(aux)`, false, String(erreur));
+      }
+    }
+  }
+
+  document.getElementById("agent").textContent = navigator.userAgent;
+  document.getElementById("resultats").innerHTML = lignes
+    .map(
+      ({ question, reponse, detail }) =>
+        `<tr><td><code>${question}</code></td>` +
+        `<td class="${reponse ? "oui" : "non"}">${reponse ? "oui" : "non"}</td>` +
+        `<td><code>${detail}</code></td></tr>`,
+    )
+    .join("");
+</script>

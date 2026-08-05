@@ -1,13 +1,12 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Neuf points sur dix sont tranchés (05/08/2026) ; E-10 est ouvert.** Ce fichier garde la
-question, la décision et son motif : une décision dont on a perdu le motif se rediscute
-tous les six mois.
+**Les dix points sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026). Ce
+fichier garde la question, la décision et son motif : une décision dont on a perdu le motif
+se rediscute tous les six mois.
 
-Les huit premiers ont été **arbitrés par le PM**. Le neuvième a été **tranché en périmètre
-technique et porté à sa connaissance** — la distinction est notée dans sa section, parce
-qu'elle change qui peut le rouvrir. **E-10 attend un arbitrage** : il oppose deux specs
-ratifiées, ce que la spec 00 réserve explicitement au PM.
+Neuf ont été **arbitrés par le PM**. Le neuvième — E-09 — a été **tranché en périmètre
+technique et porté à sa connaissance** ; la distinction est notée dans sa section, parce
+qu'elle change qui peut le rouvrir.
 
 Ce qui est **contraignant** vit ailleurs — `DECISIONS.md` § D-09 pour le modèle social,
 `specs/` pour les exigences amendées. Ici, c'est la trace. En cas de contradiction, le
@@ -24,7 +23,7 @@ contrat gagne.
 | E-07 | Layout d'appel | **Confirmé** : pas de client RTC maison | rien |
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
-| E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Ouvert — deux questions au PM** | vidéo et vocaux non envoyables tant qu'il n'est pas tranché |
+| E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 
 ---
 
@@ -221,9 +220,9 @@ disponible sur la version déployée. Le remplacement tiendrait dans la même li
 
 ## E-10 — Le transcodage média n'a nulle part où vivre (M-E)
 
-**Ouvert. Arbitrage PM requis** — contrairement à E-09, celui-ci ne se tranche pas en
-périmètre technique : il oppose deux specs ratifiées, et la réponse change une liste que
-le PM a lui-même arrêtée.
+**Arbitré par le PM le 06/08/2026.** Il ne se tranchait pas en périmètre technique, à la
+différence d'E-09 : il opposait deux specs ratifiées. La question et son analyse sont
+conservées ci-dessous ; la décision est à la fin.
 
 **La question.** La spec 08 confie au shard l'implémentation du `MediaEnvironment`, et
 exige explicitement (§ Méthode) « WebCodecs avec repli WASM (ffmpeg.wasm ou équivalent)
@@ -265,7 +264,7 @@ et une vidéo non transcodée partirait au format brut de l'appareil.
 ## Les deux questions posées au PM
 
 Elles sont distinctes, et la seconde ne se pose que si la première ferme la porte à la
-voie C.
+voie C. *(Conservées telles que posées ; les réponses sont plus bas.)*
 
 ### Q1 — D-03 impose-t-elle un **format** ou un **mécanisme** ?
 
@@ -299,31 +298,75 @@ format binaire à nous, à tester et à maintenir — ennuyeux mais borné, et s
 supply chain. *Condition :* que Safari couvre l'encodage Opus, sans quoi la voie C laisse
 les vocaux iPhone sur le carreau et redevient A ou B pour ce seul cas.
 
-## Ce qu'il faut mesurer avant de trancher
+## L'arbitrage — PM, 06/08/2026
 
-Un spike d'une demi-journée répond à la seule inconnue, et il n'appartient pas au PM :
+### Q1 → le **format**
 
-1. `AudioEncoder.isConfigSupported({ codec: "opus" })` sur la version de Safari ciblée,
-   iOS compris — c'est ce résultat qui ouvre ou ferme la voie C ;
-2. le poids réel des deux paquets WASM candidats, à comparer aux quelques centaines de
-   lignes de muxeur, pour que « moins de code » soit une mesure et pas une intuition.
+D-03 lie Ogg/Opus en sortie, rien d'autre. Le motif écrit sous la décision ne parle que de
+lisibilité par les autres clients ; le WASM y était le moyen connu à la date, pas la fin.
+Une implémentation sans WASM respecte D-03 mot pour mot. **D-03 est retitrée** — « Format
+de sortie des vocaux » — pour que cette lecture n'ait pas à être refaite dans six mois.
 
-## Recommandation technique
+### Q2 → la **voie C**, mais pas là où elle était placée
 
-**Q1 : le format.** Le motif écrit de D-03 ne parle que de lisibilité par les autres
-clients ; un vocal en Ogg/Opus produit sans WASM tient cette promesse mot pour mot.
+La proposition logeait implicitement les muxeurs dans le shard. Ce n'est pas leur place, et
+c'est ce qui rendait le choix cher : **un muxeur prend des octets et rend des octets — il
+n'a aucun DOM.** Il vit dans `packages/media-pipeline`, déjà zéro DOM et déjà porteur du
+contrat de format. Pas de paquet nouveau, pas de spec nouvelle, pas de frontière à écrire.
+Le shard ne garde que les appels navigateur — `MediaRecorder`, `WebCodecs` — c'est-à-dire
+exactement ce que `apps/web/lib/media-env.ts` contient déjà.
 
-**Q2 : la voie C si le spike la valide, la voie B sinon.** C ne touche à aucune décision
-ratifiée et n'ajoute aucune dépendance ; B ne touche à aucune décision ratifiée non plus et
-place la dépendance là où une spec l'autorise déjà. La voie A est la plus courte à écrire et
-la seule qui abîme quelque chose : la liste close ne vaut que tant qu'elle est close.
+**Cela tranche aussi la branche d'échec.** Un encodeur Opus WASM est lui aussi octets →
+octets : si le spike ferme la voie C, la dépendance va **au même endroit**, dans
+`packages/media-pipeline`, dont la spec 08 sanctionne déjà le WASM et que REQ-UI-02 ne
+gouverne pas — son test lit le `package.json` d'`apps/web`. C'est la voie B sans le paquet
+en plus. **Le spike ne rouvre donc rien : les deux branches sont décidées d'avance.**
 
-## Ce que coûte l'attente
+**Voie A refusée, et la jurisprudence est posée :** on n'amende une liste close que
+lorsqu'il n'existe **aucun autre lieu**. C'était le cas de `@stylexjs/stylex` — peer
+dependency d'Astryx, elle devait être dans ce `package.json`-là et nulle part ailleurs. Un
+codec a un autre lieu. Une liste close avec une exception a douze exceptions dans un an.
 
-Rien ne casse, et rien ne ment : M-E est livré sans les chemins concernés, et l'UI ne les
-propose pas. Mais **envoyer un vocal est une fonction attendue d'une messagerie** — c'est
-un trou produit visible, pas une finition. Il est le seul de son espèce dans les cinq
-modules livrés.
+### Le spike — approuvé, une demi-journée, avec un ordre
+
+1. `MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')` sur Safari **d'abord** : c'est
+   la mesure la moins chère, et si elle est vraie la question entière disparaît.
+2. Sinon `AudioEncoder.isConfigSupported({ codec: "opus" })`, sur les **trois dernières
+   versions majeures d'iOS**, résultat consigné **par version**. Le plancher produit se
+   fixe sur ce tableau ; il ne se suppose pas (précaution versions, `CLAUDE.md`).
+
+Le point 2 de la proposition — poids WASM vs lignes de muxeur — est **retiré** : il ne pèse
+que si la voie C est fermée, et à ce moment-là il n'y a plus de choix à éclairer. À mesurer
+seulement s'il existe deux encodeurs candidats.
+
+#### Résultats du spike — à consigner ici
+
+La sonde est écrite : `infra/smoke/sonde-opus.html`. Ce n'est ni un test ni un harnais —
+l'interdit n°12 ferme le navigateur piloté à la suite de tests, il n'interdit pas d'ouvrir
+une page et de lire un résultat. Elle pose les deux questions **dans l'ordre imposé** et
+affiche le `userAgent` pour que la ligne recopiée ci-dessous porte sa version.
+
+| Version d'iOS | `isTypeSupported('audio/ogg;codecs=opus')` | `AudioEncoder` opus | Mesuré le |
+|---|---|---|---|
+| _à mesurer_ | | | |
+| _à mesurer_ | | | |
+| _à mesurer_ | | | |
+
+**Rien n'est rempli, et rien ne doit l'être de mémoire.** Ces trois lignes demandent trois
+appareils ou trois simulateurs ; aucun n'est accessible depuis l'environnement de
+développement, et supposer une réponse ici reviendrait exactement à ce que la précaution
+versions interdit. Le plancher produit se fixe sur ce tableau une fois rempli.
+
+### Ordre de travail, et la porte de sortie produit
+
+Firefox ne demande rien ; Chrome/Edge demandent un remuxage **sans inconnue** : à lancer
+maintenant, en parallèle du spike. Le muxeur MP4 vidéo ensuite — aucune asymétrie navigateur
+là, la vidéo s'allume dès qu'il est écrit, sans condition. Safari selon le spike.
+
+**Le vocal ne s'allume dans l'UI publiée qu'avec les trois chemins couverts.** Une
+messagerie où pouvoir répondre en vocal dépend du téléphone d'en face est exactement la
+promesse conditionnelle que l'interdit n°13 vise. L'attente ne coûte plus rien côté
+arbitrage : plus aucune question n'est ouverte, seule reste l'exécution.
 
 ---
 

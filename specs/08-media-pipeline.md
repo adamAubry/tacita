@@ -14,14 +14,16 @@
 - **REQ-MED-04** — Compression automatique et adaptative images/vidéos avant envoi, seuils DECISIONS D-04 (2 profils réseau, fallback « bon réseau »). Entièrement à développer, aucun mécanisme natif Matrix.
 - **REQ-MED-05** — Capture in-app photo/vidéo : l'original **non compressé** est sauvegardé sur l'appareil de l'auteur (File System Access / téléchargement selon support), fonction locale distincte de l'envoi ; le destinataire ne reçoit que la version compressée.
 - **REQ-MED-06** — Messages vocaux : Ogg/Opus, convention `m.audio` (avec forme d'onde et durée dans le contenu de l'événement). Le calcul de forme d'onde fait partie du pipeline.
-- **REQ-MED-07** — Transcodage WASM vers Opus quand MediaRecorder ne produit pas d'Opus (Safari iOS → MP4/AAC) : format de sortie unique Ogg/Opus (DECISIONS D-03), sans quoi les vocaux iPhone sont illisibles par les clients Matrix standards.
+- **REQ-MED-07** — Sortie Ogg/Opus quel que soit ce que produit `MediaRecorder` (DECISIONS D-03), sans quoi les vocaux iPhone sont illisibles par les clients Matrix standards. Trois chemins d'entrée, trois coûts distincts : Ogg/Opus direct (Firefox) → rien à faire ; flux Opus en conteneur WebM (Chrome/Edge) → **remuxage** WebM → Ogg ; MP4/AAC (Safari/iOS) → **encodage** Opus, seul cas qui en demande un. *(Rédaction du 06/08/2026, E-10 : la version initiale imposait « transcodage WASM » sur les trois chemins.)*
 - **REQ-MED-08** — Téléchargement : récupération du blob, vérification du hash SHA-256, déchiffrement local. Hash invalide → média rejeté avec erreur explicite.
 - **REQ-MED-09** — Compatibilité authenticated media : le module consomme les URLs média selon le comportement consigné par l'infra (spec 01, REQ-INF-12) ; aucune URL média publique n'est supposée.
 - **REQ-MED-10** — Aucun contenu média en clair (ni ses clés) dans les logs ou traces d'erreur du module.
 
 ## Méthode et contraintes
 
-- WebCrypto pour AES-CTR/SHA-256 ; canvas/OffscreenCanvas pour vignettes et compression image ; WebCodecs avec repli WASM (ffmpeg.wasm ou équivalent) pour la vidéo ; encodeur Opus WASM pour REQ-MED-07.
+- WebCrypto pour AES-CTR/SHA-256 ; canvas/OffscreenCanvas pour vignettes et compression image.
+- **Encodage dans le shard, empaquetage dans le paquet** (E-10, 06/08/2026). Les APIs qui encodent vivent chez l'utilisateur et entrent par le `MediaEnvironment` injecté : `MediaRecorder` pour l'audio, `WebCodecs` pour la vidéo. Les **muxeurs** — Ogg pour l'audio, MP4 pour la vidéo — sont octets → octets, sans DOM : ils vivent **ici**, dans ce paquet, écrits à la main, sans dépendance. La contrainte « zéro DOM » du paquet est intacte : un muxeur ne touche à rien.
+- **Repli WASM, seulement si mesuré nécessaire.** Si `WebCodecs AudioEncoder` n'accepte pas `opus` sur les versions d'iOS ciblées, un encodeur Opus WASM entre — **dans ce paquet, pas dans `apps/web`** (REQ-UI-02 reste close). Un encodeur est octets → octets au même titre qu'un muxeur. Ne pas l'ajouter avant que le spike E-10 l'ait rendu nécessaire.
 - Les opérations lourdes (transcodage, compression vidéo) tournent en Web Worker — jamais sur le thread principal.
 - Hors scope : UI de capture, galerie, lecteur (spec 11) ; file d'envoi (spec 07 — le pipeline produit un contenu prêt à `enqueue`).
 

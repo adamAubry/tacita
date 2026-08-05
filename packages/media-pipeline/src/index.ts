@@ -16,8 +16,14 @@ import {
   type VideoTargets,
 } from "./profiles";
 
+import { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
+
 export { decryptAttachment, encryptAttachment, MediaIntegrityError } from "./attachments";
 export type { Bytes, EncryptedFile, FileKeys } from "./attachments";
+export { crc32Ogg, echantillonsOpus, ecrireOggOpus } from "./ogg";
+export { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
+export { lireWebmOpus } from "./webm";
+export type { WebmOpus } from "./webm";
 export { detectProfile, PROFILES, THUMBNAIL } from "./profiles";
 export type { ImageTargets, NetworkProfile, VideoTargets } from "./profiles";
 
@@ -132,6 +138,24 @@ export function waveform(samples: Float32Array, buckets = WAVEFORM_BUCKETS): num
 }
 
 /**
+ * REQ-MED-07 — l'aiguillage des trois chemins d'entrée vers l'unique format de sortie.
+ *
+ * L'ordre compte : le moins cher d'abord. Un vocal Firefox ne coûte rien, un vocal Chrome
+ * coûte une recopie d'octets, et seul Safari paie un encodage — que `transcodeAudio` porte,
+ * dans le `MediaEnvironment` injecté.
+ */
+async function versOggOpus(env: MediaEnvironment, file: File): Promise<Blob> {
+  if (file.type.startsWith(VOICE_MIME_TYPE)) return file;
+
+  if (file.type.startsWith(WEBM_OPUS_MIME)) {
+    const ogg = remuxWebmOpusVersOgg(new Uint8Array(await file.arrayBuffer()));
+    return new Blob([ogg as BlobPart], { type: VOICE_MIME_TYPE });
+  }
+
+  return env.transcodeAudio(file);
+}
+
+/**
  * Chiffre, téléverse et rend un contenu d'événement prêt à `enqueue` (spec 07).
  * REQ-MED-04 — le profil réseau est détecté ici, une fois, et fixe les cibles D-04.
  */
@@ -180,10 +204,11 @@ export async function uploadAttachment(
     }
 
     case "audio": {
-      // REQ-MED-07 / D-03 — Safari iOS rend du MP4/AAC, Chrome du WebM/Opus : ni l'un ni
-      // l'autre n'est de l'Ogg/Opus, et un vocal hors Ogg/Opus est illisible par les
-      // clients Matrix standards. Un seul format sort d'ici.
-      const ogg = file.type === VOICE_MIME_TYPE ? file : await env.transcodeAudio(file);
+      // REQ-MED-07 / D-03 — un seul format sort d'ici, quel que soit ce qui entre. Trois
+      // chemins, trois coûts (E-10) : Firefox rend déjà de l'Ogg/Opus, Chrome rend le même
+      // flux Opus dans un conteneur WebM — un remuxage suffit, sans encodeur ni perte —,
+      // et Safari rend du MP4/AAC, seul cas qui demande un vrai encodage.
+      const ogg = await versOggOpus(env, file);
       const { samples, durationMs } = await env.decodeAudio(ogg);
       return {
         msgtype: "m.audio",
