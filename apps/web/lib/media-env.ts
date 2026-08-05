@@ -1,5 +1,7 @@
 import type { MediaEnvironment, Raster } from "@tacita/media-pipeline";
 
+import { transcoderVideo } from "./transcode-video";
+
 /**
  * L'implémentation navigateur du `MediaEnvironment` que le pipeline (spec 08) attend
  * injecté. Le paquet reste sans DOM ; c'est ici que les APIs du navigateur entrent.
@@ -21,15 +23,13 @@ import type { MediaEnvironment, Raster } from "@tacita/media-pipeline";
  * façon honnête de ne pas afficher une fonction qui échouerait (interdit n°13).
  *
  * **Arbitré (E-10, 06/08/2026) : encodage dans le shard, empaquetage dans le paquet.** Le
- * remuxage WebM → Ogg vit désormais dans `@tacita/media-pipeline` et ne passe plus par ici
- * — Chrome et Edge sont couverts. Restent :
+ * remuxage WebM → Ogg et le muxeur MP4 vivent dans `@tacita/media-pipeline` ; la vidéo et
+ * les vocaux Chrome/Edge/Firefox sont couverts.
  *
- * - `transcodeAudio`, appelé pour le seul chemin Safari/iOS (MP4/AAC → Opus). Il lève tant
- *   que le spike E-10 n'a pas dit si `WebCodecs` encode l'Opus sur les iOS ciblés ; selon
- *   sa réponse, l'implémentation sera un `AudioEncoder` ici, ou un encodeur WASM **dans le
- *   paquet** — jamais une dépendance d'`apps/web`, REQ-UI-02 restant close ;
- * - `transcodeVideo`, en attente du muxeur MP4 du paquet. Aucune asymétrie navigateur là :
- *   la vidéo s'allume dès qu'il est écrit.
+ * Reste `transcodeAudio`, appelé pour le seul chemin Safari/iOS (MP4/AAC → Opus). Il lève
+ * tant que le spike E-10 n'a pas dit si `WebCodecs` encode l'Opus sur les iOS ciblés ;
+ * selon sa réponse, l'implémentation sera un `AudioEncoder` ici, ou un encodeur WASM
+ * **dans le paquet** — jamais une dépendance d'`apps/web`, REQ-UI-02 restant close.
  */
 export class TranscodageIndisponible extends Error {
   constructor(quoi: "video" | "audio") {
@@ -125,9 +125,9 @@ export function environnementMedia(): MediaEnvironment {
       }
     },
 
-    transcodeVideo() {
-      return Promise.reject(new TranscodageIndisponible("video"));
-    },
+    // REQ-MED-04 — décodage par la balise `video`, réencodage par `WebCodecs`,
+    // empaquetage par le muxeur du paquet (E-10). Le shard n'écrit aucun format.
+    transcodeVideo: (blob, cibles) => transcoderVideo(blob, cibles),
 
     transcodeAudio() {
       return Promise.reject(new TranscodageIndisponible("audio"));

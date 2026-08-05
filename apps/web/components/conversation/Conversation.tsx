@@ -22,12 +22,13 @@ import {
   typingUsers,
   type MentionCandidate,
 } from "@tacita/messaging";
-import { downloadAttachment, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
+import { downloadAttachment, PROFILES, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
 import { createOutbox, type Outbox } from "@tacita/outbox";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { environnementMedia } from "../../lib/media-env";
+import { videoTranscodable } from "../../lib/transcode-video";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { IconeAppel, IconeVideo } from "../foundation/icons";
 import { Button } from "../foundation/primitives";
@@ -74,6 +75,13 @@ export function Conversation({ roomId }: { roomId: string }) {
   // L'environnement média (spec 08) est créé une fois : il ouvre un `AudioContext` et
   // lit `navigator.connection`, ni l'un ni l'autre à refaire à chaque rendu.
   const env = useMemo(() => environnementMedia(), []);
+  const [videoAutorisee, setVideoAutorisee] = useState(false);
+
+  // REQ-MED-04 — `WebCodecs` est large mais pas universel : on **mesure** avant de
+  // proposer la vidéo, plutôt que de l'offrir partout et d'échouer chez certains.
+  useEffect(() => {
+    void videoTranscodable(PROFILES.good.video.height).then(setVideoAutorisee);
+  }, []);
 
   const rafraichir = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -322,7 +330,11 @@ export function Conversation({ roomId }: { roomId: string }) {
         ecrivent={session ? typingUsers(session, roomId).map(nomDe) : []}
         actions={
           <>
-            <MediaPicker onFichiers={(fichiers) => void joindre(fichiers)} enCours={envoiMedia} />
+            <MediaPicker
+              onFichiers={(fichiers) => void joindre(fichiers)}
+              enCours={envoiMedia}
+              videoAutorisee={videoAutorisee}
+            />
             <Button label="Prendre une photo" variant="ghost" onClick={() => setCapture(true)} />
           </>
         }

@@ -1,11 +1,15 @@
 <!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sonde E-10 — encodage Opus</title>
+<title>Sonde E-10 — encodage Opus et vidéo</title>
 
 <!--
-  Spike E-10, approuvé par le PM le 06/08/2026. Répond à **une** question : Safari sait-il
-  produire de l'Opus, et à partir de quelle version d'iOS.
+  Spike E-10, approuvé par le PM le 06/08/2026. La question qu'il devait trancher : Safari
+  sait-il produire de l'Opus, et à partir de quelle version d'iOS.
+
+  La sonde vérifie aussi `VideoEncoder`, que l'arbitrage donnait pour acquis (« aucune
+  asymétrie navigateur »). La prémisse est raisonnable ; c'est justement pourquoi elle se
+  mesure — le shard interroge la même API avant de proposer la vidéo.
 
   Ce n'est ni un test ni un harnais — c'est une mesure, à faire tourner à la main sur
   appareil réel puis à consigner dans `specs/ui/ESCALATIONS.md` § E-10. L'interdit n°12
@@ -29,7 +33,7 @@
   .non { color: #b3352c; font-weight: 600; }
 </style>
 
-<h1>Sonde E-10 — encodage Opus</h1>
+<h1>Sonde E-10 — encodage Opus et vidéo</h1>
 <p id="agent"></p>
 <table id="resultats"></table>
 <p>À recopier dans <code>ESCALATIONS.md § E-10</code>, avec la version exacte du système.</p>
@@ -54,7 +58,23 @@
     );
   }
 
-  // 2. Seulement si la première est fausse : WebCodecs sait-il encoder de l'Opus ?
+  // 2. Vidéo : `VideoEncoder` accepte-t-il H.264 ? L'arbitrage disait « aucune asymétrie
+  //    navigateur » ; la prémisse est raisonnable, elle se vérifie quand même. C'est
+  //    exactement l'appel que fait `videoTranscodable()` avant de proposer la vidéo.
+  if (typeof VideoEncoder === "undefined") {
+    ajouter("VideoEncoder", false, "API absente");
+  } else {
+    for (const hauteur of [720, 480]) {
+      const { supported } = await VideoEncoder.isConfigSupported({
+        codec: "avc1.42001f",
+        width: Math.round((hauteur * 16) / 9 / 2) * 2,
+        height: hauteur,
+      });
+      ajouter(`VideoEncoder avc1.42001f ${hauteur}p`, supported === true);
+    }
+  }
+
+  // 3. Seulement si la première est fausse : WebCodecs sait-il encoder de l'Opus ?
   //    C'est cette réponse qui ouvre ou ferme la voie « aucune dépendance » sur Safari.
   if (typeof AudioEncoder === "undefined") {
     ajouter("AudioEncoder", false, "API absente");

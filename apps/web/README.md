@@ -61,11 +61,14 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;
 - **le flash de thème au premier rendu est réel** : IndexedDB est asynchrone et l'interdit
   n°2 ferme localStorage. Il ne touche que ceux qui ont choisi l'autre mode que le défaut ;
-- **ni vidéo ni vocal ne peuvent être envoyés** — et rien ne le laisse croire : les deux
-  demandent une étape d'empaquetage (Ogg/Opus imposé par D-03, MP4 par D-04) que le shard
-  n'a pas le droit d'ajouter en dépendance, la liste close de REQ-UI-02 la refusant.
-  Photos, fichiers, lecture des vocaux reçus et capture photo fonctionnent. Deux questions
-  au PM en attente : `specs/ui/ESCALATIONS.md` § E-10 ;
+- **l'envoi de vocal attend encore Safari.** E-10 est arbitré et les muxeurs vivent dans
+  `@tacita/media-pipeline` : Firefox et Chrome/Edge sont couverts, iOS demande un encodeur
+  Opus que le spike doit situer. Le vocal ne s'allumera dans l'UI qu'avec les trois chemins
+  couverts — une messagerie où répondre en vocal dépend du téléphone d'en face est la
+  promesse conditionnelle que l'interdit n°13 vise ;
+- **la vidéo s'envoie là où `WebCodecs` l'encode**, et n'est pas proposée ailleurs : le
+  câblage interroge `VideoEncoder.isConfigSupported` au montage. Le transcodage relit la
+  vidéo **en temps réel** pour la décoder — une minute de vidéo prend une minute ;
 - **l'envoi de pièce jointe n'a pas de barre de progression**, seulement un état : le
   pipeline (spec 08) ne rapporte rien pendant la compression ni le téléversement, et une
   barre serait une animation inventée plutôt qu'une mesure ;

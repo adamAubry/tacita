@@ -8,6 +8,7 @@ import { MediaPicker } from "../components/media/MediaPicker";
 import { MediaViewer } from "../components/media/MediaViewer";
 import { PhotoCapture } from "../components/media/PhotoCapture";
 import { VoicePlayer } from "../components/media/VoicePlayer";
+import { dimensionsCibles } from "../lib/transcode-video";
 import {
   dureeLisible,
   liensDe,
@@ -120,7 +121,7 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
     expect(tailleLisible(5 * 1024 * 1024)).toBe("5.0 Mo");
   });
 
-  it("le sélecteur n'accepte pas la vidéo, faute de transcodage — et le dit", () => {
+  it("là où le navigateur n'encode pas la vidéo, elle n'est pas proposée — et le dit si elle passe", () => {
     const onFichiers = vi.fn();
     render(<MediaPicker onFichiers={onFichiers} />);
 
@@ -133,7 +134,29 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
 
     // La photo part, la vidéo est refusée avec une phrase — pas en silence.
     expect(onFichiers).toHaveBeenCalledWith([photo]);
-    expect(screen.getByText(/vidéos n'est pas encore disponible/)).toBeTruthy();
+    expect(screen.getByText(/ne sait pas encoder de vidéo/)).toBeTruthy();
+  });
+
+  it("là où il l'encode, la vidéo passe comme le reste", () => {
+    const onFichiers = vi.fn();
+    render(<MediaPicker onFichiers={onFichiers} videoAutorisee />);
+
+    const champ = screen.getByLabelText("Joindre des fichiers") as HTMLInputElement;
+    expect(champ.getAttribute("accept")).toContain("video/*");
+
+    const video = new File(["x"], "clip.mp4", { type: "video/mp4" });
+    fireEvent.change(champ, { target: { files: [video] } });
+
+    expect(onFichiers).toHaveBeenCalledWith([video]);
+    expect(screen.queryByText(/ne sait pas encoder/)).toBeNull();
+  });
+
+  it("les dimensions cibles réduisent sans agrandir, et restent paires", () => {
+    // H.264 encode par macroblocs : une dimension impaire est refusée par l'encodeur.
+    expect(dimensionsCibles(1920, 1080, 720)).toEqual({ largeur: 1280, hauteur: 720 });
+    expect(dimensionsCibles(1080, 1920, 720)).toEqual({ largeur: 406, hauteur: 720 });
+    // Déjà plus petite que la cible : on ne remonte pas une vidéo, on la laisse.
+    expect(dimensionsCibles(640, 480, 720)).toEqual({ largeur: 640, hauteur: 480 });
   });
 
   it("pendant l'envoi, un état et une annulation — pas une barre inventée", () => {

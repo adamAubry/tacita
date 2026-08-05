@@ -20,6 +20,8 @@ import { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
 
 export { decryptAttachment, encryptAttachment, MediaIntegrityError } from "./attachments";
 export type { Bytes, EncryptedFile, FileKeys } from "./attachments";
+export { ecrireMp4, TIMESCALE_US } from "./mp4";
+export type { EchantillonVideo, Mp4Options } from "./mp4";
 export { crc32Ogg, echantillonsOpus, ecrireOggOpus } from "./ogg";
 export { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
 export { lireWebmOpus } from "./webm";

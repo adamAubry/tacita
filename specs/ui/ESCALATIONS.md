@@ -341,16 +341,22 @@ seulement s'il existe deux encodeurs candidats.
 
 #### Résultats du spike — à consigner ici
 
-La sonde est écrite : `infra/smoke/sonde-opus.html`. Ce n'est ni un test ni un harnais —
+La sonde est écrite : `infra/smoke/sonde-codecs.html`. Ce n'est ni un test ni un harnais —
 l'interdit n°12 ferme le navigateur piloté à la suite de tests, il n'interdit pas d'ouvrir
 une page et de lire un résultat. Elle pose les deux questions **dans l'ordre imposé** et
 affiche le `userAgent` pour que la ligne recopiée ci-dessous porte sa version.
 
-| Version d'iOS | `isTypeSupported('audio/ogg;codecs=opus')` | `AudioEncoder` opus | Mesuré le |
-|---|---|---|---|
-| _à mesurer_ | | | |
-| _à mesurer_ | | | |
-| _à mesurer_ | | | |
+| Version d'iOS | `isTypeSupported('audio/ogg;codecs=opus')` | `AudioEncoder` opus | `VideoEncoder` H.264 | Mesuré le |
+|---|---|---|---|---|
+| _à mesurer_ | | | | |
+| _à mesurer_ | | | | |
+| _à mesurer_ | | | | |
+
+La colonne vidéo n'était pas demandée : l'arbitrage tenait « aucune asymétrie navigateur »
+pour acquis sur ce point. La prémisse est raisonnable — `VideoEncoder` est livré par les
+trois moteurs — et c'est précisément pour ça qu'elle se mesure en même temps, puisque la
+sonde est déjà sur l'appareil. Le shard, lui, ne l'attend pas : il interroge la même API au
+montage et ne propose la vidéo que là où elle répond oui.
 
 **Rien n'est rempli, et rien ne doit l'être de mémoire.** Ces trois lignes demandent trois
 appareils ou trois simulateurs ; aucun n'est accessible depuis l'environnement de

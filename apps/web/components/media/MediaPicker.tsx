@@ -4,19 +4,24 @@ import { useRef, useState } from "react";
 
 import { Button, Text } from "../foundation/primitives";
 
+const SANS_VIDEO = "image/*,application/pdf,application/zip,text/*";
+
 /**
- * Ce que le pipeline sait produire **aujourd'hui** dans le shard. La vidéo en est
- * absente : son transcodage n'existe pas côté navigateur sans dépendance WASM, que la
- * liste close de REQ-UI-02 refuse (ESCALATIONS § E-10). Le sélecteur ne la propose donc
- * pas — plutôt que de l'accepter et d'échouer à l'envoi.
+ * Ce que le pipeline sait produire. La vidéo n'y entre que si **ce navigateur-ci** sait
+ * l'encoder : `WebCodecs` est large mais pas universel, et le mesurer coûte un appel
+ * (`videoTranscodable`). Là où il ne sait pas, la vidéo n'est pas grisée — elle n'est pas
+ * proposée du tout.
  */
-export const TYPES_ACCEPTES = "image/*,application/pdf,application/zip,text/*";
+export const typesAcceptes = (videoAutorisee: boolean) =>
+  videoAutorisee ? `${SANS_VIDEO},video/*` : SANS_VIDEO;
 
 export interface MediaPickerProps {
   onFichiers: (fichiers: File[]) => void;
   /** Envoi en cours : le pipeline n'expose pas de progression, seulement un état. */
   enCours?: boolean;
   onAnnuler?: () => void;
+  /** Mesuré au montage par le câblage, jamais supposé. */
+  videoAutorisee?: boolean;
 }
 
 /**
@@ -27,7 +32,12 @@ export interface MediaPickerProps {
  * barre serait une animation inventée, pas une mesure. Passer à une vraie barre le jour
  * où le paquet expose un rappel de progression.
  */
-export function MediaPicker({ onFichiers, enCours = false, onAnnuler }: MediaPickerProps) {
+export function MediaPicker({
+  onFichiers,
+  enCours = false,
+  onAnnuler,
+  videoAutorisee = false,
+}: MediaPickerProps) {
   const champ = useRef<HTMLInputElement>(null);
   const [refus, setRefus] = useState<string>();
 
@@ -37,19 +47,23 @@ export function MediaPicker({ onFichiers, enCours = false, onAnnuler }: MediaPic
         ref={champ}
         type="file"
         multiple
-        accept={TYPES_ACCEPTES}
+        accept={typesAcceptes(videoAutorisee)}
         aria-label="Joindre des fichiers"
         hidden
         onChange={(evenement) => {
           const choisis = [...(evenement.target.files ?? [])];
-          const videos = choisis.filter((fichier) => fichier.type.startsWith("video/"));
-          // Le champ accepte ce que l'OS veut bien filtrer ; un glisser-déposer ou un
-          // sélecteur permissif peuvent toujours livrer une vidéo. On le dit ici plutôt
-          // que d'échouer plus tard, sans explication.
+          const estVideo = (fichier: File) => fichier.type.startsWith("video/");
+          // Le champ n'accepte que ce que l'OS veut bien filtrer ; un glisser-déposer ou
+          // un sélecteur permissif peuvent toujours livrer une vidéo là où ce navigateur
+          // ne sait pas l'encoder. On le dit ici plutôt que d'échouer plus tard.
+          const refuses = videoAutorisee ? [] : choisis.filter(estVideo);
           setRefus(
-            videos.length > 0 ? "L'envoi de vidéos n'est pas encore disponible." : undefined,
+            refuses.length > 0
+              ? "Ce navigateur ne sait pas encoder de vidéo : envoi impossible."
+              : undefined,
           );
-          const acceptes = choisis.filter((fichier) => !fichier.type.startsWith("video/"));
+
+          const acceptes = choisis.filter((fichier) => !refuses.includes(fichier));
           if (acceptes.length > 0) onFichiers(acceptes);
           evenement.target.value = "";
         }}
