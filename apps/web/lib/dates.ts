@@ -9,12 +9,30 @@
  * `maintenant` est un paramètre : sans lui, un test qui vérifie « aujourd'hui vs hier »
  * dépend de l'heure à laquelle il tourne — et casse à minuit, une fois sur mille.
  */
-export function dateApercu(horodatage: number, maintenant: number = Date.now()): string {
-  const date = new Date(horodatage);
-  const memeJour = date.toDateString() === new Date(maintenant).toDateString();
+/** Deux horodatages tombent-ils le même jour, dans le fuseau du lecteur ? */
+export const memeJour = (a: number, b: number) =>
+  new Date(a).toDateString() === new Date(b).toDateString();
 
-  return new Intl.DateTimeFormat(
-    undefined,
-    memeJour ? { hour: "2-digit", minute: "2-digit" } : { dateStyle: "short" },
-  ).format(date);
+/** L'heure d'un message (REQ-UI-06, REQ-UI-09). Chiffres tabulaires côté rendu. */
+export const heure = (horodatage: number): string =>
+  new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(horodatage);
+
+/**
+ * Le libellé du séparateur de date (composant 13) : `05 août`, sans l'année tant qu'elle
+ * est celle en cours — la répéter sur chaque séparateur d'une conversation active est du
+ * bruit, et son absence se remarque précisément quand elle compte.
+ */
+export function jourSeparateur(horodatage: number, maintenant: number = Date.now()): string {
+  const memeAnnee = new Date(horodatage).getFullYear() === new Date(maintenant).getFullYear();
+  return new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: memeAnnee ? undefined : "numeric",
+  }).format(horodatage);
+}
+
+export function dateApercu(horodatage: number, maintenant: number = Date.now()): string {
+  return memeJour(horodatage, maintenant)
+    ? heure(horodatage)
+    : new Intl.DateTimeFormat(undefined, { dateStyle: "short" }).format(horodatage);
 }

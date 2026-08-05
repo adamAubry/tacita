@@ -1,23 +1,14 @@
 "use client";
 
 import type { Conversation } from "@tacita/messaging";
-import { useRef, useState, type PointerEvent } from "react";
+import { useState } from "react";
 
 import { ButtonsList } from "../foundation/ButtonsList";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Sheet } from "../foundation/Sheet";
 import { Badge, ClickableCard, Text } from "../foundation/primitives";
 import { dateApercu } from "../../lib/dates";
-
-/**
- * Seuils du geste d'épingle (REQ-UIX-09). Deux, pas un : la distance seule ferait
- * épingler un doigt qui descend la liste en biais. L'axe d'abord, la distance ensuite.
- */
-export const SEUIL_GLISSEMENT = 64;
-const TOLERANCE_VERTICALE = 32;
-
-/** Appui long avant le hold menu. En dessous, un tap lent ouvrirait le menu. */
-export const DUREE_APPUI_LONG = 500;
+import { useGlissement } from "../../lib/gestes";
 
 export interface ConversationPreviewProps {
   conversation: Conversation;
@@ -69,31 +60,10 @@ export function ConversationPreview({
   maintenant,
 }: ConversationPreviewProps) {
   const [menuOuvert, setMenuOuvert] = useState(false);
-  const depart = useRef<{ x: number; y: number } | null>(null);
-  const appuiLong = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const annulerAppuiLong = () => {
-    if (appuiLong.current) clearTimeout(appuiLong.current);
-    appuiLong.current = null;
-  };
-
-  const commencer = (evenement: PointerEvent) => {
-    depart.current = { x: evenement.clientX, y: evenement.clientY };
-    appuiLong.current = setTimeout(() => setMenuOuvert(true), DUREE_APPUI_LONG);
-  };
-
-  const terminer = (evenement: PointerEvent) => {
-    annulerAppuiLong();
-    const origine = depart.current;
-    depart.current = null;
-    if (!origine) return;
-
-    const dx = evenement.clientX - origine.x;
-    const dy = evenement.clientY - origine.y;
-    if (dx >= SEUIL_GLISSEMENT && Math.abs(dy) <= TOLERANCE_VERTICALE) {
-      onEpingler(conversation.roomId, !conversation.pinned);
-    }
-  };
+  const geste = useGlissement({
+    onDroite: () => onEpingler(conversation.roomId, !conversation.pinned),
+    onAppuiLong: () => setMenuOuvert(true),
+  });
 
   return (
     <>
@@ -101,12 +71,7 @@ export function ConversationPreview({
         label={conversation.name}
         padding={3}
         onClick={() => onOuvrir(conversation.roomId)}
-        onPointerDown={commencer}
-        onPointerUp={terminer}
-        onPointerCancel={annulerAppuiLong}
-        // Sans ça, le navigateur défile pendant le geste et `pointerup` n'arrive jamais
-        // à la bonne abscisse : le seuil ne serait franchi que par hasard.
-        style={{ touchAction: "pan-y" }}
+        {...geste}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
           <ConversationAvatar nom={conversation.name} direct={conversation.direct} />

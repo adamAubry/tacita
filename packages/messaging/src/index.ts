@@ -5,13 +5,14 @@ export {
   messages,
   messageText,
   react,
+  reactions,
   REACTIONS_METADATA,
   redact,
   reply,
   sendText,
   subscribe,
 } from "./messages";
-export type { SendOptions } from "./messages";
+export type { ReactionTally, SendOptions } from "./messages";
 
 export {
   conversations,
@@ -38,5 +39,12 @@ export {
 export { EVERYONE, mentionCandidates, parseMentions, ROOM_MENTION } from "./mentions";
 export type { MentionCandidate, MentionContent } from "./mentions";
 
-export { createTypingIndicator, IDLE_STOP_MS, SERVER_TIMEOUT_MS, THROTTLE_MS } from "./typing";
+export {
+  createTypingIndicator,
+  IDLE_STOP_MS,
+  SERVER_TIMEOUT_MS,
+  subscribeTyping,
+  THROTTLE_MS,
+  typingUsers,
+} from "./typing";
 export type { TypingIndicator } from "./typing";

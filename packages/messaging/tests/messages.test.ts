@@ -8,6 +8,7 @@ import {
   messages,
   messageText,
   react,
+  reactions,
   REACTIONS_METADATA,
   redact,
   reply,
@@ -112,6 +113,32 @@ describe("REQ-MSG-05 — réactions emoji en clair, métadonnée exposée", () =
     const readme = readFileSync(new URL("../README.md", import.meta.url), "utf-8");
     expect(readme).toMatch(/réaction/i);
     expect(readme).toMatch(/clair/i);
+  });
+
+  it("relit les réactions agrégées : emoji, compte, et la mienne", () => {
+    const salon = fakeSession({
+      reactions: [
+        { key: "👍", sender: "@adam:tacita.test" },
+        { key: "👍", sender: "@luca:tacita.test" },
+        { key: "🎉", sender: "@adam:tacita.test" },
+      ],
+    });
+
+    expect(reactions(salon.session, ROOM, "$cible")).toEqual([
+      { key: "👍", count: 2, mine: true },
+      { key: "🎉", count: 1, mine: false },
+    ]);
+  });
+
+  it("une réaction retirée ne compte pas — sinon l'emoji reste sans personne derrière", () => {
+    const salon = fakeSession({
+      reactions: [
+        { key: "👍", sender: "@adam:tacita.test", redacted: true },
+        { key: "👍", sender: "@luca:tacita.test" },
+      ],
+    });
+
+    expect(reactions(salon.session, ROOM, "$cible")).toEqual([{ key: "👍", count: 1, mine: true }]);
   });
 });
 

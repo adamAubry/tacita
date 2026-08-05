@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createTypingIndicator, IDLE_STOP_MS, SERVER_TIMEOUT_MS, THROTTLE_MS } from "../src";
-import { fakeSession } from "./session-mock";
+import {
+  createTypingIndicator,
+  IDLE_STOP_MS,
+  SERVER_TIMEOUT_MS,
+  subscribeTyping,
+  THROTTLE_MS,
+  typingUsers,
+} from "../src";
+import { fakeMember, fakeSession } from "./session-mock";
 
 const ROOM = "!salon:tacita.test";
 
@@ -91,5 +98,41 @@ describe("REQ-MSG-09 — m.typing éphémère, throttlé, avec arrêt automatiqu
     typing.keystroke("!autre:tacita.test");
     expect(ctx.client.sendTyping).toHaveBeenCalledTimes(2);
     typing.dispose();
+  });
+});
+
+describe("REQ-MSG-09 — lecture : qui écrit, et le signal qui le dit", () => {
+  it("rend ceux qui écrivent, et jamais soi-même", () => {
+    const salon = fakeSession({
+      members: [
+        fakeMember("@luca:tacita.test", "luca", 100, true),
+        fakeMember("@adam:tacita.test", "adam", 0, true),
+        fakeMember("@zoe:tacita.test", "zoé"),
+      ],
+    });
+
+    // `@luca` est l'utilisateur courant du mock : se voir soi-même « en train
+    // d'écrire » serait un indicateur qui décrit sa propre frappe.
+    expect(typingUsers(salon.session, ROOM)).toEqual(["@adam:tacita.test"]);
+  });
+
+  it("personne n'écrit : une liste vide, pas une absence", () => {
+    expect(typingUsers(fakeSession().session, ROOM)).toEqual([]);
+  });
+
+  it("l'abonnement ne réveille que pour son propre salon, et se défait", () => {
+    const prevenu = vi.fn();
+    const desabonner = subscribeTyping(ctx.session, ROOM, prevenu);
+
+    const [, handler] = ctx.client.on.mock.calls.at(-1)!;
+    (handler as (event: unknown, member: { roomId: string }) => void)({}, { roomId: ROOM });
+    (handler as (event: unknown, member: { roomId: string }) => void)(
+      {},
+      { roomId: "!autre:tacita.test" },
+    );
+    expect(prevenu).toHaveBeenCalledTimes(1);
+
+    desabonner();
+    expect(ctx.client.off).toHaveBeenCalledWith("RoomMember.typing", handler);
   });
 });

@@ -42,6 +42,20 @@ export const IconeMentions: ReactNode = (
   </svg>
 );
 
+/** Appels (M-D) — Astryx n'a ni téléphone ni caméra, et sa liste de noms est fermée. */
+export const IconeAppel: ReactNode = (
+  <svg {...trait}>
+    <path d="M6.5 4h3l1.5 3.5-2 1.5a11 11 0 0 0 6 6l1.5-2 3.5 1.5v3a1.5 1.5 0 0 1-1.7 1.5A16 16 0 0 1 5 5.7 1.5 1.5 0 0 1 6.5 4" />
+  </svg>
+);
+
+export const IconeVideo: ReactNode = (
+  <svg {...trait}>
+    <rect x="3" y="6.5" width="12" height="11" rx="2" />
+    <path d="m15 11 5-3v8l-5-3z" />
+  </svg>
+);
+
 /** Création (M-C) — même géométrie que les quatre de la navbar, sans exception. */
 export const IconePlus: ReactNode = (
   <svg {...trait}>

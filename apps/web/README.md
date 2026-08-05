@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding) et **M-C** (accueil) livrés. Les modules D à I posent leur contenu sur ce squelette.
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil) et **M-D** (conversation, hors média) livrés. Les modules E à I posent leur contenu sur ce squelette.
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -60,7 +60,14 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   fournisseur est testé sur son symptôme — un jeton dans l'URL, retiré de l'historique —
   pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;
 - **le flash de thème au premier rendu est réel** : IndexedDB est asynchrone et l'interdit
-  n°2 ferme localStorage. Il ne touche que ceux qui ont choisi l'autre mode que le défaut.
+  n°2 ferme localStorage. Il ne touche que ceux qui ont choisi l'autre mode que le défaut ;
+- **le composer de M-D n'a ni bouton fichiers ni bouton vocal.** Les deux dépendent du
+  pipeline média (spec 08) et de M-E, qui n'est pas livré : un trombone inerte serait une
+  fonction affichée qui ne marche pas (interdit n°13). Les emplacements d'Astryx qui les
+  accueilleront sont `footerActions` et `sendActions` — deux props à remplir ;
+- **ni l'accueil ni la timeline ne sont fenêtrés.** Astryx `0.2.0` n'expose aucune liste
+  virtualisée ; les contraintes de M-C et M-D prévoyaient ce cas. Le plafond est réel sur une
+  conversation ancienne, pas sur une liste de conversations.
 
 ## Où sont les choses
 
@@ -70,5 +77,6 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 | `components/foundation/` | M-A : primitives réexportées, thème, navbar, header, états |
 | `components/onboarding/` | M-B : session, porte de récupération, éducation iOS, déconnexion |
 | `components/accueil/` | M-C : liste de conversations, en-tête, bannière de demandes, création |
+| `components/conversation/` | M-D : timeline, message object, hold menu, starter, composer |
 | `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

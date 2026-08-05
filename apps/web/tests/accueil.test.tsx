@@ -5,12 +5,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Accueil } from "../components/accueil/Accueil";
-import { ConversationPreview, SEUIL_GLISSEMENT } from "../components/accueil/ConversationPreview";
+import { ConversationPreview } from "../components/accueil/ConversationPreview";
 import { ConversationsList } from "../components/accueil/ConversationsList";
 import { HomeHeader } from "../components/accueil/HomeHeader";
 import { RequestsBanner } from "../components/accueil/RequestsBanner";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { dateApercu } from "../lib/dates";
+import { SEUIL_GLISSEMENT } from "../lib/gestes";
 
 const pousser = vi.fn();
 vi.mock("next/navigation", () => ({

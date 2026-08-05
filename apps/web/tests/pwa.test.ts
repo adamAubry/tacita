@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { PALETTE as COULEURS_DESIGN } from "../components/foundation/palette";
-import { lire, RACINE, sourcesLivrees } from "./sources";
+import { lire, RACINE, sansCommentaires, sourcesLivrees } from "./sources";
 
 const sw = lire("public/sw.js");
 const manifeste = JSON.parse(lire("public/manifest.webmanifest")) as {
@@ -108,7 +108,15 @@ describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
    * barrel casse `next build` — mais seulement au build, longtemps après qu'on l'a écrit.
    */
   it("un seul fichier importe Astryx, et jamais par le barrel", () => {
-    const importateurs = sourcesLivrees()
+    // Commentaires retirés : « les interdits portent sur ce que le shard exécute, pas
+    // sur ce qu'il explique » (tests/sources.ts). Un composant qui cite `@astryxdesign/…`
+    // dans sa docstring pour nommer sa primitive n'importe rien.
+    const lues = sourcesLivrees().map(({ chemin, code }) => ({
+      chemin,
+      code: sansCommentaires(code),
+    }));
+
+    const importateurs = lues
       .filter(({ code }) => code.includes("@astryxdesign/"))
       .map(({ chemin }) => chemin.replace(RACINE, ""));
 
@@ -118,10 +126,10 @@ describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
       "/app/layout.tsx",
       "/components/foundation/primitives.ts",
     ]);
-    const layout = sourcesLivrees().find(({ chemin }) => chemin.endsWith("/app/layout.tsx"))!.code;
+    const layout = lues.find(({ chemin }) => chemin.endsWith("/app/layout.tsx"))!.code;
     expect(layout.match(/@astryxdesign\/[^"']+/g)).toEqual(["@astryxdesign/core/astryx.css"]);
 
-    for (const { chemin, code } of sourcesLivrees()) {
+    for (const { chemin, code } of lues) {
       // `from "@astryxdesign/core"` nu — le sous-chemin, lui, a toujours un `/` après.
       expect(code, chemin).not.toMatch(/from ["']@astryxdesign\/core["']/);
     }

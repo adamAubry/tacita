@@ -121,6 +121,46 @@ export const REACTIONS_METADATA = {
     "la clé. Chiffrer casserait l'agrégation. Le serveur voit qui réagit à quoi.",
 } as const;
 
+/** REQ-MSG-05 — une réaction agrégée : l'emoji, combien, et si j'en fais partie. */
+export interface ReactionTally {
+  key: string;
+  count: number;
+  mine: boolean;
+}
+
+/**
+ * REQ-MSG-05, côté **lecture** — les réactions d'un message, déjà agrégées.
+ *
+ * L'agrégation est celle du SDK (`relations`), pas une reconstruction : c'est le serveur
+ * qui groupe les annotations, et le SDK qui tient le résultat à jour. Sans ce membre, le
+ * shard UI pourrait envoyer des réactions sans jamais en afficher — une moitié de
+ * fonctionnalité, que l'interdit n°13 proscrit.
+ *
+ * Les redactions sont exclues : une réaction retirée reste dans la relation, vidée de son
+ * contenu. La compter afficherait un emoji fantôme que personne ne peut retirer.
+ */
+export function reactions(session: Session, roomId: string, eventId: string): ReactionTally[] {
+  const self = session.client.getUserId();
+  const related =
+    session.client
+      .getRoom(roomId)
+      ?.relations.getChildEventsForEvent(eventId, RelationType.Annotation, EventType.Reaction)
+      ?.getRelations() ?? [];
+
+  const tallies = new Map<string, ReactionTally>();
+  for (const event of related) {
+    if (event.isRedacted()) continue;
+    const key = (event.getContent()["m.relates_to"] as { key?: unknown } | undefined)?.key;
+    if (typeof key !== "string") continue;
+
+    const tally = tallies.get(key) ?? { key, count: 0, mine: false };
+    tally.count += 1;
+    tally.mine ||= event.getSender() === self;
+    tallies.set(key, tally);
+  }
+  return [...tallies.values()];
+}
+
 export function react(
   session: Session,
   roomId: string,

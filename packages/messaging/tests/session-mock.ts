@@ -18,8 +18,15 @@ export function fakeEvent(
   };
 }
 
-export function fakeMember(userId: string, name: string, powerLevel = 0) {
-  return { userId, name, powerLevel };
+export function fakeMember(userId: string, name: string, powerLevel = 0, typing = false) {
+  return { userId, name, powerLevel, typing, roomId: "!salon:tacita.test" };
+}
+
+/** Une annotation telle que le SDK la rend dans les relations d'un événement. */
+export interface FakeReaction {
+  key: string;
+  sender?: string;
+  redacted?: boolean;
 }
 
 export interface FakeRoomOptions {
@@ -27,6 +34,8 @@ export interface FakeRoomOptions {
   pinned?: string[];
   maySendEvent?: boolean;
   mayRedact?: boolean;
+  /** Réactions portées par `$cible`, pour la lecture agrégée de REQ-MSG-05. */
+  reactions?: FakeReaction[];
 }
 
 /**
@@ -40,6 +49,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     pinned = [],
     maySendEvent = true,
     mayRedact = true,
+    reactions = [],
   } = options;
 
   const transactions = new Map<string, string>();
@@ -49,7 +59,19 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     roomId: "!salon:tacita.test",
     getJoinedMembers: () => members,
     getJoinedMemberCount: () => members.length,
+    getMembers: () => members,
     getMember: (userId: string) => members.find((member) => member.userId === userId) ?? null,
+    // L'agrégation des annotations est celle du SDK : le mock rend ce qu'elle rendrait,
+    // il ne la refait pas — sinon le test validerait notre propre regroupement.
+    relations: {
+      getChildEventsForEvent: vi.fn((_eventId: string, _relType: string, _type: string) => ({
+        getRelations: () =>
+          reactions.map(({ key, sender = "@luca:tacita.test", redacted = false }) => ({
+            ...fakeEvent("$reaction", { "m.relates_to": { key } }, sender, "m.reaction"),
+            isRedacted: () => redacted,
+          })),
+      })),
+    },
     currentState: {
       getStateEvents: vi.fn((_type: string, _stateKey: string) => ({
         getContent: () => ({ pinned }),

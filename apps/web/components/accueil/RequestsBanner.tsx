@@ -1,9 +1,7 @@
 "use client";
 
-import { useRef, type PointerEvent } from "react";
-
 import { ClickableCard, Text } from "../foundation/primitives";
-import { SEUIL_GLISSEMENT } from "./ConversationPreview";
+import { useGlissement } from "../../lib/gestes";
 
 export interface RequestsBannerProps {
   /** Nombre de demandes actives. Zéro ⇒ rien n'est rendu. */
@@ -24,30 +22,12 @@ export interface RequestsBannerProps {
  * la carte reste cliquable et que rien n'est supprimé côté serveur.
  */
 export function RequestsBanner({ demandes, onOuvrir, onIgnorer }: RequestsBannerProps) {
-  const depart = useRef<number | null>(null);
+  const geste = useGlissement({ onDroite: onIgnorer });
 
   if (demandes <= 0) return null;
 
-  const terminer = (evenement: PointerEvent) => {
-    const origine = depart.current;
-    depart.current = null;
-    if (origine !== null && evenement.clientX - origine >= SEUIL_GLISSEMENT) onIgnorer();
-  };
-
   return (
-    <ClickableCard
-      label={`Nouvelles demandes (${demandes})`}
-      padding={3}
-      onClick={onOuvrir}
-      onPointerDown={(evenement) => {
-        depart.current = evenement.clientX;
-      }}
-      onPointerUp={terminer}
-      onPointerCancel={() => {
-        depart.current = null;
-      }}
-      style={{ touchAction: "pan-y" }}
-    >
+    <ClickableCard label={`Nouvelles demandes (${demandes})`} padding={3} onClick={onOuvrir} {...geste}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
         <Text type="body" weight="bold">
           Nouvelles demandes
