@@ -6,10 +6,16 @@ import type { MediaEnvironment, Raster } from "@tacita/media-pipeline";
  */
 
 /**
- * Ce que le navigateur ne sait pas faire seul. **Lever avec un type nommé, jamais rendre
- * un blob approximatif** : un vocal qui n'est pas de l'Ogg/Opus est illisible par les
- * clients Matrix standards (D-03), et une vidéo non transcodée partirait au format brut
- * de l'appareil, à des dizaines de mégaoctets.
+ * Ce qui manque au shard pour produire les formats de sortie imposés. **Lever avec un type
+ * nommé, jamais rendre un blob approximatif** : un vocal qui n'est pas de l'Ogg/Opus est
+ * illisible par les clients Matrix standards (D-03), et une vidéo non transcodée partirait
+ * au format brut de l'appareil, à des dizaines de mégaoctets.
+ *
+ * Ce qui manque est plus étroit qu'un codec : Firefox enregistre déjà en Ogg/Opus, Chrome
+ * produit du flux Opus dans un conteneur WebM (il manque un remuxage), et WebCodecs encode
+ * la vidéo (il manque un muxeur MP4). Seul Safari, qui rend du MP4/AAC, demande un vrai
+ * encodeur. Le détail est dans ESCALATIONS § E-10 — c'est ce qui rend l'arbitrage ouvert
+ * plutôt que joué d'avance.
  *
  * L'UI ne propose pas ces deux chemins tant que le transcodage n'existe pas : c'est la
  * seule façon honnête de ne pas afficher une fonction qui échouerait (interdit n°13).
@@ -21,6 +27,18 @@ export class TranscodageIndisponible extends Error {
     this.name = "TranscodageIndisponible";
   }
 }
+
+/**
+ * File System Access API — absente de Firefox et Safari, d'où la lecture conditionnelle.
+ * Les types du DOM ne la déclarent pas encore ; c'est le seul cast du fichier.
+ */
+const choisirFichier = (
+  globalThis as unknown as {
+    showSaveFilePicker?: (options: { suggestedName: string }) => Promise<{
+      createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>;
+    }>;
+  }
+).showSaveFilePicker;
 
 /** Redimensionne en respectant le ratio, sans jamais agrandir. */
 function cible(largeur: number, hauteur: number, maxEdge: number) {
@@ -109,22 +127,13 @@ export function environnementMedia(): MediaEnvironment {
      * REQ-MED-05 — l'original non compressé, sur l'appareil. `showSaveFilePicker` est
      * absent de Firefox et Safari ; `saveOriginal` retombe alors sur le téléchargement.
      */
-    saveViaFilePicker:
-      "showSaveFilePicker" in globalThis
-        ? async (blob, filename) => {
-            const picker = (
-              globalThis as unknown as {
-                showSaveFilePicker(options: { suggestedName: string }): Promise<{
-                  createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>;
-                }>;
-              }
-            ).showSaveFilePicker;
-            const handle = await picker({ suggestedName: filename });
-            const flux = await handle.createWritable();
-            await flux.write(blob);
-            await flux.close();
-          }
-        : undefined,
+    saveViaFilePicker: choisirFichier
+      ? async (blob, filename) => {
+          const flux = await (await choisirFichier({ suggestedName: filename })).createWritable();
+          await flux.write(blob);
+          await flux.close();
+        }
+      : undefined,
 
     async saveViaDownload(blob, filename) {
       const url = URL.createObjectURL(blob);

@@ -24,7 +24,7 @@ contrat gagne.
 | E-07 | Layout d'appel | **Confirmé** : pas de client RTC maison | rien |
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
-| E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Ouvert — arbitrage PM requis** | vidéo et vocaux non envoyables tant qu'il n'est pas tranché |
+| E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Ouvert — deux questions au PM** | vidéo et vocaux non envoyables tant qu'il n'est pas tranché |
 
 ---
 
@@ -233,10 +233,26 @@ ratifiée le 05/08/2026) refuse **toute** dépendance d'`apps/web` hors
 respectables séparément ; l'espace entre elles ne l'est pas — le mode de panne dominant du
 dépôt (spec 00).
 
-Aucune API native ne comble le trou : le navigateur sait *enregistrer* en WebM/Opus
-(Chrome) ou MP4/AAC (Safari), aucun ne sait produire de l'**Ogg/Opus**, que D-03 impose
-comme format de sortie unique. WebCodecs encode, mais ne *muxe* pas : il rend des morceaux
-encodés, pas un conteneur.
+**Où le manque se situe exactement.** *(Rédaction du 06/08/2026, corrigeant une première
+version de cette section qui disait « aucune API native ne comble le trou » — trop absolu,
+et le corriger change les options.)* Le manque n'est pas un bloc, il a trois morceaux
+inégaux :
+
+| Chemin | Ce que le navigateur donne | Ce qui manque |
+|---|---|---|
+| Vocal, Firefox | Ogg/Opus directement (`MediaRecorder`) | **rien** |
+| Vocal, Chrome/Edge | flux **Opus**, conteneur WebM | un **remuxage** WebM → Ogg : du conteneur, pas du codec |
+| Vocal, Safari/iOS | MP4/**AAC** | un vrai **encodage** Opus — c'est le seul endroit qui en demande un |
+| Vidéo, tous | `WebCodecs` encode en H.264/VP9 | un **muxeur** MP4 : là encore du conteneur, pas du codec |
+
+REQ-MED-07 le disait déjà, et je l'avais lu trop vite : « quand MediaRecorder **ne produit
+pas** d'Opus (Safari iOS → MP4/AAC) ». L'encodeur WASM n'est nécessaire que sur ce
+« quand ». Partout ailleurs, ce qui manque est de la plomberie de conteneur — quelques
+centaines de lignes de code ordinaire, sans dépendance.
+
+Reste une inconnue qui **ne se décide pas, elle se mesure** : si `WebCodecs AudioEncoder`
+accepte `opus` sur la version de Safari ciblée, le dernier besoin de WASM disparaît. La
+précaution versions du dépôt interdit de le supposer dans un sens comme dans l'autre.
 
 **Ce que M-E a livré en attendant.** Tout ce qui ne dépend d'aucun codec :
 photos (compression canvas), fichiers, vignettes déchiffrées, viewer, lecteur vocal avec
@@ -246,22 +262,68 @@ cassé** : pas d'envoi de vidéo, pas d'enregistrement vocal, pas de capture vid
 blob approximatif — un vocal hors Ogg/Opus est illisible par les clients Matrix standards,
 et une vidéo non transcodée partirait au format brut de l'appareil.
 
-**Les deux voies, et ce qu'elles coûtent :**
+## Les deux questions posées au PM
 
-1. **Amender REQ-UI-02** pour admettre les deux codecs WASM dans `apps/web`. Le motif de la
-   liste est de fermer la porte aux systèmes de style **concurrents d'Astryx** ; un
-   encodeur audio n'en est pas un. Mais la liste est ratifiée et le test refuse par défaut :
-   la modifier est un geste de PM, et elle perd sa netteté (« tout le reste refusé »).
-2. **Un paquet `@tacita/media-codecs`** qui porte l'implémentation navigateur et ses
-   dépendances WASM. La liste close l'autorise déjà (`@tacita/*`), le shard reste propre, et
-   la spec 08 — qui sanctionne le WASM — reste le bon voisinage. Coût : un paquet de plus,
-   et une frontière à écrire (la spec 08 promet « zéro DOM » au pipeline, ce paquet-ci en
-   aurait).
+Elles sont distinctes, et la seconde ne se pose que si la première ferme la porte à la
+voie C.
 
-**Recommandation technique : la voie 2.** Elle ne touche à aucune décision ratifiée, garde
-la liste close intacte dans son esprit comme dans sa lettre, et place la dépendance là où sa
-spec l'autorise déjà. Mais c'est le PM qui tranche : la voie 1 est plus courte, et le choix
-est un arbitrage de gouvernance, pas de technique.
+### Q1 — D-03 impose-t-elle un **format** ou un **mécanisme** ?
+
+D-03 est titrée « transcodage WASM vers Ogg/Opus obligatoire ». Le motif écrit juste en
+dessous ne parle que du format : « un format propriétaire MP4/AAC rendrait les vocaux
+iPhone illisibles par tout client Matrix standard et créerait deux chemins de lecture ».
+Le WASM y est le moyen de l'époque, pas la fin.
+
+Si D-03 lie le **format** — Ogg/Opus partout, point — alors une implémentation sans WASM la
+respecte pleinement. Si elle lie le **mécanisme**, la voie C est fermée d'avance et il ne
+reste qu'à choisir où loger la dépendance.
+
+### Q2 — Où une dépendance de transcodage a-t-elle le droit de vivre ?
+
+**Voie A — amender REQ-UI-02** pour admettre les codecs WASM dans `apps/web`. Le motif de
+la liste close est de fermer la porte aux systèmes de style **concurrents d'Astryx** ; un
+encodeur audio n'en est pas un, et sa rédaction dit d'ailleurs « toute dépendance **de
+style** ». *Coût :* la liste est ratifiée et son test refuse par défaut de refus — la
+modifier est un geste de PM, et elle perd la netteté qui fait sa valeur (« tout le reste
+refusé » devient « tout le reste refusé, sauf »).
+
+**Voie B — un paquet `@tacita/media-codecs`** qui porte l'implémentation navigateur et ses
+dépendances WASM. La liste close l'autorise déjà (`@tacita/*`), le shard reste propre, et la
+spec 08 — qui sanctionne le WASM — est le bon voisinage. *Coût :* un paquet de plus, une
+spec de plus, et une frontière à écrire, puisque la spec 08 promet « zéro DOM » au pipeline
+alors que ce paquet-ci en aurait.
+
+**Voie C — aucune dépendance.** `MediaRecorder` et `WebCodecs` pour encoder, deux muxeurs
+écrits à la main (Ogg pour l'audio, MP4 pour la vidéo) pour empaqueter. *Coût :* du code de
+format binaire à nous, à tester et à maintenir — ennuyeux mais borné, et sans surface de
+supply chain. *Condition :* que Safari couvre l'encodage Opus, sans quoi la voie C laisse
+les vocaux iPhone sur le carreau et redevient A ou B pour ce seul cas.
+
+## Ce qu'il faut mesurer avant de trancher
+
+Un spike d'une demi-journée répond à la seule inconnue, et il n'appartient pas au PM :
+
+1. `AudioEncoder.isConfigSupported({ codec: "opus" })` sur la version de Safari ciblée,
+   iOS compris — c'est ce résultat qui ouvre ou ferme la voie C ;
+2. le poids réel des deux paquets WASM candidats, à comparer aux quelques centaines de
+   lignes de muxeur, pour que « moins de code » soit une mesure et pas une intuition.
+
+## Recommandation technique
+
+**Q1 : le format.** Le motif écrit de D-03 ne parle que de lisibilité par les autres
+clients ; un vocal en Ogg/Opus produit sans WASM tient cette promesse mot pour mot.
+
+**Q2 : la voie C si le spike la valide, la voie B sinon.** C ne touche à aucune décision
+ratifiée et n'ajoute aucune dépendance ; B ne touche à aucune décision ratifiée non plus et
+place la dépendance là où une spec l'autorise déjà. La voie A est la plus courte à écrire et
+la seule qui abîme quelque chose : la liste close ne vaut que tant qu'elle est close.
+
+## Ce que coûte l'attente
+
+Rien ne casse, et rien ne ment : M-E est livré sans les chemins concernés, et l'UI ne les
+propose pas. Mais **envoyer un vocal est une fonction attendue d'une messagerie** — c'est
+un trou produit visible, pas une finition. Il est le seul de son espèce dans les cinq
+modules livrés.
 
 ---
 
