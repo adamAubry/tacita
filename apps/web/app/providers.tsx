@@ -4,7 +4,15 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 import { Theme, type ThemeMode } from "../components/foundation/primitives";
 import { tacitaTheme } from "../components/foundation/theme";
-import { ecrireTheme, lireTheme } from "../lib/theme-store";
+import { RecoveryGate } from "../components/onboarding/RecoveryGate";
+import { SessionProvider } from "../components/onboarding/SessionProvider";
+import { ecrireTheme, lireTheme } from "../lib/preferences";
+
+/**
+ * L'adresse du homeserver est une donnée de déploiement, pas un secret : elle est
+ * publique dès le premier appel réseau du client.
+ */
+const HOMESERVER = process.env.NEXT_PUBLIC_HOMESERVER_URL ?? "https://chat.example.org";
 
 /**
  * **Le `Theme` d'Astryx doit être ici, dans un composant client à nous.** Posé
@@ -48,7 +56,11 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ContexteTheme.Provider value={{ mode, changerMode }}>
       <Theme theme={tacitaTheme} mode={mode}>
-        {children}
+        {/* REQ-UI-04 — la porte est **dans** le thème et **autour** de tout le contenu :
+            aucune route ne rend quoi que ce soit tant que la clé n'est pas confirmée. */}
+        <SessionProvider homeserverUrl={HOMESERVER}>
+          <RecoveryGate>{children}</RecoveryGate>
+        </SessionProvider>
       </Theme>
     </ContexteTheme.Provider>
   );

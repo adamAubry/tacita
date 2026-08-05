@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { MODE_DEFAUT } from "../app/providers";
 import { PALETTE as COULEURS_DESIGN } from "../components/foundation/palette";
 import { FAMILLES_CHROMATIQUES, tacitaTheme } from "../components/foundation/theme";
-import { ecrireTheme, lireTheme } from "../lib/theme-store";
-import { sourcesLivrees } from "./pwa.test";
+import { ecrireTheme, lireTheme } from "../lib/preferences";
+import { sourcesLivrees, sansCommentaires } from "./sources";
 
 const tokens = tacitaTheme.tokens as Record<string, string>;
 /** `defineTheme` résout un couple clair/sombre en une valeur `light-dark()`. */
@@ -135,13 +135,9 @@ describe("REQ-UI-03 — le choix de thème est persisté en IndexedDB", () => {
   });
 
   it("le stockage est IndexedDB, jamais localStorage (interdit n°2)", () => {
-    // Commentaires retirés : les interdits portent sur ce que le shard exécute, pas sur
-    // ce qu'il explique — le module de persistance cite l'interdit qu'il respecte.
-    const execute = (code: string) =>
-      code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
-
+    // Commentaires retirés : le module de persistance cite l'interdit qu'il respecte.
     for (const { chemin, code } of sourcesLivrees()) {
-      expect(execute(code), chemin).not.toMatch(/localStorage|sessionStorage/);
+      expect(sansCommentaires(code), chemin).not.toMatch(/localStorage|sessionStorage/);
     }
   });
 });

@@ -9,3 +9,4 @@ dist/
 infra/proxy/certs/
 .claude/settings.local.json
 *.old
+*.tsbuildinfo

@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A livré** (fondations). Les modules B à I posent leur contenu sur ce squelette.
+État : **M-A** (fondations) et **M-B** (onboarding) livrés. Les modules C à I posent leur contenu sur ce squelette.
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -56,6 +56,9 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **le service worker n'a jamais tourné.** Ce qui est testé est sa *forme* : liste de
   précache sans donnée, et une seule branche d'écriture au cache, étroite. Qu'il se comporte
   ainsi en production reste à vérifier ;
+- **le flux OIDC complet n'a jamais été exécuté d'un bout à l'autre.** Le retour du
+  fournisseur est testé sur son symptôme — un jeton dans l'URL, retiré de l'historique —
+  pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;
 - **le flash de thème au premier rendu est réel** : IndexedDB est asynchrone et l'interdit
   n°2 ferme localStorage. Il ne touche que ceux qui ont choisi l'autre mode que le défaut.
 
@@ -65,5 +68,6 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 |---|---|
 | `app/` | routes App Router — les 7 layouts, les 4 onglets dans le groupe `(onglets)` |
 | `components/foundation/` | M-A : primitives réexportées, thème, navbar, header, états |
-| `lib/` | adaptateurs vers les paquets 04–10 (aujourd'hui : persistance du thème) |
+| `components/onboarding/` | M-B : session, porte de récupération, éducation iOS, déconnexion |
+| `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

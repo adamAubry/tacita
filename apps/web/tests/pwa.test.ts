@@ -1,16 +1,9 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { PALETTE as COULEURS_DESIGN } from "../components/foundation/palette";
-
-/**
- * Chemins et non URL : en environnement jsdom, le `URL` global est celui de jsdom, que
- * `node:fs` refuse (« The URL must be of scheme file »). Le symptôme n'apparaît qu'à
- * l'intérieur d'un test, pas au chargement du module — de quoi chercher longtemps.
- */
-const RACINE = join(import.meta.dirname, "..");
-const lire = (chemin: string) => readFileSync(join(RACINE, chemin), "utf-8");
+import { lire, RACINE, sourcesLivrees } from "./sources";
 
 const sw = lire("public/sw.js");
 const manifeste = JSON.parse(lire("public/manifest.webmanifest")) as {
@@ -84,7 +77,9 @@ describe("REQ-UI-01 — PWA installable, service worker de coquille seule", () =
 });
 
 describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
-  const AUTORISES = [/^@astryxdesign\//, /^@stylexjs\/stylex$/, /^next$/, /^react(-dom)?$/];
+  // La liste close de la SPEC 11. `@tacita/*` : les paquets 04–10 que le shard compose —
+  // ils sont le produit, pas une dépendance de style.
+  const AUTORISES = [/^@astryxdesign\//, /^@stylexjs\/stylex$/, /^@tacita\//, /^next$/, /^react(-dom)?$/];
   const STYLE_INTERDIT = /tailwind|bootstrap|shadcn|styled-components|@emotion|stitches|vanilla-extract|sass|less/i;
 
   it("aucune dépendance de style hors de la liste close", () => {
@@ -149,22 +144,3 @@ describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
     }
   });
 });
-
-/**
- * Ce que le shard **livre** : `app`, `components`, `lib`. Les tests sont exclus — ils
- * nomment les motifs interdits pour les chercher, et s'y trouveraient eux-mêmes.
- */
-export function sourcesLivrees(): { chemin: string; code: string }[] {
-  const fichiers: { chemin: string; code: string }[] = [];
-  const parcourir = (dossier: string) => {
-    for (const entree of readdirSync(dossier, { withFileTypes: true })) {
-      const chemin = join(dossier, entree.name);
-      if (entree.isDirectory()) parcourir(chemin);
-      else if (/\.tsx?$/.test(entree.name)) {
-        fichiers.push({ chemin, code: readFileSync(chemin, "utf-8") });
-      }
-    }
-  };
-  for (const dossier of ["app", "components", "lib"]) parcourir(join(RACINE, dossier));
-  return fichiers;
-}

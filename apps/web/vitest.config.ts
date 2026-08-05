@@ -8,8 +8,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
-    // Astryx est publié en ESM avec 123 sous-chemins : inliné, Vite les résout comme le
-    // bundler de l'app plutôt que par le loader ESM de Node.
-    server: { deps: { inline: ["@astryxdesign/core"] } },
+    // Astryx est publié en ESM avec 123 sous-chemins ; matrix-js-sdk publie des imports
+    // de répertoire que le loader ESM de Node refuse. Inlinés, Vite les résout comme le
+    // bundler de l'app (même raison que packages/messaging/vitest.config.ts).
+    server: { deps: { inline: ["@astryxdesign/core", "matrix-js-sdk"] } },
   },
 });

@@ -28,3 +28,23 @@ if (typeof HTMLDialogElement !== "undefined" && !HTMLDialogElement.prototype.sho
 globalThis.CSS ??= {
   escape: (valeur: string) => valeur.replace(/[^\w-]/g, (c) => `\\${c}`),
 } as typeof globalThis.CSS;
+
+/**
+ * jsdom ne fournit pas `matchMedia`. Astryx s'en sert pour les requêtes média (taille,
+ * mouvement réduit, mode d'affichage) et lève sans elle. Troisième lacune de
+ * l'environnement, même traitement que les deux précédentes.
+ *
+ * Le stub ne correspond à rien : `matches` est faux partout. Les tests qui dépendent
+ * d'une requête média précise l'espionnent pour dire ce qu'elle vaut.
+ */
+globalThis.matchMedia ??= ((requete: string) =>
+  ({
+    media: requete,
+    matches: false,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }) as MediaQueryList) as typeof globalThis.matchMedia;
