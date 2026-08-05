@@ -7,8 +7,9 @@ et groupes Instagram pour un cercle fermé.
 reste en découle, y compris les limites — qui sont documentées, jamais masquées.
 
 > **Ce fichier est une carte, pas une copie.** Il dit où chaque chose vit ; il ne
-> reproduit rien. Une copie vieillit sans prévenir — `correctif/` l'a démontré en douze
-> heures. Si un point ci-dessous contredit le fichier qu'il désigne, **c'est le fichier
+> reproduit rien. Une copie vieillit sans prévenir — le dossier `correctif/`, instantané
+> de deux correctifs déjà appliqués, avait divergé en douze heures ; il a été supprimé.
+> Si un point ci-dessous contredit le fichier qu'il désigne, **c'est le fichier
 > désigné qui fait foi**, et cette carte est à corriger.
 
 ---
@@ -109,9 +110,9 @@ défauts critiques, dossier de reprise. Chacun racontait bien sa session ; aucun
 on en était, et leurs états se contredisaient d'un fichier à l'autre. Ils vivent dans
 `git log`, où un document daté est à sa place.
 
-Reste `correctif/` : instantané des fichiers C3/C2 tels que déposés avant application,
-**partiellement périmé**. Son propre README l'avertit. Sa suppression est décidée et
-planifiée — `docs/REPRISE.md` § 6.1, action A2.
+Le dossier `correctif/` — instantané des fichiers C3/C2 tels que déposés avant
+application — a été supprimé le 05/08/2026 (action A2) : deux de ses cinq fichiers avaient
+déjà divergé de `packages/`. Ce qu'il montrait est dans `git log`.
 
 **Une trace n'est utile que si sa péremption est lisible.** Une décision dont on a perdu le
 motif se rediscute tous les six mois ; un compte-rendu dont on a perdu la date se prend pour
@@ -134,9 +135,9 @@ cd .. && npm run smoke
 ```
 
 Cette pile **ne monte pas le RTC** : l'overlay `infra/rtc/docker-compose.yml` est séparé et
-demande deux IP publiques. Tant que l'annonce conditionnelle décidée en E-08 n'est pas
-implémentée (`docs/REPRISE.md` § 6.1, action A4), le `.well-known` annonce un focus LiveKit
-dont le backend est absent : un appel échoue en 502 plutôt qu'en `RtcFociMissing`.
+demande deux IP publiques. Son `.well-known` n'annonce donc aucun focus (REQ-RTC-05,
+décision E-08) : `discoverFocus()` rend `RtcFociMissing`, ce que l'UI sait afficher, au
+lieu d'un 502 en pleine connexion d'appel.
 
 Détail du socle serveur, y compris la vérification de pré-vol à faire avant toute création
 de compte : `infra/README.md`.

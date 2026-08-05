@@ -22,8 +22,9 @@ fois, sur son code puis sur ses jonctions, et la dernière passe a fermé les tr
 
 Les huit escalades du Tech Lead Frontend ont été **tranchées le 05/08/2026** — deux d'entre
 elles créent du contrat neuf : la spec 09 gagne la recherche filtrée, et une spec 12 apparaît
-pour le service de liens d'invitation. Il reste **cinq actions techniques** et **une action de
-méthode**. Elles sont en § 6.
+pour le service de liens d'invitation. Les **cinq actions techniques sont faites** le
+05/08/2026 (§ 6.1) ; reste **l'action de méthode**, le spike outillage, qui appartient au
+senior de la spec 11 et ouvre `M-A`.
 
 ---
 
@@ -129,7 +130,9 @@ La commande fait foi.
 
 **Prouvé à l'exécution :** la crypto Rust réellement chargée, un salon effectivement chiffré
 côté serveur, l'aller-retour chiffrement → serveur → déchiffrement, la reprise de session sans
-réseau, le login OIDC jusqu'à la redirection, la passerelle push à travers le proxy TLS.
+réseau, le login OIDC jusqu'à la redirection, la passerelle push à travers le proxy TLS, et
+l'atomicité de la consommation d'un lien d'invitation arbitrée par PostgreSQL (REQ-INV-07 —
+la suite par défaut ne peut que confirmer cette hypothèse par construction).
 
 **Non prouvé :** le flux SSO complet (il faudrait un navigateur, Playwright est interdit), le
 média contre un vrai serveur, LiveKit, et tout ce qui touche l'UI. La cible de fumée est une
@@ -179,6 +182,14 @@ production** : c'est le shard qui les compose. Une seule exception, en `devDepen
 Chaque paquet a un `README.md` avec une section **« Limites assumées »**, écrite pour vous :
 ce sont les cas où le module ne peut pas tenir ce que l'UI voudrait afficher. Lisez-les avant
 de dessiner un écran qui promet plus.
+
+**Un service, en plus des sept paquets : `apps/invite-tokens/` (spec 12).** Il n'est pas
+importable — c'est une API HTTP, sous `/invite/` derrière le proxy. Ce qu'il faut en retenir
+pour `M-G` et `M-H` : il **résout un token en identifiant, et s'arrête là**. C'est votre code
+qui invite ensuite, par le chemin natif de D-09. Il rend un seul et même échec pour six
+causes, et la reprise d'un lien déjà résolu est un **succès**, pas une erreur. Son
+`README.md` donne les quatre routes, son `LIMITES.md` ce qu'il apprend et ce qu'il ne peut
+pas vérifier.
 
 ### 5.3 Le point qui décide de l'onboarding — D-08
 
@@ -239,14 +250,14 @@ un contrat.
 `messaging` et `outbox`. C'est imposé par REQ-CAL-05 et documenté en limite assumée dans
 `packages/calls/README.md`. Ne le « corrigez » pas vers l'outbox.
 
-**Le focus RTC est annoncé même quand le SFU est absent.** `proxy/nginx.conf` publie
-`org.matrix.msc4143.rtc_foci` sans condition (REQ-RTC-05 l'exige), mais les backends
-`/livekit/*` vivent dans un overlay que la procédure de démarrage ne monte pas. Sur la pile de
-développement, `discoverFocus()` **trouve donc un focus** : vous n'aurez pas `RtcFociMissing`,
-vous aurez un 502 au moment de rejoindre. Ne construisez pas l'état d'erreur de REQ-UI-19 en
-vous fiant à ce que fait la pile locale. **Tranché le 05/08 (E-08) : l'annonce devient
-conditionnelle** — mais tant que l'action A4 n'est pas faite, le comportement décrit ci-dessus
-est celui que vous observerez.
+**Le focus RTC était annoncé même quand le SFU est absent — corrigé le 05/08 (A4).**
+`proxy/nginx.conf` publiait `org.matrix.msc4143.rtc_foci` sans condition, alors que les
+backends `/livekit/*` vivent dans un overlay que la procédure de démarrage ne monte pas :
+`discoverFocus()` trouvait un focus, et l'appel mourait en 502 au lieu du `RtcFociMissing`
+que REQ-CAL-02 rend affichable. L'annonce vit maintenant dans deux fichiers montés au même
+chemin — `proxy/well-known.conf` (sans focus) et `rtc/well-known.conf` (avec) — et c'est
+l'overlay compose qui choisit. **Sur la pile de développement sans RTC, vous observerez donc
+`RtcFociMissing`**, ce qui est le comportement à construire pour REQ-UI-19.
 
 ### 5.5 Mocker `Session` dans le shard
 
@@ -285,15 +296,33 @@ Les 13 interdits sont dans `CLAUDE.md`. Ceux qui vous concernent :
 
 ## 6. Le plan — ce qui reste à faire
 
-### 6.1 Cinq actions techniques
+### 6.1 Les cinq actions techniques — faites le 05/08/2026
 
-| # | Action | Pourquoi | Qui |
-|---|---|---|---|
-| **A1** | Écrire l'invariant **REQ-MED-02** : un test assertant qu'aucun `sendEvent`/`sendMessage` n'existe dans `media-pipeline`. | Le PM l'a exigé le 04/08 **en contrepartie** de sa décision « le média est hors périmètre de REQ-OBX-09 par construction ». La construction est saine ; rien ne la garde. C'est exactement ce que C1 était avant qu'on le nomme. Jamais écrit. | dev |
-| **A2** | Supprimer le dossier `correctif/`. | Décidé au point 10 de l'ordre de marche du 03/08 : « se supprime au merge, comme prévu ». Les merges sont faits depuis le 04/08. Il doublonne `packages/` avec des fichiers **partiellement périmés**, et son propre README avertit de ne pas s'en servir. Un instantané périmé à côté du code vivant est un piège pour le prochain lecteur. | dev |
-| **A4** | Rendre l'annonce du focus RTC conditionnelle : la déplacer de la config proxy de base vers l'overlay RTC, et réaligner le test `REQ-RTC-05` sur les deux configs. | Escalade **E-08 tranchée**, `specs/02-rtc-backend.md` amendée. Aujourd'hui une pile sans SFU annonce un focus dont le backend n'existe pas, donc `discoverFocus()` réussit et l'appel meurt en 502 — au lieu du `RtcFociMissing` que REQ-CAL-02 traite en message visible. **À faire avant `M-I`**, sinon le module construit son état d'erreur contre un comportement local trompeur. | dev |
-| **A5** | Implémenter la **recherche filtrée** : `mentions` et `msgtype` au schéma, alimentés au déchiffrement, et les critères combinables de `search`. | Escalade **E-01 tranchée**, `specs/09-search.md` REQ-SRC-11. **À faire avant `M-F`** : sans elle, l'onglet Mentions n'a que du plein-texte sur un nom d'affichage, c'est-à-dire le contournement que la décision refuse explicitement. Attention en écrivant : `mentions` dérive du corps déchiffré, l'interdit n°8 s'y applique entièrement. | dev |
-| **A6** | Construire le **service de liens d'invitation** (`apps/invite-tokens/`, spec 12) et son raccordement (REQ-INF-15). | Escalade **E-05 tranchée** : le service se fait, sans repli deep link. Vingt exigences, dont huit ne décrivent que des scénarios hors cadre. **La spec 12 attend une ratification du PM sur trois choix de conception** — elle les liste dans sa dernière section. Bloque la partie « ajout par lien » de `M-G` et `M-H`, pas les modules entiers. | dev |
+| # | Action | Ce qui a été fait |
+|---|---|---|
+| **A1** | Invariant **REQ-MED-02** | Un test balaie `packages/media-pipeline/src/` — le **dossier**, pas une liste de fichiers — et échoue si un `sendEvent`/`sendMessage` y apparaît. C'est la contrepartie que le PM avait exigée pour « le média est hors périmètre de REQ-OBX-09 par construction » : la construction était saine, rien ne la gardait. |
+| **A2** | Suppression de `correctif/` | Supprimé, avec les renvois qui le désignaient dans `README.md`. Ce qu'il montrait est dans `git log`. |
+| **A4** | Annonce RTC conditionnelle | Le bloc `.well-known` sort de `proxy/nginx.conf` vers deux fichiers montés au même chemin : `proxy/well-known.conf` (aucun focus) et `rtc/well-known.conf` (focus LiveKit). Compose fusionne les volumes par cible, donc l'overlay remplace la base. `REQ-RTC-05` asserte les deux configs **et** les deux montages ; les deux rendus ont été validés par un `nginx -t` réel. |
+| **A5** | Recherche filtrée **REQ-SRC-11** | `msgtype` et `mentions` au schéma Orama, alimentés depuis l'événement déchiffré (`m.mentions`, `m.new_content` pour une édition) ; `search(query, filtres)` compose salon, expéditeur, type, mentions et bornes de date en ET. `ROOM_MENTION` est exporté : l'onglet Mentions passe `[moi, ROOM_MENTION]`. Un changement de schéma **efface** le snapshot précédent au lieu de le charger — un index sans la propriété filtrée lèverait à la première requête. |
+| **A6** | Service de liens (spec 12) | `apps/invite-tokens/` : les vingt REQ, une describe par REQ. Raccordement REQ-INF-15 : image épinglée, service compose, base dédiée `invite_tokens`, route proxy `/invite/`, et le test qui asserte l'**absence de tout secret d'administration** dans son environnement. L'atomicité de REQ-INV-07 a sa cible de fumée, contre un vrai PostgreSQL. |
+
+**Ce qui reste ouvert sur A6 : la ratification du PM.** La spec 12 listait trois choix de
+conception à valider ; ils sont implémentés **tels que la spec les écrit**, faute de quoi il
+n'y avait rien à construire. Un non sur l'un d'eux se paie en modification, pas en réécriture :
+
+1. *le service ne fait aucune action Matrix* — il ne détient aucun jeton d'administration ; ses
+   trois appels à Synapse sont des lectures faites avec le jeton de l'appelant ;
+2. *un seul message pour « expiré », « révoqué » et « inconnu »* — plus « épuisé », « émetteur
+   disparu » et « blocage », tous confondus dans le même 404 ;
+3. *les liens de groupe sont couverts* (`kind: group`). Les réduire à `friend` retire un champ
+   du schéma, une branche de `resolve`, et le `roomId` de la réponse.
+
+Deux points où la spec 12 demande plus que ce que le service peut savoir sans les pouvoirs
+Matrix qu'elle lui refuse — implémentés du côté connaissable, documentés dans
+`apps/invite-tokens/LIMITES.md`, **à relire par le PM** : REQ-INV-14 (le blocage n'est
+vérifiable que dans le sens porteur → émetteur ; l'autre sens est déjà tenu par les
+sémantiques d'ignore de Matrix, côté client) et REQ-INV-15 (« salon quitté » n'est pas
+vérifiable, contrairement à « compte désactivé »).
 
 ### 6.2 Une action de méthode, bloquante
 
@@ -318,8 +347,10 @@ bloque plus un module par manque d'arbitrage.
 | **E-08** — focus RTC sans SFU | Annonce conditionnelle | `specs/02-rtc-backend.md` REQ-RTC-05 → action **A4** |
 
 **Ce qui a changé pour les modules :** `M-G` et `M-H` sont débloqués et leur périmètre est
-fixé (natif + spec 12) ; `M-F` gagne les filtres en V1 ; `M-I` attend A4. Le backlog
-`V2-BACKEND.md` est supprimé — ses quatre items sont tranchés, aucun n'attend plus une V2.
+fixé (natif + spec 12, dont le service est livré) ; `M-F` a ses filtres ; `M-I` peut
+construire son état d'erreur contre la pile locale, qui rend maintenant `RtcFociMissing`.
+Le backlog `V2-BACKEND.md` est supprimé — ses quatre items sont tranchés, aucun n'attend
+plus une V2.
 
 ### 6.4 Trois dettes marquées, avec leur seuil de déclenchement
 
@@ -353,7 +384,7 @@ Ni actions ni dettes : des décisions déjà prises de ne pas faire maintenant.
 | Les exigences, par module | `specs/00` à `specs/11` |
 | Le découpage frontend et son plan | `specs/ui/00-plan-frontend.md`, `M-A` à `M-I` |
 | Les huit escalades et leurs motifs | `specs/ui/ESCALATIONS.md` |
-| Le service de liens d'invitation | `specs/12-invite-tokens.md` |
+| Le service de liens d'invitation | `specs/12-invite-tokens.md`, `apps/invite-tokens/README.md` |
 | Stratégie produit et voix | `PRODUCT.md` |
 | Système visuel et tokens | `DESIGN.md` |
 | Les limites assumées d'un module | le `README.md` du package concerné |
