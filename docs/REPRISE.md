@@ -24,8 +24,9 @@ Les huit escalades du Tech Lead Frontend ont été **tranchées le 05/08/2026** 
 elles créent du contrat neuf : la spec 09 gagne la recherche filtrée, et une spec 12 apparaît
 pour le service de liens d'invitation. **Les six actions du plan sont faites le 05/08/2026** — les cinq
 techniques (§ 6.1) et le spike d'outillage (§ 6.2), qui ouvre `M-A`. Ce qui reste n'est plus
-du travail mais des arbitrages : quatre points attendent un oui ou un non du PM, tous
-signalés là où ils se posent.
+du travail mais du frontend : les quatre arbitrages ouverts ont été tranchés le même jour —
+deux exceptions d'outillage dans `CLAUDE.md`, la ratification de la spec 12, et deux REQ
+amendées pour dire ce que le service peut réellement vérifier.
 
 ---
 
@@ -308,23 +309,28 @@ Les 13 interdits sont dans `CLAUDE.md`. Ceux qui vous concernent :
 | **A5** | Recherche filtrée **REQ-SRC-11** | `msgtype` et `mentions` au schéma Orama, alimentés depuis l'événement déchiffré (`m.mentions`, `m.new_content` pour une édition) ; `search(query, filtres)` compose salon, expéditeur, type, mentions et bornes de date en ET. `ROOM_MENTION` est exporté : l'onglet Mentions passe `[moi, ROOM_MENTION]`. Un changement de schéma **efface** le snapshot précédent au lieu de le charger — un index sans la propriété filtrée lèverait à la première requête. |
 | **A6** | Service de liens (spec 12) | `apps/invite-tokens/` : les vingt REQ, une describe par REQ. Raccordement REQ-INF-15 : image épinglée, service compose, base dédiée `invite_tokens`, route proxy `/invite/`, et le test qui asserte l'**absence de tout secret d'administration** dans son environnement. L'atomicité de REQ-INV-07 a sa cible de fumée, contre un vrai PostgreSQL. |
 
-**Ce qui reste ouvert sur A6 : la ratification du PM.** La spec 12 listait trois choix de
-conception à valider ; ils sont implémentés **tels que la spec les écrit**, faute de quoi il
-n'y avait rien à construire. Un non sur l'un d'eux se paie en modification, pas en réécriture :
+**Ratifié le 05/08/2026 — plus rien d'ouvert sur A6.** Les trois choix de conception de la
+spec 12 sont validés par le PM et ne se rediscutent plus dans le code ; les rouvrir demande une
+escalade, comme un arbitrage de `DECISIONS.md`. Pour mémoire, ce qui a été ratifié :
 
 1. *le service ne fait aucune action Matrix* — il ne détient aucun jeton d'administration ; ses
    trois appels à Synapse sont des lectures faites avec le jeton de l'appelant ;
 2. *un seul message pour « expiré », « révoqué » et « inconnu »* — plus « épuisé », « émetteur
    disparu » et « blocage », tous confondus dans le même 404 ;
-3. *les liens de groupe sont couverts* (`kind: group`). Les réduire à `friend` retire un champ
-   du schéma, une branche de `resolve`, et le `roomId` de la réponse.
+3. *les liens de groupe sont couverts* (`kind: group`) — le périmètre de `M-G` et `M-H` en dépend.
 
-Deux points où la spec 12 demande plus que ce que le service peut savoir sans les pouvoirs
-Matrix qu'elle lui refuse — implémentés du côté connaissable, documentés dans
-`apps/invite-tokens/LIMITES.md`, **à relire par le PM** : REQ-INV-14 (le blocage n'est
-vérifiable que dans le sens porteur → émetteur ; l'autre sens est déjà tenu par les
-sémantiques d'ignore de Matrix, côté client) et REQ-INV-15 (« salon quitté » n'est pas
-vérifiable, contrairement à « compte désactivé »).
+**REQ-INV-14 et REQ-INV-15 ont été amendées le 05/08/2026**, plutôt qu'implémentées par des
+droits supplémentaires : la spec y demandait au service une connaissance qu'elle lui refuse
+par ailleurs. Reprendre d'un côté ce qu'on a refusé de l'autre aurait vidé le choix n°1 de son
+sens. Chacune dit maintenant ce qui est vérifié, par qui, et ce qui ne l'est pas :
+
+- **REQ-INV-14** — le sens porteur → émetteur est vérifié par le service ; l'autre est tenu par
+  les sémantiques d'ignore de Matrix, côté client, pour un résultat produit identique ;
+- **REQ-INV-15** — « compte désactivé » est vérifié, « salon quitté » ne l'est pas. Limite
+  assumée, dite à l'utilisateur dans l'écran de `M-H` (interdit n°13).
+
+Les deux ont un test structurel qui garde la frontière : ajouter la lecture qui manque
+demanderait un pouvoir Matrix, donc un amendement de spec, jamais un correctif.
 
 ### 6.2 L'action de méthode — faite le 05/08/2026
 
@@ -341,8 +347,11 @@ Ce qu'il faut en retenir avant d'écrire une ligne de `apps/web` :
 - **Trois contraintes dures**, trouvées en cassant le build : jamais le barrel
   `@astryxdesign/core` (toujours le sous-chemin), le `Theme` enveloppé dans un composant
   `"use client"` à nous, et un paquet de thème requis.
-- **Deux points attendent un arbitrage du PM** : StyleX au regard de l'interdit n°1, et le
-  moteur d'URL d'impeccable, qui utilise puppeteer là où l'interdit n°12 nomme Playwright.
+- **Deux exceptions ratifiées le 05/08/2026**, inscrites dans `CLAUDE.md` à côté des interdits
+  qu'elles amendent : `@stylexjs/stylex` (interdit n°1) parce que c'est le moteur d'Astryx
+  lui-même et que le refuser reviendrait à refuser Astryx ; le moteur d'URL d'impeccable
+  (interdit n°12), **outil d'audit de design et jamais harnais de test** — il ne s'exécute ni
+  dans `npm test`, ni dans un hook, et aucune exigence ne s'appuie sur lui.
 
 Le compte-rendu dit aussi ce qu'il ne prouve pas, et c'est la moitié de sa valeur : rien n'a
 été rendu dans un vrai navigateur, le service worker n'est pas écrit, et Astryx a six semaines.

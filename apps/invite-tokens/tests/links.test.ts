@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -18,12 +20,25 @@ const MIRA = "@mira:tacita.test";
 const SALON = "!groupe:tacita.test";
 const MAINTENANT = 1_800_000_000_000;
 
+/** Ce que le service exécute, commentaires retirés — le dossier, pas une liste de fichiers. */
+function codeDuService(): string {
+  const src = new URL("../src/", import.meta.url);
+  return readdirSync(src)
+    .filter((nom) => nom.endsWith(".ts"))
+    .map((nom) => readFileSync(new URL(nom, src), "utf-8"))
+    .join("\n")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/.*$/gm, "");
+}
+
 /** Deux comptes vivants, personne d'ignoré : le cas nominal, que chaque test dévie. */
 function fakeMatrix(jetons: Record<string, string> = { "jeton-luca": LUCA, "jeton-mira": MIRA }) {
   return {
     whoami: vi.fn(async (token: string) => jetons[token]),
-    ignores: vi.fn(async () => false),
-    accountExists: vi.fn(async () => true),
+    // Signatures explicites : sans elles, `mock.calls` est un tuple vide et un test qui
+    // inspecte les arguments ne compile pas — ici, celui qui garde REQ-INV-14.
+    ignores: vi.fn(async (_accessToken: string, _self: string, _other: string) => false),
+    accountExists: vi.fn(async (_accessToken: string, _userId: string) => true),
   } satisfies MatrixReader;
 }
 
@@ -339,6 +354,19 @@ describe("REQ-INV-13 — lien déjà résolu par ce porteur : succès idempotent
 });
 
 describe("REQ-INV-14 — l'un des deux a bloqué l'autre", () => {
+  it("le service ne lit que la liste d'ignorés de l'appelant, jamais celle de l'émetteur", async () => {
+    // Le sens émetteur → porteur est hors de portée : cette liste n'est lisible qu'avec
+    // les droits de l'émetteur, que la spec 12 refuse au service. Il est tenu par Matrix
+    // lui-même, côté client. Ce test garde la frontière : chercher à le vérifier ici
+    // supposerait un pouvoir Matrix, et c'est exactement ce qu'on a refusé.
+    const { token } = await lienAmi();
+    await resolve(deps, "jeton-mira", token);
+
+    for (const [jeton, soi] of matrix.ignores.mock.calls) {
+      expect([jeton, soi]).toEqual(["jeton-mira", MIRA]);
+    }
+  });
+
   it("le même échec neutre : un blocage ne s'annonce pas", async () => {
     const { token, id } = await lienAmi();
     matrix.ignores.mockResolvedValue(true);
@@ -358,6 +386,18 @@ describe("REQ-INV-15 — émetteur disparu", () => {
     matrix.accountExists.mockResolvedValue(false);
 
     expect((await échec(resolve(deps, "jeton-mira", token))).errcode).toBe("TACITA_LINK_INVALID");
+  });
+
+  it("« salon quitté » n'est pas vérifié, et rien n'essaie de l'être", async () => {
+    // Limite assumée (spec 12 amendée, LIMITES.md) : le lire supposerait l'état d'un
+    // salon dont ni le service ni le porteur ne sont membres. Un lien de groupe reste
+    // donc résolvable, et c'est le parcours d'invitation côté client qui échouera.
+    const { token } = await issue(deps, "jeton-luca", { kind: "group", roomId: SALON });
+    await expect(resolve(deps, "jeton-mira", token)).resolves.toMatchObject({ roomId: SALON });
+
+    // Le garde : personne n'ajoute discrètement une lecture d'état de salon — elle
+    // demanderait des droits Matrix, et c'est un amendement de spec, pas un correctif.
+    expect(codeDuService()).not.toMatch(/joined_members|joined_rooms|\/state\/|\/rooms\//);
   });
 
   it("vérifié à chaque résolution, jamais mis en cache", async () => {

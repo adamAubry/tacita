@@ -20,7 +20,7 @@ Spec-driven development : les specs sont exécutables, le code les implémente, 
 
 ## Interdits absolus
 
-1. **Pas de Tailwind, shadcn, Bootstrap, ni CSS-in-JS tiers** — Astryx seul.
+1. **Pas de Tailwind, shadcn, Bootstrap, ni CSS-in-JS tiers** — Astryx seul. **Exception ratifiée le 05/08/2026 : `@stylexjs/stylex`.** C'est le moteur de style d'Astryx lui-même, pas une couche ajoutée par-dessus : peer dependency, distribution déjà compilée en classes atomiques, rien à brancher dans le build. Le refuser reviendrait à refuser Astryx (`docs/SPIKE-OUTILLAGE.md`). L'interdit vise les systèmes de style **concurrents** d'Astryx, et lui seul. Sans ambiguïté en revanche : Astryx livre un `tailwind-theme.css` — **ne jamais l'importer**, ce serait Tailwind par la porte de derrière.
 2. **Pas de localStorage/sessionStorage** pour des données utilisateur — IndexedDB uniquement.
 3. **Ne jamais appeler `/search` de Synapse** ni construire de repli dessus (inopérant sur salon chiffré). Recherche 100 % locale (spec 09).
 4. **Pas de libolm** (déprécié) — vodozemac via le SDK.
@@ -31,7 +31,7 @@ Spec-driven development : les specs sont exécutables, le code les implémente, 
 9. **Ne pas supposer un accusé « délivré » natif** — Matrix ne définit que `m.read` ; le nôtre est une extension (spec 06), jamais présentée comme du Matrix natif.
 10. **Ne pas décrire `/sync` comme du WebSocket** — c'est du long-polling HTTP.
 11. **Pas de canal d'upload parallèle** — un seul pipeline média pour tous les fichiers (spec 08).
-12. **Pas de Playwright.**
+12. **Pas de Playwright.** Aucun navigateur piloté dans la suite de tests : les exigences se prouvent en Vitest, ou elles se documentent comme non prouvées. **Exception ratifiée le 05/08/2026 : le moteur d'URL d'`impeccable`**, qui utilise puppeteer. Il est un outil d'**audit de design**, jamais un harnais de test — il ne s'exécute ni dans `npm test`, ni dans un hook, et aucune exigence ne s'appuie sur lui. Les moteurs statiques d'impeccable (HTML, CSS, regex) n'ont besoin d'aucun navigateur et restent le chemin par défaut.
 13. Aucune fonctionnalité présentée avec une garantie qu'elle n'offre pas — les limites connues se documentent, ne se masquent pas.
 
 ## Design et impeccable

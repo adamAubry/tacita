@@ -10,7 +10,7 @@
 
 ### Socle
 - **REQ-UI-01** — PWA installable : manifest, icônes, service worker. Le SW cache **uniquement** coquille applicative et assets statiques — jamais de contenu déchiffré, jamais de données utilisateur (cache applicatif pur).
-- **REQ-UI-02** — UI exclusivement Astryx : pas de Tailwind, shadcn, Bootstrap, ni CSS-in-JS tiers. (Vérifié par lint + test lisant package.json.)
+- **REQ-UI-02** — UI exclusivement Astryx : pas de Tailwind, shadcn, Bootstrap, ni CSS-in-JS tiers. **Liste close, ratifiée le 05/08/2026** — le test lit `package.json`, il lui faut des noms, pas une intention. Autorisés : `@astryxdesign/*` (cœur, paquet de thème) et **`@stylexjs/stylex`**, moteur de style d'Astryx lui-même (exception à l'interdit n°1, motivée dans `docs/SPIKE-OUTILLAGE.md`). Refusés : `tailwindcss`, `bootstrap`, `shadcn*`, `styled-components`, `@emotion/*`, et toute dépendance de style qui n'est pas dans la liste des autorisés — l'assertion se fait **par défaut de refus**, sinon la prochaine bibliothèque ajoutée passera au vert faute d'avoir été nommée. Critère supplémentaire : aucun import de `@astryxdesign/core/tailwind-theme.css` dans les sources.
 - **REQ-UI-03** — Mode sombre et clair (mécanisme de thème Astryx), persistance du choix en IndexedDB (pas localStorage).
 - **REQ-UI-04** — Onboarding : login OIDC (redirection fournisseur externe, y compris passkeys gérées par le fournisseur), puis **étape bloquante de clé de récupération** (REQ-COR-06) : impossible d'atteindre les conversations sans backup configuré, clé affichée une fois avec confirmation de sauvegarde.
 
@@ -40,7 +40,9 @@
 
 ## Méthode et contraintes
 
-- Gestes tactiles implémentés sur événements pointer (testables en jsdom). Astryx/ponytail/impeccable n'ont pas été évalués pour les gestes, la PWA et le rendu hors ligne : **spike de validation d'une journée en tout début de module** ; toute incompatibilité remonte au PM avant d'écrire un contournement.
+- Gestes tactiles implémentés sur événements pointer (testables en jsdom). **Le spike de validation a été fait le 05/08/2026 — `docs/SPIKE-OUTILLAGE.md`** : les événements pointer traversent Astryx intacts, son CSS est un fichier statique sans appel réseau, et REQ-UI-01/08/09 sont réalisables tels qu'écrits. Des trois outils, seul Astryx s'exécute chez l'utilisateur ; ponytail et impeccable sont des plugins d'agent, sans empreinte à l'exécution. Toute incompatibilité **découverte depuis** remonte au PM avant qu'un contournement soit écrit.
+- **Trois contraintes de construction, non négociables** (le spike les a trouvées en cassant `next build`) : ne jamais importer depuis le barrel `@astryxdesign/core` — toujours le sous-chemin, `@astryxdesign/core/Toolbar` ; envelopper le `Theme` d'Astryx dans un composant `"use client"` du shard ; installer un paquet de thème (`@astryxdesign/theme-*`), le cœur n'en embarque aucun.
+- **Le thème n'est pas connu au premier rendu.** L'interdit n°2 ferme localStorage et IndexedDB est asynchrone : un utilisateur en mode clair verra un flash sombre. Assumé, et documenté plutôt que contourné par un stockage synchrone — le défaut sombre de REQ-UI-03 en limite la portée.
 - Aucune donnée utilisateur hors IndexedDB ; aucun contenu déchiffré dans le cache SW, les payloads de notification, les logs, la télémétrie ou les traces d'erreur, y compris en dev.
 - Aucune promesse UI supérieure aux garanties réelles (spec 00, honnêteté produit).
 - Hors scope : toute logique métier (elle vit dans les packages), CI/CD.

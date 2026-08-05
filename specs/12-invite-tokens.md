@@ -35,8 +35,12 @@ Un service Node autonome qui **traduit un token en identifiant**, et rien d'autr
 - **REQ-INV-11** — **Porteur déconnecté.** Le lien déclenche le login OIDC et **survit à la redirection** : après authentification, la résolution reprend sans que l'utilisateur ait à rouvrir le lien. Le token n'est consommé qu'après authentification réussie.
 - **REQ-INV-12** — **Le porteur est l'émetteur.** Résolution refusée, message explicite (« ce lien est le vôtre »). Aucun DM avec soi-même, aucun usage consommé.
 - **REQ-INV-13** — **Lien déjà résolu par ce porteur, ou relation déjà établie** (DM existant, déjà membre du salon). Succès **idempotent** : le client ouvre la conversation existante. Ce n'est pas une erreur, et aucun usage supplémentaire n'est consommé.
-- **REQ-INV-14** — **L'un des deux a bloqué l'autre** (`m.ignored_user_list`). La résolution rend le même échec neutre que REQ-INV-08. Un blocage ne s'annonce pas : le dire confirmerait au bloqué qu'il l'est.
-- **REQ-INV-15** — **Émetteur disparu** (compte désactivé, ou salon quitté pour un lien `group`). Le lien est invalide, même réponse neutre. Vérifié à la résolution, jamais mis en cache.
+- **REQ-INV-14** — **L'un des deux a bloqué l'autre** (`m.ignored_user_list`). Un blocage ne s'annonce pas : le dire confirmerait au bloqué qu'il l'est. **Les deux sens sont tenus, à deux endroits différents** *(amendée le 05/08/2026 : la rédaction initiale demandait au service une connaissance que la spec lui refuse par ailleurs — voir le Livrable, il n'a aucun pouvoir Matrix)* :
+  - **porteur → émetteur** : vérifié **par le service**, qui lit l'`m.ignored_user_list` de l'appelant avec le jeton de l'appelant, et rend le même échec neutre que REQ-INV-08 ;
+  - **émetteur → porteur** : **hors de portée du service** et sans objet — la liste d'ignorés de l'émetteur n'est lisible qu'avec ses droits. Ce sens est déjà tenu par Matrix : le client de l'émetteur écarte l'invitation qui arrivera, sans rien afficher. Le résultat produit est identique — rien ne se passe, personne n'apprend qu'il est bloqué. **Aucun code n'est à écrire pour ce sens**, et surtout pas un contournement qui donnerait des droits au service.
+- **REQ-INV-15** — **Émetteur disparu.** Vérifié à la résolution, jamais mis en cache : un compte désactivé hier ne doit pas rester valide parce qu'il l'était avant-hier. *(Amendée le 05/08/2026, même motif que REQ-INV-14.)*
+  - **Compte désactivé** : vérifié par le service — le profil de l'émetteur n'est plus lisible. Lien invalide, réponse neutre.
+  - **Salon quitté**, pour un lien `group` : **non vérifiable** sans lire l'état d'un salon dont ni le service ni le porteur ne sont membres. Le lien reste résolvable ; c'est le parcours d'invitation côté client qui échoue. Limite assumée, documentée dans `apps/invite-tokens/LIMITES.md` **et côté utilisateur** (interdit n°13) — elle ne se masque pas.
 - **REQ-INV-16** — **Le service est indisponible.** L'ajout par identifiant Matrix direct reste disponible dans l'UI et **ne passe pas par le service** — il est natif (D-09). Un lien cassé ne doit jamais rendre le produit inutilisable pour se lier à quelqu'un. Critère : le parcours d'ajout par identifiant n'émet aucun appel vers ce service.
 - **REQ-INV-17** — **Expiration vérifiée côté serveur** contre son horloge, jamais contre une date portée par le client ou par le token.
 
@@ -56,10 +60,10 @@ Un service Node autonome qui **traduit un token en identifiant**, et rien d'autr
 
 Suite Vitest, une describe par REQ. Points de contrôle notables : REQ-INV-07 (deux résolutions concurrentes du dernier usage → une seule réussit) ; REQ-INV-08 (les réponses pour un token inconnu, expiré et révoqué sont **strictement identiques**, corps et code) ; REQ-INV-10 à REQ-INV-15 (un test par scénario hors cadre, assertant le comportement **et** l'absence de consommation d'usage là où la spec l'exige) ; REQ-INV-16 (le parcours d'ajout par identifiant n'appelle pas le service) ; REQ-INV-20 (spy sur le logger : aucun identifiant ni token dans les lignes émises). Un test lisant la configuration asserte qu'aucune variable ne porte de jeton d'administration Synapse.
 
-## Ratification
+## Ratification — faite le 05/08/2026
 
-**Cette spec traduit la décision E-05 ; elle n'a pas encore été relue par le PM.** Trois choix ont dû être faits pour l'écrire, et méritent un oui ou un non explicite :
+**Les trois choix de conception sont ratifiés par le PM.** Ils ne se rediscutent plus dans le code ; les rouvrir demande une escalade, comme un arbitrage de `DECISIONS.md`.
 
-1. **Le service ne fait aucune action Matrix** (il résout, le client invite). C'est ce qui borne les dégâts d'une compromission, au prix d'un aller-retour de plus.
-2. **Un seul message pour « expiré », « révoqué » et « inconnu »** (REQ-INV-08) — non-énumérabilité contre confort d'usage.
-3. **Les liens de groupe sont couverts** par le même service (`kind: group`), alors que le cadre énoncé ne parlait que d'ajout d'ami. Si les liens de groupe doivent attendre, `kind` se réduit à `friend` et REQ-INV-06 perd son `roomId`.
+1. **Le service ne fait aucune action Matrix** (il résout, le client invite). C'est ce qui borne les dégâts d'une compromission, au prix d'un aller-retour de plus. **Ratifié.** Corollaire à ne pas perdre de vue : cette borne est la raison pour laquelle REQ-INV-14 et REQ-INV-15 ont été amendées plutôt qu'implémentées par des droits supplémentaires. On ne reprend pas d'un côté ce qu'on a refusé de l'autre.
+2. **Un seul message pour « expiré », « révoqué » et « inconnu »** (REQ-INV-08) — non-énumérabilité contre confort d'usage. **Ratifié**, et étendu par la mise en œuvre à trois causes de plus : « épuisé », « émetteur disparu » et « blocage » rendent la même réponse. La perte de confort est assumée jusque-là.
+3. **Les liens de groupe sont couverts** par le même service (`kind: group`). **Ratifié** — le périmètre de `M-G` et `M-H` en dépend.

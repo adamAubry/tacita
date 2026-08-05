@@ -20,7 +20,7 @@ ne porte ni nom d'affichage, ni libellé de salon, ni contenu.
 veut éviter cette métadonnée peut se lier à quelqu'un sans jamais l'utiliser — c'est
 aussi ce qui fait qu'une panne du service ne rend pas le produit inutilisable.
 
-## Un blocage n'est vérifiable que dans un sens (REQ-INV-14)
+## Un blocage n'est vérifiable que dans un sens (REQ-INV-14, amendée le 05/08/2026)
 
 Le service refuse la résolution — du même échec neutre que tout le reste — quand **le
 porteur** a mis l'émetteur dans son `m.ignored_user_list`. Il le lit avec le jeton du
@@ -33,12 +33,20 @@ porteur, son client écarte l'invitation qui arrivera, sans rien afficher. Le r�
 produit est le même — rien ne se passe, et personne n'apprend qu'il est bloqué — mais il
 est obtenu côté client, pas ici.
 
-## « Salon quitté » n'est pas vérifié (REQ-INV-15)
+Un test garde la frontière : le service ne lit que la liste de l'appelant. Chercher à
+vérifier l'autre sens ici supposerait un pouvoir Matrix — c'est un amendement de spec,
+pas un correctif.
+
+## « Salon quitté » n'est pas vérifié (REQ-INV-15, amendée le 05/08/2026)
 
 Un compte désactivé est détecté : son profil n'est plus lisible. En revanche, pour un
 lien `group`, le service **ne peut pas voir** que l'émetteur a quitté le salon — il
 faudrait lire l'état d'un salon dont ni lui ni le porteur ne sont membres. Le lien reste
 donc résolvable, et c'est le parcours d'invitation côté client qui échouera.
+
+**Cette limite se dit aussi à l'utilisateur** (REQ-INV-19, interdit n°13) : un lien de
+groupe n'est pas la promesse que le groupe est toujours joignable. Un test structurel
+garde l'absence de lecture d'état de salon dans les sources.
 
 ## L'atomicité ne se prouve que contre un vrai PostgreSQL (REQ-INV-07)
 
