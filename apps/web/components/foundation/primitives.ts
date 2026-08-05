@@ -1,0 +1,31 @@
+/**
+ * **Le seul fichier du shard qui importe Astryx.** Tout le reste passe par ici.
+ *
+ * Ce n'est pas une préférence de style, c'est une contrainte de construction (M-A,
+ * spike du 05/08/2026) : importer depuis le barrel `@astryxdesign/core` casse la
+ * compilation de Next.js — *« unsupported to use "export \*" in a client boundary »*.
+ * Les sous-chemins fonctionnent, et les centraliser ici fait que l'erreur ne peut être
+ * commise qu'à un endroit. Un test structurel garde la règle.
+ *
+ * DESIGN.md interdit de recoder une primitive existante d'Astryx : ce fichier réexporte,
+ * il n'enveloppe pas. Les composants **composés** du wireframe (Navbar, Placeholder…)
+ * sont des fichiers à part, et eux consomment ce module.
+ */
+export { Banner } from "@astryxdesign/core/Banner";
+export { Button } from "@astryxdesign/core/Button";
+export { Dialog } from "@astryxdesign/core/Dialog";
+export { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
+export { EmptyState } from "@astryxdesign/core/EmptyState";
+export { HStack } from "@astryxdesign/core/HStack";
+export { Icon } from "@astryxdesign/core/Icon";
+export { Item } from "@astryxdesign/core/Item";
+export { List, ListItem } from "@astryxdesign/core/List";
+export { NavIcon } from "@astryxdesign/core/NavIcon";
+export { PowerSearch } from "@astryxdesign/core/PowerSearch";
+export { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+export { Skeleton } from "@astryxdesign/core/Skeleton";
+export { Text } from "@astryxdesign/core/Text";
+export { Toolbar } from "@astryxdesign/core/Toolbar";
+export { VStack } from "@astryxdesign/core/VStack";
+export { defineTheme, Theme } from "@astryxdesign/core/theme";
+export type { ThemeMode, TokenName, TokenValue } from "@astryxdesign/core/theme";

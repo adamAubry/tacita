@@ -1,0 +1,30 @@
+/*
+ * Les trois tokens de DESIGN.md qui n'ont aucun logement chez Astryx (voir la table de
+ * correspondance, specs/ui/M-A.md). Ils sont consommés par nos composants composés
+ * uniquement — jamais par un composant Astryx, qui ne les connaît pas.
+ *
+ * `light-dark()` : même mécanisme que les tokens d'Astryx, donc même contrainte de
+ * support (Safari 17.5+). Un seul mécanisme de thème, pas deux.
+ */
+:root {
+  /* État pressé de l'accent. Astryx n'a qu'un voile générique `overlay-pressed`, qui
+     donnerait une autre couleur que celle de DESIGN.md. */
+  --tacita-accent-pressed: light-dark(#0e463a, #3ea381);
+
+  /* Occurrences de recherche et `@me` — fond teinté, texte inchangé (DESIGN.md). */
+  --tacita-highlight: light-dark(#155e4d24, #4fbd9638);
+
+  /* Voile de lisibilité sur fond d'écran personnalisé. **Clair** en thème clair : ce
+     n'est pas un fond de modale, c'est ce qui rend le texte lisible par-dessus une
+     image choisie par l'utilisateur. */
+  --tacita-scrim: light-dark(#ffffffb3, #13151499);
+}
+
+/*
+ * DESIGN.md : chiffres tabulaires obligatoires pour heures, dates, compteurs et durées
+ * — rien ne doit bouger quand les chiffres changent. Une classe plutôt qu'un token :
+ * c'est une propriété de rendu, pas une valeur.
+ */
+.tabulaire {
+  font-variant-numeric: tabular-nums;
+}

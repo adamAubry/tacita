@@ -50,9 +50,14 @@ livrée dans le paquet.
 `'system' | 'light' | 'dark'`, appliqué par attributs `data-theme` et variables CSS ; les
 palettes vivent dans des paquets séparés (`@astryxdesign/theme-neutral` et une dizaine d'autres).
 La réserve vient de nous : **l'interdit n°2 ferme localStorage, et IndexedDB est asynchrone** —
-le choix de thème n'est donc pas connu au premier rendu. Il y aura un flash. Le défaut sombre
-de M-A le limite aux utilisateurs en mode clair ; il n'y a pas de meilleure sortie sans stockage
-synchrone, et il ne faut pas en chercher une en violant l'interdit.
+le choix de thème n'est donc pas connu au premier rendu. Il y aura un flash, limité à ceux qui
+ont choisi l'autre mode que le défaut. Il n'y a pas de meilleure sortie sans stockage synchrone,
+et il ne faut pas en chercher une en violant l'interdit.
+
+> ⚠️ **Quel est le défaut, au fait ?** DESIGN.md en fait un de ses quatre principes non
+> négociables — « Clair par défaut » — tandis que REQ-UI-03 de `M-A` dit « sombre (défaut) »,
+> et la SPEC 11 ne se prononce pas. Le code suit DESIGN.md, autorité sur le visuel. **À
+> trancher par le PM**, c'est une contradiction de specs, pas un choix d'implémentation.
 
 ## Trois contraintes dures pour M-A — découvertes en cassant le build
 
@@ -67,7 +72,10 @@ Ce sont des faits de construction, pas des préférences. Sans elles, `next buil
    (*« Attempted to call defineSyntaxTheme() from the server »*). 378 des 516 modules d'Astryx
    sont des composants client : le shard sera massivement client, ce qui est cohérent avec un
    client de messagerie, mais doit être assumé plutôt que découvert.
-3. **Un paquet de thème est requis** — le cœur n'en embarque aucun.
+3. **Le cœur n'embarque aucune palette** — il en faut une, mais pas forcément un paquet :
+   `defineTheme` fonctionne sans `extends`. *(Corrigé le 05/08/2026 en écrivant M-A : ce
+   point disait « un paquet de thème est requis », ce qui était une inférence tirée de
+   l'exemple de la documentation, pas une mesure. Le thème de Tacita n'en utilise aucun.)*
 
 Avec ces trois points, la construction passe, en webpack comme en turbopack : `/` à 11,4 Ko,
 117 Ko de JS au premier chargement.

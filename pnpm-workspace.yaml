@@ -3,4 +3,12 @@ packages:
   - "apps/*"
   - "infra"
 allowBuilds:
+  # Son postinstall n'écrit rien : il affiche une invite à lancer `astryx init`,
+  # que nous ne suivons pas (le thème est écrit à la main, voir M-A). Refusé pour
+  # qu'aucun script ne s'exécute à l'installation sans raison.
+  '@astryxdesign/core': false
   esbuild: true
+  # Optimiseur d'images de Next. Inutile ici : aucun média ne passe par
+  # `next/image` — les nôtres sont des blobs déchiffrés, que le serveur ne peut
+  # pas optimiser par construction (interdit n°5).
+  sharp: false

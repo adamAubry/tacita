@@ -1,0 +1,170 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+import { PALETTE as COULEURS_DESIGN } from "../components/foundation/palette";
+
+/**
+ * Chemins et non URL : en environnement jsdom, le `URL` global est celui de jsdom, que
+ * `node:fs` refuse (« The URL must be of scheme file »). Le symptôme n'apparaît qu'à
+ * l'intérieur d'un test, pas au chargement du module — de quoi chercher longtemps.
+ */
+const RACINE = join(import.meta.dirname, "..");
+const lire = (chemin: string) => readFileSync(join(RACINE, chemin), "utf-8");
+
+const sw = lire("public/sw.js");
+const manifeste = JSON.parse(lire("public/manifest.webmanifest")) as {
+  name: string;
+  start_url: string;
+  display: string;
+  background_color: string;
+  theme_color: string;
+  icons: { src: string; sizes: string; purpose?: string }[];
+};
+const paquet = JSON.parse(lire("package.json")) as {
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+};
+
+describe("REQ-UI-01 — PWA installable, service worker de coquille seule", () => {
+  it("les couleurs du manifeste sont celles de DESIGN.md", () => {
+    // Le manifeste est un JSON statique : il ne peut pas importer le thème. C'est donc
+    // le seul endroit où la palette est recopiée, et le seul endroit où elle peut
+    // diverger sans que rien ne le dise — d'où ce test.
+    expect(manifeste.background_color).toBe(COULEURS_DESIGN.bg.clair);
+    expect(manifeste.theme_color).toBe(COULEURS_DESIGN.bg.clair);
+  });
+
+  it("le manifeste porte ce qu'une installation exige", () => {
+    expect(manifeste.display).toBe("standalone");
+    expect(manifeste.start_url).toBe("/");
+    expect(manifeste.name).toBe("Tacita");
+  });
+
+  it("chaque icône déclarée existe vraiment", () => {
+    // Une PWA dont une icône manque n'est pas installable, et le manifeste ne le dit
+    // pas : le navigateur échoue en silence.
+    expect(manifeste.icons.length).toBeGreaterThanOrEqual(2);
+    for (const { src } of manifeste.icons) {
+      expect(statSync(join(RACINE, "public", src)).size, `${src} est vide`).toBeGreaterThan(0);
+    }
+    expect(manifeste.icons.some((i) => i.purpose === "maskable")).toBe(true);
+  });
+
+  /**
+   * Le critère de la SPEC 11 : « liste des routes précachées du SW : zéro entrée de
+   * données ». C'est l'interdit n°8 appliqué au cache — un contenu déchiffré qui y
+   * entrerait survivrait à la déconnexion, hors de portée du registre de wipe.
+   */
+  it("le précache ne contient que des routes de coquille, aucune donnée", () => {
+    const liste = /const COQUILLE = \[([^\]]*)\]/.exec(sw)?.[1];
+    expect(liste).toBeTruthy();
+    const entrees = [...liste!.matchAll(/"([^"]+)"/g)].map(([, valeur]) => valeur);
+
+    expect(entrees.length).toBeGreaterThan(0);
+    for (const entree of entrees) {
+      // Ni API Matrix, ni média, ni identifiant de salon ou d'événement.
+      expect(entree).not.toMatch(/_matrix|\/c\/|mxc:|\$|!|@/);
+      expect(entree).toMatch(/^\//);
+    }
+  });
+
+  it("seuls les assets versionnés du build peuvent entrer au cache", () => {
+    // La condition d'entrée est unique et étroite. L'élargir est exactement ce qui
+    // ferait entrer des données utilisateur : le test lit la condition elle-même.
+    const condition = /const cachable =([^;]*);/.exec(sw)?.[1];
+    expect(condition).toBeTruthy();
+    expect(condition).toContain('startsWith("/_next/static/")');
+    expect(condition).toContain('requete.method === "GET"');
+    expect(condition).toContain("memeOrigine");
+
+    // Et aucune autre branche n'écrit dans le cache.
+    expect([...sw.matchAll(/cache\.put\(/g)]).toHaveLength(1);
+  });
+});
+
+describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
+  const AUTORISES = [/^@astryxdesign\//, /^@stylexjs\/stylex$/, /^next$/, /^react(-dom)?$/];
+  const STYLE_INTERDIT = /tailwind|bootstrap|shadcn|styled-components|@emotion|stitches|vanilla-extract|sass|less/i;
+
+  it("aucune dépendance de style hors de la liste close", () => {
+    const horsListe = Object.keys(paquet.dependencies).filter(
+      (nom) => !AUTORISES.some((motif) => motif.test(nom)),
+    );
+    // Par défaut de refus : une bibliothèque ajoutée demain échoue ici sans avoir eu
+    // besoin d'être nommée à l'avance.
+    expect(horsListe).toEqual([]);
+    for (const nom of [...Object.keys(paquet.dependencies), ...Object.keys(paquet.devDependencies)]) {
+      expect(nom).not.toMatch(STYLE_INTERDIT);
+    }
+  });
+
+  it("le tailwind-theme.css livré par Astryx n'est importé nulle part", () => {
+    // Astryx le livre ; l'importer serait Tailwind par la porte de derrière (CLAUDE.md,
+    // interdit n°1 et son exception).
+    for (const { chemin, code } of sourcesLivrees()) {
+      expect(code, chemin).not.toContain("tailwind-theme.css");
+    }
+  });
+
+  /**
+   * La contrainte de construction n°1 du spike, rendue impossible à enfreindre par
+   * inadvertance : un seul fichier importe Astryx, et il le fait par sous-chemins. Le
+   * barrel casse `next build` — mais seulement au build, longtemps après qu'on l'a écrit.
+   */
+  it("un seul fichier importe Astryx, et jamais par le barrel", () => {
+    const importateurs = sourcesLivrees()
+      .filter(({ code }) => code.includes("@astryxdesign/"))
+      .map(({ chemin }) => chemin.replace(RACINE, ""));
+
+    // Deux, et deux seulement : le module de primitives, et la feuille de style globale
+    // que Next exige dans le layout racine.
+    expect(importateurs.sort()).toEqual([
+      "/app/layout.tsx",
+      "/components/foundation/primitives.ts",
+    ]);
+    const layout = sourcesLivrees().find(({ chemin }) => chemin.endsWith("/app/layout.tsx"))!.code;
+    expect(layout.match(/@astryxdesign\/[^"']+/g)).toEqual(["@astryxdesign/core/astryx.css"]);
+
+    for (const { chemin, code } of sourcesLivrees()) {
+      // `from "@astryxdesign/core"` nu — le sous-chemin, lui, a toujours un `/` après.
+      expect(code, chemin).not.toMatch(/from ["']@astryxdesign\/core["']/);
+    }
+  });
+
+  /**
+   * La contrainte n°2, dans l'autre sens. `theme.ts` appelle `defineTheme()`, une fonction
+   * **client** : un composant serveur qui l'importe fait échouer `next build`, et seulement
+   * le build. C'est arrivé en écrivant M-A — le layout racine voulait la couleur de la
+   * barre système. La palette a été sortie dans un module sans aucun import ; ce test garde
+   * la séparation, que rien d'autre ne rappellerait avant le prochain build.
+   */
+  it("aucun composant serveur n'importe le thème — la palette est là pour ça", () => {
+    for (const { chemin, code } of sourcesLivrees()) {
+      if (chemin.endsWith("/theme.ts")) continue;
+      if (!/from ["'][./]*theme["']/.test(code)) continue;
+      expect(code.startsWith('"use client"'), `${chemin} importe le thème sans être client`).toBe(
+        true,
+      );
+    }
+  });
+});
+
+/**
+ * Ce que le shard **livre** : `app`, `components`, `lib`. Les tests sont exclus — ils
+ * nomment les motifs interdits pour les chercher, et s'y trouveraient eux-mêmes.
+ */
+export function sourcesLivrees(): { chemin: string; code: string }[] {
+  const fichiers: { chemin: string; code: string }[] = [];
+  const parcourir = (dossier: string) => {
+    for (const entree of readdirSync(dossier, { withFileTypes: true })) {
+      const chemin = join(dossier, entree.name);
+      if (entree.isDirectory()) parcourir(chemin);
+      else if (/\.tsx?$/.test(entree.name)) {
+        fichiers.push({ chemin, code: readFileSync(chemin, "utf-8") });
+      }
+    }
+  };
+  for (const dossier of ["app", "components", "lib"]) parcourir(join(RACINE, dossier));
+  return fichiers;
+}

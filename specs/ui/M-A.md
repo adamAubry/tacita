@@ -10,7 +10,7 @@ Le squelette applicatif complet sur lequel tous les autres modules se posent : r
 
 - **REQ-UI-01** — PWA installable : manifest, icônes, service worker limité coquille + assets statiques, zéro donnée utilisateur en cache.
 - **REQ-UI-02** — Astryx exclusif ; lint + test `package.json`, **par défaut de refus** sur la liste close de la SPEC 11 : autorisés `@astryxdesign/*` et `@stylexjs/stylex` (exception ratifiée le 05/08/2026), tout le reste refusé. Et aucun import de `@astryxdesign/core/tailwind-theme.css`.
-- **REQ-UI-03** — Thèmes sombre (défaut) et clair via le mécanisme Astryx (`ThemeMode = 'system' | 'light' | 'dark'`, appliqué par attributs de données), tokens de DESIGN.md ; persistance du choix en IndexedDB. **Le flash au premier rendu est assumé** : sans stockage synchrone — l'interdit n°2 ferme localStorage — le mode n'est pas connu avant l'hydratation. Le défaut sombre le limite aux utilisateurs en clair ; ne pas le contourner.
+- **REQ-UI-03** — Thèmes sombre (défaut) et clair via le mécanisme Astryx (`ThemeMode = 'system' | 'light' | 'dark'`, appliqué par attributs de données), tokens de DESIGN.md ; persistance du choix en IndexedDB. **Le flash au premier rendu est assumé** : sans stockage synchrone — l'interdit n°2 ferme localStorage — le mode n'est pas connu avant l'hydratation. Il ne touche que les utilisateurs qui ont choisi l'autre mode que le défaut ; ne pas le contourner. ⚠️ **Contradiction à trancher par le PM** : cette exigence dit « sombre (défaut) », DESIGN.md dit « Clair par défaut » et en fait un de ses quatre principes non négociables. Le code suit DESIGN.md, autorité sur le visuel ; la SPEC 11 ne se prononce pas.
 - **REQ-UIX-01** — Navbar (composant 4) : `@astryxdesign/core/NavIcon` × 4 (Accueil, Recherche, Mentions, Profil), fixée en bas, icônes seules, bouton actif légèrement surélevé (feedback UX). Navigation sans rechargement.
 - **REQ-UIX-02** — Layout header (composant 6) : `@astryxdesign/core/Toolbar`, titre centré, retour à gauche (historique de navigation, pas de route codée en dur).
 - **REQ-UIX-03** — Placeholder (composant 20) : état vide soigné et centré — illustration/icône + texte expliquant pourquoi c'est vide + action suivante si pertinente. Un seul composant paramétrable pour toute l'app.
@@ -109,7 +109,12 @@ quarante autres.
   2. **le `Theme` d'Astryx s'enveloppe dans un composant `"use client"` du shard.** Posé
      directement dans le layout racine, il fait échouer le rendu serveur
      (`defineSyntaxTheme` appelé côté serveur) ;
-  3. **un paquet de thème est requis** (`@astryxdesign/theme-*`) — le cœur n'en embarque aucun.
+  3. **le cœur n'embarque aucune palette.** Soit un paquet `@astryxdesign/theme-*`, soit
+     un `defineTheme` à nous — c'est le second : la table de correspondance ci-dessus
+     impose de toute façon presque tous les tokens, et une palette de départ qu'on
+     écrase entièrement serait une dépendance pour rien. *(Le compte-rendu du spike
+     annonçait un paquet **requis** ; c'était une inférence, pas une mesure. `defineTheme`
+     fonctionne sans `extends`, vérifié le 05/08/2026 en construisant l'app.)*
 - **Raccorder `apps/web` au `typecheck` de la racine en créant le projet.** Le script de
   `package.json` énumère les projets `tsc -p` un par un : un projet absent de cette liste
   n'est pas typechecké, et les hooks pré-commit passent au vert sans l'avoir lu. Aucun

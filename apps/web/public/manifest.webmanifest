@@ -1,0 +1,17 @@
+{
+  "name": "Tacita",
+  "short_name": "Tacita",
+  "description": "Messagerie chiffrée de bout en bout, pour un cercle fermé.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F7F6",
+  "theme_color": "#F6F7F6",
+  "icons": [
+    { "src": "/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
