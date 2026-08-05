@@ -22,9 +22,10 @@ fois, sur son code puis sur ses jonctions, et la dernière passe a fermé les tr
 
 Les huit escalades du Tech Lead Frontend ont été **tranchées le 05/08/2026** — deux d'entre
 elles créent du contrat neuf : la spec 09 gagne la recherche filtrée, et une spec 12 apparaît
-pour le service de liens d'invitation. Les **cinq actions techniques sont faites** le
-05/08/2026 (§ 6.1) ; reste **l'action de méthode**, le spike outillage, qui appartient au
-senior de la spec 11 et ouvre `M-A`.
+pour le service de liens d'invitation. **Les six actions du plan sont faites le 05/08/2026** — les cinq
+techniques (§ 6.1) et le spike d'outillage (§ 6.2), qui ouvre `M-A`. Ce qui reste n'est plus
+du travail mais des arbitrages : quatre points attendent un oui ou un non du PM, tous
+signalés là où ils se posent.
 
 ---
 
@@ -143,8 +144,9 @@ média contre un vrai serveur, LiveKit, et tout ce qui touche l'UI. La cible de 
 ## 5. Ce dont hérite le shard UI
 
 Cette section est le dossier de reprise. À lire avant de coder, dans l'ordre : `CLAUDE.md`,
-`specs/00-conventions.md`, `specs/11-ui-shard.md`, `specs/ui/00-plan-frontend.md`, puis le
-module `M-X` assigné.
+`specs/00-conventions.md`, `specs/11-ui-shard.md`, `specs/ui/00-plan-frontend.md`,
+`docs/SPIKE-OUTILLAGE.md` — les trois contraintes de construction d'Astryx s'y trouvent, et
+sans elles `next build` échoue —, puis le module `M-X` assigné.
 
 ### 5.1 Démarrer
 
@@ -324,11 +326,26 @@ vérifiable que dans le sens porteur → émetteur ; l'autre sens est déjà ten
 sémantiques d'ignore de Matrix, côté client) et REQ-INV-15 (« salon quitté » n'est pas
 vérifiable, contrairement à « compte désactivé »).
 
-### 6.2 Une action de méthode, bloquante
+### 6.2 L'action de méthode — faite le 05/08/2026
 
-| # | Action | Pourquoi | Qui |
-|---|---|---|---|
-| **A3** | Le **spike d'une journée** sur Astryx / ponytail / impeccable, avec compte-rendu d'une page au PM. | Exigé par `specs/11-ui-shard.md` « en tout début de module » et repris dans `M-A`. Aucun des trois outils n'est installé ni évalué pour les gestes tactiles, les contraintes PWA et le rendu hors ligne. **Tant qu'il n'est pas fait, on ne sait pas si REQ-UI-08/09 et REQ-UI-01 sont réalisables tels qu'écrits.** C'est la porte d'entrée de `M-A`, donc de tout le frontend. | senior spec 11 |
+**A3, le spike d'outillage : `docs/SPIKE-OUTILLAGE.md`.** La porte d'entrée de `M-A` est
+ouverte — **REQ-UI-01, 08 et 09 sont réalisables tels qu'écrits**, éprouvés en construisant
+une application Next.js 15 réelle, pas en lisant une documentation.
+
+Ce qu'il faut en retenir avant d'écrire une ligne de `apps/web` :
+
+- **Des trois outils, seul Astryx s'exécute chez l'utilisateur.** ponytail et impeccable sont
+  des plugins d'agent, sans empreinte à l'exécution : la crainte « gestes, PWA, hors ligne »
+  ne pouvait concerner qu'Astryx. `CLAUDE.md` dit « Next.js 15 App Router (plugin ponytail) » —
+  c'est une erreur de catégorie, à corriger.
+- **Trois contraintes dures**, trouvées en cassant le build : jamais le barrel
+  `@astryxdesign/core` (toujours le sous-chemin), le `Theme` enveloppé dans un composant
+  `"use client"` à nous, et un paquet de thème requis.
+- **Deux points attendent un arbitrage du PM** : StyleX au regard de l'interdit n°1, et le
+  moteur d'URL d'impeccable, qui utilise puppeteer là où l'interdit n°12 nomme Playwright.
+
+Le compte-rendu dit aussi ce qu'il ne prouve pas, et c'est la moitié de sa valeur : rien n'a
+été rendu dans un vrai navigateur, le service worker n'est pas écrit, et Astryx a six semaines.
 
 ### 6.3 Les huit escalades sont tranchées
 
@@ -384,6 +401,7 @@ Ni actions ni dettes : des décisions déjà prises de ne pas faire maintenant.
 | Les exigences, par module | `specs/00` à `specs/11` |
 | Le découpage frontend et son plan | `specs/ui/00-plan-frontend.md`, `M-A` à `M-I` |
 | Les huit escalades et leurs motifs | `specs/ui/ESCALATIONS.md` |
+| Ce que valent Astryx, ponytail et impeccable | `docs/SPIKE-OUTILLAGE.md` |
 | Le service de liens d'invitation | `specs/12-invite-tokens.md`, `apps/invite-tokens/README.md` |
 | Stratégie produit et voix | `PRODUCT.md` |
 | Système visuel et tokens | `DESIGN.md` |
