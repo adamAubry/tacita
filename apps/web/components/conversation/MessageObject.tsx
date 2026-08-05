@@ -32,7 +32,8 @@ export interface MessageObjectProps {
   onOuvrirMedia?: () => void;
 }
 
-const COCHE = { sending: "", sent: "✓", delivered: "✓✓", read: "✓✓" } as const;
+/** `sending` n'y figure pas : ce statut ne rend aucune coche, il rend `null`. */
+const COCHE = { sent: "✓", delivered: "✓✓", read: "✓✓" } as const;
 
 /**
  * REQ-UI-13 — les accusés, et **ce qu'ils ne disent pas**.

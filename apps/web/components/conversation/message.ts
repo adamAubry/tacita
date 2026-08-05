@@ -31,18 +31,6 @@ export interface MessageAffiche {
   media?: Media;
 }
 
-/**
- * REQ-UI-06 — la fusion timeline + file d'envoi.
- *
- * Les entrées en attente vont **à la fin**, sans exception : elles n'ont pas encore
- * d'ordre dans `/sync`, et leur donner une place au milieu supposerait un tri
- * d'horodatages que l'interdit n°6 refuse. C'est aussi ce que l'utilisateur attend —
- * ce qu'il vient d'écrire est en bas.
- */
-export function fusionner(timeline: MessageAffiche[], attente: MessageAffiche[]): MessageAffiche[] {
-  return [...timeline, ...attente];
-}
-
 /** Une entrée de file, rendue comme un message. Le contenu n'est jamais journalisé. */
 export function depuisFile(entree: OutboxEntry, nom: string, auteur: string): MessageAffiche {
   const body = entree.content.body;

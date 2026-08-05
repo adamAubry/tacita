@@ -89,7 +89,6 @@ export function Composer({
           onFrappe();
         }}
         onSubmit={envoyer}
-        placeholder="Message"
         // L'emplacement qu'Astryx réserve aux actions de gauche : c'est là que M-E pose
         // le trombone et la capture, sans que le composer ait à les connaître.
         footerActions={actions}
@@ -104,12 +103,11 @@ export function Composer({
           ) : undefined
         }
         input={
+          // Ni `value` ni `onChange` ici : `ChatComposerInput` les prend au contexte du
+          // composer, qui **est** le propriétaire de l'état (c'est lui qui rend
+          // `onSubmit`). Les repasser en dur créait deux sources pour une valeur, et deux
+          // endroits où oublier `onFrappe`.
           <ChatComposerInput
-            value={texte}
-            onChange={(valeur) => {
-              setTexte(valeur);
-              onFrappe();
-            }}
             label="Message"
             placeholder="Message"
             triggers={[

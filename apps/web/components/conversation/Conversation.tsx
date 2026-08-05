@@ -40,7 +40,7 @@ import { Composer } from "./Composer";
 import { ConversationStarter } from "./ConversationStarter";
 import { HoldMenu } from "./HoldMenu";
 import { Timeline } from "./Timeline";
-import { depuisFile, fusionner, texteAffiche, type MessageAffiche } from "./message";
+import { depuisFile, texteAffiche, type MessageAffiche } from "./message";
 
 /** Ce que le composer est en train de faire : rien, une réponse, ou une modification. */
 type Intention =
@@ -166,15 +166,21 @@ export function Conversation({ roomId }: { roomId: string }) {
     const attente = (outbox?.pending(roomId) ?? []).map((entree) =>
       depuisFile(entree, nomDe(moi), moi),
     );
+    // REQ-UI-06 — les entrées en attente vont **à la fin**, sans exception : elles n'ont
+    // pas encore d'ordre dans /sync, et leur donner une place au milieu supposerait un
+    // tri d'horodatages que l'interdit n°6 refuse. C'est aussi ce qu'attend celui qui
+    // vient d'écrire : son message est en bas.
+    //
     // `version` est la dépendance qui compte : les paquets rendent des vues, et c'est
     // l'abonnement qui dit qu'elles ont changé.
-    return fusionner(timeline, attente);
+    return [...timeline, ...attente];
   }, [session, roomId, outbox, nomDe, version]);
 
   // REQ-UI-13 — l'accusé se rend sur le dernier message envoyé, et sur lui seul.
   const dernierEnvoye = [...messages].reverse().find((message) => message.moi && message.eventId);
   const recu = dernierEnvoye?.eventId
     ? {
+        cle: dernierEnvoye.cle,
         statut: (receipts.current?.status(dernierEnvoye.eventId) ?? "sent") as ReceiptStatus,
         indecidable: receipts.current?.deliveryUnknowable(dernierEnvoye.eventId) ?? false,
       }

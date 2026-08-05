@@ -16,8 +16,14 @@ export interface TimelineProps {
   /** REQ-UIX-13 — le starter est le premier élément de la timeline, pas un en-tête. */
   starter?: React.ReactNode;
   reactions?: (message: MessageAffiche) => ReactionTally[];
-  /** REQ-UI-13 — l'état du dernier message envoyé, et de lui seul. */
-  recu?: { statut: ReceiptStatus; indecidable: boolean };
+  /**
+   * REQ-UI-13 — l'état du dernier message envoyé, et la clé de ce message.
+   *
+   * La clé vient du câblage, qui la calcule déjà pour interroger les accusés : la
+   * recalculer ici donnait deux définitions de « dernier message envoyé » dans deux
+   * fichiers, exactement le genre qui dérive.
+   */
+  recu?: { cle: string; statut: ReceiptStatus; indecidable: boolean };
   onRepondre: (message: MessageAffiche) => void;
   onHold: (message: MessageAffiche) => void;
   onReagir: (message: MessageAffiche, emoji: string) => void;
@@ -72,8 +78,6 @@ export function Timeline({
     );
   }
 
-  const dernierEnvoye = [...messages].reverse().find((message) => message.moi && message.eventId);
-
   return (
     <div role="log" aria-label="Messages" aria-live="polite" style={{ paddingBottom: "var(--spacing-3)" }}>
       {starter}
@@ -88,7 +92,7 @@ export function Timeline({
               entete={shouldShowHeader(precedent, message)}
               heureVisible={heuresVisibles}
               reactions={reactions?.(message)}
-              recu={message.cle === dernierEnvoye?.cle ? recu : undefined}
+              recu={message.cle === recu?.cle ? recu : undefined}
               onRepondre={() => onRepondre(message)}
               onHold={() => onHold(message)}
               onRevelerHeures={() => setHeuresVisibles((visible) => !visible)}

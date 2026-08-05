@@ -17,7 +17,7 @@ export interface MediaViewerProps {
   onSauvegarder: (media: Media) => void;
 }
 
-const ZOOMS = [1, 2, 3] as const;
+const ZOOM_MAX = 3;
 
 /**
  * REQ-UIX-16 — viewer plein écran : zoom, navigation entre les médias du salon,
@@ -105,7 +105,9 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
             <img
               src={url}
               alt={media.nom}
-              onClick={() => setZoom(ZOOMS[(ZOOMS.indexOf(zoom as 1) + 1) % ZOOMS.length] ?? 1)}
+              // Tap = palier suivant, puis retour à 1. Un tableau et un `indexOf` pour
+              // trois entiers consécutifs, c'était une addition déguisée.
+              onClick={() => setZoom((niveau) => (niveau >= ZOOM_MAX ? 1 : niveau + 1))}
               style={{
                 transform: `scale(${zoom})`,
                 transformOrigin: "center",

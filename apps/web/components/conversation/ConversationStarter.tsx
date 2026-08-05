@@ -1,4 +1,4 @@
-import { ButtonsList } from "../foundation/ButtonsList";
+import { ButtonsList, type Bouton } from "../foundation/ButtonsList";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Text } from "../foundation/primitives";
 
@@ -33,14 +33,21 @@ export function ConversationStarter({
   onMuter,
   onQuitter,
 }: ConversationStarterProps) {
-  const actions = direct
+  // Une action sans destination n'entre pas dans la liste — un bouton inerte est une
+  // promesse non tenue (interdit n°13). Le `?` construit le tableau au lieu de le
+  // filtrer ensuite, ce qui évitait un `!` sur chaque `onClick`.
+  const actions: Bouton[] = direct
     ? [
-        { cle: "bloquer", libelle: "Bloquer", destructif: true, onClick: onBloquer },
-        { cle: "retirer", libelle: "Retirer l'ami", destructif: true, onClick: onRetirer },
+        ...(onBloquer ? [{ cle: "bloquer", libelle: "Bloquer", destructif: true, onClick: onBloquer }] : []),
+        ...(onRetirer
+          ? [{ cle: "retirer", libelle: "Retirer l'ami", destructif: true, onClick: onRetirer }]
+          : []),
       ]
     : [
-        { cle: "muter", libelle: "Muter", onClick: onMuter },
-        { cle: "quitter", libelle: "Quitter", destructif: true, onClick: onQuitter },
+        ...(onMuter ? [{ cle: "muter", libelle: "Muter", onClick: onMuter }] : []),
+        ...(onQuitter
+          ? [{ cle: "quitter", libelle: "Quitter", destructif: true, onClick: onQuitter }]
+          : []),
       ];
 
   return (
@@ -65,13 +72,8 @@ export function ConversationStarter({
           : "C'est le début de ce groupe. Les messages sont chiffrés de bout en bout."}
       </Text>
 
-      {/* Une action sans destination n'est pas rendue : un bouton inerte est une
-          promesse non tenue (interdit n°13). M-G et M-H les branchent. */}
-      <ButtonsList
-        boutons={actions
-          .filter((action) => action.onClick !== undefined)
-          .map((action) => ({ ...action, onClick: action.onClick! }))}
-      />
+      {/* M-G et M-H branchent ces actions ; celles qui ne le sont pas n'existent pas. */}
+      <ButtonsList boutons={actions} />
     </section>
   );
 }
