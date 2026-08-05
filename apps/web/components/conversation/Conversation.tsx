@@ -22,13 +22,19 @@ import {
   typingUsers,
   type MentionCandidate,
 } from "@tacita/messaging";
+import { downloadAttachment, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
 import { createOutbox, type Outbox } from "@tacita/outbox";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { environnementMedia } from "../../lib/media-env";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { IconeAppel, IconeVideo } from "../foundation/icons";
 import { Button } from "../foundation/primitives";
+import { MediaPicker } from "../media/MediaPicker";
+import { MediaViewer } from "../media/MediaViewer";
+import { PhotoCapture } from "../media/PhotoCapture";
+import { mediaDe, type Media } from "../media/media";
 import { useSession } from "../onboarding/SessionProvider";
 import { Composer } from "./Composer";
 import { ConversationStarter } from "./ConversationStarter";
@@ -61,6 +67,13 @@ export function Conversation({ roomId }: { roomId: string }) {
   const [pret, setPret] = useState(false);
   const [intention, setIntention] = useState<Intention | undefined>();
   const [holdSur, setHoldSur] = useState<MessageAffiche | undefined>();
+  const [envoiMedia, setEnvoiMedia] = useState(false);
+  const [capture, setCapture] = useState(false);
+  const [viewer, setViewer] = useState<number | undefined>();
+
+  // L'environnement média (spec 08) est créé une fois : il ouvre un `AudioContext` et
+  // lit `navigator.connection`, ni l'un ni l'autre à refaire à chaque rendu.
+  const env = useMemo(() => environnementMedia(), []);
 
   const rafraichir = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -146,6 +159,7 @@ export function Conversation({ roomId }: { roomId: string }) {
         // ici, où l'on tient déjà l'événement, évite de le rechercher au moment du menu.
         modifiable: canEdit(session, roomId, evenement),
         supprimable: canRedact(session, roomId, evenement),
+        media: mediaDe(evenement),
       } satisfies MessageAffiche;
     });
 
@@ -203,6 +217,42 @@ export function Conversation({ roomId }: { roomId: string }) {
     if (session && message.eventId) void react(session, roomId, message.eventId, emoji);
   };
 
+  /**
+   * REQ-UI-14 — un seul pipeline pour toutes les pièces jointes (interdit n°11) :
+   * `uploadAttachment` chiffre, compresse et téléverse, puis le contenu rendu part par la
+   * file d'envoi comme un message texte.
+   */
+  const joindre = async (fichiers: File[]) => {
+    if (!session || !outbox) return;
+    setEnvoiMedia(true);
+    try {
+      for (const fichier of fichiers) {
+        const contenu = await uploadAttachment(session, env, fichier);
+        await outbox.enqueue(roomId, contenu);
+      }
+    } finally {
+      setEnvoiMedia(false);
+    }
+  };
+
+  /** Les médias du salon, dans l'ordre de la timeline : le viewer navigue dedans. */
+  const medias: Media[] = messages.flatMap((message) =>
+    message.media?.msgtype === "m.image" || message.media?.msgtype === "m.video"
+      ? [message.media]
+      : [],
+  );
+
+  const telecharger = useCallback(
+    async (fichier: Parameters<typeof downloadAttachment>[2], mimeType?: string) => {
+      if (!session) throw new Error("session absente : aucun média déchiffrable");
+      const octets = await downloadAttachment(session, env, fichier);
+      // Le type est celui que l'UI attend pour l'affichage, pas celui du blob chiffré :
+      // le pipeline rend des octets nus, sans en-tête de contenu.
+      return new Blob([octets as BlobPart], { type: mimeType ?? "application/octet-stream" });
+    },
+    [session, env],
+  );
+
   return (
     <>
       <LayoutHeader
@@ -240,6 +290,11 @@ export function Conversation({ roomId }: { roomId: string }) {
         onReagir={reagir}
         onRenvoyer={(message) => void outbox?.retry(message.cle)}
         onAbandonner={(message) => void outbox?.remove(message.cle)}
+        telecharger={telecharger}
+        onOuvrirMedia={(message) => {
+          const rang = medias.findIndex((media) => media === message.media);
+          if (rang >= 0) setViewer(rang);
+        }}
       />
 
       <Composer
@@ -259,7 +314,34 @@ export function Conversation({ roomId }: { roomId: string }) {
         onEnvoyer={envoyer}
         onFrappe={() => typing.current?.keystroke(roomId)}
         ecrivent={session ? typingUsers(session, roomId).map(nomDe) : []}
+        actions={
+          <>
+            <MediaPicker onFichiers={(fichiers) => void joindre(fichiers)} enCours={envoiMedia} />
+            <Button label="Prendre une photo" variant="ghost" onClick={() => setCapture(true)} />
+          </>
+        }
       />
+
+      <PhotoCapture
+        ouvert={capture}
+        onFermer={() => setCapture(false)}
+        // REQ-UI-15 — deux gestes, deux destinations : l'original reste sur l'appareil,
+        // seule la version compressée par le pipeline part au correspondant.
+        onEnregistrer={(original, nom) => saveOriginal(env, original, nom)}
+        onEnvoyer={(photo) => void joindre([photo])}
+      />
+
+      {viewer !== undefined && (
+        <MediaViewer
+          medias={medias}
+          depart={viewer}
+          telecharger={telecharger}
+          onFermer={() => setViewer(undefined)}
+          onSauvegarder={(media) => {
+            void telecharger(media.fichier).then((blob) => saveOriginal(env, blob, media.nom));
+          }}
+        />
+      )}
 
       <HoldMenu
         ouvert={holdSur !== undefined}

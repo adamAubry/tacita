@@ -7,6 +7,7 @@ import { Fragment, useState } from "react";
 import { Skeleton } from "../foundation/primitives";
 import { DateSeparator } from "./DateSeparator";
 import { MessageObject } from "./MessageObject";
+import type { Telecharger } from "../media/media";
 import { nouveauJour, shouldShowHeader, type MessageAffiche } from "./message";
 
 export interface TimelineProps {
@@ -22,6 +23,9 @@ export interface TimelineProps {
   onReagir: (message: MessageAffiche, emoji: string) => void;
   onRenvoyer: (message: MessageAffiche) => void;
   onAbandonner: (message: MessageAffiche) => void;
+  /** REQ-UI-14 — déchiffrement des pièces jointes (M-E), et ouverture du viewer. */
+  telecharger?: Telecharger;
+  onOuvrirMedia?: (message: MessageAffiche) => void;
 }
 
 /**
@@ -47,6 +51,8 @@ export function Timeline({
   onReagir,
   onRenvoyer,
   onAbandonner,
+  telecharger,
+  onOuvrirMedia,
 }: TimelineProps) {
   // REQ-UI-09 — l'état vit ici : le geste porte sur un message, la révélation porte sur
   // la colonne entière. C'est ce que fait Instagram, et c'est ce qu'on attend.
@@ -89,6 +95,8 @@ export function Timeline({
               onReagir={(emoji) => onReagir(message, emoji)}
               onRenvoyer={message.envoi === "failed" ? () => onRenvoyer(message) : undefined}
               onAbandonner={message.envoi === "failed" ? () => onAbandonner(message) : undefined}
+              telecharger={telecharger}
+              onOuvrirMedia={onOuvrirMedia ? () => onOuvrirMedia(message) : undefined}
             />
           </Fragment>
         );

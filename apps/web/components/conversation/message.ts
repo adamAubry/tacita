@@ -2,6 +2,7 @@ import { ROOM_MENTION, EVERYONE } from "@tacita/messaging";
 import type { OutboxEntry, OutboxStatus } from "@tacita/outbox";
 
 import { memeJour } from "../../lib/dates";
+import type { Media } from "../media/media";
 
 /**
  * Un message tel que la timeline le rend — venu du flux `/sync` **ou** de la file
@@ -26,6 +27,8 @@ export interface MessageAffiche {
   /** REQ-MSG-06 — droits exposés par le paquet, jamais dérivés ici. */
   modifiable?: boolean;
   supprimable?: boolean;
+  /** REQ-UI-14 — la pièce jointe, quand le message en porte une (M-E). */
+  media?: Media;
 }
 
 /**

@@ -1,11 +1,13 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Les neuf points sont tranchés (05/08/2026).** Ce fichier garde la question, la décision et
-son motif : une décision dont on a perdu le motif se rediscute tous les six mois.
+**Neuf points sur dix sont tranchés (05/08/2026) ; E-10 est ouvert.** Ce fichier garde la
+question, la décision et son motif : une décision dont on a perdu le motif se rediscute
+tous les six mois.
 
 Les huit premiers ont été **arbitrés par le PM**. Le neuvième a été **tranché en périmètre
 technique et porté à sa connaissance** — la distinction est notée dans sa section, parce
-qu'elle change qui peut le rouvrir.
+qu'elle change qui peut le rouvrir. **E-10 attend un arbitrage** : il oppose deux specs
+ratifiées, ce que la spec 00 réserve explicitement au PM.
 
 Ce qui est **contraignant** vit ailleurs — `DECISIONS.md` § D-09 pour le modèle social,
 `specs/` pour les exigences amendées. Ici, c'est la trace. En cas de contradiction, le
@@ -22,6 +24,7 @@ contrat gagne.
 | E-07 | Layout d'appel | **Confirmé** : pas de client RTC maison | rien |
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
+| E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Ouvert — arbitrage PM requis** | vidéo et vocaux non envoyables tant qu'il n'est pas tranché |
 
 ---
 
@@ -213,6 +216,52 @@ valeur — la refuser pour trier tout en l'affichant serait incohérent.
 
 **Ce qui rouvrirait la question :** un ordre de liste fourni par le serveur qui devienne
 disponible sur la version déployée. Le remplacement tiendrait dans la même ligne.
+
+---
+
+## E-10 — Le transcodage média n'a nulle part où vivre (M-E)
+
+**Ouvert. Arbitrage PM requis** — contrairement à E-09, celui-ci ne se tranche pas en
+périmètre technique : il oppose deux specs ratifiées, et la réponse change une liste que
+le PM a lui-même arrêtée.
+
+**La question.** La spec 08 confie au shard l'implémentation du `MediaEnvironment`, et
+exige explicitement (§ Méthode) « WebCodecs avec repli WASM (ffmpeg.wasm ou équivalent)
+pour la vidéo ; encodeur Opus WASM pour REQ-MED-07 ». La spec 11 (REQ-UI-02, liste close
+ratifiée le 05/08/2026) refuse **toute** dépendance d'`apps/web` hors
+`@astryxdesign/*`, `@stylexjs/stylex`, `@tacita/*`, `next` et `react`. Les deux specs sont
+respectables séparément ; l'espace entre elles ne l'est pas — le mode de panne dominant du
+dépôt (spec 00).
+
+Aucune API native ne comble le trou : le navigateur sait *enregistrer* en WebM/Opus
+(Chrome) ou MP4/AAC (Safari), aucun ne sait produire de l'**Ogg/Opus**, que D-03 impose
+comme format de sortie unique. WebCodecs encode, mais ne *muxe* pas : il rend des morceaux
+encodés, pas un conteneur.
+
+**Ce que M-E a livré en attendant.** Tout ce qui ne dépend d'aucun codec :
+photos (compression canvas), fichiers, vignettes déchiffrées, viewer, lecteur vocal avec
+forme d'onde, capture photo, galeries. **Ce qui manque est absent de l'UI, pas grisé ni
+cassé** : pas d'envoi de vidéo, pas d'enregistrement vocal, pas de capture vidéo. Le
+`MediaEnvironment` du shard lève un `TranscodageIndisponible` nommé plutôt que de rendre un
+blob approximatif — un vocal hors Ogg/Opus est illisible par les clients Matrix standards,
+et une vidéo non transcodée partirait au format brut de l'appareil.
+
+**Les deux voies, et ce qu'elles coûtent :**
+
+1. **Amender REQ-UI-02** pour admettre les deux codecs WASM dans `apps/web`. Le motif de la
+   liste est de fermer la porte aux systèmes de style **concurrents d'Astryx** ; un
+   encodeur audio n'en est pas un. Mais la liste est ratifiée et le test refuse par défaut :
+   la modifier est un geste de PM, et elle perd sa netteté (« tout le reste refusé »).
+2. **Un paquet `@tacita/media-codecs`** qui porte l'implémentation navigateur et ses
+   dépendances WASM. La liste close l'autorise déjà (`@tacita/*`), le shard reste propre, et
+   la spec 08 — qui sanctionne le WASM — reste le bon voisinage. Coût : un paquet de plus,
+   et une frontière à écrire (la spec 08 promet « zéro DOM » au pipeline, ce paquet-ci en
+   aurait).
+
+**Recommandation technique : la voie 2.** Elle ne touche à aucune décision ratifiée, garde
+la liste close intacte dans son esprit comme dans sa lettre, et place la dépendance là où sa
+spec l'autorise déjà. Mais c'est le PM qui tranche : la voie 1 est plus courte, et le choix
+est un arbitrage de gouvernance, pas de technique.
 
 ---
 

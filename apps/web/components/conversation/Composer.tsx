@@ -1,7 +1,7 @@
 "use client";
 
 import type { MentionCandidate } from "@tacita/messaging";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import {
   Button,
@@ -33,6 +33,8 @@ export interface ComposerProps {
   onFrappe: () => void;
   /** REQ-UI-11 — qui écrit en face, déjà filtré par le paquet. */
   ecrivent?: string[];
+  /** REQ-UI-14/15 — pièces jointes et capture, fournis par M-E. */
+  actions?: ReactNode;
 }
 
 /**
@@ -55,6 +57,7 @@ export function Composer({
   onEnvoyer,
   onFrappe,
   ecrivent = [],
+  actions,
 }: ComposerProps) {
   const [texte, setTexte] = useState(texteInitial);
   const source = useMemo(() => createStaticSource(mentions), [mentions]);
@@ -87,6 +90,9 @@ export function Composer({
         }}
         onSubmit={envoyer}
         placeholder="Message"
+        // L'emplacement qu'Astryx réserve aux actions de gauche : c'est là que M-E pose
+        // le trombone et la capture, sans que le composer ait à les connaître.
+        footerActions={actions}
         headerContext={
           contexte ? (
             <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>

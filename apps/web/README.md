@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil) et **M-D** (conversation, hors média) livrés. Les modules E à I posent leur contenu sur ce squelette.
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation) et **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10) livrés. Les modules F à I posent leur contenu sur ce squelette.
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -61,10 +61,14 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;
 - **le flash de thème au premier rendu est réel** : IndexedDB est asynchrone et l'interdit
   n°2 ferme localStorage. Il ne touche que ceux qui ont choisi l'autre mode que le défaut ;
-- **le composer de M-D n'a ni bouton fichiers ni bouton vocal.** Les deux dépendent du
-  pipeline média (spec 08) et de M-E, qui n'est pas livré : un trombone inerte serait une
-  fonction affichée qui ne marche pas (interdit n°13). Les emplacements d'Astryx qui les
-  accueilleront sont `footerActions` et `sendActions` — deux props à remplir ;
+- **ni vidéo ni vocal ne peuvent être envoyés** — et rien ne le laisse croire : les deux
+  demandent un transcodage (Ogg/Opus imposé par D-03, MP4 par D-04) qu'aucune API native
+  ne fournit, et dont la dépendance WASM se heurte à la liste close de REQ-UI-02. Photos,
+  fichiers, lecture des vocaux reçus et capture photo fonctionnent. Arbitrage PM en
+  attente : `specs/ui/ESCALATIONS.md` § E-10 ;
+- **l'envoi de pièce jointe n'a pas de barre de progression**, seulement un état : le
+  pipeline (spec 08) ne rapporte rien pendant la compression ni le téléversement, et une
+  barre serait une animation inventée plutôt qu'une mesure ;
 - **ni l'accueil ni la timeline ne sont fenêtrés.** Astryx `0.2.0` n'expose aucune liste
   virtualisée ; les contraintes de M-C et M-D prévoyaient ce cas. Le plafond est réel sur une
   conversation ancienne, pas sur une liste de conversations.
@@ -78,5 +82,6 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 | `components/onboarding/` | M-B : session, porte de récupération, éducation iOS, déconnexion |
 | `components/accueil/` | M-C : liste de conversations, en-tête, bannière de demandes, création |
 | `components/conversation/` | M-D : timeline, message object, hold menu, starter, composer |
+| `components/media/` | M-E : vignettes, viewer, vocal, capture, galeries partagées |
 | `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

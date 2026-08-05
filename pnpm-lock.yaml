@@ -67,6 +67,9 @@ importers:
       '@tacita/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@tacita/media-pipeline':
+        specifier: workspace:*
+        version: link:../../packages/media-pipeline
       '@tacita/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging

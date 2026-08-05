@@ -7,6 +7,8 @@ import type { ReceiptStatus } from "@tacita/receipts";
 import { heure } from "../../lib/dates";
 import { useGlissement } from "../../lib/gestes";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
+import { MediaMessage } from "../media/MediaMessage";
+import type { Telecharger } from "../media/media";
 import { Button, Text, ToggleButton } from "../foundation/primitives";
 import { texteAffiche, type MessageAffiche } from "./message";
 
@@ -25,6 +27,9 @@ export interface MessageObjectProps {
   onReagir?: (emoji: string) => void;
   onRenvoyer?: () => void;
   onAbandonner?: () => void;
+  /** REQ-UI-14 — déchiffrement d'une pièce jointe, injecté par le câblage (M-E). */
+  telecharger?: Telecharger;
+  onOuvrirMedia?: () => void;
 }
 
 const COCHE = { sending: "", sent: "✓", delivered: "✓✓", read: "✓✓" } as const;
@@ -117,6 +122,8 @@ export function MessageObject({
   onReagir,
   onRenvoyer,
   onAbandonner,
+  telecharger,
+  onOuvrirMedia,
 }: MessageObjectProps) {
   const geste = useGlissement({
     onGauche: onRepondre,
@@ -157,8 +164,14 @@ export function MessageObject({
           </div>
         )}
 
+        {/* REQ-UI-14 — une pièce jointe remplace le corps de texte : le `body` d'un
+            média est son nom de fichier, que la tuile porte déjà. */}
+        {message.media && telecharger && (
+          <MediaMessage media={message.media} telecharger={telecharger} onOuvrir={onOuvrirMedia} />
+        )}
+
         <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--spacing-2)" }}>
-          <Text type="body">{texteAffiche(message.texte)}</Text>
+          {!message.media && <Text type="body">{texteAffiche(message.texte)}</Text>}
 
           {/* REQ-UI-09 — révélées par le geste, jamais affichées en permanence : une
               heure sur chaque ligne, c'est une colonne de bruit. */}
