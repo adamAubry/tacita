@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p infra && tsc -p apps/push-gateway && tsc -p packages/client-core && tsc -p packages/messaging && tsc -p packages/outbox && tsc -p packages/search && tsc -p packages/receipts && tsc -p packages/media-pipeline && tsc -p packages/calls",
+    "typecheck": "tsc -p infra && tsc -p apps/push-gateway && tsc -p apps/invite-tokens && tsc -p packages/client-core && tsc -p packages/messaging && tsc -p packages/outbox && tsc -p packages/search && tsc -p packages/receipts && tsc -p packages/media-pipeline && tsc -p packages/calls",
     "lint": "eslint .",
     "prepare": "husky",
     "smoke": "node --env-file=infra/.env node_modules/vitest/vitest.mjs run --config infra/smoke/vitest.config.ts"

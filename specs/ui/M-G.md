@@ -1,6 +1,6 @@
 # M-G — Social : profils, amis, demandes, note
 
-**Dépendances : M-A, M-E (galeries pour Activity), packages client-core/messaging, spec 12 (service de liens d'invitation). Escalades E-02, E-04, E-05 tranchées le 05/08/2026 — voir `DECISIONS.md` D-09 : « ami » = DM natif, note privée locale à l'appareil et non synchronisée, liens d'invitation servis par la spec 12. L'interface `Contacts` reste, par découplage.**
+**Dépendances : M-A, M-E (galeries pour Activity), packages client-core/messaging, spec 12 (service de liens d'invitation). Escalades E-02, E-04, E-05 tranchées le 05/08/2026 — voir `DECISIONS.md` D-09 : « ami » = DM natif, note privée locale à l'appareil et non synchronisée, liens d'invitation servis par la spec 12, **dont le service est livré** (`apps/invite-tokens/`, son README donne les quatre routes). L'interface `Contacts` reste, par découplage.**
 
 ## Livrable
 

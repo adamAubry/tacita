@@ -29,6 +29,13 @@ cd .. && npm run smoke
   vers le realm Keycloak, avec PKCE. C'est la découverte OIDC qui était cassée — quatre
   causes, documentées dans `../README.md` — et c'est elle que la redirection prouve.
 
+- **Que la consommation d'un lien d'invitation est atomique**
+  (`invite-tokens.smoke.test.ts`, REQ-INV-07) : deux résolutions concurrentes du dernier
+  usage, **arbitrées par PostgreSQL**. La suite par défaut ne peut pas le prouver — son
+  imitation de la base est monothread, donc atomique par construction, et une imitation
+  qui confirme l'hypothèse par construction ne l'éprouve pas. Elle y asserte la forme de
+  l'instruction SQL ; ici, on l'exécute.
+
 ## Ce qu'elle ne couvre pas
 
 **Le flux de login complet.** La cible s'arrête à la redirection vers Keycloak : aller

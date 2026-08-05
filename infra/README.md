@@ -1,9 +1,10 @@
 # infra — socle serveur (spec 01)
 
 Config-as-code : PostgreSQL, Synapse, Keycloak (OIDC + WebAuthn), MinIO (S3),
-reverse proxy nginx, et le **raccordement** de la passerelle Web Push (REQ-INF-14).
+reverse proxy nginx, et le **raccordement** de deux services livrés ailleurs — la
+passerelle Web Push (REQ-INF-14) et le service de liens d'invitation (REQ-INF-15).
 Hors scope : LiveKit/TURN/well-known (spec 02), le *code* de la passerelle push
-(spec 03).
+(spec 03) et celui du service de liens (spec 12).
 
 ## Démarrage
 
@@ -95,6 +96,34 @@ un endpoint sans authentification.
 `p256dh` et `auth` sont les clés de la `PushSubscription` du navigateur ; la
 passerelle en a besoin pour chiffrer le push (sans elles, elle rejette la
 pushkey — REQ-PSH-01).
+
+## REQ-INF-15 — service de liens d'invitation
+
+Le service de la spec 12 est construit et démarré par ce compose, par la même
+jurisprudence que la passerelle push : la spec 12 livre le code, la spec 01 le
+provisionne. Il est joignable **sous `/invite/`**, par le proxy, et nulle part
+ailleurs — aucun port publié. Ses quatre routes exigent chacune un jeton d'accès
+Matrix valide.
+
+**Aucun secret d'administration Synapse dans son environnement**, et un test le
+vérifie (`tests/invite-tokens.test.ts`). C'est le point : la spec 12 borne les
+dégâts d'une compromission en ne lui donnant aucun pouvoir Matrix, et le
+raccordement est précisément l'endroit où on le lui rendrait par confort. Il
+joint Synapse par le nom du réseau du compose (`http://synapse:8008`) — passer
+par le proxy TLS rejouerait les quatre causes du 503 OIDC ci-dessous.
+
+**Base dédiée `invite_tokens`**, jamais une table dans celle de Synapse. Elle est
+créée par `postgres/10-invite-tokens.sh`, monté dans
+`/docker-entrypoint-initdb.d/` — donc **uniquement à la première initialisation du
+volume**. Sur une pile déjà démarrée :
+
+```sh
+docker compose exec postgres createdb -U "$POSTGRES_USER" invite_tokens
+```
+
+Le schéma, lui, est créé par le service à son démarrage (`CREATE TABLE IF NOT
+EXISTS`) : rien à dérouler à la main.
+
 ## Login OIDC — trois causes qui l'empêchent en local, une non résolue
 
 Trouvé en montant la cible de fumée (arbitrage PM, point 9). **Le flux de login n'avait

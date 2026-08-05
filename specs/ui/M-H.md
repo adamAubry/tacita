@@ -1,6 +1,6 @@
 # M-H — Réglages et infos de conversation
 
-**Dépendances : M-A, M-E (galeries), packages messaging (05), receipts (06), média (08), spec 12 pour les liens d'invitation de groupe. Escalades E-03 et E-05 tranchées le 05/08/2026 (`DECISIONS.md` D-09) : pas de messages éphémères, et les liens passent par le service de tokens.**
+**Dépendances : M-A, M-E (galeries), packages messaging (05), receipts (06), média (08), spec 12 pour les liens d'invitation de groupe. Escalades E-03 et E-05 tranchées le 05/08/2026 (`DECISIONS.md` D-09) : pas de messages éphémères, et les liens passent par le service de tokens, **livré** (`apps/invite-tokens/`).**
 
 ## Livrable
 

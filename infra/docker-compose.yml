@@ -12,6 +12,9 @@ services:
       POSTGRES_INITDB_ARGS: "--lc-collate=C --lc-ctype=C --encoding=UTF8"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # REQ-INF-15 — crée la base dédiée du service de liens (spec 12) à la première
+      # initialisation du volume. Sur une pile existante, voir le script.
+      - ./postgres/10-invite-tokens.sh:/docker-entrypoint-initdb.d/10-invite-tokens.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
@@ -117,6 +120,33 @@ services:
       VAPID_SUBJECT: ${VAPID_SUBJECT}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+
+  # REQ-INF-15 — le service de liens d'invitation (spec 12). Même jurisprudence que la
+  # passerelle push : la spec 12 livre le code, la spec 01 le provisionne.
+  #
+  # **Aucun secret d'administration Synapse ici**, et un test l'asserte : le service ne
+  # détient aucun pouvoir Matrix. Il valide le jeton de son appelant auprès de Synapse et
+  # rend un identifiant ; c'est le client qui invite (D-09).
+  #
+  # Base dédiée `invite_tokens`, jamais celle de Synapse. Joint par son nom sur le réseau
+  # du compose ; seul le proxy l'expose, sous /invite/.
+  invite-tokens:
+    build:
+      context: ..
+      dockerfile: apps/invite-tokens/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      synapse:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/invite_tokens
+      # Synapse par son nom sur le réseau du compose, pas par le proxy TLS : passer par
+      # `https://${SERVER_NAME}` rejouerait les quatre causes du 503 OIDC (résolution du
+      # nom depuis le réseau Docker, CA de développement, protection SSRF). Ces appels
+      # sont internes, ils n'ont rien à gagner à ressortir.
+      HOMESERVER_URL: http://synapse:8008
 
   # REQ-INF-10 — seul point d'entrée TLS ; routes /_matrix, /livekit/jwt, /livekit/sfu
   # (backends /livekit/* provisionnés par la spec 02, absents tant qu'elle n'est pas déployée).
