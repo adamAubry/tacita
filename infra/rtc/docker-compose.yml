@@ -51,3 +51,8 @@ services:
     # l'autre. `!override` remplace la liste de ports au lieu de l'étendre.
     ports: !override
       - "${WEB_BIND_IP:?IP publique du proxy requise, voir rtc/README.md}:443:443"
+    # REQ-RTC-05 — l'annonce du focus appartient à cet overlay, pas à la pile de base :
+    # elle n'est vraie que là où les backends `/livekit/*` existent. Même cible de
+    # montage que `proxy/well-known.conf`, que compose remplace au lieu de l'ajouter.
+    volumes:
+      - ./well-known.conf:/etc/nginx/well-known.conf:ro

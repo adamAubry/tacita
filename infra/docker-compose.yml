@@ -131,6 +131,9 @@ services:
       - "443:443"
     volumes:
       - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      # REQ-RTC-05 — pile sans SFU : le `.well-known` n'annonce aucun focus. L'overlay
+      # RTC monte son propre fichier à ce chemin, compose fusionne par cible de montage.
+      - ./proxy/well-known.conf:/etc/nginx/well-known.conf:ro
       - ./proxy/certs:/etc/nginx/certs:ro
 
 volumes:

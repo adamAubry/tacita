@@ -8,8 +8,8 @@
  * - `matrix-js-sdk@42.0.0`, la version déployée — `lib/matrixrtc/MembershipManager.js`
  *   (type d'événement et fabrique de state key) et `lib/@types/event.d.ts`
  *   (`GroupCallMemberPrefix`) ;
- * - `infra/rtc/README.md` (REQ-RTC-07) et le bloc `.well-known` de `proxy/nginx.conf`,
- *   pour la clé de découverte des foci et les champs du focus LiveKit.
+ * - `infra/rtc/README.md` (REQ-RTC-07) et `infra/rtc/well-known.conf`, pour la clé de
+ *   découverte des foci et les champs du focus LiveKit.
  *
  * ⚠️ Divergence connue, à surveiller : le brouillon courant de MSC4143 remplace ces
  * événements d'état `org.matrix.msc3401.call.member` par des événements *sticky*

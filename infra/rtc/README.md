@@ -39,9 +39,26 @@ d'Element Call et de `lk-jwt-service`** :
 - le nom des champs du focus (`type`, `livekit_service_url`).
 
 Une valeur périmée ne casse pas bruyamment : le bouton d'appel reste simplement
-inerte. Le seul endroit du dépôt qui porte ces littéraux est le bloc
-`.well-known` de `proxy/nginx.conf` (REQ-RTC-05) ; la spec 10 les relit côté
-client.
+inerte. Le seul endroit du dépôt qui porte ces littéraux est `rtc/well-known.conf`
+(REQ-RTC-05) ; la spec 10 les relit côté client.
+
+## REQ-RTC-05 — l'annonce du focus appartient à cet overlay
+
+Deux fichiers servent la même route, un seul est monté à la fois :
+
+| Fichier | Monté par | Annonce |
+|---|---|---|
+| `proxy/well-known.conf` | `docker-compose.yml` (pile de base) | `m.homeserver` seul, **aucun focus** |
+| `rtc/well-known.conf` | cet overlay | `m.homeserver` + `org.matrix.msc4143.rtc_foci` |
+
+Même point de montage (`/etc/nginx/well-known.conf`) : compose fusionne les volumes
+par cible, l'overlay remplace donc le fichier de base au lieu de s'y ajouter.
+
+**Pourquoi ce détour plutôt qu'un `rtc_foci` en dur dans `nginx.conf`** — c'est ce
+qu'on faisait jusqu'au 05/08/2026 (escalade E-08). Une pile sans SFU annonçait un focus
+dont le backend n'existe pas : `discoverFocus()` réussissait, et l'appel mourait en
+502 à la connexion au lieu du `RtcFociMissing` que REQ-CAL-02 rend affichable. Une
+annonce ne doit pas survivre au déploiement qu'elle décrit.
 
 ## REQ-RTC-04 — la plage UDP s'ouvre en deux endroits
 
