@@ -4,6 +4,22 @@ const STORE = "index";
 const KEY = "orama";
 const VERSION = 1;
 
+/**
+ * Génération du **schéma d'index**, distincte de la version du store IndexedDB.
+ * `load()` restaure les index internes d'Orama tels qu'ils ont été sauvegardés : un
+ * snapshot d'avant REQ-SRC-11 n'a pas d'index `msgtype` ni `mentions`, et un `where`
+ * dessus échouerait sur une base pourtant « chargée ». On préfère repartir vide.
+ *
+ * Un snapshot périmé est **effacé**, pas ignoré : c'est du contenu déchiffré, il n'a
+ * aucune raison de survivre à sa lisibilité.
+ */
+const GENERATION = 2;
+
+interface StoredSnapshot {
+  generation: number;
+  raw: RawData;
+}
+
 const promisify = <T>(request: IDBRequest<T>): Promise<T> =>
   new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -48,14 +64,25 @@ export async function openSnapshot(
         reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
     });
 
-  return {
-    read: () => promisify(reading().get(KEY) as IDBRequest<RawData | undefined>),
-    write: (raw) => commit((store) => {
-      store.put(raw, KEY);
-    }),
-    clear: () => commit((store) => {
+  const clear = () =>
+    commit((store) => {
       store.clear();
+    });
+
+  return {
+    async read() {
+      const stored = await promisify(
+        reading().get(KEY) as IDBRequest<StoredSnapshot | undefined>,
+      );
+      if (!stored) return undefined;
+      if (stored.generation === GENERATION) return stored.raw;
+      await clear();
+      return undefined;
+    },
+    write: (raw) => commit((store) => {
+      store.put({ generation: GENERATION, raw } satisfies StoredSnapshot, KEY);
     }),
+    clear,
     close: () => db.close(),
   };
 }

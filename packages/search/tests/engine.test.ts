@@ -15,12 +15,21 @@ import {
 const ROOM = "!salon:tacita.test";
 const AUTRE = "!autre:tacita.test";
 
-const event = (n: number, body: string, roomId = ROOM, tsOrigin = n): IndexableEvent => ({
+const event = (
+  n: number,
+  body: string,
+  roomId = ROOM,
+  tsOrigin = n,
+  reste: Partial<IndexableEvent> = {},
+): IndexableEvent => ({
   eventId: `$e${n}`,
   roomId,
   sender: "@luca:tacita.test",
   tsOrigin,
   body,
+  msgtype: "m.text",
+  mentions: [],
+  ...reste,
 });
 
 let indexedDB: IDBFactory;
@@ -51,6 +60,42 @@ describe("REQ-SRC-02 — index persisté, rechargé sans réindexation", () => {
     rechargé.close();
   });
 
+  it("un snapshot d'une génération de schéma antérieure est effacé, pas chargé", async () => {
+    await engine.index([event(1, "rendez-vous au parc")]);
+    engine.close();
+
+    // Ce que laisserait une version d'avant REQ-SRC-11 : les mêmes octets, sans les
+    // index `msgtype` et `mentions`. Le charger donnerait une base qui échoue au
+    // premier filtre — et laisserait du clair illisible en IndexedDB.
+    const db = await new Promise<IDBDatabase>((resolve) => {
+      const request = indexedDB.open("tacita-search", 1);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const stored = db.transaction("index", "readwrite").objectStore("index");
+    stored.put({ generation: 1, raw: { anciens: "octets" } }, "orama");
+    await new Promise((resolve) => {
+      stored.transaction.oncomplete = resolve;
+    });
+    db.close();
+
+    const rechargé = await createEngine({ indexedDB });
+    expect((await rechargé.stats()).size).toBe(0);
+    rechargé.close();
+
+    // Effacé, pas seulement ignoré : c'est du contenu déchiffré, il n'a aucune raison
+    // de survivre à sa lisibilité.
+    const relu = await new Promise<IDBDatabase>((resolve) => {
+      const request = indexedDB.open("tacita-search", 1);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const restant = relu.transaction("index", "readonly").objectStore("index").get("orama");
+    await new Promise((resolve) => {
+      restant.onsuccess = resolve;
+    });
+    expect(restant.result).toBeUndefined();
+    relu.close();
+  });
+
   it("un index neuf sans snapshot ne trouve rien plutôt que d'échouer", async () => {
     expect(await engine.search("parc")).toEqual([]);
     expect(await engine.stats()).toMatchObject({ size: 0, oldestTs: null, newestTs: null });
@@ -72,12 +117,78 @@ describe("REQ-SRC-04 — recherche globale et par salon", () => {
   });
 
   it("restreint à un salon quand il est fourni", async () => {
-    const hits = await engine.search("réunion", AUTRE);
+    const hits = await engine.search("réunion", { roomId: AUTRE });
     expect(hits.map((hit) => hit.eventId)).toEqual(["$e2"]);
   });
 
   it("rend une liste vide quand rien ne correspond", async () => {
     expect(await engine.search("licorne")).toEqual([]);
+  });
+});
+
+describe("REQ-SRC-11 — recherche filtrée, critères combinables et locaux", () => {
+  const LUCA = "@luca:tacita.test";
+  const MIRA = "@mira:tacita.test";
+
+  beforeEach(async () => {
+    await engine.index([
+      event(1, "réunion demain", ROOM, 1_000, { mentions: [MIRA] }),
+      event(2, "réunion annulée", ROOM, 2_000, { sender: MIRA }),
+      event(3, "photo réunion.jpg", ROOM, 3_000, { msgtype: "m.image" }),
+      event(4, "réunion de crise", AUTRE, 4_000, { sender: MIRA, mentions: [LUCA] }),
+      event(5, "réunion générale", ROOM, 5_000, { mentions: ["@room"] }),
+    ]);
+  });
+
+  const ids = async (query: string, filters?: Parameters<typeof engine.search>[1]) =>
+    (await engine.search(query, filters)).map((hit) => hit.eventId).sort();
+
+  it("un critère absent ne restreint rien", async () => {
+    expect(await ids("réunion")).toEqual(["$e1", "$e2", "$e3", "$e4", "$e5"]);
+    expect(await ids("réunion", {})).toEqual(["$e1", "$e2", "$e3", "$e4", "$e5"]);
+  });
+
+  it("filtrer par expéditeur ne rend que ses messages", async () => {
+    expect(await ids("réunion", { sender: MIRA })).toEqual(["$e2", "$e4"]);
+  });
+
+  it("filtrer par msgtype distingue le texte du média", async () => {
+    expect(await ids("réunion", { msgtype: "m.image" })).toEqual(["$e3"]);
+    expect(await ids("réunion", { msgtype: "m.text" })).toEqual(["$e1", "$e2", "$e4", "$e5"]);
+  });
+
+  it("l'onglet Mentions se sert du champ, sans plein-texte sur un nom d'affichage", async () => {
+    // Terme vide : on ne cherche pas un mot, on filtre. Chercher « luca » aurait rendu
+    // les messages qui *parlent* de lui, et raté ceux qui le mentionnent en pièce jointe.
+    expect(await ids("", { mentions: LUCA })).toEqual(["$e4"]);
+    // Une mention de salon en est une pour chacun : l'UI passe les deux.
+    expect(await ids("", { mentions: [LUCA, "@room"] })).toEqual(["$e4", "$e5"]);
+    expect(await ids("", { mentions: "@inconnu:tacita.test" })).toEqual([]);
+  });
+
+  it("les bornes de date filtrent, chacune de son côté", async () => {
+    expect(await ids("réunion", { since: 3_000 })).toEqual(["$e3", "$e4", "$e5"]);
+    expect(await ids("réunion", { until: 2_000 })).toEqual(["$e1", "$e2"]);
+    expect(await ids("réunion", { since: 2_000, until: 4_000 })).toEqual(["$e2", "$e3", "$e4"]);
+  });
+
+  it("un filtre de dates ne modifie pas l'ordre des résultats", async () => {
+    // Interdit n°6 — `tsOrigin` filtre, il ne trie jamais. L'ordre reste celui de la
+    // pertinence : un sous-ensemble filtré garde l'ordre relatif du résultat complet.
+    const complet = (await engine.search("réunion")).map((hit) => hit.eventId);
+    const filtré = (await engine.search("réunion", { since: 2_000 })).map((hit) => hit.eventId);
+    expect(filtré).toEqual(complet.filter((id) => filtré.includes(id)));
+  });
+
+  it("deux critères combinés rendent l'intersection", async () => {
+    expect(await ids("réunion", { sender: MIRA, roomId: AUTRE })).toEqual(["$e4"]);
+    expect(await ids("réunion", { sender: MIRA, msgtype: "m.image" })).toEqual([]);
+    expect(await ids("réunion", { mentions: LUCA, since: 5_000 })).toEqual([]);
+  });
+
+  it("le hit porte les deux champs ajoutés, pour que l'UI n'ait rien à redériver", async () => {
+    const [hit] = await engine.search("crise");
+    expect(hit).toMatchObject({ msgtype: "m.text", mentions: [LUCA], sender: MIRA });
   });
 });
 

@@ -22,22 +22,37 @@ export function matrixEvent(
   eventId: string,
   roomId: string,
   body: string,
-  options: { failed?: boolean; type?: string; ts?: number; replaces?: string } = {},
+  options: {
+    failed?: boolean;
+    type?: string;
+    ts?: number;
+    replaces?: string;
+    /** REQ-SRC-11 — ce que porte l'événement réel, pas ce que l'index en fait. */
+    msgtype?: string;
+    mentions?: { user_ids?: unknown; room?: boolean };
+    sender?: string;
+  } = {},
 ): MatrixEvent {
+  const utile = {
+    body,
+    ...(options.msgtype && { msgtype: options.msgtype }),
+    ...(options.mentions && { "m.mentions": options.mentions }),
+  };
+
   // REQ-SRC-10 — une édition porte la relation `m.replace` et le texte réel dans
   // `m.new_content` ; le `body` de premier niveau n'est qu'un repli « * texte ».
   const content = options.replaces
     ? {
         body: `* ${body}`,
-        "m.new_content": { body },
+        "m.new_content": utile,
         "m.relates_to": { rel_type: "m.replace", event_id: options.replaces },
       }
-    : { body };
+    : utile;
 
   return {
     getId: () => eventId,
     getRoomId: () => roomId,
-    getSender: () => "@luca:tacita.test",
+    getSender: () => options.sender ?? "@luca:tacita.test",
     getType: () => options.type ?? "m.room.message",
     getTs: () => options.ts ?? 1_000,
     getContent: () => content,

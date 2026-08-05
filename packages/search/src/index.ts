@@ -1,8 +1,8 @@
 import type { Session } from "@tacita/client-core";
 import { MatrixEventEvent, RoomEvent, type MatrixEvent } from "matrix-js-sdk";
 
-import type { IndexableEvent, SearchHit, SearchStats } from "./engine";
-import type { SearchRequest, SearchResponse } from "./protocol";
+import type { IndexableEvent, SearchFilters, SearchHit, SearchStats } from "./engine";
+import { ROOM_MENTION, type SearchRequest, type SearchResponse } from "./protocol";
 
 /**
  * Ce point d'entrée ne réexporte volontairement ni le moteur ni `serve` : les
@@ -10,7 +10,8 @@ import type { SearchRequest, SearchResponse } from "./protocol";
  * ce que le découpage en worker existe précisément pour éviter (REQ-SRC-01).
  * Le worker s'importe par `@tacita/search/worker`.
  */
-export type { IndexableEvent, SearchHit, SearchStats } from "./engine";
+export type { IndexableEvent, SearchFilters, SearchHit, SearchStats } from "./engine";
+export { ROOM_MENTION } from "./protocol";
 
 /** Fenêtre d'accumulation des événements déchiffrés avant un envoi au worker. */
 export const BUFFER_MS = 250;
@@ -18,8 +19,12 @@ export const BUFFER_MS = 250;
 export interface Search {
   /** REQ-SRC-01 — indexation manuelle ; un événement ou un lot. */
   index(events: IndexableEvent | IndexableEvent[]): Promise<void>;
-  /** REQ-SRC-04 — mot-clé, tous salons si `roomId` est omis. */
-  search(query: string, roomId?: string): Promise<SearchHit[]>;
+  /**
+   * REQ-SRC-04/11 — mot-clé, restreint par les critères fournis (salon, expéditeur,
+   * type, mentions, bornes de date). Sans critère, la recherche est globale ; un terme
+   * vide avec des critères est légitime — c'est ce que fait l'onglet « Mentions ».
+   */
+  search(query: string, filters?: SearchFilters): Promise<SearchHit[]>;
   /** REQ-SRC-05/06 — taille, plafond et bornes réellement couvertes. */
   stats(): Promise<SearchStats>;
   wipe(): Promise<void>;
@@ -40,7 +45,9 @@ function indexable(event: MatrixEvent): IndexableEvent | undefined {
   const content = event.getContent();
   const relation = content["m.relates_to"] as { rel_type?: unknown; event_id?: unknown } | undefined;
   const edited = relation?.rel_type === "m.replace";
-  const source = edited ? (content["m.new_content"] as { body?: unknown } | undefined) : content;
+  const source = (edited ? content["m.new_content"] : content) as
+    | Record<string, unknown>
+    | undefined;
 
   const eventId = edited ? relation?.event_id : event.getId();
   const body: unknown = source?.body;
@@ -48,7 +55,34 @@ function indexable(event: MatrixEvent): IndexableEvent | undefined {
   if (typeof eventId !== "string" || !roomId) return undefined;
   if (typeof body !== "string" || body.length === 0) return undefined;
 
-  return { eventId, roomId, sender: event.getSender() ?? "", tsOrigin: event.getTs(), body };
+  return {
+    eventId,
+    roomId,
+    sender: event.getSender() ?? "",
+    tsOrigin: event.getTs(),
+    body,
+    // REQ-SRC-11 — une correction peut changer le type comme le texte : les deux se
+    // relisent de `m.new_content`, avec le repli sur l'événement d'origine. `m.text`
+    // par défaut : c'est ce que vaut un `m.room.message` sans `msgtype`.
+    msgtype: typeof source?.msgtype === "string" ? source.msgtype : "m.text",
+    mentions: mentionsOf((source?.["m.mentions"] ?? content["m.mentions"]) as MentionsField),
+  };
+}
+
+type MentionsField = { user_ids?: unknown; room?: unknown } | undefined;
+
+/**
+ * REQ-SRC-11 — `m.mentions` est du contenu déchiffré : il ne quitte pas ce chemin, ne
+ * passe par aucun log, et n'existe dans l'index que pour l'onglet « Mentions ».
+ *
+ * Le contenu vient du réseau : un `user_ids` qui n'est pas un tableau de chaînes est
+ * ignoré plutôt que propagé dans l'index.
+ */
+function mentionsOf(field: MentionsField): string[] {
+  const ids = Array.isArray(field?.user_ids)
+    ? field.user_ids.filter((id): id is string => typeof id === "string")
+    : [];
+  return field?.room === true ? [...ids, ROOM_MENTION] : ids;
 }
 
 /**
@@ -141,7 +175,7 @@ export function createSearch(session: Session, worker: Worker): Search {
 
   return {
     index,
-    search: (query, roomId) => call<SearchHit[]>("search", [query, roomId]),
+    search: (query, filters) => call<SearchHit[]>("search", [query, filters]),
     stats: () => call<SearchStats>("stats", []),
     wipe,
 

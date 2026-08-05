@@ -20,8 +20,12 @@ export const MAX_EVENTS = 200_000;
 export const BATCH_SIZE = 500;
 
 /**
- * Schéma minimal (spec 09) : de quoi retrouver l'événement et filtrer par salon.
- * Pas de facettes, pas de fuzzy — YAGNI tant que personne ne les demande.
+ * Schéma d'index (spec 09) : de quoi retrouver l'événement et servir les critères de
+ * REQ-SRC-11. Pas de fuzzy avancé — ce YAGNI-là tient toujours, aucun besoin établi.
+ *
+ * **Tout ce qui est ici est du contenu déchiffré**, `mentions` au même titre que `body` :
+ * l'interdit n°8 couvre le schéma entier, logs, télémétrie, cache du service worker et
+ * payloads push compris — y compris en développement.
  */
 const schema = {
   // `enum` et non `string` : une propriété `string` est tokenisée et le `where`
@@ -30,6 +34,13 @@ const schema = {
   // ce qui est voulu : chercher un mot ne doit pas matcher un identifiant.
   roomId: "enum",
   sender: "enum",
+  // REQ-SRC-11 — le filtre qui distingue texte et média. Même raison d'être un `enum` :
+  // `m.text` ne doit pas répondre à une recherche du mot « text ».
+  msgtype: "enum",
+  // REQ-SRC-11 — l'onglet « Mentions » se sert de ce champ, **jamais** d'un plein-texte
+  // sur un nom d'affichage : un nom change, et un homonyme dans une phrase n'est pas
+  // une mention.
+  mentions: "enum[]",
   // Deux horodatages, deux usages, jamais interchangeables (spec 09).
   tsIndexed: "number",
   tsOrigin: "number",
@@ -41,11 +52,36 @@ export interface IndexableEvent {
   roomId: string;
   sender: string;
   /**
-   * `origin_server_ts`. Sert **uniquement** aux bornes de `stats()` (REQ-SRC-06) :
-   * jamais à trier, jamais à évincer (interdit n°6).
+   * `origin_server_ts`. Sert aux bornes de `stats()` (REQ-SRC-06) et au filtre de dates
+   * de REQ-SRC-11 : jamais à trier, jamais à évincer (interdit n°6).
    */
   tsOrigin: number;
   body: string;
+  /** `m.text`, `m.image`, `m.file`… tel que porté par l'événement. */
+  msgtype: string;
+  /** `m.mentions.user_ids`, plus `ROOM_MENTION` si l'événement mentionne le salon. */
+  mentions: string[];
+}
+
+/**
+ * REQ-SRC-11 — critères combinables, tous servis par l'index local : un critère absent
+ * ne restreint rien, les critères présents se composent en ET. Aucun n'ajoute d'appel
+ * réseau (REQ-SRC-03 inchangée).
+ */
+export interface SearchFilters {
+  /** REQ-SRC-04 — une seule conversation. */
+  roomId?: string;
+  sender?: string;
+  msgtype?: string;
+  /**
+   * L'événement doit mentionner **au moins un** de ces identifiants. L'onglet
+   * « Mentions » passe `[moi, ROOM_MENTION]` : côté Matrix, une mention de salon en
+   * est une pour chacun.
+   */
+  mentions?: string | string[];
+  /** Bornes **inclusives** sur `tsOrigin`. Un filtre, jamais un tri (interdit n°6). */
+  since?: number;
+  until?: number;
 }
 
 /**
@@ -54,13 +90,9 @@ export interface IndexableEvent {
  * Évincer par `tsOrigin` ferait qu'un rattrapage d'historique — qui insère par
  * définition des événements anciens — s'auto-évincerait au premier plafond atteint.
  */
-type IndexedDocument = {
+type IndexedDocument = Omit<IndexableEvent, "eventId"> & {
   id: string;
-  roomId: string;
-  sender: string;
   tsIndexed: number;
-  tsOrigin: number;
-  body: string;
 };
 
 export interface SearchHit extends IndexableEvent {
@@ -93,7 +125,8 @@ export interface SearchEngine {
   index(events: IndexableEvent[]): Promise<void>;
   /** REQ-SRC-10 — retire les documents redactés. Les identifiants inconnus sont ignorés. */
   remove(eventIds: string[]): Promise<void>;
-  search(query: string, roomId?: string): Promise<SearchHit[]>;
+  /** REQ-SRC-04/11 — mot-clé, restreint par les critères fournis. */
+  search(query: string, filters?: SearchFilters): Promise<SearchHit[]>;
   stats(): Promise<SearchStats>;
   wipe(): Promise<void>;
   close(): void;
@@ -107,8 +140,33 @@ const toHit = (hit: { id: string; score: number; document: Record<string, unknow
   sender: hit.document.sender as string,
   tsOrigin: hit.document.tsOrigin as number,
   body: hit.document.body as string,
+  msgtype: hit.document.msgtype as string,
+  mentions: hit.document.mentions as string[],
   score: hit.score,
 });
+
+/**
+ * REQ-SRC-11 — les critères se composent en ET ; un critère absent ne restreint rien.
+ * Les propriétés `enum` se filtrent par opérateur explicite : une valeur nue serait lue
+ * caractère par caractère comme autant d'opérations.
+ */
+const whereOf = (filters: SearchFilters) => {
+  const where: Record<string, unknown> = {};
+  if (filters.roomId) where.roomId = { eq: filters.roomId };
+  if (filters.sender) where.sender = { eq: filters.sender };
+  if (filters.msgtype) where.msgtype = { eq: filters.msgtype };
+  if (filters.mentions) where.mentions = { containsAny: [filters.mentions].flat() };
+  // Bornes sur la date d'origine — celle qui parle à l'utilisateur. En `where`, donc
+  // sans effet sur l'ordre des résultats (interdit n°6).
+  //
+  // Orama n'accepte **qu'une opération par propriété** : deux bornes se disent
+  // `between`, pas `gte` + `lte`, sinon la requête lève au lieu de filtrer.
+  const { since, until } = filters;
+  if (since !== undefined && until !== undefined) where.tsOrigin = { between: [since, until] };
+  else if (since !== undefined) where.tsOrigin = { gte: since };
+  else if (until !== undefined) where.tsOrigin = { lte: until };
+  return where;
+};
 
 /** REQ-SRC-06 — bornes affichées : la date d'origine, celle qui parle à l'utilisateur. */
 const edgeTs = async (db: Database, order: "ASC" | "DESC"): Promise<number | null> => {
@@ -221,14 +279,14 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
       await persist();
     },
 
-    // REQ-SRC-03/04 — mot-clé, tous salons ou un seul, strictement en local.
-    async search(query, roomId) {
+    // REQ-SRC-03/04/11 — mot-clé et critères, strictement en local. Un terme vide est
+    // légitime : l'onglet « Mentions » filtre sans rien chercher.
+    async search(query, filters = {}) {
+      const where = whereOf(filters);
       const results = await search(db, {
         term: query,
         limit: 50,
-        // Une propriété `enum` se filtre par opérateur explicite ; une valeur nue
-        // serait lue caractère par caractère comme autant d'opérations.
-        ...(roomId ? { where: { roomId: { eq: roomId } } } : {}),
+        ...(Object.keys(where).length > 0 && { where }),
       });
       return results.hits.map(toHit);
     },

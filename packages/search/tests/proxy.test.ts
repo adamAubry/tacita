@@ -4,7 +4,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { MatrixEventEvent, RoomEvent } from "matrix-js-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BUFFER_MS, createSearch, type Search } from "../src";
+import { BUFFER_MS, createSearch, ROOM_MENTION, type Search } from "../src";
 // Moteur et worker s'importent par leur module : le point d'entrée principal ne
 // les réexporte pas, sinon Orama atterrirait dans le bundle du thread principal.
 import { createEngine } from "../src/engine";
@@ -12,6 +12,17 @@ import { serve } from "../src/worker";
 import { fakeSession, fakeWorker, matrixEvent, packageCode, redactionOf } from "./session-mock";
 
 const ROOM = "!salon:tacita.test";
+
+/** Un événement prêt pour l'index, tel que le produirait `indexable()`. */
+const doc = (eventId: string, body: string, tsOrigin = 1) => ({
+  eventId,
+  roomId: ROOM,
+  sender: "@luca:tacita.test",
+  tsOrigin,
+  body,
+  msgtype: "m.text",
+  mentions: [],
+});
 
 let ctx: ReturnType<typeof fakeSession>;
 let worker: ReturnType<typeof fakeWorker>;
@@ -33,13 +44,7 @@ afterEach(() => {
 
 describe("REQ-SRC-01 — indexation et requêtes déportées dans le worker", () => {
   it("index et search passent par des messages, pas par un appel direct", async () => {
-    await search.index({
-      eventId: "$e1",
-      roomId: ROOM,
-      sender: "@luca:tacita.test",
-      tsOrigin: 1,
-      body: "rendez-vous au parc",
-    });
+    await search.index(doc("$e1", "rendez-vous au parc"));
 
     expect(worker.posted.map((message) => message.method)).toEqual(["index"]);
     expect((await search.search("parc")).map((hit) => hit.eventId)).toEqual(["$e1"]);
@@ -87,13 +92,7 @@ describe("REQ-SRC-03 — aucune recherche n'émet d'appel réseau", () => {
     vi.stubGlobal("fetch", fetchSpy);
     vi.stubGlobal("XMLHttpRequest", class { open = xhrSpy; send = xhrSpy });
 
-    await search.index({
-      eventId: "$e1",
-      roomId: ROOM,
-      sender: "@luca:tacita.test",
-      tsOrigin: 1,
-      body: "hors ligne",
-    });
+    await search.index(doc("$e1", "hors ligne"));
     await search.search("hors ligne");
     await search.stats();
 
@@ -109,12 +108,54 @@ describe("REQ-SRC-03 — aucune recherche n'émet d'appel réseau", () => {
   });
 });
 
+describe("REQ-SRC-11 — msgtype et mentions alimentés au déchiffrement", () => {
+  const MIRA = "@mira:tacita.test";
+
+  it("relit msgtype et m.mentions de l'événement, sans que l'appelant s'en occupe", async () => {
+    ctx.emitDecrypted(
+      matrixEvent("$e1", ROOM, "chat.jpg", { msgtype: "m.image", mentions: { user_ids: [MIRA] } }),
+    );
+    ctx.emitDecrypted(matrixEvent("$e2", ROOM, "coucou tout le monde", { mentions: { room: true } }));
+
+    await vi.waitFor(async () => expect((await search.stats()).size).toBe(2));
+    expect((await search.search("", { msgtype: "m.image" })).map((hit) => hit.eventId)).toEqual([
+      "$e1",
+    ]);
+    expect((await search.search("", { mentions: [MIRA, ROOM_MENTION] })).map((h) => h.eventId).sort())
+      .toEqual(["$e1", "$e2"]);
+  });
+
+  it("un message sans msgtype vaut m.text, un message sans mention n'en porte aucune", async () => {
+    ctx.emitDecrypted(matrixEvent("$e1", ROOM, "message nu"));
+
+    await vi.waitFor(async () => expect((await search.stats()).size).toBe(1));
+    const [hit] = await search.search("nu");
+    expect(hit).toMatchObject({ msgtype: "m.text", mentions: [] });
+  });
+
+  it("une correction met à jour le type et les mentions, pas seulement le texte", async () => {
+    ctx.emitDecrypted(matrixEvent("$e1", ROOM, "oubli", { mentions: { user_ids: [MIRA] } }));
+    await vi.waitFor(async () => expect((await search.stats()).size).toBe(1));
+
+    ctx.emitDecrypted(matrixEvent("$e2", ROOM, "corrigé", { replaces: "$e1" }));
+
+    await vi.waitFor(async () => expect((await search.search("corrigé")).length).toBe(1));
+    expect(await search.search("", { mentions: MIRA })).toEqual([]);
+  });
+
+  it("les critères traversent le protocole du worker tels quels", async () => {
+    await search.search("réunion", { sender: MIRA, since: 1_000 });
+
+    expect(worker.posted.at(-1)).toMatchObject({
+      method: "search",
+      args: ["réunion", { sender: MIRA, since: 1_000 }],
+    });
+  });
+});
+
 describe("REQ-SRC-06 — le périmètre couvert est exposé pour l'UI", () => {
   it("stats donne de quoi dire « historique téléchargé », pas « tout l'historique »", async () => {
-    await search.index([
-      { eventId: "$e1", roomId: ROOM, sender: "@luca:tacita.test", tsOrigin: 1_000, body: "un" },
-      { eventId: "$e2", roomId: ROOM, sender: "@luca:tacita.test", tsOrigin: 9_000, body: "deux" },
-    ]);
+    await search.index([doc("$e1", "un", 1_000), doc("$e2", "deux", 9_000)]);
 
     expect(await search.stats()).toEqual({
       size: 2,
@@ -176,13 +217,7 @@ describe("REQ-SRC-08 — wipe enregistré au registre de la Session", () => {
   it("s'enregistre sous le nom search et vide l'index quand il est appelé", async () => {
     expect(ctx.session.registerWipe).toHaveBeenCalledWith("search", expect.any(Function));
 
-    await search.index({
-      eventId: "$e1",
-      roomId: ROOM,
-      sender: "@luca:tacita.test",
-      tsOrigin: 1,
-      body: "secret",
-    });
+    await search.index(doc("$e1", "secret"));
     await ctx.runWipes();
 
     expect(await search.search("secret")).toEqual([]);
