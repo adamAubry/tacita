@@ -26,11 +26,20 @@ export interface Deps {
  * donc pas de détail qui distinguerait deux causes que REQ-INV-08 veut confondre.
  */
 export class LinkError extends Error {
-  constructor(
-    readonly status: number,
-    readonly errcode: string,
-  ) {
+  readonly status: number;
+  readonly errcode: string;
+
+  /**
+   * Champs déclarés puis affectés, et **non** des propriétés de paramètre
+   * (`constructor(readonly status: number)`). Le service tourne sous
+   * `node --experimental-strip-types`, qui retire les types sans les transformer : une
+   * propriété de paramètre est une construction qui *génère* du code, et Node refuse de
+   * démarrer dessus. Les tests ne l'attrapent pas — Vitest transpile pour de bon.
+   */
+  constructor(status: number, errcode: string) {
     super(errcode);
+    this.status = status;
+    this.errcode = errcode;
   }
 }
 

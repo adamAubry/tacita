@@ -1,4 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
@@ -82,6 +84,36 @@ describe("REQ-INF-15 — le service de liens d'invitation est provisionné par c
 
   it("aucun port publié : le service n'est joignable que par le proxy", () => {
     expect(service.ports).toBeUndefined();
+  });
+
+  /**
+   * Le critère « `docker compose up` démarre le service », rendu vérifiable sans Docker.
+   *
+   * L'image lance `node --experimental-strip-types`, qui **retire** les types sans les
+   * transformer : toute construction TypeScript qui *génère* du code fait échouer le
+   * démarrage. Une propriété de paramètre (`constructor(readonly status: number)`) l'a
+   * fait — le service ne bootait pas, avec 58 tests verts et un typecheck propre. Vitest
+   * transpile pour de bon, il ne pouvait pas le voir ; seul Node le voit.
+   *
+   * On charge donc les modules du service **avec le moteur de production**. `server.ts`
+   * tire tout le reste sauf `index.ts`, qui se connecte à PostgreSQL au chargement.
+   */
+  it("les sources se chargent sous le moteur de production, pas seulement sous Vitest", () => {
+    const service = fileURLToPath(new URL("../../apps/invite-tokens/src/server.ts", import.meta.url));
+    const matrix = fileURLToPath(new URL("../../apps/invite-tokens/src/matrix.ts", import.meta.url));
+
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        [
+          "--experimental-strip-types",
+          "--input-type=module",
+          "-e",
+          `await import(${JSON.stringify(service)}); await import(${JSON.stringify(matrix)});`,
+        ],
+        { stdio: "pipe" },
+      ),
+    ).not.toThrow();
   });
 
   it(".env.example dit qu'il n'a aucune variable propre, et pourquoi", () => {

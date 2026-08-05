@@ -14,7 +14,7 @@ Spec-driven development : les specs sont exécutables, le code les implémente, 
 
 ## Stack imposée
 
-- Next.js 15 App Router (plugin **ponytail**) — uniquement `apps/web`
+- Next.js 15 App Router — uniquement `apps/web`. *(Ce point disait « plugin ponytail » : erreur de catégorie corrigée le 05/08/2026. **ponytail est un plugin d'agent**, un style de codage, sans rapport avec Next.js et sans aucune empreinte à l'exécution. Le paquet npm homonyme, publié en 2019, n'a rien à voir — ne pas l'installer.)*
 - **Astryx UI** exclusivement, avec le plugin **impeccable** (voir section dédiée)
 - matrix-js-sdk avec crypto Rust (vodozemac) ; monorepo pnpm ; tests **Vitest** uniquement
 
@@ -52,4 +52,9 @@ Usage attendu : avant de coder un composant, vérifier son token/style dans DESI
 
 ## Prudence outillage
 
-Astryx, ponytail et impeccable n'ont pas été évalués (gestes tactiles, contraintes PWA, rendu hors ligne). Toute incompatibilité constatée : ne pas contourner silencieusement, escalader au PM.
+**Les trois outils ont été évalués le 05/08/2026** — application Next.js 15 réellement construite, rendu éprouvé, registre npm interrogé. Ce qu'il faut en savoir tient en quatre points ; le reste est dans `specs/11-ui-shard.md` et `specs/ui/M-A.md`, qui sont les contrats.
+
+1. **Seul Astryx s'exécute chez l'utilisateur.** ponytail et impeccable sont des plugins d'agent, sans empreinte à l'exécution — ils ne peuvent être incompatibles ni avec les gestes, ni avec la PWA, ni avec le hors-ligne.
+2. **Trois contraintes de construction, non négociables**, sans lesquelles `next build` échoue : jamais le barrel `@astryxdesign/core` (toujours le sous-chemin) ; le `Theme` d'Astryx enveloppé dans un composant `"use client"` du shard ; une palette fournie par le shard (`defineTheme`), le cœur n'en embarque aucune.
+3. **Astryx est en `0.2.0` et a six semaines.** Version épinglée, CHANGELOG relu avant tout bump — même jurisprudence que les digests d'images du compose.
+4. Toute incompatibilité **découverte depuis** : ne pas contourner silencieusement, escalader au PM.
