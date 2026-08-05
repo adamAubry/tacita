@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Session } from "@tacita/client-core";
@@ -19,6 +21,21 @@ import {
 
 const MXC = "mxc://tacita.test/blob";
 const bytes = (text: string) => new TextEncoder().encode(text);
+
+/**
+ * Ce que le package **exécute**, commentaires retirés : un interdit qui se déclenche sur
+ * une prose explicative n'apprend rien. Le dossier est lu, jamais une liste de fichiers —
+ * une liste laisserait un fichier neuf hors de portée de l'invariant.
+ */
+function packageCode(): string {
+  const src = new URL("../src/", import.meta.url);
+  return readdirSync(src)
+    .filter((name) => name.endsWith(".ts"))
+    .map((name) => readFileSync(new URL(name, src), "utf-8"))
+    .join("\n")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/.*$/gm, "");
+}
 
 function fakeEnv(overrides: Partial<MediaEnvironment> = {}) {
   return {
@@ -381,5 +398,18 @@ describe("REQ-MED-02 — contenu prêt pour la file d'envoi", () => {
     expect(content.body).toBe("archive.zip");
     expect(content.file.url).toBe(MXC);
     expect(content.info).toMatchObject({ mimetype: "application/zip" });
+  });
+
+  /**
+   * L'invariant que le PM a exigé en contrepartie de « le média est hors périmètre de
+   * REQ-OBX-09 par construction » (04/08/2026). La construction est saine : le pipeline
+   * téléverse et rend un contenu, c'est `outbox` qui envoie — donc la garde de salon
+   * non chiffré s'applique une fois, au bon endroit. Rien ne la gardait.
+   *
+   * Un `sendEvent`/`sendMessage` ajouté ici rouvrirait un chemin d'envoi qui contourne
+   * la file **et** sa garde de chiffrement, sans qu'aucun test existant ne bouge.
+   */
+  it("aucun chemin d'envoi dans le package : le pipeline ne poste jamais d'événement", () => {
+    expect(packageCode()).not.toMatch(/\bsend(Event|Message)\b/);
   });
 });
