@@ -1,4 +1,5 @@
 import type { Session } from "@tacita/client-core";
+import { asSession } from "@tacita/client-core/testing";
 import { IDBFactory } from "fake-indexeddb";
 import { vi } from "vitest";
 
@@ -49,13 +50,13 @@ export function fakeSession(indexedDB: IDBFactory = new IDBFactory()) {
     registerWipe: vi.fn((name: string, wipe: () => Promise<void> | void) => {
       wipes.set(name, wipe);
     }),
-    // Audit des jonctions — voir le mock de `search` pour le raisonnement : le double
-    // cast plus bas désactive la vérification structurelle, `satisfies` la rétablit
-    // sur les membres applicatifs. Le `client` reste un faux assumé.
+    // Audit des jonctions — `satisfies` ancre les membres définis ici sur le vrai
+    // contrat. Les membres absents sont complétés par `asSession`, qui les fait lever
+    // au lieu de manquer. Le `client` reste un faux assumé.
   } satisfies { client: unknown } & Partial<Omit<Session, "client">>;
 
   return {
-    session: session as unknown as Session,
+    session: asSession(session),
     client,
     indexedDB,
     /**

@@ -19,6 +19,11 @@ Le squelette applicatif complet sur lequel tous les autres modules se posent : r
 
 ## Contraintes
 
+- **Raccorder `apps/web` au `typecheck` de la racine en créant le projet.** Le script de
+  `package.json` énumère les projets `tsc -p` un par un : un projet absent de cette liste
+  n'est pas typechecké, et les hooks pré-commit passent au vert sans l'avoir lu. Aucun
+  garde ne peut le rappeler — `specs/00-conventions.md` rejette les tests sans ID
+  d'exigence, et ce point n'en porte pas.
 - Chaque primitive rend correctement dans les deux thèmes (test sur les deux).
 - Cibles tactiles ≥ 44 px ; safe-areas iOS en standalone.
 - Aucun état vide « brut » ailleurs dans l'app : tout passe par REQ-UIX-03.

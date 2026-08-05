@@ -1,4 +1,5 @@
 import type { Session } from "@tacita/client-core";
+import { asSession } from "@tacita/client-core/testing";
 import type { ICreateRoomOpts, MatrixEvent } from "matrix-js-sdk";
 import { vi } from "vitest";
 
@@ -103,13 +104,13 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     // `MatrixEvent`. C'est le `satisfies` ci-dessous qui a révélé l'écart — le mock
     // annonçait `unknown[]`, et personne ne le voyait.
     timeline: vi.fn((_roomId: string) => ({ events: () => timelineEvents as MatrixEvent[] })),
-    // Audit des jonctions — voir le mock de `search` pour le raisonnement : le double
-    // cast plus bas désactive la vérification structurelle, `satisfies` la rétablit
-    // sur les membres applicatifs. Le `client` reste un faux assumé.
+    // Audit des jonctions — `satisfies` ancre les membres définis ici sur le vrai
+    // contrat. Les membres absents sont complétés par `asSession`, qui les fait lever
+    // au lieu de manquer. Le `client` reste un faux assumé.
   } satisfies { client: unknown } & Partial<Omit<Session, "client">>;
 
   return {
-    session: session as unknown as Session,
+    session: asSession(session),
     client,
     crypto,
     room,

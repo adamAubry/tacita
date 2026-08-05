@@ -19,11 +19,20 @@ cd infra
 cp .env.example .env                       # remplir les secrets
 ./proxy/generate-dev-certs.sh              # lit .env tout seul, ne rien exporter
 docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
-cd .. && npm run smoke                     # 14/14 attendus
+cd .. && npm run smoke                     # tout doit être vert
 ```
 
-`npm run test` (279 unitaires), `npm run typecheck`, `npm run lint`. Les hooks pré-commit
-lancent les trois : **`--no-verify` est proscrit** (`CLAUDE.md`).
+`npm run test`, `npm run typecheck`, `npm run lint`. Les hooks pré-commit lancent les
+trois : **`--no-verify` est proscrit** (`CLAUDE.md`).
+
+Aucun compte de tests n'est écrit ici, ni dans le `README.md` : ce dossier en portait un,
+faux dès la semaine suivante, et le README en portait un autre. Un nombre qu'aucun test ne
+garde dérive — la commande fait foi.
+
+**La pile ci-dessus ne démarre pas le RTC.** L'overlay `rtc/docker-compose.yml` est
+séparé et demande deux IP publiques (`WEB_BIND_IP`, `TURN_BIND_IP` : le proxy et le
+TURN-TLS veulent tous les deux le 443). Conséquence à connaître avant M-I, détaillée en
+§ 5.
 
 Si `npm run smoke` échoue au démarrage, la cause est presque toujours dans
 `infra/README.md`, section « Login OIDC » — quatre causes documentées, toutes déjà
@@ -34,8 +43,13 @@ corrigées, mais elles décrivent les symptômes que vous reverrez si un réglag
 ## 2. Ce dont vous héritez
 
 Sept paquets, tous verts, tous en dépendance unique sur `client-core`. **Aucun paquet n'en
-importe un autre** : c'est votre shard qui les compose. C'est un choix d'architecture des
-specs, pas un oubli.
+importe un autre en production** : c'est votre shard qui les compose. C'est un choix
+d'architecture des specs, pas un oubli.
+
+Une seule exception, en `devDependencies` : `media-pipeline` tire `outbox` pour le site de
+compilation `tests/jonction-outbox.ts` (§ 5). Une passation entre deux paquets que personne
+ne compile ensemble n'est vérifiée par rien — c'est le prix à payer pour ce choix
+d'architecture, et la contrepartie est ce fichier.
 
 | Paquet | Ce qu'il vous donne | REQ-UI servies |
 |---|---|---|
@@ -130,10 +144,23 @@ recopiez jamais en dur** — une chaîne recopiée n'est plus un contrat.
 `messaging` et `outbox`. C'est imposé par REQ-CAL-05 et documenté en limite assumée dans
 `packages/calls/README.md`. Ne le « corrigez » pas vers l'outbox.
 
-**Les mocks de `Session`.** Trois sont ancrés au contrat par `satisfies` ; trois ne le sont
-pas (`calls`, `media-pipeline`, `receipts` — ils n'exposent que `client`). Si vous ajoutez
-un membre à `Session`, le compilateur ne vous dira rien de ces trois-là : la panne sera un
-`undefined is not a function` à l'exécution. C'est un risque **connu et non couvert**.
+**Les mocks de `Session` — corrigé, et voici la règle qui en sort.** Les six mocks passent
+désormais par `asSession()` (`@tacita/client-core/testing`). Ce que ça vous donne : ajouter
+un membre à `Session` **casse la compilation d'un seul fichier**, `src/testing.ts`, qui est
+le site de compilation du contrat ; complétez-le et les six mocks en héritent. Et un membre
+qu'un test n'a pas stubbé **lève en se nommant** au lieu de rendre `undefined`. Si vous
+mockez `Session` dans le shard, passez par là — ne refaites pas un `as unknown as Session`,
+c'est précisément ce qui cachait le trou.
+
+**Le focus RTC est annoncé même quand le SFU n'est pas là.** `proxy/nginx.conf` publie
+`org.matrix.msc4143.rtc_foci` dans `.well-known/matrix/client` sans condition (REQ-RTC-05
+l'exige), mais les backends `/livekit/*` vivent dans l'overlay `rtc/docker-compose.yml`,
+que la procédure de démarrage ne lance pas. Sur la pile de développement courante,
+`discoverFocus()` **trouve donc un focus** : vous n'aurez pas `RtcFociMissing`, vous aurez
+un 502 au moment de rejoindre. Ne construisez pas l'état d'erreur de REQ-UI-19 en vous
+fiant à ce que fait la pile locale — REQ-CAL-02 veut un message visible, jamais un bouton
+inerte, et les deux chemins d'échec sont distincts. Contradiction remontée en
+`specs/ui/ESCALATIONS.md` § E-08.
 
 ---
 

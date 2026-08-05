@@ -71,8 +71,8 @@ Les deux sont nécessaires. La première seule a déjà menti : la configuration
 était conforme à 100 % pendant que personne ne pouvait se connecter.
 
 ```sh
-npm test        # 273 tests — imitations, aucune dépendance externe
-npm run smoke   # 6 tests — vrai Synapse, vraie crypto, vrai IndexedDB (Docker requis)
+npm test        # imitations, aucune dépendance externe
+npm run smoke   # vrai Synapse, vraie crypto, vrai IndexedDB (Docker requis)
 ```
 
 **Prouvé à l'exécution :** la crypto Rust réellement chargée, un salon effectivement
@@ -129,6 +129,11 @@ cp .env.example .env                       # remplir les secrets
 docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
 cd .. && npm run smoke
 ```
+
+Cette pile **ne monte pas le RTC** : l'overlay `infra/rtc/docker-compose.yml` est séparé et
+demande deux IP publiques. Le `.well-known` annonce pourtant un focus LiveKit sans
+condition, donc un appel échoue en 502 plutôt qu'en `RtcFociMissing` — c'est une
+contradiction entre REQ-RTC-05 et REQ-CAL-02, remontée en `specs/ui/ESCALATIONS.md` § E-08.
 
 Détail du socle serveur, y compris la vérification de pré-vol à faire avant toute création
 de compte : `infra/README.md`.

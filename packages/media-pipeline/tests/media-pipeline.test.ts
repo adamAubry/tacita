@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Session } from "@tacita/client-core";
+import { asSession } from "@tacita/client-core/testing";
 
 import {
   decryptAttachment,
@@ -73,7 +74,9 @@ beforeEach(() => {
   vi.unstubAllGlobals();
   env = fakeEnv();
   fake = fakeSession();
-  session = fake as unknown as Session;
+  // Ce paquet ne lit que `client`. `asSession` fournit le reste du contrat en
+  // levées nommées : un membre ajouté à `Session` ne manque plus en silence.
+  session = asSession({ client: fake.client });
 });
 
 /** L'erreur d'une promesse qui doit échouer. */

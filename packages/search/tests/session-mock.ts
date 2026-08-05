@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import type { Session } from "@tacita/client-core";
+import { asSession } from "@tacita/client-core/testing";
 import { MatrixEventEvent, RoomEvent, type MatrixEvent } from "matrix-js-sdk";
 import { vi } from "vitest";
 
@@ -102,15 +103,16 @@ export function fakeSession() {
     registerWipe: vi.fn((name: string, wipe: () => Promise<void> | void) => {
       wipes.set(name, wipe);
     }),
-    // Audit des jonctions — le double cast plus bas désactive toute vérification :
-    // une signature de `Session` qui dérive ne casserait rien à la compilation, et
-    // l'échec deviendrait un `undefined is not a function` à l'exécution. `satisfies`
-    // ancre les membres applicatifs sur le vrai contrat. Le `client` en est exclu :
-    // c'est un faux assumé, exiger un vrai `MatrixClient` demanderait 357 propriétés.
+    // Audit des jonctions — sans ancrage, une signature de `Session` qui dérive ne
+    // casserait rien à la compilation et l'échec deviendrait un `undefined is not a
+    // function` à l'exécution. `satisfies` ancre les membres définis ici ; `asSession`
+    // complète les autres en levées nommées, de sorte qu'un membre **ajouté** au
+    // contrat ne manque plus en silence. Le `client` en est exclu : c'est un faux
+    // assumé, exiger un vrai `MatrixClient` demanderait 357 propriétés.
   } satisfies { client: unknown } & Partial<Omit<Session, "client">>;
 
   return {
-    session: session as unknown as Session,
+    session: asSession(session),
     client,
     emitDecrypted(event: MatrixEvent) {
       for (const listener of [...listenersOf(MatrixEventEvent.Decrypted)]) listener(event);

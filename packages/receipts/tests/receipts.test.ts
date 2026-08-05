@@ -5,6 +5,7 @@ import { ClientEvent, EventStatus, ReceiptType, RoomEvent } from "matrix-js-sdk"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Session } from "@tacita/client-core";
+import { asSession } from "@tacita/client-core/testing";
 
 import { createReceipts, DELIVERED_EVENT_TYPE, type ReceiptStatus } from "../src/index";
 
@@ -73,7 +74,9 @@ let session: Session;
 beforeEach(() => {
   vi.useFakeTimers();
   client = fakeClient();
-  session = { client } as unknown as Session;
+  // Ce paquet ne lit que `client`. `asSession` fournit le reste du contrat en
+  // levées nommées : un membre ajouté à `Session` ne manque plus en silence.
+  session = asSession({ client });
 });
 
 describe("REQ-RCP-01 — « envoyé » dérivé de l'event_id serveur, `sending` avant", () => {
