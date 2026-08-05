@@ -29,9 +29,9 @@ reste en découle, y compris les limites — qui sont documentées, jamais masqu
 
 1. **`CLAUDE.md`** — principe directeur, stack imposée, **13 interdits absolus**. Ne se
    négocie pas dans une PR.
-2. **`DECISIONS.md`** — arbitrages produit fermes (D-01 à D-08). Le code ne les rediscute
+2. **`DECISIONS.md`** — arbitrages produit fermes (D-01 à D-09). Le code ne les rediscute
    pas ; on escalade au PM.
-3. **`specs/00-conventions.md`** puis `specs/01` à `specs/11` — un contrat par module.
+3. **`specs/00-conventions.md`** puis `specs/01` à `specs/12` — un contrat par module.
    Chaque exigence porte un identifiant `REQ-XXX-NN`, et **chaque test nomme l'exigence
    qu'il couvre**.
 
@@ -134,9 +134,9 @@ cd .. && npm run smoke
 ```
 
 Cette pile **ne monte pas le RTC** : l'overlay `infra/rtc/docker-compose.yml` est séparé et
-demande deux IP publiques. Le `.well-known` annonce pourtant un focus LiveKit sans
-condition, donc un appel échoue en 502 plutôt qu'en `RtcFociMissing` — c'est une
-contradiction entre REQ-RTC-05 et REQ-CAL-02, remontée en `specs/ui/ESCALATIONS.md` § E-08.
+demande deux IP publiques. Tant que l'annonce conditionnelle décidée en E-08 n'est pas
+implémentée (`docs/REPRISE.md` § 6.1, action A4), le `.well-known` annonce un focus LiveKit
+dont le backend est absent : un appel échoue en 502 plutôt qu'en `RtcFociMissing`.
 
 Détail du socle serveur, y compris la vérification de pré-vol à faire avant toute création
 de compte : `infra/README.md`.

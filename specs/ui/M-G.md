@@ -1,6 +1,6 @@
 # M-G — Social : profils, amis, demandes, note
 
-**Dépendances : M-A, M-E (galeries pour Activity), packages client-core/messaging. Escalations E-02, E-04, E-05 : la V1 s'appuie sur les interfaces `Contacts`, `ProfileNotes`, `InviteLinks` (adaptateurs V1 = natif Matrix, cf. V2-BACKEND).**
+**Dépendances : M-A, M-E (galeries pour Activity), packages client-core/messaging, spec 12 (service de liens d'invitation). Escalades E-02, E-04, E-05 tranchées le 05/08/2026 — voir `DECISIONS.md` D-09 : « ami » = DM natif, note privée locale à l'appareil et non synchronisée, liens d'invitation servis par la spec 12. L'interface `Contacts` reste, par découplage.**
 
 ## Livrable
 
@@ -27,7 +27,7 @@ Layouts Profile (soi / autrui), Add-friends, Friend request, et les composants s
 
 ## Hors scope
 
-Backend social (V2-01) ; settings (M-H) ; appels (M-I).
+Le graphe social dédié — refusé par D-09, pas reporté ; settings (M-H) ; appels (M-I) ; le service de liens lui-même (spec 12), dont ce module n'est que le client.
 
 ## Objectif mesurable
 

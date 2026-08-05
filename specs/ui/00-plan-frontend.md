@@ -1,12 +1,12 @@
 # PLAN FRONTEND — Découpage du shard UI (apps/web)
 
-Rédigé par le Tech Lead Frontend. **Hiérarchie des sources** : la SPEC 11 fait autorité (REQ-UI-XX, contraintes, critères) ; `ui-specs.md` (wireframe du concepteur) est un point de départ non exhaustif et faillible — toute divergence est tranchée en faveur de la SPEC 11 ou remontée (ESCALATIONS.md). Les exigences issues du wireframe portent le préfixe **REQ-UIX** (en attente de ratification PM, E-06).
+Rédigé par le Tech Lead Frontend. **Hiérarchie des sources** : la SPEC 11 fait autorité (REQ-UI-XX, contraintes, critères) ; `ui-specs.md` (wireframe du concepteur) est un point de départ non exhaustif et faillible — toute divergence est tranchée en faveur de la SPEC 11 ou remontée (ESCALATIONS.md). Les exigences issues du wireframe portent le préfixe **REQ-UIX** ; elles ont été **ratifiées telles quelles le 05/08/2026** (E-06) et valent contrat au même titre que les REQ-UI.
 
 ## Documents
 
 - `M-A.md` … `M-I.md` — les 9 modules frontend, assignables indépendamment
 - `ESCALATIONS.md` — points remontés au PM, propositions V1
-- `V2-BACKEND.md` — features reportées faute d'infra, avec interfaces de branchement
+- `ESCALATIONS.md` — les huit points remontés au PM, tous tranchés le 05/08/2026
 - Racine du repo : `PRODUCT.md` et `DESIGN.md` (impeccable) — à lire avant tout code UI
 
 ## Modules et ordre
@@ -64,4 +64,4 @@ Règles : un composant du wireframe = un composant React nommé, réutilisé par
 
 ## Divergences wireframe déjà arbitrées
 
-Voir ESCALATIONS.md : mentions/tokens (E-01), note synchronisée (E-02), messages éphémères (E-03), modèle amis (E-04), liens d'invitation (E-05), call layout (E-07), plus les décisions design (avatar, navbar, formats de date). Le wireframe n'inclut pas : onboarding clé de récupération, bandeau hors ligne, reçus 3 niveaux, capture in-app, mode masqué — **ils sont dans la SPEC 11 et donc au périmètre**, répartis dans les modules.
+Voir ESCALATIONS.md : les huit points sont tranchés (05/08/2026) — filtres de recherche (E-01), note locale à l'appareil (E-02), éphémères abandonnés (E-03), modèle amis natif (E-04), service de liens (E-05), REQ-UIX ratifiées (E-06), call layout (E-07), focus RTC conditionnel (E-08), plus les décisions design (avatar, navbar, formats de date). Le wireframe n'inclut pas : onboarding clé de récupération, bandeau hors ligne, reçus 3 niveaux, capture in-app, mode masqué — **ils sont dans la SPEC 11 et donc au périmètre**, répartis dans les modules.

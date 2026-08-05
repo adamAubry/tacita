@@ -6,7 +6,7 @@ racontaient chacun une session ; aucun ne disait où on en est. Leur contenu uti
 leur contenu périmé est dans `git log`.
 
 > **Cette page ne fait foi sur rien.** Elle oriente. Ce qui fait foi : `CLAUDE.md` (les
-> 13 interdits), `DECISIONS.md` (D-01 à D-08), `specs/` (les exigences), et le `README.md`
+> 13 interdits), `DECISIONS.md` (D-01 à D-09), `specs/` (les exigences), et le `README.md`
 > de chaque package (les limites assumées). En cas de contradiction, c'est le fichier
 > désigné qui gagne et cette page qui est à corriger. Une copie diverge — ce dépôt en a
 > fait la démonstration en douze heures avec le dossier `correctif/`.
@@ -20,8 +20,10 @@ humain senior** (directive PM du 04/08/2026) ; `apps/web/` n'existe pas encore. 
 frontend est fait : neuf modules `M-A` à `M-I` dans `specs/ui/`. Le socle a été audité deux
 fois, sur son code puis sur ses jonctions, et la dernière passe a fermé les trous connus.
 
-Il reste **deux actions techniques**, **une action de méthode** et **huit escalades non
-tranchées**. Elles sont en § 6.
+Les huit escalades du Tech Lead Frontend ont été **tranchées le 05/08/2026** — deux d'entre
+elles créent du contrat neuf : la spec 09 gagne la recherche filtrée, et une spec 12 apparaît
+pour le service de liens d'invitation. Il reste **cinq actions techniques** et **une action de
+méthode**. Elles sont en § 6.
 
 ---
 
@@ -242,7 +244,9 @@ un contrat.
 `/livekit/*` vivent dans un overlay que la procédure de démarrage ne monte pas. Sur la pile de
 développement, `discoverFocus()` **trouve donc un focus** : vous n'aurez pas `RtcFociMissing`,
 vous aurez un 502 au moment de rejoindre. Ne construisez pas l'état d'erreur de REQ-UI-19 en
-vous fiant à ce que fait la pile locale. Escaladé en `specs/ui/ESCALATIONS.md` § E-08.
+vous fiant à ce que fait la pile locale. **Tranché le 05/08 (E-08) : l'annonce devient
+conditionnelle** — mais tant que l'action A4 n'est pas faite, le comportement décrit ci-dessus
+est celui que vous observerez.
 
 ### 5.5 Mocker `Session` dans le shard
 
@@ -281,12 +285,15 @@ Les 13 interdits sont dans `CLAUDE.md`. Ceux qui vous concernent :
 
 ## 6. Le plan — ce qui reste à faire
 
-### 6.1 Deux actions techniques, petites et datées
+### 6.1 Cinq actions techniques
 
 | # | Action | Pourquoi | Qui |
 |---|---|---|---|
 | **A1** | Écrire l'invariant **REQ-MED-02** : un test assertant qu'aucun `sendEvent`/`sendMessage` n'existe dans `media-pipeline`. | Le PM l'a exigé le 04/08 **en contrepartie** de sa décision « le média est hors périmètre de REQ-OBX-09 par construction ». La construction est saine ; rien ne la garde. C'est exactement ce que C1 était avant qu'on le nomme. Jamais écrit. | dev |
 | **A2** | Supprimer le dossier `correctif/`. | Décidé au point 10 de l'ordre de marche du 03/08 : « se supprime au merge, comme prévu ». Les merges sont faits depuis le 04/08. Il doublonne `packages/` avec des fichiers **partiellement périmés**, et son propre README avertit de ne pas s'en servir. Un instantané périmé à côté du code vivant est un piège pour le prochain lecteur. | dev |
+| **A4** | Rendre l'annonce du focus RTC conditionnelle : la déplacer de la config proxy de base vers l'overlay RTC, et réaligner le test `REQ-RTC-05` sur les deux configs. | Escalade **E-08 tranchée**, `specs/02-rtc-backend.md` amendée. Aujourd'hui une pile sans SFU annonce un focus dont le backend n'existe pas, donc `discoverFocus()` réussit et l'appel meurt en 502 — au lieu du `RtcFociMissing` que REQ-CAL-02 traite en message visible. **À faire avant `M-I`**, sinon le module construit son état d'erreur contre un comportement local trompeur. | dev |
+| **A5** | Implémenter la **recherche filtrée** : `mentions` et `msgtype` au schéma, alimentés au déchiffrement, et les critères combinables de `search`. | Escalade **E-01 tranchée**, `specs/09-search.md` REQ-SRC-11. **À faire avant `M-F`** : sans elle, l'onglet Mentions n'a que du plein-texte sur un nom d'affichage, c'est-à-dire le contournement que la décision refuse explicitement. Attention en écrivant : `mentions` dérive du corps déchiffré, l'interdit n°8 s'y applique entièrement. | dev |
+| **A6** | Construire le **service de liens d'invitation** (`apps/invite-tokens/`, spec 12) et son raccordement (REQ-INF-15). | Escalade **E-05 tranchée** : le service se fait, sans repli deep link. Vingt exigences, dont huit ne décrivent que des scénarios hors cadre. **La spec 12 attend une ratification du PM sur trois choix de conception** — elle les liste dans sa dernière section. Bloque la partie « ajout par lien » de `M-G` et `M-H`, pas les modules entiers. | dev |
 
 ### 6.2 Une action de méthode, bloquante
 
@@ -294,19 +301,25 @@ Les 13 interdits sont dans `CLAUDE.md`. Ceux qui vous concernent :
 |---|---|---|---|
 | **A3** | Le **spike d'une journée** sur Astryx / ponytail / impeccable, avec compte-rendu d'une page au PM. | Exigé par `specs/11-ui-shard.md` « en tout début de module » et repris dans `M-A`. Aucun des trois outils n'est installé ni évalué pour les gestes tactiles, les contraintes PWA et le rendu hors ligne. **Tant qu'il n'est pas fait, on ne sait pas si REQ-UI-08/09 et REQ-UI-01 sont réalisables tels qu'écrits.** C'est la porte d'entrée de `M-A`, donc de tout le frontend. | senior spec 11 |
 
-### 6.3 Huit escalades non tranchées
+### 6.3 Les huit escalades sont tranchées
 
-Elles sont détaillées dans `specs/ui/ESCALATIONS.md`, avec une proposition chacune. Trois
-bloquent un module entier :
+Décidées le 05/08/2026. Question, décision et motif : `specs/ui/ESCALATIONS.md`. Rien ne
+bloque plus un module par manque d'arbitrage.
 
-| Escalade | Bloque |
-|---|---|
-| **E-04** — modèle « amis » : aucun concept natif Matrix | `M-G` en entier |
-| **E-02** — note privée sur profil : synchronisée vs zéro clair serveur | `M-G` |
-| **E-06** — ratification des 40 exigences `REQ-UIX` issues du wireframe | la validité des tests de tous les modules |
-| E-01, E-03, E-05, E-07, E-08 | `M-F`, `M-D`, `M-G`, `M-I` partiellement |
+| Escalade | Décision | Où elle est contraignante |
+|---|---|---|
+| **E-01** — filtres de recherche | Retenus, schéma étendu proprement, aucun contournement | `specs/09-search.md` REQ-SRC-11 → action **A5** |
+| **E-02** — note privée | Locale à l'appareil, non synchronisée, **définitif** | `DECISIONS.md` D-09 |
+| **E-03** — messages éphémères | Abandonnés, ni V1 ni backlog, pas même une option grisée | `DECISIONS.md` D-09 |
+| **E-04** — modèle « amis » | Mécanismes Matrix natifs, **définitif** ; pas de graphe social | `DECISIONS.md` D-09 |
+| **E-05** — liens d'invitation | Service de tokens construit | `specs/12-invite-tokens.md` → action **A6** |
+| **E-06** — les 40 `REQ-UIX` | Ratifiées telles quelles | les tests les nomment |
+| **E-07** — layout d'appel | Confirmé : pas de client RTC maison | interdit n°7, inchangé |
+| **E-08** — focus RTC sans SFU | Annonce conditionnelle | `specs/02-rtc-backend.md` REQ-RTC-05 → action **A4** |
 
-**Coder `M-G` avant E-04, c'est du travail à jeter.**
+**Ce qui a changé pour les modules :** `M-G` et `M-H` sont débloqués et leur périmètre est
+fixé (natif + spec 12) ; `M-F` gagne les filtres en V1 ; `M-I` attend A4. Le backlog
+`V2-BACKEND.md` est supprimé — ses quatre items sont tranchés, aucun n'attend plus une V2.
 
 ### 6.4 Trois dettes marquées, avec leur seuil de déclenchement
 
@@ -336,10 +349,11 @@ Ni actions ni dettes : des décisions déjà prises de ne pas faire maintenant.
 | Question | Fichier |
 |---|---|
 | Les interdits, la stack, le workflow | `CLAUDE.md` |
-| Pourquoi telle décision produit | `DECISIONS.md` (D-01 à D-08) |
+| Pourquoi telle décision produit | `DECISIONS.md` (D-01 à D-09) |
 | Les exigences, par module | `specs/00` à `specs/11` |
 | Le découpage frontend et son plan | `specs/ui/00-plan-frontend.md`, `M-A` à `M-I` |
-| Ce qui attend le PM | `specs/ui/ESCALATIONS.md` |
+| Les huit escalades et leurs motifs | `specs/ui/ESCALATIONS.md` |
+| Le service de liens d'invitation | `specs/12-invite-tokens.md` |
 | Stratégie produit et voix | `PRODUCT.md` |
 | Système visuel et tokens | `DESIGN.md` |
 | Les limites assumées d'un module | le `README.md` du package concerné |

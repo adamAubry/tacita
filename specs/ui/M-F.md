@@ -1,6 +1,6 @@
 # M-F — Recherche (Default layout, variations search et mentions)
 
-**Dépendances : M-A, package search (spec 09). Escalation E-01 ouverte (tokens avancés).**
+**Dépendances : M-A, package search (spec 09) — dont la recherche filtrée REQ-SRC-11, action A5. Escalade E-01 tranchée le 05/08/2026 : les filtres sont au périmètre V1, implémentés par le schéma d'index, jamais par un contournement plein-texte.**
 
 ## Livrable
 
@@ -11,7 +11,7 @@ Les trois états de la variation search + l'onglet Mentions. 100 % local (spec 0
 - **REQ-UI-16** — Barre de recherche globale (PowerSearch, tokens configurés ici) ; périmètre explicite affiché : « Recherche dans l'historique téléchargé » avec les bornes de `stats()` (REQ-SRC-06).
 - **REQ-UIX-19** — État initial (rien saisi) : Recent searches (composant 17) — titre + scroller horizontal de profils récemment recherchés avec « content peek » (dernier élément partiellement visible s'il déborde), stocké en IndexedDB, purgeable ; puis raccourcis/options de recherche. Placeholder si aucun historique.
 - **REQ-UIX-20** — État résultats : deux sections titrées — « Conversations » (liste de previews filtrées par nom, sans badge ni épingle) et « Messages » (composant 19 : « message preview » = nom de conversation en haut à gauche, date en haut à droite, extrait tronqué en bas). Occurrences surlignées via Highlighted text (composant 18, token `highlight` de DESIGN.md). Tap sur un résultat → conversation positionnée sur le message.
-- **REQ-UIX-21** — Onglet Mentions : recherche pré-armée du token `@me` (surligné dans la barre), résultats sous titre « Mentions » avec mentions surlignées ; filtre « exclure les groupes » (bouton dédié) + dropdown de filtres avancés (personne, conversation, type, dates). **Les filtres non couverts par l'index actuel (type, mentions structurées) restent derrière flag tant que E-01 n'est pas tranché** — le bouton n'apparaît pas, aucun filtre grisé.
+- **REQ-UIX-21** — Onglet Mentions : recherche pré-armée du token `@me` (surligné dans la barre), résultats sous titre « Mentions » avec mentions surlignées ; filtre « exclure les groupes » (bouton dédié) + dropdown de filtres avancés (personne, conversation, type, dates). **Tous ces filtres sont au périmètre V1** (E-01 tranchée) : `sender`, `roomId`, dates, `msgtype` et `mentions` sont servis par REQ-SRC-11. L'onglet Mentions interroge le champ `mentions`, jamais une recherche plein-texte sur un nom d'affichage. Ce module ne démarre pas avant l'action A5 — sans elle, il n'y a rien à interroger.
 - **REQ-UIX-22** — Recherche débouncée (300 ms), exécutée dans le worker du package ; skeletons pendant la requête ; Placeholder « aucun résultat » avec rappel du périmètre.
 
 ## Contraintes
@@ -25,4 +25,4 @@ Indexation (package spec 09) ; recherche intra-conversation du layout info (M-H,
 
 ## Objectif mesurable
 
-Vitest + Testing Library, package search mocké : REQ-UI-16 (bornes stats rendues) ; REQ-UIX-19 (débordement simulé → dernier item partiellement visible via attribut/style testable) ; REQ-UIX-20 (résultats mixtes → deux sections, texte surligné présent) ; REQ-UIX-21 (flag off → filtres avancés absents du DOM) ; REQ-UIX-22 (20 frappes → 1 appel search, fake timers ; spy fetch : zéro appel réseau).
+Vitest + Testing Library, package search mocké : REQ-UI-16 (bornes stats rendues) ; REQ-UIX-19 (débordement simulé → dernier item partiellement visible via attribut/style testable) ; REQ-UIX-20 (résultats mixtes → deux sections, texte surligné présent) ; REQ-UIX-21 (chaque filtre appelle `search` avec le critère correspondant ; deux filtres combinés rendent l'intersection ; l'onglet Mentions n'émet aucune requête plein-texte sur un nom d'affichage) ; REQ-UIX-22 (20 frappes → 1 appel search, fake timers ; spy fetch : zéro appel réseau).

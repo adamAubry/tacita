@@ -22,11 +22,12 @@ Config-as-code complète et testée du socle serveur auto-hébergé : `homeserve
 - **REQ-INF-12** — Comportement de l'**authenticated media** vérifié sur la version Synapse déployée et consigné dans `infra/README.md` (il a changé récemment et casse les intégrations supposant des URLs média publiques). Le client (spec 08) consomme ce qui est consigné ici.
 - **REQ-INF-13** — Doc `infra/LIMITES.md` : métadonnées en clair côté serveur (qui parle à qui, quand, fréquence, taille des pièces jointes) documentées comme limite assumée.
 - **REQ-INF-14** — La passerelle Web Push (spec 03) est **provisionnée par ce module** : image construite (Dockerfile), service dans `docker-compose.yml` joignable par Synapse (URL du pusher configurée), route reverse proxy exposant au client l'endpoint de config (clé publique VAPID, REQ-PSH-03), variables `VAPID_*` dans `.env.example`. Critère : `docker compose up` démarre la passerelle. *(Créée le 03/08/2026 — la spec 03 livre le service, la spec 01 possède le raccordement ; personne ne le possédait.)*
+- **REQ-INF-15** — Le service de liens d'invitation (spec 12) est **provisionné par ce module**, par la même jurisprudence que REQ-INF-14 : image construite, service dans `docker-compose.yml`, base PostgreSQL dédiée (jamais une table dans celle de Synapse), route reverse proxy, variables dans `.env.example`. **Aucun jeton d'administration Synapse dans son environnement** — la spec 12 lui interdit tout pouvoir Matrix, le raccordement ne doit pas le lui rendre. Critère : `docker compose up` démarre le service, et un test de configuration asserte l'absence de variable portant un secret d'administration. *(Créée le 05/08/2026 — escalade E-05, D-09.)*
 
 ## Méthode et contraintes
 
 - Toute valeur par défaut Synapse est lue dans la doc de la version épinglée, jamais supposée. Versions épinglées (digest) dans le compose.
-- Hors scope : LiveKit/TURN/well-known (spec 02), le **code** de la passerelle push (spec 03 — son raccordement est ici, REQ-INF-14), tout code client, CI/CD.
+- Hors scope : LiveKit/TURN/well-known (spec 02), tout code client, CI/CD. Le **code** de la passerelle push (spec 03) et celui du service de liens (spec 12) sont hors scope eux aussi — mais pas leurs raccordements, qui sont ici : REQ-INF-14 et REQ-INF-15.
 
 ## Objectif mesurable
 

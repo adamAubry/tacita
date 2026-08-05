@@ -1,6 +1,6 @@
 # M-H — Réglages et infos de conversation
 
-**Dépendances : M-A, M-E (galeries), packages messaging (05), receipts (06), média (08). Escalation E-03 (éphémères : absents de la V1).**
+**Dépendances : M-A, M-E (galeries), packages messaging (05), receipts (06), média (08), spec 12 pour les liens d'invitation de groupe. Escalades E-03 et E-05 tranchées le 05/08/2026 (`DECISIONS.md` D-09) : pas de messages éphémères, et les liens passent par le service de tokens.**
 
 ## Livrable
 
@@ -15,7 +15,7 @@ Layout Settings, layout Conversation info (1:1 et groupe), et toutes les options
 
 ### Conversation info
 - **REQ-UIX-33** — Layout info : header ; avatar + nom centrés ; Info buttons (composant 14, taille navbar + libellé sous l'icône, 4 boutons équirépartis) — 1:1 : profil, rechercher dans la conversation (PowerSearch pré-armée token conversation, M-F), muter, options ; groupe : ajouter un membre, rechercher, muter, options.
-- **REQ-UIX-34** — Options (composant 15, ClickableCards) — 1:1 : thème de la conversation, notifications, créer un groupe avec cette personne (+ autres) ; groupe : thème, lien d'invitation (V1 = deep link, E-05), membres (liste + kick si power level suffisant, REQ-MSG-11), notifications. **« Messages éphémères » absent de la V1** (E-03).
+- **REQ-UIX-34** — Options (composant 15, ClickableCards) — 1:1 : thème de la conversation, notifications, créer un groupe avec cette personne (+ autres) ; groupe : thème, lien d'invitation (émis par le service de la spec 12, E-05 tranchée — l'écran gère aussi l'expiration et la révocation), membres (liste + kick si power level suffisant, REQ-MSG-11), notifications. **« Messages éphémères » n'existe pas** — abandonné, pas reporté (E-03, D-09) : absent du DOM, jamais grisé.
 - **REQ-UIX-35** — Thème de conversation : fond d'écran depuis la galerie du user (REQ-UI-20) — stocké en IndexedDB, non synchronisé, libellé « sur cet appareil » ; aperçu avant application ; réinitialisation possible. Lisibilité garantie par le voile (M-D).
 - **REQ-UIX-36** — Muter / notifications par salon : push rules Matrix natives (silencieux, mentions uniquement, tout), état actuel visible dans la liste.
 - **REQ-UIX-37** — Galeries : dernière section du layout info = `ConversationCollections` (M-E), 4 onglets, deux variantes 1:1/groupe identiques hors actions.
