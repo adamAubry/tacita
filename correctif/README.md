@@ -25,8 +25,13 @@
 > Pour comparer vous-même :
 > `git diff --no-index correctif/packages/search/src/index.ts packages/search/src/index.ts`
 
-Raisonnement, conséquences et suites : `docs/REMEDIATION-CRITIQUES.md`, sections C3
-et C2. Les correctifs eux-mêmes sont commités en `05f22aa` (C3) et `98e0065` (C2).
+Les correctifs eux-mêmes sont commités en `05f22aa` (C3) et `98e0065` (C2) : leurs
+messages portent le raisonnement et les conséquences. Le document qui les détaillait
+(`docs/REMEDIATION-CRITIQUES.md`) a été remplacé par `docs/REPRISE.md`, qui en garde les
+enseignements sans en garder l'état daté.
+
+**Ce dossier est en instance de suppression** — décidée à l'ordre de marche du 03/08/2026,
+planifiée en `docs/REPRISE.md` § 6.1, action A2.
 
 ## Contenu
 

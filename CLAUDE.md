@@ -8,7 +8,7 @@ Spec-driven development : les specs sont exécutables, le code les implémente, 
 
 - `specs/00-conventions.md` — architecture, IDs d'exigence, workflow. **Lire en premier.**
 - `specs/01..11-*.md` — un contrat par module. Ne travailler que dans le module assigné.
-- `DECISIONS.md` — arbitrages produit tranchés (D-01 à D-05). Ne pas les rediscuter dans le code ; escalader au PM.
+- `DECISIONS.md` — arbitrages produit tranchés (D-01 à D-08). Ne pas les rediscuter dans le code ; escalader au PM.
 - `specs/ui/` — découpage frontend du shard UI (modules M-A à M-I, plan, ESCALATIONS.md, V2-BACKEND.md). Pour tout travail dans `apps/web`, le module M-X assigné est le contrat ; la SPEC 11 reste l'autorité fonctionnelle.
 - `PRODUCT.md` et `DESIGN.md` (racine) — stratégie produit et système visuel (voir section impeccable).
 

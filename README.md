@@ -18,8 +18,9 @@ reste en découle, y compris les limites — qui sont documentées, jamais masqu
 | Vous êtes | Lisez, dans cet ordre |
 |---|---|
 | **Développeur qui arrive** | `specs/00-conventions.md`, puis la spec de votre module, puis le `README.md` du package |
-| **Relecteur** | `docs/REMEDIATION-CRITIQUES.md` §1 (état) et §4 (ce qui n'est pas prouvé), puis le diff |
-| **PM / décideur** | `DECISIONS.md`, puis `docs/ARBITRAGE-PM.md` — les deux seuls documents contraignants côté produit |
+| **Relecteur** | `docs/REPRISE.md` § 4 (ce qui est prouvé, ce qui ne l'est pas), puis le diff |
+| **PM / décideur** | `DECISIONS.md`, puis `specs/ui/ESCALATIONS.md` — ce qui est tranché, puis ce qui attend |
+| **Développeur du shard UI** | `docs/REPRISE.md` § 5 en entier — c'est le dossier de reprise |
 | **Quelqu'un que ça réveille la nuit** | la section « Ce qui est prouvé, ce qui ne l'est pas » ci-dessous |
 
 ---
@@ -28,7 +29,7 @@ reste en découle, y compris les limites — qui sont documentées, jamais masqu
 
 1. **`CLAUDE.md`** — principe directeur, stack imposée, **13 interdits absolus**. Ne se
    négocie pas dans une PR.
-2. **`DECISIONS.md`** — arbitrages produit fermes (D-01 à D-07). Le code ne les rediscute
+2. **`DECISIONS.md`** — arbitrages produit fermes (D-01 à D-08). Le code ne les rediscute
    pas ; on escalade au PM.
 3. **`specs/00-conventions.md`** puis `specs/01` à `specs/11` — un contrat par module.
    Chaque exigence porte un identifiant `REQ-XXX-NN`, et **chaque test nomme l'exigence
@@ -96,24 +97,26 @@ et login OIDC verts, et les contrats d'interface propres dans les README —
 
 ---
 
-## Les documents de processus, et leur péremption
+## Le document de processus, et ce qu'il a remplacé
 
-Ils racontent comment on en est arrivé là. **Aucun n'est contraignant** — ce qui l'est a
-migré dans `DECISIONS.md`, les specs et les README de packages.
+**`docs/REPRISE.md`** — un seul fichier : la chronologie et ce que chaque étape a appris, les
+six règles qui en sortent, l'état de ce qui est prouvé, le dossier de reprise du shard UI, et
+le plan des actions restantes. **Il n'est contraignant sur rien** ; ce qui l'est a migré dans
+`DECISIONS.md`, les specs et les README de packages.
 
-| Fichier | Ce que c'est | Encore utile ? |
-|---|---|---|
-| `docs/REMEDIATION-CRITIQUES.md` | L'audit et ses suites : chaque défaut, pourquoi ce correctif-là, ce qu'il coûte | Oui — journal de bord vivant |
-| `docs/ARBITRAGE-PM.md` | Les décisions du PM et leurs motifs | Oui — les motifs font jurisprudence |
-| `docs/BRIEF-PM.md` | La mise en contexte qui a précédé l'arbitrage | Historique — les réponses sont dans `docs/ARBITRAGE-PM.md` |
-| `docs/ESCALADE-PM-OIDC.md` | La question posée quand le login s'est révélé cassé | Historique — tranché, correctif livré |
-| `docs/ESCALADE-PM-VERIFICATION.md` | L'affaire REQ-COR-07 de bout en bout, jusqu'à D-08 | Historique — tranché, `DECISIONS.md` fait foi |
-| `docs/DOSSIER-SPEC-11.md` | Le dossier de reprise remis au développeur de la spec 11 | Oui — c'est le point d'entrée du shard UI |
-| `correctif/` | Instantané des fichiers C3/C2 tels que déposés avant application | **Historique et partiellement périmé — lire son README avant de s'en servir** |
+Il remplace six documents de session — brief PM, arbitrages, deux escalades, remédiation des
+défauts critiques, dossier de reprise. Chacun racontait bien sa session ; aucun ne disait où
+on en était, et leurs états se contredisaient d'un fichier à l'autre. Ils vivent dans
+`git log`, où un document daté est à sa place.
 
-Conserver ces traces est un choix délibéré : une décision dont on a perdu le motif se
-rediscute tous les six mois. Mais **une trace n'est utile que si sa péremption est
-lisible** — d'où cette colonne, et d'où l'avertissement en tête de `correctif/README.md`.
+Reste `correctif/` : instantané des fichiers C3/C2 tels que déposés avant application,
+**partiellement périmé**. Son propre README l'avertit. Sa suppression est décidée et
+planifiée — `docs/REPRISE.md` § 6.1, action A2.
+
+**Une trace n'est utile que si sa péremption est lisible.** Une décision dont on a perdu le
+motif se rediscute tous les six mois ; un compte-rendu dont on a perdu la date se prend pour
+l'état courant. Le premier risque justifie qu'on garde les motifs, le second qu'on ne garde
+qu'un fichier.
 
 ---
 
