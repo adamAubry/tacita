@@ -1,6 +1,6 @@
 # M-A — Fondations : shell, thème, navigation, états
 
-**Dépendances : aucune. Premier module. Le spike Astryx/ponytail/impeccable est fait (05/08/2026) — `docs/SPIKE-OUTILLAGE.md`, à lire avant la première ligne : ses trois contraintes de construction sont reprises ci-dessous, et sans elles `next build` échoue. Tout blocage découvert depuis remonte au PM avant contournement.**
+**Dépendances : aucune. Premier module. Le spike Astryx/ponytail/impeccable est fait (05/08/2026) : ses trois contraintes de construction sont reprises ci-dessous, et sans elles `next build` échoue. Tout blocage découvert depuis remonte au PM avant contournement.**
 
 ## Livrable
 
@@ -10,7 +10,7 @@ Le squelette applicatif complet sur lequel tous les autres modules se posent : r
 
 - **REQ-UI-01** — PWA installable : manifest, icônes, service worker limité coquille + assets statiques, zéro donnée utilisateur en cache.
 - **REQ-UI-02** — Astryx exclusif ; lint + test `package.json`, **par défaut de refus** sur la liste close de la SPEC 11 : autorisés `@astryxdesign/*`, `@stylexjs/stylex` (exception ratifiée le 05/08/2026), `@tacita/*`, `next` et `react`/`react-dom` ; tout le reste refusé. Et aucun import de `@astryxdesign/core/tailwind-theme.css`.
-- **REQ-UI-03** — Thèmes sombre (défaut) et clair via le mécanisme Astryx (`ThemeMode = 'system' | 'light' | 'dark'`, appliqué par attributs de données), tokens de DESIGN.md ; persistance du choix en IndexedDB. **Le flash au premier rendu est assumé** : sans stockage synchrone — l'interdit n°2 ferme localStorage — le mode n'est pas connu avant l'hydratation. Il ne touche que les utilisateurs qui ont choisi l'autre mode que le défaut ; ne pas le contourner. ⚠️ **Contradiction à trancher par le PM** : cette exigence dit « sombre (défaut) », DESIGN.md dit « Clair par défaut » et en fait un de ses quatre principes non négociables. Le code suit DESIGN.md, autorité sur le visuel ; la SPEC 11 ne se prononce pas.
+- **REQ-UI-03** — Thèmes **clair (défaut)** et sombre via le mécanisme Astryx (`ThemeMode = 'system' | 'light' | 'dark'`, appliqué par attributs de données), tokens de DESIGN.md ; persistance du choix en IndexedDB. Le clair est le thème de référence — premier des quatre principes non négociables de DESIGN.md. **Le flash au premier rendu est assumé** : sans stockage synchrone — l'interdit n°2 ferme localStorage — le mode n'est pas connu avant l'hydratation, et un utilisateur qui a choisi le sombre verra un flash clair. Ne pas le contourner. *(Cette exigence disait « sombre (défaut) » ; corrigée le 05/08/2026 pour s'accorder à DESIGN.md, autorité sur le visuel.)*
 - **REQ-UIX-01** — Navbar (composant 4) : `@astryxdesign/core/NavIcon` × 4 (Accueil, Recherche, Mentions, Profil), fixée en bas, icônes seules, bouton actif légèrement surélevé (feedback UX). Navigation sans rechargement.
 - **REQ-UIX-02** — Layout header (composant 6) : `@astryxdesign/core/Toolbar`, titre centré, retour à gauche (historique de navigation, pas de route codée en dur).
 - **REQ-UIX-03** — Placeholder (composant 20) : état vide soigné et centré — illustration/icône + texte expliquant pourquoi c'est vide + action suivante si pertinente. Un seul composant paramétrable pour toute l'app.
@@ -112,9 +112,7 @@ quarante autres.
   3. **le cœur n'embarque aucune palette.** Soit un paquet `@astryxdesign/theme-*`, soit
      un `defineTheme` à nous — c'est le second : la table de correspondance ci-dessus
      impose de toute façon presque tous les tokens, et une palette de départ qu'on
-     écrase entièrement serait une dépendance pour rien. *(Le compte-rendu du spike
-     annonçait un paquet **requis** ; c'était une inférence, pas une mesure. `defineTheme`
-     fonctionne sans `extends`, vérifié le 05/08/2026 en construisant l'app.)*
+     écrase entièrement serait une dépendance pour rien. *(`defineTheme` fonctionne sans `extends`, vérifié le 05/08/2026 en construisant l'app.)*
 - **Raccorder `apps/web` au `typecheck` de la racine en créant le projet.** Le script de
   `package.json` énumère les projets `tsc -p` un par un : un projet absent de cette liste
   n'est pas typechecké, et les hooks pré-commit passent au vert sans l'avoir lu. Aucun

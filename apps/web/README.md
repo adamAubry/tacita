@@ -14,8 +14,8 @@ npx vitest run apps/web    # ou `npm test` à la racine
 
 ## Trois contraintes de construction — sans elles, `next build` échoue
 
-Ce sont des faits, trouvés en cassant le build pendant le spike (`docs/SPIKE-OUTILLAGE.md`),
-pas des préférences de style.
+Ce sont des faits, trouvés en cassant le build pendant le spike du 05/08/2026 ; ils sont
+au contrat dans `specs/11-ui-shard.md` et `specs/ui/M-A.md`. Pas des préférences de style.
 
 1. **Jamais le barrel `@astryxdesign/core`.** *« unsupported to use "export \*" in a client
    boundary »*. Toujours le sous-chemin. En pratique : **un seul fichier importe Astryx**,

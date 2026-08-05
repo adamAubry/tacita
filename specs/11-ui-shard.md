@@ -4,14 +4,14 @@
 
 ## Livrable
 
-**Toute l'UI du client tient dans ce seul shard** : PWA installable Next.js 15 (App Router, plugin ponytail), composants **exclusivement Astryx** (plugin impeccable), apparence clone de Discord. Le shard ne contient aucune logique métier : il consomme les APIs des packages 04–10. Toute logique découverte pendant le dev de l'UI remonte dans le package concerné, jamais dans le shard.
+**Toute l'UI du client tient dans ce seul shard** : PWA installable Next.js 15 (App Router), composants **exclusivement Astryx**, apparence clone de Discord. *(ponytail et impeccable sont des plugins d'agent — un style de codage et un outil d'audit de design —, pas des dépendances du shard : ils n'ont aucune empreinte à l'exécution. Précisé le 05/08/2026.)* Le shard ne contient aucune logique métier : il consomme les APIs des packages 04–10. Toute logique découverte pendant le dev de l'UI remonte dans le package concerné, jamais dans le shard.
 
 ## Exigences et critères d'acceptation
 
 ### Socle
 - **REQ-UI-01** — PWA installable : manifest, icônes, service worker. Le SW cache **uniquement** coquille applicative et assets statiques — jamais de contenu déchiffré, jamais de données utilisateur (cache applicatif pur).
-- **REQ-UI-02** — UI exclusivement Astryx : pas de Tailwind, shadcn, Bootstrap, ni CSS-in-JS tiers. **Liste close, ratifiée le 05/08/2026** — le test lit `package.json`, il lui faut des noms, pas une intention. Autorisés : `@astryxdesign/*`, **`@stylexjs/stylex`** — moteur de style d'Astryx lui-même, exception à l'interdit n°1 motivée dans `docs/SPIKE-OUTILLAGE.md` —, `@tacita/*` (les paquets 04–10 que le shard compose : ils sont le produit, pas une dépendance de style), `next` et `react`/`react-dom`. Refusés : `tailwindcss`, `bootstrap`, `shadcn*`, `styled-components`, `@emotion/*`, et toute dépendance de style qui n'est pas dans la liste des autorisés — l'assertion se fait **par défaut de refus**, sinon la prochaine bibliothèque ajoutée passera au vert faute d'avoir été nommée. Critère supplémentaire : aucun import de `@astryxdesign/core/tailwind-theme.css` dans les sources.
-- **REQ-UI-03** — Mode sombre et clair (mécanisme de thème Astryx), persistance du choix en IndexedDB (pas localStorage).
+- **REQ-UI-02** — UI exclusivement Astryx : pas de Tailwind, shadcn, Bootstrap, ni CSS-in-JS tiers. **Liste close, ratifiée le 05/08/2026** — le test lit `package.json`, il lui faut des noms, pas une intention. Autorisés : `@astryxdesign/*`, **`@stylexjs/stylex`** — moteur de style d'Astryx lui-même, exception à l'interdit n°1 motivée dans `CLAUDE.md` —, `@tacita/*` (les paquets 04–10 que le shard compose : ils sont le produit, pas une dépendance de style), `next` et `react`/`react-dom`. Refusés : `tailwindcss`, `bootstrap`, `shadcn*`, `styled-components`, `@emotion/*`, et toute dépendance de style qui n'est pas dans la liste des autorisés — l'assertion se fait **par défaut de refus**, sinon la prochaine bibliothèque ajoutée passera au vert faute d'avoir été nommée. Critère supplémentaire : aucun import de `@astryxdesign/core/tailwind-theme.css` dans les sources.
+- **REQ-UI-03** — Mode **clair par défaut** et mode sombre (mécanisme de thème Astryx, `ThemeMode = 'system' | 'light' | 'dark'`), persistance du choix en IndexedDB (pas localStorage). Le clair est le thème de référence : c'est le premier des quatre principes non négociables de DESIGN.md, et le sombre en dérive. *(Défaut fixé le 05/08/2026 : `M-A` disait « sombre (défaut) », DESIGN.md « clair ». DESIGN.md fait autorité sur le visuel.)*
 - **REQ-UI-04** — Onboarding : login OIDC (redirection fournisseur externe, y compris passkeys gérées par le fournisseur), puis **étape bloquante de clé de récupération** (REQ-COR-06) : impossible d'atteindre les conversations sans backup configuré, clé affichée une fois avec confirmation de sauvegarde.
 
 ### Conversations
@@ -38,11 +38,32 @@
 - **REQ-UI-19** — Boutons d'appel voix/vidéo intégrant le widget Element Call en iframe (spec 10) ; bandeau « appel en cours — rejoindre » (REQ-CAL-03) ; erreur RtcFociMissing → message d'erreur visible, jamais de bouton inerte (REQ-CAL-02).
 - **REQ-UI-20** — Personnalisation : photo de profil (via pipeline média), fond d'écran de conversation choisi dans la galerie du user (stocké localement en IndexedDB, non synchronisé — YAGNI).
 
+## Ce dont le shard hérite
+
+Les sept paquets sont livrés, verts, et **aucun n'importe un autre en production** : c'est le shard qui les compose. Chacun a un `README.md` avec une section « Limites assumées » — les cas où le module ne peut pas tenir ce que l'UI voudrait afficher. À lire avant de dessiner un écran qui promet plus.
+
+| Paquet | Ce qu'il donne | REQ-UI servies |
+|---|---|---|
+| `@tacita/client-core` | `initSession`, `restoreSession`, `Session` (client, timeline, isEncrypted, recoveryRequired, setupRecoveryKey, identityResetOf, confirmIdentityOf, registerWipe, logout) | 01, 04, 17 |
+| `@tacita/messaging` | `sendText`, `reply`, `edit`, `redact`, `react`, `messages`, `subscribe`, `canEdit`, `canRedact`, `createDirectMessage`, `createGroupChat`, `memberCount`, `getPinnedEvents`, `setPinnedEvents`, `parseMentions`, `mentionCandidates`, `createTypingIndicator` | 05–12 |
+| `@tacita/outbox` | `createOutbox`, `Outbox` (enqueue/retry/remove/pending/subscribe), `OutboxEntry`, `NOT_ENCRYPTED` | 06, 17 |
+| `@tacita/receipts` | `createReceipts`, `ReceiptStatus`, `DELIVERED`, `deliveryUnknowable` | 13 |
+| `@tacita/media-pipeline` | `uploadAttachment`, `downloadAttachment`, `saveOriginal`, `waveform`, `AttachmentContent` | 14, 15 |
+| `@tacita/search` | `createSearch`, `Search`, `SearchHit`, `SearchStats`, `ROOM_MENTION` | 16 |
+| `@tacita/calls` | `discoverFocus`, `buildCallWidget`, `CallWidgetDriver`, `activeCall`, `hangupLocal` | 19 |
+
+Un service en plus, non importable — c'est une API HTTP sous `/invite/` : **`apps/invite-tokens/`** (spec 12). Il résout un token en identifiant **et s'arrête là** ; c'est le shard qui invite ensuite, par le chemin natif de D-09.
+
+Deux points qui se paient cher s'ils sont ignorés :
+
+- **`NOT_ENCRYPTED` s'importe depuis `@tacita/outbox`, jamais ne se recopie.** C'est l'`errcode` d'une entrée bloquée par REQ-OBX-09 (salon non chiffré), et l'UI doit le distinguer d'un échec réseau : le premier ne se réessaie pas. Une chaîne recopiée n'est plus un contrat.
+- **Rien ne se dérive du crypto dans le shard.** Si vous vous surprenez à appeler `session.client.getCrypto()`, c'est qu'un membre manque à la spec 04 — demandez-le plutôt que de le contourner. C'est exactement ce qui s'est passé pour `identityResetOf` et `confirmIdentityOf`.
+
 ## Méthode et contraintes
 
-- Gestes tactiles implémentés sur événements pointer (testables en jsdom). **Le spike de validation a été fait le 05/08/2026 — `docs/SPIKE-OUTILLAGE.md`** : les événements pointer traversent Astryx intacts, son CSS est un fichier statique sans appel réseau, et REQ-UI-01/08/09 sont réalisables tels qu'écrits. Des trois outils, seul Astryx s'exécute chez l'utilisateur ; ponytail et impeccable sont des plugins d'agent, sans empreinte à l'exécution. Toute incompatibilité **découverte depuis** remonte au PM avant qu'un contournement soit écrit.
+- Gestes tactiles implémentés sur événements pointer (testables en jsdom). **Le spike de validation a été fait le 05/08/2026** : les événements pointer traversent Astryx intacts, son CSS est un fichier statique sans appel réseau, et REQ-UI-01/08/09 sont réalisables tels qu'écrits. Des trois outils, seul Astryx s'exécute chez l'utilisateur ; ponytail et impeccable sont des plugins d'agent, sans empreinte à l'exécution (`CLAUDE.md`, « Prudence outillage »). Toute incompatibilité **découverte depuis** remonte au PM avant qu'un contournement soit écrit.
 - **Trois contraintes de construction, non négociables** (le spike les a trouvées en cassant `next build`) : ne jamais importer depuis le barrel `@astryxdesign/core` — toujours le sous-chemin, `@astryxdesign/core/Toolbar` ; envelopper le `Theme` d'Astryx dans un composant `"use client"` du shard ; fournir une palette, le cœur n'en embarque aucune — un `defineTheme` du shard suffit, sans paquet de thème.
-- **Le thème n'est pas connu au premier rendu.** L'interdit n°2 ferme localStorage et IndexedDB est asynchrone : un utilisateur qui a choisi l'autre mode que le défaut verra un flash. Assumé, et documenté plutôt que contourné par un stockage synchrone. *(Quel défaut : DESIGN.md dit « Clair par défaut » et en fait un principe non négociable, `M-A` dit « sombre (défaut) ». Le code suit DESIGN.md ; contradiction signalée au PM.)*
+- **Le thème n'est pas connu au premier rendu.** L'interdit n°2 ferme localStorage et IndexedDB est asynchrone : un utilisateur qui a choisi le sombre verra un flash clair au premier rendu. Assumé, et documenté plutôt que contourné par un stockage synchrone.
 - Aucune donnée utilisateur hors IndexedDB ; aucun contenu déchiffré dans le cache SW, les payloads de notification, les logs, la télémétrie ou les traces d'erreur, y compris en dev.
 - Aucune promesse UI supérieure aux garanties réelles (spec 00, honnêteté produit).
 - Hors scope : toute logique métier (elle vit dans les packages), CI/CD.

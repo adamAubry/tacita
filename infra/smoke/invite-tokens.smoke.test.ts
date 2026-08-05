@@ -10,7 +10,7 @@ import { createPostgresStore, SCHEMA, type Store } from "../../apps/invite-token
  * *forme* de l'instruction, ce qui attrape une régression de structure. Il ne prouve pas
  * le comportement — l'imitation en mémoire de la suite est monothread, donc atomique par
  * construction, et une imitation qui confirme l'hypothèse par construction ne l'éprouve
- * pas (c'est la règle 3 de `docs/REPRISE.md`).
+ * pas (règle 3 de `specs/00-conventions.md`).
  *
  * Ce que ce fichier prouve, et que 56 tests ne prouvaient pas : que le SQL est valide,
  * et qu'une seule de deux résolutions concurrentes du dernier usage réussit **quand

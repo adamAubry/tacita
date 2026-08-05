@@ -24,7 +24,7 @@ vi.mock("@tacita/client-core", async (original) => ({
 /**
  * `asSession` de `client-core/testing` plutôt qu'un `as unknown as Session` : un membre
  * ajouté au contrat de `Session` doit casser la compilation d'un seul fichier, pas
- * disparaître en `undefined is not a function` à l'exécution (docs/REPRISE.md § 5.5).
+ * disparaître en `undefined is not a function` à l'exécution (specs/00-conventions.md).
  */
 function fausseSession(options: { recuperationRequise?: boolean } = {}) {
   const setupRecoveryKey = vi.fn(async () => ({

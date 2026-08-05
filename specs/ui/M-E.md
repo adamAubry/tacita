@@ -16,6 +16,9 @@ Tous les composants média partagés : sélection/envoi, affichage dans la timel
 
 ## Contraintes
 
+- ⚠️ **Ne jamais appeler `useImageMode` d'Astryx sur un média Matrix.** C'est le seul hook d'Astryx qui émet une requête réseau — un `fetch(src, {mode:'cors'})` pour détecter si une image est claire ou sombre. Aucun composant ne l'appelle : c'est un opt-in, et il faut qu'il le reste. Sur un média chiffré il ne peut qu'échouer, faute d'en-tête d'authentification (REQ-MED-09), et l'appeler serait un accès réseau sur un chemin qui doit rester local. *(Relevé au spike du 05/08/2026, en lisant la distribution d'Astryx.)*
+
+
 - Décodage/déchiffrement hors thread principal quand le pipeline l'expose ; jamais de blob déchiffré écrit hors IndexedDB.
 - Galeries en lazy loading par lots ; Placeholder par onglet vide.
 - Permissions caméra/micro demandées au moment de l'usage, jamais à l'avance, avec état « refusé » expliqué et rattrapable.

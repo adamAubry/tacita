@@ -166,8 +166,8 @@ pas de focus, `discoverFocus()` rend `RtcFociMissing`, et l'UI affiche le messag
 REQ-CAL-02 exige.
 
 **Impact module.** `M-I`. `specs/02-rtc-backend.md` REQ-RTC-05 amendée ; l'implémentation
-(annonce portée par l'overlay RTC, test REQ-RTC-05 réaligné) est l'action A4 du plan —
-`docs/REPRISE.md` § 6.1.
+(annonce portée par l'overlay RTC, test REQ-RTC-05 réaligné) a été implémentée le 05/08/2026 :
+`proxy/well-known.conf` sans focus, `rtc/well-known.conf` avec, montés au même chemin.
 
 ---
 
