@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
@@ -99,8 +98,11 @@ describe("REQ-INF-15 — le service de liens d'invitation est provisionné par c
    * tire tout le reste sauf `index.ts`, qui se connecte à PostgreSQL au chargement.
    */
   it("les sources se chargent sous le moteur de production, pas seulement sous Vitest", () => {
-    const service = fileURLToPath(new URL("../../apps/invite-tokens/src/server.ts", import.meta.url));
-    const matrix = fileURLToPath(new URL("../../apps/invite-tokens/src/matrix.ts", import.meta.url));
+    // L'URL `file://`, pas le chemin du système : un chemin Windows (`C:\…`) n'est pas
+    // un spécificateur d'import valide, et le test échouait là où le service, lui, va
+    // très bien — un rouge qui ne dit rien du produit. La forme URL marche partout.
+    const service = new URL("../../apps/invite-tokens/src/server.ts", import.meta.url).href;
+    const matrix = new URL("../../apps/invite-tokens/src/matrix.ts", import.meta.url).href;
 
     expect(() =>
       execFileSync(

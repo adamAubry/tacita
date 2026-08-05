@@ -6,7 +6,15 @@ import { join } from "node:path";
  * `node:fs` refuse (« The URL must be of scheme file »). Le symptôme n'apparaît qu'à
  * l'intérieur d'un test, pas au chargement du module — de quoi chercher longtemps.
  */
-export const RACINE = join(import.meta.dirname, "..");
+/**
+ * Séparateurs normalisés en `/`. Les tests comparent des chemins littéraux
+ * (`endsWith("/app/layout.tsx")`), et `join` rend des antislashs sous Windows : sans
+ * cette normalisation, REQ-UI-02 et REQ-UI-03 échouent sur une machine Windows alors que
+ * le code est correct — un rouge qui ne dit rien du produit.
+ */
+const enPosix = (chemin: string) => chemin.replaceAll("\\", "/");
+
+export const RACINE = enPosix(join(import.meta.dirname, ".."));
 
 export const lire = (chemin: string) => readFileSync(join(RACINE, chemin), "utf-8");
 
@@ -22,7 +30,7 @@ export function sourcesLivrees(): { chemin: string; code: string }[] {
   const fichiers: { chemin: string; code: string }[] = [];
   const parcourir = (dossier: string) => {
     for (const entree of readdirSync(dossier, { withFileTypes: true })) {
-      const chemin = join(dossier, entree.name);
+      const chemin = enPosix(join(dossier, entree.name));
       if (entree.isDirectory()) parcourir(chemin);
       else if (/\.tsx?$/.test(entree.name)) fichiers.push({ chemin, code: readFileSync(chemin, "utf-8") });
     }
