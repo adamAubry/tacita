@@ -82,8 +82,8 @@ function describe(session: Session, room: Room, peers: Map<string, string>): Con
  * n'a pas d'ordre dans /sync : `getRooms()` rend l'ordre d'insertion du store, qui n'est
  * ni la récence ni rien de stable. La récence du dernier message est le seul signal
  * disponible côté client, et il est ici *le seul* endroit du dépôt où il sert de clé de
- * tri — jamais à l'intérieur d'un salon. Point signalé au PM avec l'amendement de la
- * spec 05.
+ * tri — jamais à l'intérieur d'un salon. Décision et alternatives écartées :
+ * `specs/ui/ESCALATIONS.md` § E-09.
  */
 export function conversations(session: Session): Conversation[] {
   const peers = directPeers(session);

@@ -1,7 +1,11 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Les huit points sont tranchés (05/08/2026).** Ce fichier garde la question, la décision et
+**Les neuf points sont tranchés (05/08/2026).** Ce fichier garde la question, la décision et
 son motif : une décision dont on a perdu le motif se rediscute tous les six mois.
+
+Les huit premiers ont été **arbitrés par le PM**. Le neuvième a été **tranché en périmètre
+technique et porté à sa connaissance** — la distinction est notée dans sa section, parce
+qu'elle change qui peut le rouvrir.
 
 Ce qui est **contraignant** vit ailleurs — `DECISIONS.md` § D-09 pour le modèle social,
 `specs/` pour les exigences amendées. Ici, c'est la trace. En cas de contradiction, le
@@ -17,6 +21,7 @@ contrat gagne.
 | E-06 | Exigences REQ-UIX-01..40 | **Ratifiées** | rien — les tests les nomment |
 | E-07 | Layout d'appel | **Confirmé** : pas de client RTC maison | rien |
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
+| E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 
 ---
 
@@ -168,6 +173,46 @@ REQ-CAL-02 exige.
 **Impact module.** `M-I`. `specs/02-rtc-backend.md` REQ-RTC-05 amendée ; l'implémentation
 (annonce portée par l'overlay RTC, test REQ-RTC-05 réaligné) a été implémentée le 05/08/2026 :
 `proxy/well-known.conf` sans focus, `rtc/well-known.conf` avec, montés au même chemin.
+
+---
+
+## E-09 — L'ordre de la liste de conversations (M-C)
+
+**Tranché en périmètre technique le 05/08/2026, PM informé.** Ce n'est pas un arbitrage
+produit : ni le périmètre, ni une promesse faite à l'utilisateur, ni une décision de
+`DECISIONS.md` ne bougent. Le PM peut évidemment le rouvrir — il n'a simplement pas eu à
+attendre pour que M-C avance.
+
+**La question.** L'interdit n°6 dit « ne jamais trier par `origin_server_ts` — l'ordre
+canonique est celui du flux /sync » (REQ-COR-04, REQ-MSG-12). REQ-UIX-07 demande un tri
+« récentes / anciennes » sur la liste de conversations. Les deux ne peuvent pas être vrais
+au pied de la lettre : **/sync ne définit aucun ordre entre salons**. `getRooms()` rend
+l'ordre d'insertion du store — au démarrage, l'ordre où IndexedDB les a rechargés, qui n'a
+aucun rapport avec l'activité. Le seul signal de récence disponible côté client est
+l'horodatage du dernier message, c'est-à-dire `origin_server_ts`.
+
+**La décision.** La liste est ordonnée par récence du dernier message. **Ici seulement** —
+`packages/messaging/src/conversations.ts`, une ligne — et jamais à l'intérieur d'un salon.
+
+**Le motif.** L'interdit protège l'ordre **dans** une conversation, où un horodatage
+menteur permettrait d'insérer un message au milieu d'un échange déjà lu. Cette protection
+reste entière : aucun message n'est retrié, REQ-MSG-12 est inchangée. Le pire cas ici est
+une conversation mal placée dans une liste. Et l'horodatage est de toute façon **déjà
+affiché** : REQ-UI-05 exige la date localisée du dernier message, qui sort de la même
+valeur — la refuser pour trier tout en l'affichant serait incohérent.
+
+**Les deux alternatives, et pourquoi elles coûtent plus qu'elles ne rapportent :**
+
+- *Compter soi-même l'ordre d'arrivée dans /sync.* Ne vaut que pendant que l'app est
+  ouverte : après un rechargement, l'historique relu depuis IndexedDB ne porte aucun
+  compteur, et la liste repartirait dans un ordre arbitraire. Il faudrait le persister —
+  un état de plus à maintenir, à migrer et à effacer à la déconnexion, pour se protéger
+  d'un risque cosmétique.
+- *Sliding sync (MSC3575)*, où c'est le serveur qui ordonne la liste. Non stabilisé, non
+  déployé, et la précaution versions du dépôt l'écarte d'elle-même.
+
+**Ce qui rouvrirait la question :** un ordre de liste fourni par le serveur qui devienne
+disponible sur la version déployée. Le remplacement tiendrait dans la même ligne.
 
 ---
 

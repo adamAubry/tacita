@@ -40,7 +40,7 @@ typing.keystroke(roomId); // throttlé, arrêt automatique
   seul signal disponible : `getRooms()` rend l'ordre d'insertion du store, et /sync ne
   définit aucun ordre entre salons. L'interdit de tri par `origin_server_ts` reste entier
   là où il porte — **dans** une timeline (REQ-MSG-12), où rien n'a changé. La réserve est
-  écrite dans la spec 05, sous REQ-MSG-13.
+  écrite dans la spec 05 sous REQ-MSG-13, son motif dans `specs/ui/ESCALATIONS.md` § E-09.
 - **`@everyone` devient `@room` dans le corps du message.** C'est ce littéral que
   la push rule native `.m.rule.roomnotif` cherche ; `m.mentions.room` est posé en
   parallèle pour `.m.rule.is_room_mention`. Le réaffichage en `@everyone` est du
