@@ -18,8 +18,8 @@ reste en découle, y compris les limites — qui sont documentées, jamais masqu
 | Vous êtes | Lisez, dans cet ordre |
 |---|---|
 | **Développeur qui arrive** | `specs/00-conventions.md`, puis la spec de votre module, puis le `README.md` du package |
-| **Relecteur** | `REMEDIATION-CRITIQUES.md` §1 (état) et §4 (ce qui n'est pas prouvé), puis le diff |
-| **PM / décideur** | `DECISIONS.md`, puis `ARBITRAGE-PM.md` — les deux seuls documents contraignants côté produit |
+| **Relecteur** | `docs/REMEDIATION-CRITIQUES.md` §1 (état) et §4 (ce qui n'est pas prouvé), puis le diff |
+| **PM / décideur** | `DECISIONS.md`, puis `docs/ARBITRAGE-PM.md` — les deux seuls documents contraignants côté produit |
 | **Quelqu'un que ça réveille la nuit** | la section « Ce qui est prouvé, ce qui ne l'est pas » ci-dessous |
 
 ---
@@ -103,10 +103,12 @@ migré dans `DECISIONS.md`, les specs et les README de packages.
 
 | Fichier | Ce que c'est | Encore utile ? |
 |---|---|---|
-| `REMEDIATION-CRITIQUES.md` | L'audit et ses suites : chaque défaut, pourquoi ce correctif-là, ce qu'il coûte | Oui — journal de bord vivant |
-| `ARBITRAGE-PM.md` | Les décisions du PM et leurs motifs | Oui — les motifs font jurisprudence |
-| `BRIEF-PM.md` | La mise en contexte qui a précédé l'arbitrage | Historique — les réponses sont dans `ARBITRAGE-PM.md` |
-| `ESCALADE-PM-OIDC.md` | La question posée quand le login s'est révélé cassé | Historique — tranché, correctif livré |
+| `docs/REMEDIATION-CRITIQUES.md` | L'audit et ses suites : chaque défaut, pourquoi ce correctif-là, ce qu'il coûte | Oui — journal de bord vivant |
+| `docs/ARBITRAGE-PM.md` | Les décisions du PM et leurs motifs | Oui — les motifs font jurisprudence |
+| `docs/BRIEF-PM.md` | La mise en contexte qui a précédé l'arbitrage | Historique — les réponses sont dans `docs/ARBITRAGE-PM.md` |
+| `docs/ESCALADE-PM-OIDC.md` | La question posée quand le login s'est révélé cassé | Historique — tranché, correctif livré |
+| `docs/ESCALADE-PM-VERIFICATION.md` | L'affaire REQ-COR-07 de bout en bout, jusqu'à D-08 | Historique — tranché, `DECISIONS.md` fait foi |
+| `docs/DOSSIER-SPEC-11.md` | Le dossier de reprise remis au développeur de la spec 11 | Oui — c'est le point d'entrée du shard UI |
 | `correctif/` | Instantané des fichiers C3/C2 tels que déposés avant application | **Historique et partiellement périmé — lire son README avant de s'en servir** |
 
 Conserver ces traces est un choix délibéré : une décision dont on a perdu le motif se

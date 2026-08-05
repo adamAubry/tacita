@@ -25,7 +25,7 @@
 > Pour comparer vous-même :
 > `git diff --no-index correctif/packages/search/src/index.ts packages/search/src/index.ts`
 
-Raisonnement, conséquences et suites : `REMEDIATION-CRITIQUES.md` à la racine, sections C3
+Raisonnement, conséquences et suites : `docs/REMEDIATION-CRITIQUES.md`, sections C3
 et C2. Les correctifs eux-mêmes sont commités en `05f22aa` (C3) et `98e0065` (C2).
 
 ## Contenu

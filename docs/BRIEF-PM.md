@@ -213,8 +213,8 @@ ferait rentrer les trois correctifs d'un coup, dont ceux dont la spec n'est pas 
 
 | Fichier | Contenu |
 |---|---|
-| `REMEDIATION-CRITIQUES.md` | **Le document principal.** État, un chapitre par défaut corrigé (le bug, pourquoi ce correctif-là, les conséquences), le plan pour C1, les limites de la vérification, la section « À statuer par le CM », et l'inventaire des fichiers touchés. |
-| `BRIEF-PM.md` | Ce document. |
+| `docs/REMEDIATION-CRITIQUES.md` | **Le document principal.** État, un chapitre par défaut corrigé (le bug, pourquoi ce correctif-là, les conséquences), le plan pour C1, les limites de la vérification, la section « À statuer par le CM », et l'inventaire des fichiers touchés. |
+| `docs/BRIEF-PM.md` | Ce document. |
 | `correctif/` | Archive de la revue : les fichiers tels que déposés avant application. Doublonne `packages/`, supprimable sans perte au merge. |
 | `packages/client-core/README.md` | Les limites assumées de la reprise de session, dont celle qui motive D-06. |
 
@@ -238,7 +238,7 @@ contenu est déjà dans `main`. Elles peuvent être supprimées.
 ## 7. Votre mission
 
 Neuf points attendent votre arbitrage. Ils sont détaillés en section 5 de
-`REMEDIATION-CRITIQUES.md` ; ce qui suit en donne la substance et l'enjeu.
+`docs/REMEDIATION-CRITIQUES.md` ; ce qui suit en donne la substance et l'enjeu.
 
 ### Trois décisions bloquent un merge
 

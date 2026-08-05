@@ -11,7 +11,7 @@ personne ne possède**. Chaque spec est respectée ; c'est l'espace entre les sp
 relu.** Il reste C1, dont le prérequis est levé.
 
 L'arbitrage du PM est rendu et poussé (`pm/arbitrage-2026-08-03`) : les neuf points de
-`BRIEF-PM.md` sont tranchés, et les textes de specs correspondants écrits. Le détail de ce qui en
+`docs/BRIEF-PM.md` sont tranchés, et les textes de specs correspondants écrits. Le détail de ce qui en
 découle est en §5.
 
 ---
@@ -59,7 +59,7 @@ Les compteurs de tests ne s'additionnent pas : chacun est mesuré sur sa propre 
 
 `review/remediation` ne sert qu'à la revue : elle réunit tout pour qu'on voie l'ensemble sans
 jongler. **Ce n'est pas une branche d'intégration — elle ne doit jamais être mergée dans `main`.**
-Ce sont les branches nommées qui partent, dans l'ordre de marche de `ARBITRAGE-PM.md`.
+Ce sont les branches nommées qui partent, dans l'ordre de marche de `docs/ARBITRAGE-PM.md`.
 
 Sur chaque branche : `lint`, `typecheck` et la suite complète passent, hooks de pré-commit inclus.
 `--no-verify` n'a jamais été utilisé.
@@ -356,8 +356,8 @@ garde qui ment est pire que pas de garde.
 
 ## 5. Arbitrage rendu — ce qui en découle
 
-Les neuf points de `BRIEF-PM.md` sont tranchés. Décisions et textes exacts :
-**`ARBITRAGE-PM.md`** sur la branche `pm/arbitrage-2026-08-03`, qui porte aussi les amendements de
+Les neuf points de `docs/BRIEF-PM.md` sont tranchés. Décisions et textes exacts :
+**`docs/ARBITRAGE-PM.md`** sur la branche `pm/arbitrage-2026-08-03`, qui porte aussi les amendements de
 `specs/` et de `DECISIONS.md`. Résumé de ce que ça change ici.
 
 ### Les trois bloquants sont levés
@@ -419,7 +419,7 @@ pagination arrière, des centaines de messages jamais indexés. Corrigé sur `fi
 
 Trouvé en montant la cible de fumée, et c'est la trouvaille la plus lourde de la session.
 `GET /_matrix/client/v3/login/sso/redirect` répondait **503** : personne ne pouvait se
-connecter à Tacita. Détail : `ESCALADE-PM-OIDC.md` et `infra/README.md` § « Login OIDC ».
+connecter à Tacita. Détail : `docs/ESCALADE-PM-OIDC.md` et `infra/README.md` § « Login OIDC ».
 
 **Pourquoi ça n'avait pas été vu :** les tests de REQ-INF-09 vérifiaient que le YAML déclare
 le provider et désactive les mots de passe. Pas qu'une connexion aboutit.

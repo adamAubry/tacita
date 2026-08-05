@@ -1,7 +1,7 @@
 # Arbitrage PM — réponse au brief du 03/08/2026
 
 **Émetteur :** PM (session d'arbitrage du 03/08/2026)
-**Répond à :** `BRIEF-PM.md` et section 5 de `REMEDIATION-CRITIQUES.md` (branche `review/remediation`)
+**Répond à :** `docs/BRIEF-PM.md` et section 5 de `docs/REMEDIATION-CRITIQUES.md` (branche `review/remediation`)
 **Textes appliqués :** les amendements décidés ici sont écrits dans `specs/` et `DECISIONS.md`
 sur cette branche (`pm/arbitrage-2026-08-03`) — conformément à la règle : c'est le PM qui écrit
 dans les contrats, pas le code.
@@ -49,7 +49,7 @@ acceptable à condition d'être écrit noir sur blanc — il l'est.
 
 ### 4. Exploitabilité de C1 — on ne finance pas la preuve, on finance le correctif
 
-**Décision :** C1 se corrige **maintenant**, selon le plan de `REMEDIATION-CRITIQUES.md` §3
+**Décision :** C1 se corrige **maintenant**, selon le plan de `docs/REMEDIATION-CRITIQUES.md` §3
 (prédicat `isEncrypted` sur `Session`). Les contrats sont posés : REQ-COR-12 (spec 04) et
 REQ-OBX-09 (spec 07). Prérequis : `fix-n3-n2` mergée d'abord.
 
@@ -148,7 +148,7 @@ applications de cette même règle.
 
 ---
 
-# Addendum du 03/08/2026 — réponse à `ESCALADE-PM-OIDC.md`
+# Addendum du 03/08/2026 — réponse à `docs/ESCALADE-PM-OIDC.md`
 
 La cible de fumée a payé avant d'exister : le login OIDC n'avait jamais été exécuté et ne
 fonctionne pas. C'est exactement le mode de panne pour lequel elle a été financée. Trois
@@ -370,7 +370,7 @@ chemin de relèvement post-V1, spec dédiée, pour épingler les identités.
 - La limite (compromission du compte d'un correspondant) documentée côté utilisateur,
   interdit n°13.
 
-Oui pour `ESCALADE-PM-VERIFICATION.md` sur la branche : une escalade tranchée mérite sa trace
+Oui pour `docs/ESCALADE-PM-VERIFICATION.md` sur la branche : une escalade tranchée mérite sa trace
 hors d'un message de commit — y référencer D-08 et le présent addendum.
 
 ---

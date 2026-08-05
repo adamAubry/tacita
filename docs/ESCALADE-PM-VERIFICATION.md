@@ -7,7 +7,7 @@ exigence.
 | | |
 |---|---|
 | Ouverte | 03/08/2026, en répondant à « deux utilisateurs distincts peuvent-ils échanger un message lisible ? » |
-| Tranchée | 04/08/2026 — `DECISIONS.md` **D-08**, addendum `ARBITRAGE-PM.md` « REQ-COR-07 : la troisième voie » |
+| Tranchée | 04/08/2026 — `DECISIONS.md` **D-08**, addendum `docs/ARBITRAGE-PM.md` « REQ-COR-07 : la troisième voie » |
 | Effet | `specs/04-client-core.md` REQ-COR-07 **amendée**, pas abrogée |
 | Implémentée | 04/08/2026, branche `fix-d08` — conditions (a) à (d) levées, voir §4 |
 | Reste à faire | (e) le dialogue de réinitialisation d'identité, à la spec 11 |
@@ -44,7 +44,7 @@ tests de configuration attestent des fichiers, la fumée atteste d'un comporteme
 
 **Ni parcours SAS en V1, ni TOFU par appareil : la confiance se porte sur l'identité
 cross-signing.** Le détail et le raisonnement sont en `DECISIONS.md` § D-08 et dans l'addendum
-d'`ARBITRAGE-PM.md` — non recopiés ici, une copie diverge.
+de `docs/ARBITRAGE-PM.md` — non recopiés ici, une copie diverge.
 
 Le point qui a écarté les deux options que l'escalade proposait : REQ-COR-06 rend le bootstrap
 cross-signing obligatoire à l'inscription, donc **le matériel de confiance existe déjà** et

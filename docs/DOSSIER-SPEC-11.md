@@ -66,7 +66,7 @@ Le reste de D-08 : les clés Megolm ne vont qu'aux appareils signés par leur pr
 Aucun parcours de vérification (SAS/QR) n'est requis en V1 — il est renvoyé post-V1. Deux
 utilisateurs qui ont terminé leur inscription se parlent, sans geste supplémentaire.
 
-Détail complet : `DECISIONS.md` § D-08, `ESCALADE-PM-VERIFICATION.md`, et
+Détail complet : `DECISIONS.md` § D-08, `docs/ESCALADE-PM-VERIFICATION.md`, et
 `specs/04-client-core.md` REQ-COR-07.
 
 ---
@@ -106,7 +106,7 @@ demandez-le plutôt que de le contourner. C'est exactement ce qui s'est passé i
 D-08 renvoie la vérification interactive (SAS/QR) au post-V1, dans une spec dédiée qui
 définira sa propre interface. L'API a été **retirée** du contrat le 04/08/2026 : un exporté
 sans appelant sur un chemin de clés est un piège, et l'interdit n°13 veut qu'on n'annonce
-aucune capacité qu'on ne rend pas. Détail : `ARBITRAGE-PM.md`, addendum du 04/08.
+aucune capacité qu'on ne rend pas. Détail : `docs/ARBITRAGE-PM.md`, addendum du 04/08.
 
 ---
 
@@ -176,9 +176,9 @@ Escaladez au PM plutôt que de trancher dans le code — `DECISIONS.md` l'impose
 | Question | Fichier |
 |---|---|
 | Pourquoi telle décision produit | `DECISIONS.md` (D-01 à D-08) |
-| Arbitrages PM et leurs motifs | `ARBITRAGE-PM.md` |
-| Ce qui a été cassé et réparé, et pourquoi | `REMEDIATION-CRITIQUES.md` |
-| L'affaire REQ-COR-07 de bout en bout | `ESCALADE-PM-VERIFICATION.md` |
+| Arbitrages PM et leurs motifs | `docs/ARBITRAGE-PM.md` |
+| Ce qui a été cassé et réparé, et pourquoi | `docs/REMEDIATION-CRITIQUES.md` |
+| L'affaire REQ-COR-07 de bout en bout | `docs/ESCALADE-PM-VERIFICATION.md` |
 | Le login OIDC et ses quatre causes | `infra/README.md` |
 | Ce que la fumée prouve et ne prouve pas | `infra/smoke/README.md` |
 | Instantané daté, **partiellement périmé** | `correctif/README.md` |
