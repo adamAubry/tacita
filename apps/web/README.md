@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations) et **M-B** (onboarding) livrés. Les modules C à I posent leur contenu sur ce squelette.
+État : **M-A** (fondations), **M-B** (onboarding) et **M-C** (accueil) livrés. Les modules D à I posent leur contenu sur ce squelette.
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -69,5 +69,6 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 | `app/` | routes App Router — les 7 layouts, les 4 onglets dans le groupe `(onglets)` |
 | `components/foundation/` | M-A : primitives réexportées, thème, navbar, header, états |
 | `components/onboarding/` | M-B : session, porte de récupération, éducation iOS, déconnexion |
+| `components/accueil/` | M-C : liste de conversations, en-tête, bannière de demandes, création |
 | `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

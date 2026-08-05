@@ -11,8 +11,12 @@
  * il n'enveloppe pas. Les composants **composés** du wireframe (Navbar, Placeholder…)
  * sont des fichiers à part, et eux consomment ce module.
  */
+export { Avatar } from "@astryxdesign/core/Avatar";
+export { Badge } from "@astryxdesign/core/Badge";
 export { Banner } from "@astryxdesign/core/Banner";
 export { Button } from "@astryxdesign/core/Button";
+export { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
+export { ClickableCard } from "@astryxdesign/core/ClickableCard";
 export { Dialog } from "@astryxdesign/core/Dialog";
 export { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 export { EmptyState } from "@astryxdesign/core/EmptyState";
@@ -25,6 +29,7 @@ export { PowerSearch } from "@astryxdesign/core/PowerSearch";
 export { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 export { Skeleton } from "@astryxdesign/core/Skeleton";
 export { Text } from "@astryxdesign/core/Text";
+export { TextInput } from "@astryxdesign/core/TextInput";
 export { Toolbar } from "@astryxdesign/core/Toolbar";
 export { VStack } from "@astryxdesign/core/VStack";
 export { defineTheme, Theme } from "@astryxdesign/core/theme";

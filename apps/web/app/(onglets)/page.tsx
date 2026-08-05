@@ -1,11 +1,6 @@
-import { Placeholder } from "../../components/foundation/Placeholder";
+import { Accueil } from "../../components/accueil/Accueil";
 
-/** Layout Default — accueil. Le contenu est livré par M-C (liste de conversations). */
-export default function Accueil() {
-  return (
-    <Placeholder
-      titre="Aucune conversation"
-      explication="Vos conversations apparaîtront ici. Commencez par ajouter quelqu'un."
-    />
-  );
+/** Layout Default — variation home (M-C). L'écran vit dans un composant client. */
+export default function PageAccueil() {
+  return <Accueil />;
 }

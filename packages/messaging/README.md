@@ -32,6 +32,15 @@ typing.keystroke(roomId); // throttlé, arrêt automatique
   et Matrix ne chiffre pas l'état. **Le serveur voit quels messages sont
   épinglés, dans quel salon et par qui.** Exposé par
   `PINNED_EVENTS_METADATA.cleartext`.
+- **L'épingle de conversation est en clair, elle aussi.** `m.favourite` est un tag,
+  donc de l'account data de salon : c'est ce qui le rend synchronisé entre les
+  appareils, et **le serveur voit quelles conversations sont épinglées**. Métadonnée,
+  jamais du contenu.
+- **La liste des conversations est ordonnée par récence du dernier message.** C'est le
+  seul signal disponible : `getRooms()` rend l'ordre d'insertion du store, et /sync ne
+  définit aucun ordre entre salons. L'interdit de tri par `origin_server_ts` reste entier
+  là où il porte — **dans** une timeline (REQ-MSG-12), où rien n'a changé. La réserve est
+  écrite dans la spec 05, sous REQ-MSG-13.
 - **`@everyone` devient `@room` dans le corps du message.** C'est ce littéral que
   la push rule native `.m.rule.roomnotif` cherche ; `m.mentions.room` est posé en
   parallèle pour `.m.rule.is_room_mention`. Le réaffichage en `@everyone` est du

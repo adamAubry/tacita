@@ -42,6 +42,13 @@ export const IconeMentions: ReactNode = (
   </svg>
 );
 
+/** Création (M-C) — même géométrie que les quatre de la navbar, sans exception. */
+export const IconePlus: ReactNode = (
+  <svg {...trait}>
+    <path d="M12 5.5v13M5.5 12h13" />
+  </svg>
+);
+
 export const IconeProfil: ReactNode = (
   <svg {...trait}>
     <circle cx="12" cy="8" r="3.75" />

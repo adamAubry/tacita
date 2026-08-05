@@ -67,6 +67,9 @@ importers:
       '@tacita/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@tacita/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
       next:
         specifier: ^15.5.22
         version: 15.5.22(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

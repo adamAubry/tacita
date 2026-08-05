@@ -14,6 +14,16 @@ export {
 export type { SendOptions } from "./messages";
 
 export {
+  conversations,
+  FAVOURITE_TAG,
+  invitations,
+  openDirectMessage,
+  setFavourite,
+  subscribeConversations,
+} from "./conversations";
+export type { Conversation, Invitation } from "./conversations";
+
+export {
   assertEncrypted,
   createDirectMessage,
   createGroupChat,

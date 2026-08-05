@@ -1,0 +1,177 @@
+import type { Session } from "@tacita/client-core";
+import { asSession } from "@tacita/client-core/testing";
+import type { MatrixEvent } from "matrix-js-sdk";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  conversations,
+  FAVOURITE_TAG,
+  invitations,
+  openDirectMessage,
+  setFavourite,
+  subscribeConversations,
+} from "../src";
+import { fakeEvent } from "./session-mock";
+
+const MOI = "@luca:tacita.test";
+const ADAM = "@adam:tacita.test";
+
+interface SalonFictif {
+  roomId: string;
+  name: string;
+  membership?: "join" | "invite" | "leave";
+  messages?: { texte: string; ts: number }[];
+  unread?: number;
+  highlight?: number;
+  tags?: string[];
+  inviter?: string;
+}
+
+/**
+ * Un client à plusieurs salons — ce que `session-mock` n'offre pas : il en tient un
+ * seul, ce qui suffit aux quatre autres suites et pas à celle-ci. Le contrat `Session`
+ * reste vérifié par `asSession`, seul site de compilation autorisé (spec 00).
+ */
+function fakeClient(salons: SalonFictif[], directs: Record<string, string[]> = {}) {
+  const rooms = salons.map((salon) => ({
+    roomId: salon.roomId,
+    name: salon.name,
+    tags: Object.fromEntries((salon.tags ?? []).map((tag) => [tag, {}])),
+    getMyMembership: () => salon.membership ?? "join",
+    getDMInviter: () => salon.inviter,
+    getUnreadNotificationCount: (type?: string) =>
+      (type === "highlight" ? salon.highlight : salon.unread) ?? 0,
+  }));
+
+  const client = {
+    getUserId: vi.fn(() => MOI),
+    getRooms: vi.fn(() => rooms),
+    getRoom: vi.fn((roomId: string) => rooms.find((room) => room.roomId === roomId) ?? null),
+    getAccountData: vi.fn((type: string) =>
+      type === "m.direct" ? { getContent: () => directs } : undefined,
+    ),
+    setRoomTag: vi.fn(async (_roomId: string, _tag: string, _metadata: object) => ({})),
+    deleteRoomTag: vi.fn(async (_roomId: string, _tag: string) => ({})),
+    createRoom: vi.fn(async () => ({ room_id: "!neuf:tacita.test" })),
+    isEncrypted: vi.fn(async () => true),
+    on: vi.fn(),
+    off: vi.fn(),
+  };
+
+  const session = asSession({
+    client,
+    isEncrypted: async () => true,
+    timeline: (roomId: string) => ({
+      events: () =>
+        (salons.find((salon) => salon.roomId === roomId)?.messages ?? []).map(
+          ({ texte, ts }) =>
+            ({ ...fakeEvent("$e", { body: texte }, ADAM), getTs: () => ts }) as unknown as MatrixEvent,
+        ),
+    }),
+  } as unknown as { client: unknown } & Partial<Omit<Session, "client">>);
+
+  return { session, client };
+}
+
+describe("REQ-MSG-13 — liste des conversations, compteurs natifs, invitations à part", () => {
+  it("rend les salons rejoints, le plus récent d'abord, avec aperçu et horodatage", () => {
+    const { session } = fakeClient([
+      { roomId: "!vieux:t", name: "vieux", messages: [{ texte: "salut", ts: 1000 }] },
+      { roomId: "!neuf:t", name: "neuf", messages: [{ texte: "coucou", ts: 5000 }] },
+    ]);
+
+    expect(conversations(session).map((c) => [c.roomId, c.preview, c.timestamp])).toEqual([
+      ["!neuf:t", "coucou", 5000],
+      ["!vieux:t", "salut", 1000],
+    ]);
+  });
+
+  it("relaie les compteurs natifs tels quels, mention comprise", () => {
+    const { session } = fakeClient([
+      { roomId: "!a:t", name: "a", unread: 12, highlight: 1 },
+      { roomId: "!b:t", name: "b", unread: 3 },
+    ]);
+
+    const [a, b] = conversations(session);
+    expect([a!.unread, a!.mention]).toEqual([12, true]);
+    expect([b!.unread, b!.mention]).toEqual([3, false]);
+  });
+
+  it("distingue DM et groupe par `m.direct`, et expose l'autre membre", () => {
+    const { session } = fakeClient(
+      [
+        { roomId: "!dm:t", name: "adam" },
+        { roomId: "!groupe:t", name: "équipe" },
+      ],
+      { [ADAM]: ["!dm:t"] },
+    );
+
+    const [dm, groupe] = conversations(session).sort((x, y) => x.roomId.localeCompare(y.roomId));
+    expect([dm!.direct, dm!.peerId]).toEqual([true, ADAM]);
+    expect([groupe!.direct, groupe!.peerId]).toEqual([false, undefined]);
+  });
+
+  it("un salon invité n'est pas dans la liste : il est dans les invitations", () => {
+    const { session } = fakeClient([
+      { roomId: "!joint:t", name: "joint" },
+      { roomId: "!invite:t", name: "adam", membership: "invite", inviter: ADAM },
+      { roomId: "!parti:t", name: "parti", membership: "leave" },
+    ]);
+
+    expect(conversations(session).map((c) => c.roomId)).toEqual(["!joint:t"]);
+    expect(invitations(session)).toEqual([{ roomId: "!invite:t", name: "adam", from: ADAM }]);
+  });
+
+  it("l'abonnement couvre les quatre sources de changement, et se défait", () => {
+    const { session, client } = fakeClient([]);
+    const desabonner = subscribeConversations(session, () => {});
+
+    expect(client.on.mock.calls.map(([evenement]) => evenement)).toEqual([
+      "Room.timeline",
+      "Room.tags",
+      "Room.receipt",
+      "Room.myMembership",
+    ]);
+
+    desabonner();
+    expect(client.off).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe("REQ-MSG-14 — épingle par le tag natif m.favourite", () => {
+  it("épingler pose le tag, désépingler le retire", async () => {
+    const { session, client } = fakeClient([{ roomId: "!a:t", name: "a" }]);
+
+    await setFavourite(session, "!a:t", true);
+    expect(client.setRoomTag).toHaveBeenCalledWith("!a:t", FAVOURITE_TAG, {});
+
+    await setFavourite(session, "!a:t", false);
+    expect(client.deleteRoomTag).toHaveBeenCalledWith("!a:t", FAVOURITE_TAG);
+  });
+
+  it("le tag posé se relit sur la conversation", () => {
+    const { session } = fakeClient([{ roomId: "!a:t", name: "a", tags: [FAVOURITE_TAG] }]);
+    expect(conversations(session)[0]!.pinned).toBe(true);
+  });
+});
+
+describe("REQ-MSG-15 — un seul DM par correspondant", () => {
+  it("réutilise le DM existant sans créer de salon", async () => {
+    const { session, client } = fakeClient([{ roomId: "!dm:t", name: "adam" }], {
+      [ADAM]: ["!dm:t"],
+    });
+
+    expect(await openDirectMessage(session, ADAM)).toBe("!dm:t");
+    expect(client.createRoom).not.toHaveBeenCalled();
+  });
+
+  it("un DM quitté ne compte pas : un nouveau est créé", async () => {
+    const { session, client } = fakeClient(
+      [{ roomId: "!parti:t", name: "adam", membership: "leave" }],
+      { [ADAM]: ["!parti:t"] },
+    );
+
+    expect(await openDirectMessage(session, ADAM)).toBe("!neuf:tacita.test");
+    expect(client.createRoom).toHaveBeenCalledTimes(1);
+  });
+});
