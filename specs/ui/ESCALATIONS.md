@@ -1,8 +1,9 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Les dix points sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026). Ce
-fichier garde la question, la décision et son motif : une décision dont on a perdu le motif
-se rediscute tous les six mois.
+**Dix points sur onze sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
+**E-11 est ouvert**, relevé le 06/08/2026 au cours de M-F. Ce fichier garde la question,
+la décision et son motif : une décision dont on a perdu le motif se rediscute tous les six
+mois.
 
 Neuf ont été **arbitrés par le PM**. Le neuvième — E-09 — a été **tranché en périmètre
 technique et porté à sa connaissance** ; la distinction est notée dans sa section, parce
@@ -24,6 +25,7 @@ contrat gagne.
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
+| E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Ouvert** — livré débouncé sur les critères, la limite est documentée | rien tant que non tranché ; REQ-UIX-22 **non modifiée** |
 
 ---
 
@@ -373,6 +375,62 @@ là, la vidéo s'allume dès qu'il est écrit, sans condition. Safari selon le s
 messagerie où pouvoir répondre en vocal dépend du téléphone d'en face est exactement la
 promesse conditionnelle que l'interdit n°13 vise. L'attente ne coûte plus rien côté
 arbitrage : plus aucune question n'est ouverte, seule reste l'exécution.
+
+---
+
+## E-11 — `PowerSearch` ne notifie pas la frappe (M-F) — **ouvert**
+
+**Relevé le 06/08/2026, au cours de M-F.** Rien n'est bloqué : le module est livré et
+vert. Ce point demande un arbitrage de rédaction, pas une reprise de code.
+
+**La question.** REQ-UI-16 impose `PowerSearch` comme barre de recherche. REQ-UIX-22
+demande une « recherche débouncée (300 ms) », dont l'objectif mesurable dit « 20 frappes
+→ 1 appel search ». Les deux ne se rejoignent pas sur Astryx `0.2.0` : la primitive
+n'expose **aucun moyen d'observer la saisie brute**. Son texte libre traverse un
+typeahead et ne devient un token qu'à la validation — `onChange` ne se déclenche qu'à ce
+moment-là, et il n'existe ni `onQueryChange`, ni `onInputChange`, ni valeur lisible par
+`handleRef` (`PowerSearchHandle` n'expose que `focusTypeahead`/`blurTypeahead`).
+
+Autrement dit : la recherche « au fil de la frappe » n'est pas implémentable **tant que la
+barre est `PowerSearch`**. Ce n'est pas une difficulté, c'est une absence d'API.
+
+**Ce que M-F a livré.** Le débounce existe et il est éprouvé — mais il porte sur les
+**critères**, pas sur les caractères : `useResultats` coalesce toute rafale de
+changements de terme ou de filtres en un seul appel, avec la fenêtre de 300 ms de la
+spec. Le test nommé REQ-UIX-22 prouve exactement cela (20 changements → 1 appel, faux
+minuteurs), au niveau du hook, qui est le seul endroit où la coalescence est observable
+puisque la primitive ne la laisse pas voir.
+
+La fenêtre n'est pas décorative : éditer la valeur d'un token, en ajouter un puis en
+retirer un autre produit bien des rafales, et sans elle chacune partirait au worker.
+
+**Ce que l'utilisateur perd.** Il doit valider sa saisie pour voir des résultats, au lieu
+de les voir se réduire pendant qu'il tape. C'est un cran en dessous de l'intention de
+REQ-UIX-22, et cela se voit à l'usage.
+
+**Trois voies, pour arbitrage :**
+
+- **Voie A — reconnaître la limite dans REQ-UIX-22.** L'exigence dit « débouncée » sans
+  promettre « au fil de la frappe » ; son objectif mesurable, lui, parle de frappes. Le
+  reformuler en « 20 changements de critères → 1 appel » aligne le contrat sur ce que la
+  primitive permet. *Coût :* on renonce à la recherche incrémentale tant qu'Astryx
+  n'expose rien — c'est-à-dire peut-être longtemps.
+- **Voie B — demander l'API en amont.** Astryx a six semaines et bouge ; un
+  `onQueryChange` est une demande légitime et petite. *Coût :* dépendance à un tiers sur
+  une version épinglée, sans date. À combiner avec A en attendant.
+- **Voie C — une barre à nous pour le champ libre**, `PowerSearch` ne gardant que les
+  filtres. *Coût :* recoder ce qu'Astryx livre, ce que DESIGN.md interdit, et deux
+  champs de saisie côte à côte là où le wireframe en montre un. **Déconseillé** — la
+  jurisprudence d'E-10 vaut ici aussi : on ne contourne pas une primitive parce qu'il lui
+  manque une prop.
+
+**Recommandation du Tech Lead : A maintenant, B en parallèle.** Rien ne justifie de
+retenir M-F pour cela, et la limite est déjà écrite là où elle se lit — dans la docstring
+de `useResultats`, et ici.
+
+**Ce que ce point ne remet pas en cause.** REQ-UIX-22 n'est pas modifiée : l'amender est
+un geste de PM. Le débounce, les skeletons, le placeholder « aucun résultat » avec rappel
+du périmètre et l'absence totale d'appel réseau sont livrés et testés.
 
 ---
 

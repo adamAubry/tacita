@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation) et **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10) livrés. Les modules F à I posent leur contenu sur ce squelette.
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10) et **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11) livrés. Les modules G à I posent leur contenu sur ce squelette.
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -86,5 +86,6 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 | `components/accueil/` | M-C : liste de conversations, en-tête, bannière de demandes, création |
 | `components/conversation/` | M-D : timeline, message object, hold menu, starter, composer |
 | `components/media/` | M-E : vignettes, viewer, vocal, capture, galeries partagées |
+| `components/recherche/` | M-F : barre et périmètre, recherches récentes, résultats surlignés, onglet Mentions |
 | `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

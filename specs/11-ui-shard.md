@@ -49,7 +49,7 @@ Les sept paquets sont livrés, verts, et **aucun n'importe un autre en productio
 | `@tacita/outbox` | `createOutbox`, `Outbox` (enqueue/retry/remove/pending/subscribe), `OutboxEntry`, `NOT_ENCRYPTED` | 06, 17 |
 | `@tacita/receipts` | `createReceipts`, `ReceiptStatus`, `DELIVERED`, `deliveryUnknowable` | 13 |
 | `@tacita/media-pipeline` | `uploadAttachment`, `downloadAttachment`, `saveOriginal`, `waveform`, `AttachmentContent` | 14, 15 |
-| `@tacita/search` | `createSearch`, `Search`, `SearchHit`, `SearchStats`, `ROOM_MENTION` | 16 |
+| `@tacita/search` | `createSearch`, `Search`, `SearchHit`, `SearchStats`, `SearchFilters`, `ROOM_MENTION` | 16 |
 | `@tacita/calls` | `discoverFocus`, `buildCallWidget`, `CallWidgetDriver`, `activeCall`, `hangupLocal` | 19 |
 
 Un service en plus, non importable — c'est une API HTTP sous `/invite/` : **`apps/invite-tokens/`** (spec 12). Il résout un token en identifiant **et s'arrête là** ; c'est le shard qui invite ensuite, par le chemin natif de D-09.

@@ -2,7 +2,7 @@
 
 import type { ReactionTally } from "@tacita/messaging";
 import type { ReceiptStatus } from "@tacita/receipts";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { Skeleton } from "../foundation/primitives";
 import { DateSeparator } from "./DateSeparator";
@@ -32,6 +32,15 @@ export interface TimelineProps {
   /** REQ-UI-14 — déchiffrement des pièces jointes (M-E), et ouverture du viewer. */
   telecharger?: Telecharger;
   onOuvrirMedia?: (message: MessageAffiche) => void;
+  /**
+   * REQ-UIX-20 (M-F) — l'identifiant du message sur lequel se positionner, tel qu'un
+   * résultat de recherche l'a passé dans l'URL.
+   *
+   * Un identifiant absent de la timeline chargée **ne déclenche rien** : la contrainte
+   * de M-F interdit d'aller le chercher au serveur, et une recherche silencieuse qui
+   * échoue vaut mieux qu'un aller-retour réseau que l'utilisateur n'a pas demandé.
+   */
+  ancre?: string;
 }
 
 /**
@@ -59,10 +68,20 @@ export function Timeline({
   onAbandonner,
   telecharger,
   onOuvrirMedia,
+  ancre,
 }: TimelineProps) {
   // REQ-UI-09 — l'état vit ici : le geste porte sur un message, la révélation porte sur
   // la colonne entière. C'est ce que fait Instagram, et c'est ce qu'on attend.
   const [heuresVisibles, setHeuresVisibles] = useState(false);
+  const cible = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // `messages.length` en dépendance : l'ancre arrive souvent avant la timeline, et
+    // sans cela on tenterait de défiler vers un élément pas encore rendu.
+    if (!ancre) return;
+    // `scrollIntoView` manque à jsdom ; l'absence de défilement n'est pas une panne.
+    cible.current?.scrollIntoView?.({ block: "center" });
+  }, [ancre, messages.length]);
 
   if (chargement) {
     return (
@@ -84,9 +103,13 @@ export function Timeline({
 
       {messages.map((message, rang) => {
         const precedent = messages[rang - 1];
+        const vise = ancre !== undefined && message.eventId === ancre;
         return (
           <Fragment key={message.cle}>
             {nouveauJour(precedent, message) && <DateSeparator horodatage={message.horodatage} />}
+            {/* Le conteneur n'existe que pour porter la cible du défilement : envelopper
+                tous les messages ajouterait un niveau de DOM par message pour rien. */}
+            {vise && <div ref={cible} data-ancre={message.eventId} aria-hidden="true" />}
             <MessageObject
               message={message}
               entete={shouldShowHeader(precedent, message)}

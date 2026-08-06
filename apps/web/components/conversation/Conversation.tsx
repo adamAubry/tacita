@@ -25,6 +25,7 @@ import {
 import { downloadAttachment, PROFILES, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
 import { createOutbox, type Outbox } from "@tacita/outbox";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { environnementMedia } from "../../lib/media-env";
@@ -59,6 +60,13 @@ type Intention =
 export function Conversation({ roomId }: { roomId: string }) {
   const { etat } = useSession();
   const session: Session | null = etat.phase === "prete" ? etat.session : null;
+
+  /**
+   * M-F — le message visé par un résultat de recherche, quand on arrive d'un résultat.
+   * La timeline s'y positionne si elle le contient ; sinon rien ne se passe, et surtout
+   * aucun aller-retour serveur (contrainte de M-F).
+   */
+  const ancre = useSearchParams()?.get("m");
 
   const [outbox, setOutbox] = useState<Outbox | null>(null);
   const receipts = useRef<Receipts | null>(null);
@@ -284,6 +292,7 @@ export function Conversation({ roomId }: { roomId: string }) {
       <Timeline
         messages={messages}
         chargement={!pret}
+        ancre={ancre ?? undefined}
         starter={
           <ConversationStarter
             nom={salon?.name ?? ""}

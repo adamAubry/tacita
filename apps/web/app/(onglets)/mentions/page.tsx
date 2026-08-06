@@ -1,11 +1,6 @@
-import { Placeholder } from "../../../components/foundation/Placeholder";
+import { EcranRecherche } from "../../../components/recherche/EcranRecherche";
 
-/** Onglet Mentions — alimenté par M-F, via le champ `mentions` de l'index (REQ-SRC-11). */
+/** Onglet Mentions (M-F) — le champ `mentions` de l'index, jamais un plein-texte. */
 export default function Mentions() {
-  return (
-    <Placeholder
-      titre="Aucune mention"
-      explication="Les messages qui vous mentionnent apparaîtront ici."
-    />
-  );
+  return <EcranRecherche variation="mentions" />;
 }
