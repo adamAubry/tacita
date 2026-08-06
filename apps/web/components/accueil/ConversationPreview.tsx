@@ -16,6 +16,11 @@ export interface ConversationPreviewProps {
   onEpingler: (roomId: string, epingle: boolean) => void;
   /** Injecté en test, pour que « aujourd'hui » ne dépende pas de l'heure du CI. */
   maintenant?: number;
+  /**
+   * Variation « résultat de recherche » (M-F, REQ-UIX-20) : ni badge, ni geste d'épingle.
+   * Une prop plutôt qu'une copie du composant — la règle du plan frontend.
+   */
+  simple?: boolean;
 }
 
 /**
@@ -58,12 +63,17 @@ export function ConversationPreview({
   onOuvrir,
   onEpingler,
   maintenant,
+  simple = false,
 }: ConversationPreviewProps) {
   const [menuOuvert, setMenuOuvert] = useState(false);
-  const geste = useGlissement({
-    onDroite: () => onEpingler(conversation.roomId, !conversation.pinned),
-    onAppuiLong: () => setMenuOuvert(true),
-  });
+  const geste = useGlissement(
+    simple
+      ? {}
+      : {
+          onDroite: () => onEpingler(conversation.roomId, !conversation.pinned),
+          onAppuiLong: () => setMenuOuvert(true),
+        },
+  );
 
   return (
     <>
@@ -102,7 +112,9 @@ export function ConversationPreview({
             <Text type="supporting" color="secondary" hasTabularNumbers>
               {conversation.timestamp === 0 ? "" : dateApercu(conversation.timestamp, maintenant)}
             </Text>
-            <BadgeNonLus unread={conversation.unread} mention={conversation.mention} />
+            {!simple && (
+              <BadgeNonLus unread={conversation.unread} mention={conversation.mention} />
+            )}
           </div>
         </div>
       </ClickableCard>

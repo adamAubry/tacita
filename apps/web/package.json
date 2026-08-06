@@ -17,7 +17,8 @@
     "@tacita/media-pipeline": "workspace:*",
     "@tacita/messaging": "workspace:*",
     "@tacita/outbox": "workspace:*",
-    "@tacita/receipts": "workspace:*"
+    "@tacita/receipts": "workspace:*",
+    "@tacita/search": "workspace:*"
   },
   "devDependencies": {
     "@testing-library/react": "^16.1.0",

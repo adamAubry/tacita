@@ -79,6 +79,9 @@ importers:
       '@tacita/receipts':
         specifier: workspace:*
         version: link:../../packages/receipts
+      '@tacita/search':
+        specifier: workspace:*
+        version: link:../../packages/search
       next:
         specifier: ^15.5.22
         version: 15.5.22(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

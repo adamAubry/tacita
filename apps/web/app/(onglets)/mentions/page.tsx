@@ -1,11 +1,6 @@
-import { Placeholder } from "../../../components/foundation/Placeholder";
+import { Recherche } from "../../../components/recherche/Recherche";
 
-/** Onglet Mentions — alimenté par M-F, via le champ `mentions` de l'index (REQ-SRC-11). */
-export default function Mentions() {
-  return (
-    <Placeholder
-      titre="Aucune mention"
-      explication="Les messages qui vous mentionnent apparaîtront ici."
-    />
-  );
+/** Layout Default — variation mentions (M-F) : la même recherche, pré-armée sur `@me`. */
+export default function PageMentions() {
+  return <Recherche variation="mentions" />;
 }

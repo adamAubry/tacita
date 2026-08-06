@@ -27,6 +27,10 @@ export { Item } from "@astryxdesign/core/Item";
 export { List, ListItem } from "@astryxdesign/core/List";
 export { NavIcon } from "@astryxdesign/core/NavIcon";
 export { PowerSearch } from "@astryxdesign/core/PowerSearch";
+export type {
+  PowerSearchConfig,
+  PowerSearchFilter,
+} from "@astryxdesign/core/PowerSearch";
 export { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 export { Skeleton } from "@astryxdesign/core/Skeleton";
 export { Text } from "@astryxdesign/core/Text";
