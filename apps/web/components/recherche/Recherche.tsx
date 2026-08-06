@@ -32,6 +32,14 @@ export interface RechercheProps {
   moi: string;
   /** `search` = l'onglet Recherche ; `mentions` = l'onglet Mentions (REQ-UIX-21). */
   variation?: "search" | "mentions";
+  /**
+   * REQ-UIX-33 — des tokens pré-posés à l'ouverture, quand l'écran est atteint depuis
+   * ailleurs : « Rechercher dans la conversation » (M-H) arme le salon.
+   *
+   * Ils sont un **état initial**, pas une contrainte : l'utilisateur peut les retirer.
+   * C'est pourquoi ils alimentent `useState` plutôt qu'un effet qui les reposerait.
+   */
+  tokensInitiaux?: readonly Token[];
   onOuvrirConversation: (roomId: string) => void;
   onOuvrirMessage: (resultat: ResultatMessage) => void;
   /** REQ-UIX-19 — le stockage des profils récents. Injecté pour les tests. */
@@ -53,12 +61,13 @@ export function Recherche({
   contacts,
   moi,
   variation = "search",
+  tokensInitiaux,
   onOuvrirConversation,
   onOuvrirMessage,
   indexedDB,
   maintenant,
 }: RechercheProps) {
-  const [tokens, setTokens] = useState<readonly Token[]>([]);
+  const [tokens, setTokens] = useState<readonly Token[]>(tokensInitiaux ?? []);
   const [stats, setStats] = useState<SearchStats | null>(null);
   const [sansGroupes, setSansGroupes] = useState(false);
   const [recents, setRecents] = useState<string[]>([]);

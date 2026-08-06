@@ -19,6 +19,14 @@ canRedact(session, roomId, event);
 
 const typing = createTypingIndicator(session);
 typing.keystroke(roomId); // throttlé, arrêt automatique
+
+members(session, roomId);
+canKick(session, roomId, userId); // niveau requis ET au-dessus de la cible
+await kick(session, roomId, userId);
+await invite(session, roomId, userId);
+
+roomNotificationLevel(session, roomId); // "all" | "mentions" | "mute"
+await setRoomNotificationLevel(session, roomId, "mentions");
 ```
 
 ## Limites assumées
@@ -50,6 +58,16 @@ typing.keystroke(roomId); // throttlé, arrêt automatique
   la syntaxe n'a pas de délimiteur de fin.
 - **Pas de rôles nommés.** L'échelle de power levels Matrix est exposée telle
   quelle, en entiers. Toute traduction en libellés est du rendu.
+- **Le niveau de notification d'un salon est une métadonnée que le serveur voit.**
+  Les push rules sont de l'account data en clair : le serveur sait quelles
+  conversations vous avez mises en silence. C'est le prix d'un filtrage qui
+  fonctionne quand l'application est fermée — un filtrage local ne réveillerait
+  rien. Même nature que `m.favourite`.
+- **`mentions` ne coupe que ce que les règles par défaut allument.** Une règle de
+  genre `room` passe après les `override` natifs : c'est ce qui laisse les mentions
+  sonner, et c'est aussi ce qui fait qu'un compte dont les règles par défaut ont été
+  modifiées ailleurs peut se comporter autrement. Le niveau lu vient toujours de
+  l'état réel du compte, jamais d'une mémoire locale.
 - **Le refus d'envoi en salon non chiffré est une vérification, pas la
   garantie.** La garantie vient de la config Synapse (spec 01) ; `assertEncrypted`
   est là pour que la régression d'une config distante casse l'envoi au lieu de

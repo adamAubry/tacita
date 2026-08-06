@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11) et **M-G** (social, hors photo de profil — voir `ESCALATIONS` § E-12) livrés. Les modules H et I posent leur contenu sur ce squelette.
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11), **M-G** (social, hors photo de profil — voir `ESCALATIONS` § E-12) et **M-H** (réglages et infos de conversation, réception de lien de groupe exceptée — voir `ESCALATIONS` § E-13) livrés. Reste **M-I** (appels et push).
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -81,7 +81,14 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   branchée ;
 - **ni l'accueil ni la timeline ne sont fenêtrés.** Astryx `0.2.0` n'expose aucune liste
   virtualisée ; les contraintes de M-C et M-D prévoyaient ce cas. Le plafond est réel sur une
-  conversation ancienne, pas sur une liste de conversations.
+  conversation ancienne, pas sur une liste de conversations ;
+- **aucune push rule n'a été écrite contre un vrai Synapse.** M-H pose les trois niveaux de
+  notification par salon avec les règles natives, et la suite prouve *quelles* règles partent ;
+  que le serveur les évalue comme prévu — mentions qui passent en « mentions uniquement »,
+  rien qui passe en « silencieux » — demande une pile déployée ;
+- **un lien d'invitation de groupe s'émet, mais rien ne le consomme encore.** L'écran de
+  réception appartient à M-G, et le mécanisme d'arrivée dans un salon privé est remonté au PM
+  (`ESCALATIONS` § E-13). L'émission, l'expiration et la révocation, elles, fonctionnent.
 
 ## Où sont les choses
 
@@ -96,5 +103,6 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 | `components/recherche/` | M-F : barre et périmètre, recherches récentes, résultats surlignés, onglet Mentions |
 | `components/profil/` | M-G : profile card, profil propre et d'autrui, note privée locale |
 | `components/amis/` | M-G : ajout par lien ou annuaire, demandes reçues |
+| `components/settings/` | M-H : réglages, infos de conversation, options, notifications |
 | `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

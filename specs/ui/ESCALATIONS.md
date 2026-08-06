@@ -1,13 +1,18 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Dix points sur douze sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
-**E-11 et E-12 sont ouverts**, relevés le 06/08/2026 au cours de M-F et de M-G. Ce fichier garde la question,
-la décision et son motif : une décision dont on a perdu le motif se rediscute tous les six
-mois.
+**Dix points sur treize sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
+**E-11, E-12 et E-13 sont ouverts**, relevés le 06/08/2026 en livrant M-F, M-G et M-H. Ce
+fichier garde la question, la décision et son motif : une décision dont on a perdu le motif
+se rediscute tous les six mois.
 
-Neuf ont été **arbitrés par le PM**. Le neuvième — E-09 — a été **tranché en périmètre
-technique et porté à sa connaissance** ; la distinction est notée dans sa section, parce
-qu'elle change qui peut le rouvrir.
+> **Note de fusion, 06/08/2026.** M-F a été écrite deux fois en parallèle, sur deux
+> branches, et les deux ont numéroté leur escalade « E-11 ». Celle de M-H — le lien de
+> groupe — est **renumérotée E-13** ; son contenu n'a pas changé d'un mot. Si une trace
+> extérieure la cite comme E-11, c'est de cette section qu'elle parle.
+
+Neuf ont été **arbitrés par le PM**. E-09 a été **tranché en périmètre technique et porté à
+sa connaissance** ; la distinction est notée dans sa section, parce qu'elle change qui peut
+le rouvrir.
 
 Ce qui est **contraignant** vit ailleurs — `DECISIONS.md` § D-09 pour le modèle social,
 `specs/` pour les exigences amendées. Ici, c'est la trace. En cas de contradiction, le
@@ -27,6 +32,7 @@ contrat gagne.
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 | E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Ouvert** — livré débouncé sur les critères, la limite est documentée | rien tant que non tranché ; REQ-UIX-22 **non modifiée** |
 | E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Ouvert** — la photo est **absente** de M-G, le reste de REQ-UI-20 est livré | rien tant que non tranché ; REQ-UI-20 et l'interdit n°11 **non modifiés** |
+| E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H *(numérotée E-11 à l'origine)* | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
 
 ---
 
@@ -481,6 +487,59 @@ image serait précisément le mode de panne que la spec 00 nomme.
 **Ce que ce point ne remet pas en cause.** REQ-UI-20 n'est pas modifiée, l'interdit n°11
 non plus : amender l'un ou l'autre est un geste de PM. Le reste de REQ-UIX-24 est livré —
 nom d'affichage modifiable, identifiant affiché, form edit.
+## E-13 — Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre
+
+**Remonté le 06/08/2026, en câblant REQ-UIX-34 (M-H). Ouvert.** Rien n'a été contourné :
+l'émission est livrée, la réception ne l'est pas, et la limite est écrite côté utilisateur.
+
+**La question.** La spec 12 pose que le service ne fait aucune action Matrix : il résout un
+token et rend `{ kind, issuer, roomId }`, « c'est **le client** qui invite ensuite, par le
+chemin natif de D-09 (invitation de salon DM pour un ami, invitation de salon pour un
+groupe) ». Le sens `friend` est cohérent — le porteur crée le DM et invite l'émetteur.
+
+Le sens `group` ne l'est pas. Le porteur obtient un `roomId`, et c'est tout ce qu'il obtient :
+
+- il ne peut pas **s'inviter** lui-même, `POST /rooms/:id/invite` demande d'être membre ;
+- il ne peut pas **rejoindre** : `createGroupChat` utilise `Preset.PrivateChat`, donc
+  `join_rule: invite`, et le serveur refuse le `join` d'un non-invité ;
+- l'**émetteur** ne peut pas inviter non plus : il n'apprend jamais qu'une résolution a eu
+  lieu — le service n'a aucun canal vers lui, et lui en donner un serait un pouvoir Matrix
+  que la ratification n°1 de la spec 12 lui refuse.
+
+Aucune des trois portes n'est ouverte. REQ-INV-13 mentionne pourtant « déjà membre du
+salon » comme un cas de succès idempotent, ce qui suppose qu'un premier passage existe.
+
+**Ce que M-H a livré en attendant.** L'émission complète : création d'un lien `group` avec
+ses bornes d'usage et de durée, liste des liens actifs avec leur échéance, révocation. Plus
+l'avertissement de REQ-INV-15 amendée, posé **au-dessus** du bouton d'émission. La réception
+appartient à M-G et n'existe pas encore : rien dans l'UI ne promet qu'un lien émis fera
+entrer quelqu'un.
+
+**Les trois voies, et ce qu'elles coûtent.**
+
+**Voie A — la règle d'accès du salon de groupe change.** `join_rule: knock` : le porteur
+frappe, un membre laisse entrer. Natif, stable, et le refus reste possible. *Coût :* une
+étape humaine de plus, donc un lien qui ne fait plus entrer tout seul — c'est un choix
+produit, pas un détail technique. À poser dans `createGroupChat` (spec 05).
+
+**Voie B — `join_rule: restricted` (salons v9+).** Le lien devient une autorisation portée
+par l'appartenance à un autre salon. *Coût :* il faut ce « autre salon », que le modèle
+social de D-09 n'a pas — on réinventerait un espace, donc un graphe.
+
+**Voie C — le service invite.** Il faudrait lui donner un pouvoir Matrix. *Coût :* la
+ratification n°1 de la spec 12 tombe, et avec elle la borne qui limite les dégâts d'une
+compromission. Le corollaire écrit dans cette ratification s'applique mot pour mot : « on ne
+reprend pas d'un côté ce qu'on a refusé de l'autre. »
+
+**Ce que je recommande, sans le décider :** la voie A. Elle est la seule qui ne coûte ni une
+notion produit nouvelle, ni la borne de sécurité ratifiée. Elle change en revanche ce qu'un
+lien de groupe *promet*, et cette promesse est au PM.
+
+**Ce que la décision touche.** `specs/12-invite-tokens.md` (REQ-INV-06 et REQ-INV-13, qui
+supposent un chemin d'entrée), `specs/05-messaging.md` (`createGroupChat` si voie A), `M-G`
+(l'écran de réception), et le test REQ-INV-16 de la spec 12 — son balayage interdit à tout
+module hors du service de connaître la route `/resolve`, ce qui devra s'ouvrir au client
+de réception le jour où il existe.
 
 ---
 

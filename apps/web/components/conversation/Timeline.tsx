@@ -41,6 +41,12 @@ export interface TimelineProps {
    * échoue vaut mieux qu'un aller-retour réseau que l'utilisateur n'a pas demandé.
    */
   ancre?: string;
+  /**
+   * REQ-UIX-35 — l'URL d'objet du fond d'écran choisi pour ce salon (M-H), quand il y
+   * en a un. La timeline pose alors le voile de lisibilité (`scrim`), qui est ce qui
+   * autorise à laisser l'utilisateur choisir n'importe quelle image.
+   */
+  fondEcran?: string;
 }
 
 /**
@@ -69,6 +75,7 @@ export function Timeline({
   telecharger,
   onOuvrirMedia,
   ancre,
+  fondEcran,
 }: TimelineProps) {
   // REQ-UI-09 — l'état vit ici : le geste porte sur un message, la révélation porte sur
   // la colonne entière. C'est ce que fait Instagram, et c'est ce qu'on attend.
@@ -98,7 +105,23 @@ export function Timeline({
   }
 
   return (
-    <div role="log" aria-label="Messages" aria-live="polite" style={{ paddingBottom: "var(--spacing-3)" }}>
+    <div
+      role="log"
+      aria-label="Messages"
+      aria-live="polite"
+      style={{
+        paddingBottom: "var(--spacing-3)",
+        // Le voile est **au-dessus** de l'image et sous le texte : c'est lui qui rend les
+        // messages lisibles quel que soit le fond choisi (DESIGN.md, token `scrim`). Sans
+        // lui, un fond clair effacerait le texte, et l'utilisateur n'aurait aucun moyen
+        // de le savoir avant de l'avoir posé.
+        backgroundImage: fondEcran
+          ? `linear-gradient(var(--tacita-scrim), var(--tacita-scrim)), url(${fondEcran})`
+          : undefined,
+        backgroundSize: fondEcran ? "cover" : undefined,
+        backgroundAttachment: fondEcran ? "local" : undefined,
+      }}
+    >
       {starter}
 
       {messages.map((message, rang) => {

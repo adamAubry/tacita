@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { contactsDeLaSession, type Demande } from "../../lib/contacts";
-import { creerLienAmi, partagerLien, urlDuLien } from "../../lib/invitations";
+import { liensDeLaSession, partagerLien, urlDInvitation } from "../../lib/liens-invitation";
 import { Placeholder } from "../foundation/Placeholder";
 import { useSession } from "../onboarding/SessionProvider";
 import { AjouterAmis } from "./AjouterAmis";
@@ -32,13 +32,12 @@ export function EcranAmis({ variation }: { variation: "ajouter" | "demandes" }) 
     [session],
   );
 
+  // Un seul client de la spec 12 dans le dépôt : celui de M-H, qui sait aussi lister et
+  // révoquer. M-G n'a besoin que d'émettre, mais pas d'une seconde implémentation.
   const onPartagerLien = useCallback(async () => {
     if (!session) return "annule" as const;
-    const jeton = session.client.getAccessToken();
-    if (!jeton) return "annule" as const;
-
-    const lien = await creerLienAmi(jeton);
-    return partagerLien(urlDuLien(lien.token, globalThis.location.origin));
+    const { token } = await liensDeLaSession(session).emettreAmi();
+    return partagerLien(urlDInvitation(globalThis.location.origin, token));
   }, [session]);
 
   if (!session || !contacts) {
@@ -49,7 +48,7 @@ export function EcranAmis({ variation }: { variation: "ajouter" | "demandes" }) 
     <AjouterAmis
       chercher={chercher}
       onPartagerLien={onPartagerLien}
-      onOuvrirProfil={(userId) => router.push(`/u/${encodeURIComponent(userId)}`)}
+      onOuvrirProfil={(userId) => router.push(`/profil/${encodeURIComponent(userId)}`)}
     />
   ) : (
     <Demandes

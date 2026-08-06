@@ -16,7 +16,7 @@ import { DEBOUNCE_MS } from "../lib/recherche";
 const pousser = vi.fn();
 const revenir = vi.fn();
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/u/@mira:tacita.test",
+  usePathname: () => "/profil/@mira:tacita.test",
   useRouter: () => ({ push: pousser, back: revenir }),
   useSearchParams: () => new URLSearchParams(),
 }));

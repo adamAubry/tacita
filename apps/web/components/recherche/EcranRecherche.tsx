@@ -6,10 +6,11 @@ import {
   type Conversation,
 } from "@tacita/messaging";
 import { createSearch, type Search } from "@tacita/search";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { contactsDeLaSession } from "../../lib/contacts";
+import { CHAMP_CONVERSATION } from "../../lib/recherche";
 import { useSession } from "../onboarding/SessionProvider";
 import { Placeholder } from "../foundation/Placeholder";
 import { Recherche } from "./Recherche";
@@ -23,6 +24,16 @@ export function EcranRecherche({ variation }: { variation?: "search" | "mentions
   const { etat } = useSession();
   const router = useRouter();
   const session = etat.phase === "prete" ? etat.session : null;
+
+  /**
+   * REQ-UIX-33 — « Rechercher » depuis les informations d'une conversation (M-H) arrive
+   * par `?salon=`. Le token est **modifiable**, contrairement à celui des mentions :
+   * c'est un point de départ, et l'élargir à tout l'historique est un geste légitime.
+   *
+   * C'est un contrat d'URL, pas un import : M-H pousse l'adresse, cet écran la lit, et
+   * ni l'un ni l'autre ne connaît le code de son vis-à-vis.
+   */
+  const salonInitial = useSearchParams()?.get("salon") ?? undefined;
 
   const [recherche, setRecherche] = useState<Search | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -76,6 +87,11 @@ export function EcranRecherche({ variation }: { variation?: "search" | "mentions
       contacts={contacts}
       moi={session.client.getUserId() ?? ""}
       variation={variation}
+      tokensInitiaux={
+        salonInitial
+          ? [{ field: CHAMP_CONVERSATION, value: { type: "enum", value: salonInitial } }]
+          : undefined
+      }
       indexedDB={globalThis.indexedDB}
       onOuvrirConversation={(roomId) => router.push(`/c/${encodeURIComponent(roomId)}`)}
       // REQ-UIX-20 — « positionnée sur le message ». L'ancre passe par l'URL : la

@@ -1,15 +1,22 @@
 import { readFileSync } from "node:fs";
+import { PushRuleActionName, type IPushRule } from "matrix-js-sdk";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  canKick,
   createDirectMessage,
   createGroupChat,
   getPinnedEvents,
+  invite,
+  kick,
   memberCount,
+  members,
   PINNED_EVENTS_METADATA,
   powerLevelOf,
+  roomNotificationLevel,
   setPinnedEvents,
   setPowerLevel,
+  setRoomNotificationLevel,
 } from "../src";
 import { fakeMember, fakeSession } from "./session-mock";
 
@@ -96,5 +103,122 @@ describe("REQ-MSG-11 — power levels numériques, aucun rôle nommé", () => {
   it("aucune échelle de rôles nommés n'est introduite", () => {
     const source = readFileSync(new URL("../src/rooms.ts", import.meta.url), "utf-8");
     expect(source).not.toMatch(/\b(moderator|modérateur|administrateur|OWNER|ROLES?)\b/i);
+  });
+
+  it("expose la liste des membres rejoints", () => {
+    expect(members(ctx.session, ROOM).map((membre) => membre.userId)).toEqual([
+      "@luca:tacita.test",
+      "@adam:tacita.test",
+    ]);
+  });
+
+  it("le droit d'exclure exige le niveau requis **et** d'être au-dessus de la cible", () => {
+    // @luca est à 100, le seuil `kick` du salon à 50, @adam à 0.
+    expect(canKick(ctx.session, ROOM, "@adam:tacita.test")).toBe(true);
+  });
+
+  it("à égalité de power level, Matrix refuse — le prédicat aussi", () => {
+    ctx = fakeSession({
+      members: [
+        fakeMember("@luca:tacita.test", "luca", 100),
+        fakeMember("@adam:tacita.test", "adam", 100),
+      ],
+    });
+    expect(canKick(ctx.session, ROOM, "@adam:tacita.test")).toBe(false);
+  });
+
+  it("sous le seuil du salon, aucun droit — même sur quelqu'un de plus bas", () => {
+    ctx = fakeSession({
+      members: [
+        fakeMember("@luca:tacita.test", "luca", 10),
+        fakeMember("@adam:tacita.test", "adam", 0),
+      ],
+      kickLevel: 50,
+    });
+    expect(canKick(ctx.session, ROOM, "@adam:tacita.test")).toBe(false);
+  });
+
+  it("s'exclure soi-même n'est pas un kick", () => {
+    expect(canKick(ctx.session, ROOM, "@luca:tacita.test")).toBe(false);
+  });
+
+  it("l'exclusion et l'invitation passent par le SDK, sans détour", async () => {
+    await kick(ctx.session, ROOM, "@adam:tacita.test");
+    expect(ctx.client.kick).toHaveBeenCalledWith(ROOM, "@adam:tacita.test", undefined);
+
+    await invite(ctx.session, ROOM, "@mira:tacita.test");
+    expect(ctx.client.invite).toHaveBeenCalledWith(ROOM, "@mira:tacita.test");
+  });
+});
+
+describe("REQ-UIX-36 — trois niveaux de notification, en push rules natives", () => {
+  /** Une règle telle que `/sync` la rend : muette si ses actions ne notifient pas. */
+  const regle = (ruleId: string, notifie: boolean): IPushRule => ({
+    rule_id: ruleId,
+    actions: [notifie ? PushRuleActionName.Notify : PushRuleActionName.DontNotify],
+    default: false,
+    enabled: true,
+  });
+
+  it("sans règle, le salon notifie tout", () => {
+    expect(roomNotificationLevel(ctx.session, ROOM)).toBe("all");
+  });
+
+  it("une règle `room` muette se lit « mentions uniquement »", () => {
+    ctx = fakeSession({ pushRules: { global: { room: [regle(ROOM, false)] } } });
+    expect(roomNotificationLevel(ctx.session, ROOM)).toBe("mentions");
+  });
+
+  it("une règle `override` muette l'emporte : le salon est silencieux", () => {
+    ctx = fakeSession({
+      pushRules: { global: { override: [regle(ROOM, false)], room: [regle(ROOM, false)] } },
+    });
+    expect(roomNotificationLevel(ctx.session, ROOM)).toBe("mute");
+  });
+
+  it("une règle qui notifie n'est pas une règle de silence", () => {
+    ctx = fakeSession({ pushRules: { global: { room: [regle(ROOM, true)] } } });
+    expect(roomNotificationLevel(ctx.session, ROOM)).toBe("all");
+  });
+
+  it("la règle d'un autre salon ne dit rien de celui-ci", () => {
+    ctx = fakeSession({ pushRules: { global: { room: [regle("!autre:tacita.test", false)] } } });
+    expect(roomNotificationLevel(ctx.session, ROOM)).toBe("all");
+  });
+
+  it("« mentions uniquement » écrit une règle de genre room, sans condition", async () => {
+    await setRoomNotificationLevel(ctx.session, ROOM, "mentions");
+    expect(ctx.client.addPushRule).toHaveBeenCalledWith("global", "room", ROOM, {
+      actions: ["dont_notify"],
+    });
+  });
+
+  it("« silencieux » écrit un override sur le room_id : les mentions s'éteignent aussi", async () => {
+    await setRoomNotificationLevel(ctx.session, ROOM, "mute");
+    expect(ctx.client.addPushRule).toHaveBeenCalledWith("global", "override", ROOM, {
+      conditions: [{ kind: "event_match", key: "room_id", pattern: ROOM }],
+      actions: ["dont_notify"],
+    });
+  });
+
+  it("« tout » retire la règle existante et n'en écrit aucune", async () => {
+    ctx = fakeSession({ pushRules: { global: { room: [regle(ROOM, false)] } } });
+    await setRoomNotificationLevel(ctx.session, ROOM, "all");
+
+    expect(ctx.client.deletePushRule).toHaveBeenCalledWith("global", "room", ROOM);
+    expect(ctx.client.addPushRule).not.toHaveBeenCalled();
+  });
+
+  it("changer de niveau ne laisse jamais deux règles côte à côte", async () => {
+    ctx = fakeSession({ pushRules: { global: { override: [regle(ROOM, false)] } } });
+    await setRoomNotificationLevel(ctx.session, ROOM, "mentions");
+
+    expect(ctx.client.deletePushRule).toHaveBeenCalledWith("global", "override", ROOM);
+    expect(ctx.client.addPushRule).toHaveBeenCalledTimes(1);
+  });
+
+  it("aucune règle absente n'est supprimée — pas de 404 provoqué", async () => {
+    await setRoomNotificationLevel(ctx.session, ROOM, "mute");
+    expect(ctx.client.deletePushRule).not.toHaveBeenCalled();
   });
 });

@@ -25,14 +25,16 @@ import {
 import { downloadAttachment, PROFILES, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
 import { createOutbox, type Outbox } from "@tacita/outbox";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { environnementMedia } from "../../lib/media-env";
+import { brancherModeMasque } from "../../lib/mode-masque";
+import { lireFondEcran } from "../../lib/preferences";
 import { videoTranscodable } from "../../lib/transcode-video";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { IconeAppel, IconeVideo } from "../foundation/icons";
-import { Button } from "../foundation/primitives";
+import { Button, Icon } from "../foundation/primitives";
 import { MediaPicker } from "../media/MediaPicker";
 import { MediaViewer } from "../media/MediaViewer";
 import { PhotoCapture } from "../media/PhotoCapture";
@@ -59,6 +61,7 @@ type Intention =
  */
 export function Conversation({ roomId }: { roomId: string }) {
   const { etat } = useSession();
+  const router = useRouter();
   const session: Session | null = etat.phase === "prete" ? etat.session : null;
 
   /**
@@ -93,6 +96,29 @@ export function Conversation({ roomId }: { roomId: string }) {
 
   const rafraichir = useCallback(() => setVersion((v) => v + 1), []);
 
+  /**
+   * REQ-UIX-35 — le fond d'écran choisi pour ce salon (M-H), lu sur cet appareil.
+   *
+   * L'URL d'objet est révoquée au changement de salon comme au démontage : sans cela,
+   * chaque conversation ouverte retiendrait son image en mémoire pour toujours.
+   */
+  const [fondEcran, setFondEcran] = useState<string | undefined>();
+  useEffect(() => {
+    let url: string | undefined;
+    void lireFondEcran(globalThis.indexedDB, roomId)
+      .then((image) => {
+        if (!image) return;
+        url = URL.createObjectURL(image);
+        setFondEcran(url);
+      })
+      .catch(() => {});
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+      setFondEcran(undefined);
+    };
+  }, [roomId]);
+
   // Les trois services de session, créés une fois par salon et **arrêtés au démontage** :
   // sans cet arrêt, un aller-retour entre deux conversations laisse deux files et deux
   // jeux d'accusés branchés sur le même `/sync`.
@@ -107,6 +133,9 @@ export function Conversation({ roomId }: { roomId: string }) {
       subscribe(session, roomId, rafraichir),
       subscribeTyping(session, roomId, rafraichir),
       receipts.current.subscribe(rafraichir),
+      // REQ-UI-13 — le mode masqué est réglé dans les réglages (M-H) et s'applique ici :
+      // sans ce branchement, la bascule n'aurait aucun effet sur les reçus émis.
+      brancherModeMasque(globalThis.indexedDB, receipts.current),
     ];
 
     void createOutbox(session).then((file) => {
@@ -285,6 +314,15 @@ export function Conversation({ roomId }: { roomId: string }) {
                 vers l'écran d'appel — il ne compose rien lui-même (interdit n°7). */}
             <Button label="Appel audio" variant="ghost" isIconOnly icon={IconeAppel} />
             <Button label="Appel vidéo" variant="ghost" isIconOnly icon={IconeVideo} />
+            {/* Le point d'entrée du layout Conversation info (M-H) : sans lui, l'écran
+                des options n'est atteignable par aucun geste. */}
+            <Button
+              label="Informations"
+              variant="ghost"
+              isIconOnly
+              icon={<Icon icon="info" />}
+              onClick={() => router.push(`/c/${roomId}/infos`)}
+            />
           </div>
         }
       />
@@ -293,6 +331,7 @@ export function Conversation({ roomId }: { roomId: string }) {
         messages={messages}
         chargement={!pret}
         ancre={ancre ?? undefined}
+        fondEcran={fondEcran}
         starter={
           <ConversationStarter
             nom={salon?.name ?? ""}

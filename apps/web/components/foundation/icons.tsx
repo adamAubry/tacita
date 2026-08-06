@@ -77,3 +77,33 @@ export const IconeProfil: ReactNode = (
     <path d="M4.75 20a7.25 7.25 0 0 1 14.5 0" />
   </svg>
 );
+
+/**
+ * Les trois icônes des Info buttons (M-H, REQ-UIX-33). Astryx n'a ni cloche, ni
+ * réglages, ni « ajouter quelqu'un », et sa liste de noms reste un type fermé.
+ *
+ * La cloche est **barrée** : le bouton ouvre le réglage de notification, et l'état
+ * « en silence » se lit alors sans ouvrir. Une cloche pleine dirait l'inverse.
+ */
+export const IconeMuet: ReactNode = (
+  <svg {...trait}>
+    <path d="M18 15.5V11a6 6 0 0 0-9.2-5.1M6 9.7V15.5l-1.5 2h15" />
+    <path d="M10 20.5a2.2 2.2 0 0 0 4 0" />
+    <path d="m4 4 16 16" />
+  </svg>
+);
+
+export const IconeOptions: ReactNode = (
+  <svg {...trait}>
+    <circle cx="12" cy="12" r="2.75" />
+    <path d="M12 3.5v2.2M12 18.3v2.2M20.5 12h-2.2M5.7 12H3.5M18 6l-1.6 1.6M7.6 16.4 6 18M18 18l-1.6-1.6M7.6 7.6 6 6" />
+  </svg>
+);
+
+export const IconeAjouterMembre: ReactNode = (
+  <svg {...trait}>
+    <circle cx="10" cy="8" r="3.75" />
+    <path d="M3.5 20a6.5 6.5 0 0 1 13 0" />
+    <path d="M18.5 6.5v6M15.5 9.5h6" />
+  </svg>
+);

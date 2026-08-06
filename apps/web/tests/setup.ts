@@ -30,6 +30,23 @@ globalThis.CSS ??= {
 } as typeof globalThis.CSS;
 
 /**
+ * jsdom n'implémente pas `Blob.arrayBuffer()` — pourtant standard depuis 2019, et le
+ * seul chemin pour poser une image dans IndexedDB (REQ-UIX-35). Quatrième lacune de
+ * l'environnement, même traitement que les trois autres : on la comble ici plutôt que
+ * de tordre le code produit pour l'éviter.
+ */
+if (typeof Blob !== "undefined" && !Blob.prototype.arrayBuffer) {
+  Blob.prototype.arrayBuffer = function arrayBuffer(this: Blob) {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      const lecteur = new FileReader();
+      lecteur.onload = () => resolve(lecteur.result as ArrayBuffer);
+      lecteur.onerror = () => reject(lecteur.error);
+      lecteur.readAsArrayBuffer(this);
+    });
+  };
+}
+
+/**
  * jsdom ne fournit pas `matchMedia`. Astryx s'en sert pour les requêtes média (taille,
  * mouvement réduit, mode d'affichage) et lève sans elle. Troisième lacune de
  * l'environnement, même traitement que les deux précédentes.
