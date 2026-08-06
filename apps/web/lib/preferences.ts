@@ -78,3 +78,53 @@ export const lireRefusEducationIOS = async (indexedDB: IDBFactory) =>
 
 export const ecrireRefusEducationIOS = (indexedDB: IDBFactory) =>
   ecrirePreference(indexedDB, "education-ios-refusee", true);
+
+/**
+ * REQ-UI-13 / REQ-RCP-07 — le mode masqué. **Un réglage d'appareil**, pas de compte :
+ * le rendre synchronisé le poserait en account data, que le serveur lit en clair.
+ *
+ * Le défaut est `false` : les reçus normaux. Un mode masqué activé par défaut donnerait
+ * un produit qui ne montre jamais « lu » sans que personne l'ait demandé.
+ */
+export const lireModeMasque = async (indexedDB: IDBFactory) =>
+  (await lirePreference(indexedDB, "mode-masque")) === true;
+
+export const ecrireModeMasque = (indexedDB: IDBFactory, masque: boolean) =>
+  ecrirePreference(indexedDB, "mode-masque", masque);
+
+/**
+ * REQ-UIX-35 / REQ-UI-20 — le fond d'écran d'une conversation, **sur cet appareil**.
+ *
+ * Non synchronisé, et le libellé de l'écran le dit — un fond retrouvé sur un seul
+ * téléphone n'est pas un bug si on l'a annoncé. Une clé par salon, pour que la remise à
+ * zéro d'une conversation n'emporte pas les autres.
+ *
+ * **Des octets et un type MIME, pas un `Blob`.** Un vrai IndexedDB sait garder un blob ;
+ * le `fake-indexeddb` de la suite de tests ne le rend pas — il en fait un objet vide, et
+ * un fond d'écran devenu intestable serait un fond d'écran non prouvé. La conversion
+ * coûte une ligne de chaque côté, et l'appelant continue de voir un `Blob`.
+ */
+const cleFond = (roomId: string) => `fond-ecran:${roomId}`;
+
+interface FondEnregistre {
+  octets: ArrayBuffer;
+  type: string;
+}
+
+export async function lireFondEcran(
+  indexedDB: IDBFactory,
+  roomId: string,
+): Promise<Blob | undefined> {
+  const valeur = (await lirePreference(indexedDB, cleFond(roomId))) as FondEnregistre | undefined;
+  return valeur?.octets ? new Blob([valeur.octets], { type: valeur.type }) : undefined;
+}
+
+export const ecrireFondEcran = async (indexedDB: IDBFactory, roomId: string, image: Blob) =>
+  ecrirePreference(indexedDB, cleFond(roomId), {
+    octets: await image.arrayBuffer(),
+    type: image.type,
+  } satisfies FondEnregistre);
+
+/** La réinitialisation exigée par REQ-UIX-35 : la clé retombe à `undefined`. */
+export const effacerFondEcran = (indexedDB: IDBFactory, roomId: string) =>
+  ecrirePreference(indexedDB, cleFond(roomId), undefined);

@@ -26,15 +26,22 @@ export type { Conversation, Invitation } from "./conversations";
 
 export {
   assertEncrypted,
+  canKick,
   createDirectMessage,
   createGroupChat,
   getPinnedEvents,
+  invite,
+  kick,
   memberCount,
+  members,
   PINNED_EVENTS_METADATA,
   powerLevelOf,
+  roomNotificationLevel,
   setPinnedEvents,
   setPowerLevel,
+  setRoomNotificationLevel,
 } from "./rooms";
+export type { RoomNotificationLevel } from "./rooms";
 
 export { EVERYONE, mentionCandidates, parseMentions, ROOM_MENTION } from "./mentions";
 export type { MentionCandidate, MentionContent } from "./mentions";

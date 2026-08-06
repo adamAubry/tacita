@@ -3,7 +3,7 @@
 import type { Session } from "@tacita/client-core";
 import { conversations as listerConversations, type Conversation } from "@tacita/messaging";
 import { createSearch, ROOM_MENTION, type Search, type SearchHit, type SearchStats } from "@tacita/search";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ajouterRecente, lireRecentes, purgerRecentes, type RechercheRecente } from "../../lib/recherches-recentes";
@@ -13,7 +13,7 @@ import { Button, PowerSearch, Skeleton, Text, type PowerSearchFilter } from "../
 import { useSession } from "../onboarding/SessionProvider";
 import { MessagePreview } from "./MessagePreview";
 import { RecentSearches } from "./RecentSearches";
-import { CONFIG_RECHERCHE, tokensMentions, versCriteres } from "./filtres";
+import { CONFIG_RECHERCHE, tokenConversation, tokensMentions, versCriteres } from "./filtres";
 
 /** REQ-UIX-22 — la frappe se pose avant que la requête parte. */
 export const DEBOUNCE_MS = 300;
@@ -34,6 +34,7 @@ export interface RechercheProps {
 export function Recherche({ variation }: RechercheProps) {
   const { etat } = useSession();
   const router = useRouter();
+  const parametres = useSearchParams();
   const session: Session | null = etat.phase === "prete" ? etat.session : null;
   const moi = session?.client.getUserId() ?? "";
 
@@ -75,6 +76,14 @@ export function Recherche({ variation }: RechercheProps) {
   useEffect(() => {
     if (variation === "mentions" && moi) setFiltres(tokensMentions(moi, ROOM_MENTION));
   }, [variation, moi]);
+
+  // REQ-UIX-33 — « rechercher dans la conversation » (M-H) arrive par l'URL. Même
+  // mécanisme que l'onglet Mentions : un token posé une fois, que l'utilisateur peut
+  // retirer pour élargir.
+  useEffect(() => {
+    const salon = parametres.get("salon");
+    if (variation === "search" && salon) setFiltres([tokenConversation(salon)]);
+  }, [variation, parametres]);
 
   const { terme, criteres } = versCriteres(filtres);
   const interroge = terme.trim() !== "" || Object.keys(criteres).length > 0;

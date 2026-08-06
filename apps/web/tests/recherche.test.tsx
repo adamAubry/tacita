@@ -23,9 +23,12 @@ import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { empiler, MAX_RECENTES } from "../lib/recherches-recentes";
 
 const pousser = vi.fn();
+/** REQ-UIX-33 — l'écran lit `?salon=` : le mock doit rendre des paramètres, pas rien. */
+const parametres = new URLSearchParams();
 vi.mock("next/navigation", () => ({
   usePathname: () => "/recherche",
   useRouter: () => ({ push: pousser, back: vi.fn() }),
+  useSearchParams: () => parametres,
 }));
 
 /**

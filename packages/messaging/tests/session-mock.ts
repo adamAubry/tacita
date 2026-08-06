@@ -1,6 +1,6 @@
 import type { Session } from "@tacita/client-core";
 import { asSession } from "@tacita/client-core/testing";
-import type { ICreateRoomOpts, MatrixEvent } from "matrix-js-sdk";
+import type { ICreateRoomOpts, IPushRules, MatrixEvent, PushRuleKind } from "matrix-js-sdk";
 import { vi } from "vitest";
 
 /** Un `MatrixEvent` réduit à ce que le package en lit. */
@@ -36,6 +36,10 @@ export interface FakeRoomOptions {
   mayRedact?: boolean;
   /** Réactions portées par `$cible`, pour la lecture agrégée de REQ-MSG-05. */
   reactions?: FakeReaction[];
+  /** REQ-MSG-11 — niveau exigé par l'état du salon pour l'action `kick`. */
+  kickLevel?: number;
+  /** REQ-UIX-36 — les push rules du compte, telles que `/sync` les rend. */
+  pushRules?: IPushRules;
 }
 
 /**
@@ -50,6 +54,8 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     maySendEvent = true,
     mayRedact = true,
     reactions = [],
+    kickLevel = 50,
+    pushRules = { global: {} },
   } = options;
 
   const transactions = new Map<string, string>();
@@ -78,6 +84,11 @@ export function fakeSession(options: FakeRoomOptions = {}) {
       })),
       maySendEvent: vi.fn(() => maySendEvent),
       maySendRedactionForEvent: vi.fn(() => mayRedact),
+      // REQ-MSG-11 — le seuil vient de l'état du salon, comme chez le SDK : le test
+      // pilote le niveau exigé, jamais le résultat du prédicat.
+      hasSufficientPowerLevelFor: vi.fn(
+        (_action: string, powerLevel: number) => powerLevel >= kickLevel,
+      ),
     },
   };
 
@@ -103,6 +114,13 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     setPowerLevel: vi.fn(async (_roomId: string, _userId: string, _level: number) => ({
       event_id: "$pl",
     })),
+    kick: vi.fn(async (_roomId: string, _userId: string, _reason?: string) => ({})),
+    invite: vi.fn(async (_roomId: string, _userId: string) => ({})),
+    pushRules,
+    addPushRule: vi.fn(
+      async (_scope: string, _kind: PushRuleKind, _ruleId: string, _body: object) => ({}),
+    ),
+    deletePushRule: vi.fn(async (_scope: string, _kind: PushRuleKind, _ruleId: string) => ({})),
     on: vi.fn(),
     off: vi.fn(),
   };

@@ -17,6 +17,14 @@ export interface NewConversationSheetProps {
   /** REQ-UIX-11 — le DM, existant ou créé. La déduplication vit dans le package. */
   onConversation: (userId: string) => void;
   onGroupe: (nom: string, userIds: string[]) => void;
+  /**
+   * REQ-UIX-34 — « créer un groupe avec cette personne » ouvre la même feuille, mais
+   * directement sur l'étape groupe et avec la personne déjà cochée. Deux props plutôt
+   * qu'une copie du composant : c'est la règle du plan frontend, et le premier
+   * changement d'étape aurait dérivé entre les deux exemplaires.
+   */
+  etapeInitiale?: "choix" | "groupe";
+  selectionInitiale?: string[];
 }
 
 /**
@@ -34,14 +42,16 @@ export function NewConversationSheet({
   contacts,
   onConversation,
   onGroupe,
+  etapeInitiale = "choix",
+  selectionInitiale = [],
 }: NewConversationSheetProps) {
-  const [etape, setEtape] = useState<Etape>("choix");
-  const [selection, setSelection] = useState<string[]>([]);
+  const [etape, setEtape] = useState<Etape>(etapeInitiale);
+  const [selection, setSelection] = useState<string[]>(selectionInitiale);
   const [nom, setNom] = useState("");
 
   const fermer = () => {
-    setEtape("choix");
-    setSelection([]);
+    setEtape(etapeInitiale);
+    setSelection(selectionInitiale);
     setNom("");
     onFermer();
   };

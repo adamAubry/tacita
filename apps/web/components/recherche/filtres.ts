@@ -100,6 +100,18 @@ export const tokenTexte = (terme: string): PowerSearchFilter => ({
 });
 
 /**
+ * REQ-UIX-33 — la recherche lancée depuis les informations d'une conversation arrive
+ * armée sur ce salon. Le token **reste modifiable**, contrairement à celui des mentions :
+ * c'est un point de départ, pas la définition de l'écran, et le retirer pour élargir à
+ * tout l'historique est un geste légitime.
+ */
+export const tokenConversation = (roomId: string): PowerSearchFilter => ({
+  field: CHAMP_CONVERSATION,
+  operator: "est",
+  value: { type: "string", value: roomId },
+});
+
+/**
  * REQ-UIX-21 — l'onglet Mentions arrive avec sa requête déjà armée : `mentions` contient
  * mon identifiant **et** `@room`, parce qu'une mention de salon en est une pour chacun.
  *

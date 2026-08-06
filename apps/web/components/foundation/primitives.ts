@@ -18,7 +18,7 @@ export { Button } from "@astryxdesign/core/Button";
 export { ChatComposer, ChatComposerInput } from "@astryxdesign/core/Chat";
 export { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
 export { ClickableCard } from "@astryxdesign/core/ClickableCard";
-export { Dialog } from "@astryxdesign/core/Dialog";
+export { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 export { DropdownMenu } from "@astryxdesign/core/DropdownMenu";
 export { EmptyState } from "@astryxdesign/core/EmptyState";
 export { HStack } from "@astryxdesign/core/HStack";
@@ -31,8 +31,10 @@ export type {
   PowerSearchConfig,
   PowerSearchFilter,
 } from "@astryxdesign/core/PowerSearch";
+export { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 export { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 export { Skeleton } from "@astryxdesign/core/Skeleton";
+export { Switch } from "@astryxdesign/core/Switch";
 export { Text } from "@astryxdesign/core/Text";
 export { ToggleButton } from "@astryxdesign/core/ToggleButton";
 export { TextInput } from "@astryxdesign/core/TextInput";

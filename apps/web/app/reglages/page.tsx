@@ -1,12 +1,6 @@
-import { LayoutHeader } from "../../components/foundation/LayoutHeader";
-import { Placeholder } from "../../components/foundation/Placeholder";
+import { Reglages } from "../../components/settings/Reglages";
 
-/** Layout Settings — livré par M-H. */
-export default function Reglages() {
-  return (
-    <>
-      <LayoutHeader titre="Réglages" />
-      <Placeholder titre="Réglages" explication="Apparence, notifications, confidentialité." />
-    </>
-  );
+/** Layout Settings — M-H, REQ-UIX-31. */
+export default function PageReglages() {
+  return <Reglages />;
 }
