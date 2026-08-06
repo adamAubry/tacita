@@ -1,8 +1,25 @@
 import type { Session } from "@tacita/client-core";
-import { conversations } from "@tacita/messaging";
+import {
+  acceptInvitation,
+  conversations,
+  ignoredUsers,
+  ignoreUser,
+  invitations,
+  leaveConversation,
+  openDirectMessage,
+  unignoreUser,
+} from "@tacita/messaging";
 
 export interface Contact {
   userId: string;
+  nom: string;
+}
+
+/** Une demande d'ami en attente. D-09 : c'est une invitation de DM, pas un autre objet. */
+export interface Demande {
+  roomId: string;
+  /** L'auteur de l'invitation, quand le serveur le donne. */
+  userId?: string;
   nom: string;
 }
 
@@ -11,19 +28,63 @@ export interface Contact {
  * un « ami » est un DM existant, et c'est le produit final, pas une étape (D-09).
  *
  * Elle existe pour que la substitution reste possible sans réécriture — du découplage
- * ordinaire, pas un pari sur une V2. M-G en portera l'implémentation complète (demandes,
- * blocage, liens d'invitation) ; M-C n'a besoin que de lister.
+ * ordinaire, pas un pari sur une V2.
+ *
+ * **La distinction ami / non-ami ne se calcule qu'ici** (contrainte M-G). Un écran qui
+ * referait le test « ai-je un DM avec cette personne ? » créerait une seconde définition,
+ * et les deux divergeraient au premier cas limite — un DM quitté, une invitation en
+ * attente, un blocage.
  */
 export interface Contacts {
   lister(): Contact[];
+  /** Les demandes reçues, pas encore acceptées. */
+  demandes(): Demande[];
+  /** `true` si un DM rejoint existe avec cette personne. */
+  estAmi(userId: string): boolean;
+  bloque(userId: string): boolean;
+  /** Accepter rend le salon à ouvrir ; c'est l'appelant qui navigue. */
+  accepter(roomId: string): Promise<string>;
+  refuser(roomId: string): Promise<void>;
+  /** Envoyer une demande : en V1, une invitation de DM (D-09). */
+  inviter(userId: string): Promise<string>;
+  /** Retirer un ami = quitter le DM partagé. Sans DM, il n'y a rien à quitter. */
+  retirer(userId: string): Promise<void>;
+  bloquer(userId: string): Promise<void>;
+  debloquer(userId: string): Promise<void>;
 }
 
 /** L'implémentation native : les correspondants des DM rejoints, et rien d'autre. */
 export function contactsDeLaSession(session: Session): Contacts {
+  /** Le DM rejoint partagé avec cette personne, s'il y en a un. */
+  const dmAvec = (userId: string) =>
+    conversations(session).find((conversation) => conversation.peerId === userId);
+
   return {
     lister: () =>
       conversations(session)
         .filter((conversation) => conversation.peerId !== undefined)
         .map((conversation) => ({ userId: conversation.peerId!, nom: conversation.name })),
+
+    demandes: () =>
+      invitations(session).map((invitation) => ({
+        roomId: invitation.roomId,
+        userId: invitation.from,
+        nom: invitation.name,
+      })),
+
+    estAmi: (userId) => dmAvec(userId) !== undefined,
+    bloque: (userId) => ignoredUsers(session).includes(userId),
+
+    accepter: (roomId) => acceptInvitation(session, roomId),
+    refuser: (roomId) => leaveConversation(session, roomId),
+    inviter: (userId) => openDirectMessage(session, userId),
+
+    retirer: async (userId) => {
+      const dm = dmAvec(userId);
+      if (dm) await leaveConversation(session, dm.roomId);
+    },
+
+    bloquer: (userId) => ignoreUser(session, userId),
+    debloquer: (userId) => unignoreUser(session, userId),
   };
 }

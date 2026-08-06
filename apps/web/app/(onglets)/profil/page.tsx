@@ -1,6 +1,6 @@
-import { Placeholder } from "../../../components/foundation/Placeholder";
+import { EcranProfil } from "../../../components/profil/EcranProfil";
 
-/** Layout Profile — livré par M-G. */
+/** Layout Profile — le sien (M-G). */
 export default function Profil() {
-  return <Placeholder titre="Profil" explication="Votre profil et vos réglages de compte." />;
+  return <EcranProfil />;
 }

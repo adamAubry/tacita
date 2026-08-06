@@ -36,6 +36,18 @@ export {
   setPowerLevel,
 } from "./rooms";
 
+export {
+  acceptInvitation,
+  ignoredUsers,
+  ignoreUser,
+  leaveConversation,
+  profileOf,
+  searchUsers,
+  unignoreUser,
+  updateProfile,
+} from "./social";
+export type { Profile } from "./social";
+
 export { EVERYONE, mentionCandidates, parseMentions, ROOM_MENTION } from "./mentions";
 export type { MentionCandidate, MentionContent } from "./mentions";
 

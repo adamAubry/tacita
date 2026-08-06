@@ -1,0 +1,115 @@
+"use client";
+
+import type { Profile } from "@tacita/messaging";
+
+import type { Demande } from "../../lib/contacts";
+import { ConversationAvatar } from "../foundation/ConversationAvatar";
+import { Button, ClickableCard, Text } from "../foundation/primitives";
+
+export interface SuggestionsProps {
+  profils: Profile[];
+  onOuvrirProfil: (userId: string) => void;
+}
+
+/**
+ * REQ-UIX-28 — composant 16, variation **suggestion** : une carte cliquable qui mène au
+ * profil. Elle ne porte aucune action directe — ajouter quelqu'un se décide sur son
+ * profil, après l'avoir regardé, pas depuis une ligne de résultat.
+ */
+export function Suggestions({ profils, onOuvrirProfil }: SuggestionsProps) {
+  return (
+    <div
+      role="list"
+      aria-label="Résultats"
+      style={{ display: "grid", gap: "var(--spacing-1)", padding: "var(--spacing-3)" }}
+    >
+      {profils.map((profil) => (
+        <div role="listitem" key={profil.userId}>
+          <ClickableCard
+            label={profil.displayName}
+            padding={3}
+            onClick={() => onOuvrirProfil(profil.userId)}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
+              <ConversationAvatar nom={profil.displayName} direct taille={40} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <Text type="body" weight="bold" maxLines={1}>
+                  {profil.displayName}
+                </Text>
+                <Text type="supporting" color="secondary" maxLines={1}>
+                  {profil.userId}
+                </Text>
+              </div>
+            </div>
+          </ClickableCard>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export interface DemandesListProps {
+  demandes: Demande[];
+  onAccepter: (demande: Demande) => void;
+  onRefuser: (demande: Demande) => void;
+}
+
+/**
+ * REQ-UIX-29 — composant 16, variation **demande** : accepter en vert, refuser en rouge.
+ *
+ * Les deux couleurs sont les seules de l'app à porter un sens par elles-mêmes ; elles
+ * sont doublées par leur libellé, parce qu'une paire vert/rouge seule est illisible pour
+ * une bonne part des daltonismes.
+ */
+export function DemandesList({ demandes, onAccepter, onRefuser }: DemandesListProps) {
+  return (
+    <div
+      role="list"
+      aria-label="Demandes"
+      style={{ display: "grid", gap: "var(--spacing-1)", padding: "var(--spacing-3)" }}
+    >
+      {demandes.map((demande) => (
+        <div
+          role="listitem"
+          key={demande.roomId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--spacing-3)",
+            padding: "var(--spacing-2)",
+          }}
+        >
+          <ConversationAvatar nom={demande.nom} direct taille={40} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Text type="body" weight="bold" maxLines={1}>
+              {demande.nom}
+            </Text>
+            {demande.userId && (
+              <Text type="supporting" color="secondary" maxLines={1}>
+                {demande.userId}
+              </Text>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: "var(--spacing-2)" }}>
+            <Button
+              label="Accepter"
+              variant="primary"
+              size="sm"
+              // Le vert de l'accent ne suffit pas : DESIGN.md réserve `success` à la
+              // confirmation, et c'est bien ce que fait ce bouton.
+              style={{ background: "var(--color-success)" }}
+              onClick={() => onAccepter(demande)}
+            />
+            <Button
+              label="Refuser"
+              variant="destructive"
+              size="sm"
+              onClick={() => onRefuser(demande)}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

@@ -1,7 +1,7 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Dix points sur onze sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
-**E-11 est ouvert**, relevé le 06/08/2026 au cours de M-F. Ce fichier garde la question,
+**Dix points sur douze sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
+**E-11 et E-12 sont ouverts**, relevés le 06/08/2026 au cours de M-F et de M-G. Ce fichier garde la question,
 la décision et son motif : une décision dont on a perdu le motif se rediscute tous les six
 mois.
 
@@ -26,6 +26,7 @@ contrat gagne.
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 | E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Ouvert** — livré débouncé sur les critères, la limite est documentée | rien tant que non tranché ; REQ-UIX-22 **non modifiée** |
+| E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Ouvert** — la photo est **absente** de M-G, le reste de REQ-UI-20 est livré | rien tant que non tranché ; REQ-UI-20 et l'interdit n°11 **non modifiés** |
 
 ---
 
@@ -431,6 +432,55 @@ de `useResultats`, et ici.
 **Ce que ce point ne remet pas en cause.** REQ-UIX-22 n'est pas modifiée : l'amender est
 un geste de PM. Le débounce, les skeletons, le placeholder « aucun résultat » avec rappel
 du périmètre et l'absence totale d'appel réseau sont livrés et testés.
+
+---
+
+## E-12 — La photo de profil n'a pas de chemin non chiffré (M-G) — **ouvert**
+
+**Relevé le 06/08/2026, au cours de M-G.** Le reste du module est livré et vert ; seule
+la photo de profil manque, et elle manque **visiblement** — le champ est absent du
+formulaire, pas grisé, pas cassé. Même traitement que le vocal en M-E.
+
+**La question.** REQ-UI-20 demande une photo de profil « via pipeline média ». Le
+pipeline (spec 08) **chiffre tout ce qu'il téléverse**, et c'est sa raison d'être :
+REQ-MED-01 en fait la garantie du principe directeur. Mais un avatar Matrix n'est pas une
+pièce jointe :
+
+- il vit dans `m.room.member` et dans le profil du compte, sous forme d'un `mxc://` **nu**,
+  sans les clés ni le hash qu'un `EncryptedFile` transporte ;
+- le protocole n'offre **aucun canal** pour ces clés sur un avatar de profil ;
+- il est lu par tout client Matrix, y compris ceux qui ne sont pas les nôtres.
+
+Un avatar chiffré est donc un avatar que **personne** ne peut afficher — pas même nous
+sur un second appareil. Le téléverser quand même produirait un carré cassé partout :
+exactement la promesse non tenue que l'interdit n°13 vise.
+
+**Pourquoi je ne l'ai pas contourné.** La sortie évidente — appeler `uploadContent` du
+SDK depuis le shard — est fermée par l'interdit n°11 : « pas de canal d'upload parallèle,
+un seul pipeline média pour tous les fichiers ». Le contourner en silence pour une seule
+image serait précisément le mode de panne que la spec 00 nomme.
+
+**Trois voies, pour arbitrage :**
+
+- **Voie A — un chemin public explicite dans le pipeline**, du genre
+  `uploadPublicImage(session, env, file)` : même paquet, même compression, même point
+  d'entrée unique, mais **sans chiffrement et nommé pour qu'on ne s'y trompe pas**.
+  L'interdit n°11 est respecté (un seul pipeline), et spec 08 gagne une exigence qui dit
+  *quand* le non-chiffré est légitime. *Coût :* le pipeline cesse de pouvoir promettre
+  « tout ce qui sort d'ici est chiffré » ; la promesse devient conditionnelle, donc
+  relisable de travers dans six mois. **C'est la voie que je recommande**, à condition
+  que le nom de la fonction porte la condition.
+- **Voie B — pas de photo de profil, définitivement.** Les initiales colorées de
+  `ConversationAvatar` sont déjà le rendu par défaut, et elles sont cohérentes avec le
+  positionnement de PRODUCT.md. *Coût :* on retire une exigence ratifiée, ce qui est un
+  geste de PM ; et l'absence d'avatar se remarque face à toutes les messageries.
+- **Voie C — avatar local, non synchronisé**, comme le fond d'écran de REQ-UI-20 et la
+  note de D-09. *Coût :* il ne suivrait ni les autres appareils ni le regard des autres —
+  un avatar que personne d'autre ne voit n'est pas un avatar, c'est un thème.
+
+**Ce que ce point ne remet pas en cause.** REQ-UI-20 n'est pas modifiée, l'interdit n°11
+non plus : amender l'un ou l'autre est un geste de PM. Le reste de REQ-UIX-24 est livré —
+nom d'affichage modifiable, identifiant affiché, form edit.
 
 ---
 

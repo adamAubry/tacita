@@ -36,6 +36,12 @@ export interface FakeRoomOptions {
   mayRedact?: boolean;
   /** Réactions portées par `$cible`, pour la lecture agrégée de REQ-MSG-05. */
   reactions?: FakeReaction[];
+  /** REQ-MSG-17 — l'état initial de `m.ignored_user_list`. */
+  ignored?: string[];
+  /** REQ-MSG-18 — ce que `getProfileInfo` rend. */
+  profile?: { displayname?: string; avatar_url?: string };
+  /** REQ-MSG-19 — ce que l'annuaire du homeserver rend. */
+  annuaire?: { user_id: string; display_name?: string; avatar_url?: string }[];
 }
 
 /**
@@ -50,7 +56,10 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     maySendEvent = true,
     mayRedact = true,
     reactions = [],
+    profile = { displayname: "luca" },
+    annuaire = [],
   } = options;
+  let ignored = options.ignored ?? [];
 
   const transactions = new Map<string, string>();
   let autoId = 0;
@@ -102,6 +111,23 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     createRoom: vi.fn(async (_opts: ICreateRoomOpts) => ({ room_id: "!nouveau:tacita.test" })),
     setPowerLevel: vi.fn(async (_roomId: string, _userId: string, _level: number) => ({
       event_id: "$pl",
+    })),
+    // Le modèle social de D-09 (REQ-MSG-16 à 19). `ignored` est un état porté par le
+    // mock et non un tableau figé : `ignoreUser` relit la liste avant d'écrire, et un
+    // faux qui rendrait toujours la même chose ne prouverait pas cette relecture.
+    joinRoom: vi.fn(async (roomId: string) => ({ roomId })),
+    leave: vi.fn(async (_roomId: string) => ({})),
+    getIgnoredUsers: vi.fn((): string[] => ignored),
+    setIgnoredUsers: vi.fn(async (userIds: string[]) => {
+      ignored = userIds;
+      return {};
+    }),
+    getProfileInfo: vi.fn(async (_userId: string) => profile),
+    setDisplayName: vi.fn(async (_name: string) => ({})),
+    setAvatarUrl: vi.fn(async (_url: string) => ({})),
+    searchUserDirectory: vi.fn(async (_options: { term: string; limit?: number }) => ({
+      results: annuaire,
+      limited: false,
     })),
     on: vi.fn(),
     off: vi.fn(),

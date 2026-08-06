@@ -45,7 +45,7 @@ Les sept paquets sont livrés, verts, et **aucun n'importe un autre en productio
 | Paquet | Ce qu'il donne | REQ-UI servies |
 |---|---|---|
 | `@tacita/client-core` | `initSession`, `restoreSession`, `Session` (client, timeline, isEncrypted, recoveryRequired, setupRecoveryKey, identityResetOf, confirmIdentityOf, registerWipe, logout) | 01, 04, 17 |
-| `@tacita/messaging` | `sendText`, `reply`, `edit`, `redact`, `react`, `messages`, `subscribe`, `canEdit`, `canRedact`, `createDirectMessage`, `createGroupChat`, `memberCount`, `getPinnedEvents`, `setPinnedEvents`, `parseMentions`, `mentionCandidates`, `createTypingIndicator`, `conversations`, `invitations`, `setFavourite`, `openDirectMessage`, `subscribeConversations` | 05–12 |
+| `@tacita/messaging` | `sendText`, `reply`, `edit`, `redact`, `react`, `messages`, `subscribe`, `canEdit`, `canRedact`, `createDirectMessage`, `createGroupChat`, `memberCount`, `getPinnedEvents`, `setPinnedEvents`, `parseMentions`, `mentionCandidates`, `createTypingIndicator`, `conversations`, `invitations`, `setFavourite`, `openDirectMessage`, `subscribeConversations`, `acceptInvitation`, `leaveConversation`, `ignoredUsers`, `ignoreUser`, `unignoreUser`, `profileOf`, `updateProfile`, `searchUsers`, `Profile` | 05–12 |
 | `@tacita/outbox` | `createOutbox`, `Outbox` (enqueue/retry/remove/pending/subscribe), `OutboxEntry`, `NOT_ENCRYPTED` | 06, 17 |
 | `@tacita/receipts` | `createReceipts`, `ReceiptStatus`, `DELIVERED`, `deliveryUnknowable` | 13 |
 | `@tacita/media-pipeline` | `uploadAttachment`, `downloadAttachment`, `saveOriginal`, `waveform`, `AttachmentContent` | 14, 15 |

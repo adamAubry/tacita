@@ -14,48 +14,86 @@ const VERSION = 1;
  *
  * Ce store ne contient **jamais de contenu déchiffré** : que des choix d'affichage.
  */
-const ouvrir = (indexedDB: IDBFactory): Promise<IDBDatabase> =>
+const ouvrir = (indexedDB: IDBFactory, base: string, store: string): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
-    const requete = indexedDB.open(BASE, VERSION);
-    requete.onupgradeneeded = () => requete.result.createObjectStore(STORE);
+    const requete = indexedDB.open(base, VERSION);
+    requete.onupgradeneeded = () => requete.result.createObjectStore(store);
     requete.onsuccess = () => resolve(requete.result);
     requete.onerror = () => reject(requete.error);
   });
 
-export async function lirePreference(indexedDB: IDBFactory, cle: string): Promise<unknown> {
-  const base = await ouvrir(indexedDB);
+/**
+ * Le couple lecture/écriture générique. Il prend la base et le store en paramètre parce
+ * que **toutes les données locales n'ont pas la même nature** : les préférences sont des
+ * choix d'affichage, les notes de M-G disent quelque chose d'une personne. Les mélanger
+ * dans un store dont la docstring promet « aucun contenu » rendrait cette promesse fausse.
+ */
+export async function lireCle(
+  indexedDB: IDBFactory,
+  cle: string,
+  nomBase = BASE,
+  store = STORE,
+): Promise<unknown> {
+  const connexion = await ouvrir(indexedDB, nomBase, store);
   try {
     return await new Promise<unknown>((resolve, reject) => {
-      const requete = base.transaction(STORE, "readonly").objectStore(STORE).get(cle);
+      const requete = connexion.transaction(store, "readonly").objectStore(store).get(cle);
       requete.onsuccess = () => resolve(requete.result);
       requete.onerror = () => reject(requete.error);
     });
   } finally {
-    base.close();
+    connexion.close();
   }
 }
 
-export async function ecrirePreference(
+export async function ecrireCle(
   indexedDB: IDBFactory,
   cle: string,
   valeur: unknown,
+  nomBase = BASE,
+  store = STORE,
 ): Promise<void> {
-  const base = await ouvrir(indexedDB);
+  const connexion = await ouvrir(indexedDB, nomBase, store);
   try {
     await new Promise<void>((resolve, reject) => {
       // Le `onsuccess` de la requête précède le commit de la transaction, qui peut
       // encore avorter : on attend `oncomplete`, sinon un réglage « enregistré » peut ne
       // pas l'être. Même motif que packages/search/src/snapshot.ts.
-      const transaction = base.transaction(STORE, "readwrite");
-      transaction.objectStore(STORE).put(valeur, cle);
+      const transaction = connexion.transaction(store, "readwrite");
+      transaction.objectStore(store).put(valeur, cle);
       transaction.oncomplete = () => resolve();
       transaction.onabort = transaction.onerror = () =>
         reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
     });
   } finally {
-    base.close();
+    connexion.close();
   }
 }
+
+/** Vide un store entier. REQ-COR-10 : ce que la déconnexion doit pouvoir effacer. */
+export async function viderStore(
+  indexedDB: IDBFactory,
+  nomBase: string,
+  store: string,
+): Promise<void> {
+  const connexion = await ouvrir(indexedDB, nomBase, store);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = connexion.transaction(store, "readwrite");
+      transaction.objectStore(store).clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = transaction.onerror = () =>
+        reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
+    });
+  } finally {
+    connexion.close();
+  }
+}
+
+export const lirePreference = (indexedDB: IDBFactory, cle: string) => lireCle(indexedDB, cle);
+
+export const ecrirePreference = (indexedDB: IDBFactory, cle: string, valeur: unknown) =>
+  ecrireCle(indexedDB, cle, valeur);
 
 const estMode = (valeur: unknown): valeur is ThemeMode =>
   valeur === "system" || valeur === "light" || valeur === "dark";

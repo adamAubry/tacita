@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10) et **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11) livrés. Les modules G à I posent leur contenu sur ce squelette.
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11) et **M-G** (social, hors photo de profil — voir `ESCALATIONS` § E-12) livrés. Les modules H et I posent leur contenu sur ce squelette.
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -72,6 +72,13 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **l'envoi de pièce jointe n'a pas de barre de progression**, seulement un état : le
   pipeline (spec 08) ne rapporte rien pendant la compression ni le téléversement, et une
   barre serait une animation inventée plutôt qu'une mesure ;
+- **la photo de profil n'est pas livrée**, et son champ est absent plutôt que grisé : le
+  pipeline chiffre tout ce qu'il téléverse, alors qu'un avatar Matrix est un `mxc://` nu
+  que tout client doit pouvoir afficher. Un avatar chiffré serait un carré cassé partout
+  — `ESCALATIONS` § E-12 ;
+- **aucun avatar n'est une image**, pas même celui d'un contact : `ConversationAvatar`
+  rend des initiales, la récupération de média authentifié pour les avatars n'étant pas
+  branchée ;
 - **ni l'accueil ni la timeline ne sont fenêtrés.** Astryx `0.2.0` n'expose aucune liste
   virtualisée ; les contraintes de M-C et M-D prévoyaient ce cas. Le plafond est réel sur une
   conversation ancienne, pas sur une liste de conversations.
@@ -87,5 +94,7 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 | `components/conversation/` | M-D : timeline, message object, hold menu, starter, composer |
 | `components/media/` | M-E : vignettes, viewer, vocal, capture, galeries partagées |
 | `components/recherche/` | M-F : barre et périmètre, recherches récentes, résultats surlignés, onglet Mentions |
+| `components/profil/` | M-G : profile card, profil propre et d'autrui, note privée locale |
+| `components/amis/` | M-G : ajout par lien ou annuaire, demandes reçues |
 | `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

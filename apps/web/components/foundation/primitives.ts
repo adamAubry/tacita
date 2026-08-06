@@ -31,6 +31,7 @@ export { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/Segme
 export { Skeleton } from "@astryxdesign/core/Skeleton";
 export { Text } from "@astryxdesign/core/Text";
 export { ToggleButton } from "@astryxdesign/core/ToggleButton";
+export { TextArea } from "@astryxdesign/core/TextArea";
 export { TextInput } from "@astryxdesign/core/TextInput";
 export { Toolbar } from "@astryxdesign/core/Toolbar";
 export { createStaticSource } from "@astryxdesign/core/Typeahead";
