@@ -1,7 +1,7 @@
 import type { Session } from "@tacita/client-core";
 import { mentionCandidates, messages as listerMessages, messageText } from "@tacita/messaging";
 
-import { PUSH_GATEWAY_URL } from "./config";
+import { PUSH_CONFIG_URL, PUSH_NOTIFY_URL } from "./config";
 
 /**
  * REQ-UI-18 — la chaîne Web Push côté client, de bout en bout.
@@ -62,7 +62,7 @@ export const permissionPush = (): NotificationPermission | "indisponible" =>
 
 /** REQ-PSH-03 — la clé publique VAPID, servie par la passerelle. */
 async function cleVapid(): Promise<string> {
-  const reponse = await fetch(`${PUSH_GATEWAY_URL.replace(/\/$/, "")}/config`);
+  const reponse = await fetch(PUSH_CONFIG_URL);
   if (!reponse.ok) throw new Error("passerelle push indisponible");
   const { vapid_public_key } = (await reponse.json()) as { vapid_public_key?: string };
   if (!vapid_public_key) throw new Error("passerelle push sans clé VAPID");
@@ -107,7 +107,7 @@ export async function abonnerAuxNotifications(session: Session): Promise<boolean
 
   await session.client.setPusher({
     kind: "http",
-    app_id: "chat.tacita.web",
+    app_id: "org.tacita.web",
     pushkey: endpoint,
     app_display_name: "Tacita",
     device_display_name: session.client.getDeviceId() ?? "web",
@@ -116,7 +116,7 @@ export async function abonnerAuxNotifications(session: Session): Promise<boolean
     // et `brand`. Les clés de la subscription y sont indispensables — c'est là que la
     // passerelle les relit (spec 03), et sans elles aucun push ne peut être chiffré.
     data: {
-      url: `${PUSH_GATEWAY_URL.replace(/\/$/, "")}/_matrix/push/v1/notify`,
+      url: PUSH_NOTIFY_URL,
       // REQ-PSH-02 — le format que la passerelle relaie : jamais de contenu, seulement
       // de quoi réveiller ce navigateur.
       format: "event_id_only",

@@ -4,8 +4,12 @@ import type { Conversation } from "@tacita/messaging";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { PushNotifications } from "../components/notifications/PushNotifications";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
+import { PUSH_CONFIG_URL, PUSH_NOTIFY_URL } from "../lib/config";
 import { apercuLocal, TYPE_APERCU } from "../lib/push";
 import { lire } from "./sources";
 
@@ -303,5 +307,37 @@ describe("REQ-UIX-40 — le service worker n'écrit rien, ne journalise rien, ne
     await attente;
 
     expect(naviguer).toHaveBeenCalledWith(`/c/${encodeURIComponent(SALON)}`);
+  });
+});
+
+describe("REQ-INF-14 — le client vise les adresses que le déploiement expose vraiment", () => {
+  // `join` et non `new URL` : sous jsdom, le `URL` global est celui de jsdom, que
+  // `node:fs` refuse (« The URL must be of scheme file »). Même lacune que celle déjà
+  // documentée dans `tests/sources.ts`.
+  const contratInfra = readFileSync(
+    join(import.meta.dirname, "../../../infra/README.md"),
+    "utf-8",
+  );
+
+  /**
+   * Trouvé le 07/08/2026 en montant la pile. Le shard visait une origine publique
+   * `https://push.example.org`, qui n'existe dans aucun déploiement : la lecture de la
+   * clé partait en 404, et le pusher enregistré pointait vers un hôte injoignable — donc
+   * aucune notification n'aurait jamais été délivrée. Rien ne l'attrapait, parce que les
+   * deux moitiés du contrat vivaient dans deux dépôts de vérité sans lien.
+   */
+  it("lit la clé VAPID là où le proxy la publie, derrière le homeserver", () => {
+    expect(new URL(PUSH_CONFIG_URL).pathname).toBe("/push/config");
+    // Et c'est bien ce que l'infra documente, pas une convention inventée ici.
+    expect(contratInfra).toContain("/push/config");
+  });
+
+  it("enregistre le pusher sur l'adresse interne, jamais une URL publique", () => {
+    // `/_matrix/push/v1/notify` n'a aucune authentification : la publier ferait de la
+    // passerelle un relais de push ouvert. C'est Synapse qui appelle, depuis le réseau
+    // du déploiement — l'adresse est donc interne par construction.
+    expect(PUSH_NOTIFY_URL).toContain("/_matrix/push/v1/notify");
+    expect(PUSH_NOTIFY_URL).not.toContain("push.example.org");
+    expect(contratInfra).toContain(PUSH_NOTIFY_URL);
   });
 });
