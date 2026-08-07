@@ -12,6 +12,7 @@ import { downloadAttachment } from "@tacita/media-pipeline";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { routeAppel } from "../../lib/appels";
 import { contactsDeLaSession } from "../../lib/contacts";
 import { environnementMedia } from "../../lib/media-env";
 import { enregistrerWipeNotes } from "../../lib/notes";
@@ -102,8 +103,10 @@ export function EcranProfil({ userId }: { userId?: string }) {
         void contacts.inviter(cible).then((roomId) => router.push(`/c/${encodeURIComponent(roomId)}`));
       }}
       onAppel={() => {
-        // M-I porte l'appel ; on ouvre la conversation, d'où il se déclenche.
-        if (dm) router.push(`/c/${encodeURIComponent(dm.roomId)}`);
+        // REQ-UIX-39 — **le même chemin que le header 1:1**, littéralement le même
+        // constructeur de route. Passer par la conversation pour y cliquer une seconde
+        // fois ferait deux gestes là où le bouton en promet un.
+        if (dm) router.push(routeAppel(dm.roomId));
       }}
       onInviter={async () => {
         await contacts.inviter(cible);

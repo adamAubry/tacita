@@ -4,15 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 import { Theme, type ThemeMode } from "../components/foundation/primitives";
 import { tacitaTheme } from "../components/foundation/theme";
+import { PushNotifications } from "../components/notifications/PushNotifications";
 import { RecoveryGate } from "../components/onboarding/RecoveryGate";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
+import { HOMESERVER } from "../lib/config";
 import { ecrireTheme, lireTheme } from "../lib/preferences";
-
-/**
- * L'adresse du homeserver est une donnée de déploiement, pas un secret : elle est
- * publique dès le premier appel réseau du client.
- */
-const HOMESERVER = process.env.NEXT_PUBLIC_HOMESERVER_URL ?? "https://chat.example.org";
 
 /**
  * **Le `Theme` d'Astryx doit être ici, dans un composant client à nous.** Posé
@@ -60,6 +56,10 @@ export function Providers({ children }: { children: ReactNode }) {
             aucune route ne rend quoi que ce soit tant que la clé n'est pas confirmée. */}
         <SessionProvider homeserverUrl={HOMESERVER}>
           <RecoveryGate>{children}</RecoveryGate>
+          {/* REQ-UI-18 — la chaîne push est **hors** de la porte de récupération : elle
+              ne rend rien tant qu'un message n'est pas arrivé, et elle doit pouvoir
+              répondre au service worker quel que soit l'écran affiché. */}
+          <PushNotifications />
         </SessionProvider>
       </Theme>
     </ContexteTheme.Provider>

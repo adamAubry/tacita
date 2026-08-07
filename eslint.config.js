@@ -20,7 +20,19 @@ export default tseslint.config(
     files: ["apps/web/public/sw.js"],
     languageOptions: {
       globals: Object.fromEntries(
-        ["self", "caches", "fetch", "Response", "URL", "Request"].map((nom) => [nom, "readonly"]),
+        [
+          "self",
+          "caches",
+          "fetch",
+          "Response",
+          "URL",
+          "Request",
+          // Le réveil push (REQ-UI-18) : il interroge une fenêtre par `MessageChannel`,
+          // avec un délai au-delà duquel la notification part générique.
+          "MessageChannel",
+          "setTimeout",
+          "clearTimeout",
+        ].map((nom) => [nom, "readonly"]),
       ),
     },
   },

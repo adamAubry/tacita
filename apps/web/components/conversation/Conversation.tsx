@@ -28,10 +28,12 @@ import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/recei
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { routeAppel } from "../../lib/appels";
 import { environnementMedia } from "../../lib/media-env";
 import { brancherModeMasque } from "../../lib/mode-masque";
 import { lireFondEcran } from "../../lib/preferences";
 import { videoTranscodable } from "../../lib/transcode-video";
+import { BandeauAppel } from "../appels/BandeauAppel";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { IconeAppel, IconeVideo } from "../foundation/icons";
 import { Button, Icon } from "../foundation/primitives";
@@ -310,10 +312,24 @@ export function Conversation({ roomId }: { roomId: string }) {
         titre={salon?.name ?? "Conversation"}
         fin={
           <div style={{ display: "flex", gap: "var(--spacing-1)" }}>
-            {/* M-I porte la logique d'appel ; M-D ne rend que les deux boutons et route
-                vers l'écran d'appel — il ne compose rien lui-même (interdit n°7). */}
-            <Button label="Appel audio" variant="ghost" isIconOnly icon={IconeAppel} />
-            <Button label="Appel vidéo" variant="ghost" isIconOnly icon={IconeVideo} />
+            {/* M-D fournit l'emplacement, M-I le comportement (REQ-UI-19) : les deux
+                boutons routent vers l'écran d'appel, qui embarque Element Call. Rien
+                n'est composé ici (interdit n°7), et **aucun des deux n'est désactivé**
+                sans focus RTC — la cause s'affiche dans l'écran (REQ-CAL-02). */}
+            <Button
+              label="Appel audio"
+              variant="ghost"
+              isIconOnly
+              icon={IconeAppel}
+              onClick={() => router.push(routeAppel(roomId))}
+            />
+            <Button
+              label="Appel vidéo"
+              variant="ghost"
+              isIconOnly
+              icon={IconeVideo}
+              onClick={() => router.push(routeAppel(roomId, true))}
+            />
             {/* Le point d'entrée du layout Conversation info (M-H) : sans lui, l'écran
                 des options n'est atteignable par aucun geste. */}
             <Button
@@ -326,6 +342,9 @@ export function Conversation({ roomId }: { roomId: string }) {
           </div>
         }
       />
+
+      {/* REQ-UI-19 — « appel en cours — rejoindre », dans le salon concerné. */}
+      <BandeauAppel roomId={roomId} />
 
       <Timeline
         messages={messages}

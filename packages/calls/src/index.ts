@@ -1,7 +1,10 @@
 import type { Session } from "@tacita/client-core";
 import { Direction, RoomStateEvent, type MatrixEvent } from "matrix-js-sdk";
+import { ClientWidgetApi, Widget } from "matrix-widget-api";
 
+import { CallWidgetDriver } from "./driver";
 import {
+  CALL_APPLICATION,
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
   isLivekitFocus,
@@ -59,6 +62,19 @@ export interface CallWidgetOptions {
   parentUrl: string;
   /** Identifiant du widget côté client, repris tel quel par le driver. */
   widgetId: string;
+  /**
+   * Point d'entrée : `true` pour « appel vidéo », `false` pour « appel audio »
+   * (REQ-UIX-38). C'est un **paramètre de lancement**, pas un réglage : la bascule
+   * voix↔vidéo pendant l'appel appartient à Element Call (E-07).
+   *
+   * ⚠️ Sensible à la version d'Element Call (CLAUDE.md § prudence outillage). Le
+   * déploiement n'est épinglé nulle part dans le dépôt, donc ce nom de paramètre n'a pas
+   * pu être relu contre une version — voir `ESCALATIONS` § E-14. Si Element Call
+   * l'ignore, l'appel **fonctionne quand même** : son lobby demande caméra et micro
+   * avant d'entrer. C'est une préférence perdue, pas un appel cassé — raison pour
+   * laquelle `skipLobby` n'est pas envoyé.
+   */
+  video?: boolean;
 }
 
 /**
@@ -116,12 +132,52 @@ export function buildCallWidget(
     hideHeader: "true",
     // Le média reste chiffré par participant : le SFU relaie sans déchiffrer.
     perParticipantE2EE: "true",
+    // REQ-UIX-38 — le point d'entrée choisi, transmis au lancement. Défaut audio :
+    // allumer la caméra de quelqu'un qui n'a rien demandé se répare mal.
+    video: String(options.video ?? false),
   };
 
   return {
     params,
     url: `${options.elementCallUrl.replace(/\/$/, "")}/room#?${new URLSearchParams(params).toString()}`,
   };
+}
+
+/**
+ * REQ-CAL-05 — branche l'API widget sur une iframe **déjà rendue par le shard UI**.
+ *
+ * Le rendu de l'iframe reste hors de ce paquet (spec 10) ; le pont postMessage, lui, y
+ * est : sans lui le widget n'obtient pas son jeton OpenID et l'appel n'est jamais
+ * autorisé par le SFU. Il vit ici et pas dans le shard parce que REQ-UI-02 tient une
+ * liste close de dépendances qui n'inclut pas `matrix-widget-api` — et n'a pas à
+ * l'inclure : c'est du protocole, pas de l'interface.
+ *
+ * `onReady` est appelé quand le widget **nous a parlé**. C'est le seul signal qui dise
+ * qu'Element Call a démarré : le `load` de l'iframe, lui, se déclenche pour n'importe
+ * quel document — y compris une page d'erreur du serveur qui l'héberge. Le shard s'en
+ * sert pour son délai de chargement (REQ-UIX-38).
+ */
+export function attachCallWidget(
+  session: Session,
+  roomId: string,
+  iframe: HTMLIFrameElement,
+  options: CallWidgetOptions,
+  onReady?: () => void,
+): () => void {
+  const { url } = buildCallWidget(session, roomId, options);
+  const widget = new Widget({
+    id: options.widgetId,
+    creatorUserId: session.client.getUserId() ?? "",
+    type: CALL_APPLICATION,
+    url,
+    // Element Call annonce lui-même son chargement (`preload=true` → `content_loaded`).
+    // Attendre en plus le `load` de l'iframe ferait démarrer la session deux fois.
+    waitForIframeLoad: false,
+  });
+
+  const api = new ClientWidgetApi(widget, iframe, new CallWidgetDriver(session, roomId));
+  if (onReady) api.once("ready", onReady);
+  return () => api.stop();
 }
 
 /**

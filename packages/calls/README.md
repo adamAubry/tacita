@@ -8,8 +8,9 @@ l'URL et le driver.
 
 ```ts
 const focus = await discoverFocus(homeserverUrl); // lève RtcFociMissingError
-const { url } = buildCallWidget(session, roomId, { elementCallUrl, parentUrl, widgetId });
+const { url } = buildCallWidget(session, roomId, { elementCallUrl, parentUrl, widgetId, video });
 const driver = new CallWidgetDriver(session, roomId); // à passer à ClientWidgetApi
+const detacher = attachCallWidget(session, roomId, iframe, options); // le pont postMessage
 const call = activeCall(session, roomId); // idle → active → ended
 await hangupLocal(session, roomId);
 ```
@@ -28,6 +29,16 @@ erreur bruyante : le salon affichera simplement « aucun appel ». À revérifie
 montée de version du SDK ou d'Element Call.
 
 ## Limites assumées
+
+- **`attachCallWidget` prend une iframe, il n'en rend aucune.** La spec 10 dit « zéro DOM,
+  le shard rend l'iframe » — c'est toujours vrai : le shard la rend, ce paquet branche le
+  pont postMessage dessus. Le pont est ici et non dans le shard parce que REQ-UI-02 tient
+  une liste close de dépendances qui n'inclut pas `matrix-widget-api`, et n'a pas à
+  l'inclure : c'est du protocole, pas de l'interface.
+- **Le paramètre `video` n'a été relu contre aucune version d'Element Call** — le dépôt
+  n'en épingle aucune (`ESCALATIONS` § E-14). S'il est ignoré, l'appel fonctionne : le
+  lobby d'Element Call demande caméra et micro avant l'entrée. C'est pourquoi `skipLobby`
+  n'est pas envoyé.
 
 - **Le driver envoie directement, sans passer par la file d'envoi** (spec 07). Seul
   endroit du dépôt, hors `messaging` et `outbox` lui-même, à appeler `client.sendEvent`.

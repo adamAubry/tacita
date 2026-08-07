@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11), **M-G** (social, hors photo de profil — voir `ESCALATIONS` § E-12) et **M-H** (réglages et infos de conversation, réception de lien de groupe exceptée — voir `ESCALATIONS` § E-13) livrés. Reste **M-I** (appels et push).
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11), **M-G** (social, hors photo de profil — voir `ESCALATIONS` § E-12), **M-H** (réglages et infos de conversation, réception de lien de groupe exceptée — voir `ESCALATIONS` § E-13) et **M-I** (appels et push, paramètre de lancement d'Element Call non vérifiable — voir `ESCALATIONS` § E-14) livrés. Les neuf modules du shard sont posés ; reste l'intégration finale (navigation croisée, passe de cohérence design).
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -53,9 +53,23 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **rien n'a été rendu dans un vrai navigateur.** jsdom prouve la logique et la propagation
   des événements ; il ne prouve ni un doigt sur un écran, ni le conflit entre un swipe et le
   défilement, ni la zone morte de Safari iOS (REQ-UI-08/09, module M-D) ;
-- **le service worker n'a jamais tourné.** Ce qui est testé est sa *forme* : liste de
-  précache sans donnée, et une seule branche d'écriture au cache, étroite. Qu'il se comporte
-  ainsi en production reste à vérifier ;
+- **le service worker n'a jamais tourné dans un navigateur.** Ses gestionnaires `push` et
+  `notificationclick` sont, eux, exercés : la suite évalue **le fichier livré** avec un
+  `self` fourni, et vérifie la notification construite comme celle qui reste générique.
+  Le reste est testé sur sa *forme* : liste de précache sans donnée, une seule branche
+  d'écriture au cache, étroite. Que le navigateur l'installe et le réveille comme prévu
+  reste à vérifier sur une pile déployée ;
+- **une notification arrivée application fermée reste générique.** Les clés Megolm vivent
+  dans le store crypto d'une fenêtre : sans fenêtre ouverte, le service worker ne peut rien
+  déchiffrer et affiche « Nouveau message ». La limite est écrite dans les limites connues
+  (M-H) ; la lever demanderait la crypto Rust dans le service worker ;
+- **aucun appel n'a été passé.** Le shell d'appel est prouvé sur ce qui lui appartient —
+  permissions de l'iframe, message de `RtcFociMissing`, sortie de secours au délai,
+  paramètre de lancement — avec le paquet 10 mocké. Qu'Element Call démarre, s'authentifie
+  auprès du SFU et rende du média demande la pile RTC déployée (spec 02) ;
+- **le paramètre audio/vidéo passé à Element Call n'a été relu contre aucune version.** Le
+  dépôt n'en épingle aucune (`ESCALATIONS` § E-14). S'il est ignoré, l'appel démarre quand
+  même : le lobby d'Element Call demande caméra et micro avant d'entrer ;
 - **le flux OIDC complet n'a jamais été exécuté d'un bout à l'autre.** Le retour du
   fournisseur est testé sur son symptôme — un jeton dans l'URL, retiré de l'historique —
   pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;

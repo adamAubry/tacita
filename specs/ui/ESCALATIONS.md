@@ -33,6 +33,7 @@ contrat gagne.
 | E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Ouvert** — livré débouncé sur les critères, la limite est documentée | rien tant que non tranché ; REQ-UIX-22 **non modifiée** |
 | E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Ouvert** — la photo est **absente** de M-G, le reste de REQ-UI-20 est livré | rien tant que non tranché ; REQ-UI-20 et l'interdit n°11 **non modifiés** |
 | E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H *(numérotée E-11 à l'origine)* | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
+| E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Ouvert** — remonté le 07/08/2026 pendant M-I ; livré avec dégradation bénigne documentée | rien tant qu'il n'est pas tranché ; REQ-UIX-38 **non modifiée** |
 
 ---
 
@@ -540,6 +541,40 @@ supposent un chemin d'entrée), `specs/05-messaging.md` (`createGroupChat` si vo
 (l'écran de réception), et le test REQ-INV-16 de la spec 12 — son balayage interdit à tout
 module hors du service de connaître la route `/resolve`, ce qui devra s'ouvrir au client
 de réception le jour où il existe.
+
+---
+
+## E-14 — Le paramètre de lancement audio/vidéo n'est vérifiable contre aucune version
+
+**La question.** REQ-UIX-38 demande que « appel audio » et « appel vidéo » passent *les
+paramètres de lancement correspondants* au widget. CLAUDE.md est explicite sur ce genre de
+valeur : « vérifier dans la doc de la version déployée avant usage, ne jamais supposer ».
+Or le dépôt n'épingle **aucune** version d'Element Call — ni image, ni digest, ni
+`docker-compose` : `infra/` ne connaît que LiveKit et lk-jwt. Le déploiement Element Call
+existe (`elementCallUrl` est une donnée de configuration du shard) mais rien n'en fixe la
+version. Le nom du paramètre n'a donc pas pu être relu ; il ne peut qu'être supposé, ce
+que la règle interdit.
+
+C'est la même classe de problème que E-08 : deux specs correctes séparément,
+l'incohérence dans la jonction — ici entre la spec 02 (qui déploie le RTC) et la spec 10
+(qui construit l'URL du widget).
+
+**Ce qui est livré, et pourquoi ce n'est pas un contournement.** `buildCallWidget` émet un
+paramètre `video` valant `"true"` ou `"false"` selon le point d'entrée, dans le fragment
+d'URL, avec le risque de version écrit à côté. **Si Element Call ignore ce nom, l'appel
+fonctionne quand même** : son lobby demande caméra et micro avant l'entrée. Le pire cas
+est une préférence perdue et un geste de plus — pas un bouton inerte, pas un appel cassé.
+C'est pour cette raison que `skipLobby` n'est **pas** envoyé : le lobby est le filet.
+
+Rien n'est masqué : la limite est dans la docstring de `CallWidgetOptions.video`, et la
+seule chose qui manque pour la lever est une information de déploiement.
+
+**Ce qu'il faut, pour trancher.** L'URL et la **version** du déploiement Element Call,
+consignées comme les digests d'images du compose. Avec elles, le nom se relit dans
+`src/UrlParams.ts` de cette version et la docstring perd son avertissement.
+
+**Ce que la décision touche.** `packages/calls/src/index.ts` (un nom de paramètre),
+`infra/` (l'épinglage à créer). REQ-UIX-38 n'a pas besoin d'être modifiée.
 
 ---
 

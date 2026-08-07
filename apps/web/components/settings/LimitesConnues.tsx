@@ -66,6 +66,12 @@ const LIMITES: Limite[] = [
       "Le service qui émet les liens n'a aucun pouvoir sur les salons : il ne peut pas voir que l'émetteur a quitté le groupe. Le lien reste valide, l'invitation échoue.",
   },
   {
+    cle: "notifications",
+    titre: "Une notification arrivée application fermée reste sans contenu",
+    texte:
+      "Le serveur n'envoie que de quoi réveiller l'application : il n'a rien d'autre à envoyer. Le déchiffrement demande les clés de cet appareil, qui ne sont accessibles qu'à l'application ouverte — sinon, la notification dit « Nouveau message » et rien de plus.",
+  },
+  {
     cle: "invitations",
     titre: "Le service de liens apprend qui invite qui",
     texte:

@@ -18,6 +18,7 @@ import { RadioList, RadioListItem, Text, type ThemeMode } from "../foundation/pr
 import { useSession } from "../onboarding/SessionProvider";
 import { Confidentialite } from "./Confidentialite";
 import { LimitesConnues } from "./LimitesConnues";
+import { NotificationsPush } from "./NotificationsPush";
 import { libelleNiveau } from "./NotificationsSalon";
 import { SettingsProfileCard } from "./SettingsProfileCard";
 import { StockageLocal } from "./StockageLocal";
@@ -125,7 +126,11 @@ export function Reglages() {
         {ouverte === "confidentialite" && <Confidentialite />}
 
         {ouverte === "notifications" && (
-          <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
+          <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
+            {/* REQ-UI-18 — l'abonnement push et son rattrapage (M-I) : d'abord savoir
+                si l'appareil prévient, ensuite quelle conversation est en silence. */}
+            <NotificationsPush />
+
             <Text type="supporting" color="secondary">
               Les notifications se règlent conversation par conversation, depuis ses
               informations. Voici celles qui ne sont pas au niveau « Tout ».
