@@ -67,15 +67,26 @@ export interface CallWidgetOptions {
    * (REQ-UIX-38). C'est un **paramètre de lancement**, pas un réglage : la bascule
    * voix↔vidéo pendant l'appel appartient à Element Call (E-07).
    *
-   * ⚠️ Sensible à la version d'Element Call (CLAUDE.md § prudence outillage). Le
-   * déploiement n'est épinglé nulle part dans le dépôt, donc ce nom de paramètre n'a pas
-   * pu être relu contre une version — voir `ESCALATIONS` § E-14. Si Element Call
-   * l'ignore, l'appel **fonctionne quand même** : son lobby demande caméra et micro
-   * avant d'entrer. C'est une préférence perdue, pas un appel cassé — raison pour
-   * laquelle `skipLobby` n'est pas envoyé.
+   * Traduit en `intent`, relu dans `src/UrlParams.ts` de la **v0.23.0** — la version
+   * qu'épingle `infra/rtc/` (REQ-RTC-08). E-14 close : la version précédente de ce
+   * fichier envoyait `video=true|false`, un paramètre qu'Element Call **ne lit nulle
+   * part**. Il ne cassait rien et ne faisait rien.
    */
   video?: boolean;
 }
+
+/**
+ * REQ-UIX-38 — les intentions de lancement d'Element Call, relues dans l'enum
+ * `UserIntent` de la v0.23.0. Elles ne se recopient pas de mémoire : `infra/rtc/README.md`
+ * dit où les relire au prochain bump d'image.
+ *
+ * `start_call` et `start_call_voice` posent tous deux `skipLobby: false` : le lobby
+ * reste, et avec lui le rattrapage si l'intention envoyée n'est pas celle qu'on voulait.
+ * Les variantes `_dm` ne sont volontairement pas utilisées — elles activent sonnerie et
+ * attente de décrochage, ce que la spec 10 a écarté en V1 (YAGNI).
+ */
+const INTENT_AUDIO = "start_call_voice";
+const INTENT_VIDEO = "start_call";
 
 /**
  * REQ-CAL-02 — découverte des foci via `.well-known/matrix/client` (servi par le proxy
@@ -127,14 +138,20 @@ export function buildCallWidget(
     widgetId: options.widgetId,
     parentUrl: options.parentUrl,
     // Mode widget : Element Call se pilote par l'API widget, pas par sa propre navigation.
+    // `widgetId` + `parentUrl` sont ce qui le fait basculer en mode widget (`isWidget`
+    // dans `UrlParams.ts`), et c'est cette bascule qui rend `intent` lisible pour lui.
     embed: "true",
     preload: "true",
-    hideHeader: "true",
-    // Le média reste chiffré par participant : le SFU relaie sans déchiffrer.
+    // `header=none` et non `hideHeader` : ce dernier a disparu de `UrlConfiguration` en
+    // v0.23.0 — le commentaire d'amont le dit rétrocompatible, le code ne le lit plus.
+    header: "none",
+    // Le média reste chiffré par participant : le SFU relaie sans déchiffrer. Explicite
+    // et pas hérité du preset d'`intent` : c'est la garantie du produit, elle ne dépend
+    // pas d'une valeur par défaut d'amont. Les params explicites gagnent sur le preset.
     perParticipantE2EE: "true",
     // REQ-UIX-38 — le point d'entrée choisi, transmis au lancement. Défaut audio :
     // allumer la caméra de quelqu'un qui n'a rien demandé se répare mal.
-    video: String(options.video ?? false),
+    intent: options.video ? INTENT_VIDEO : INTENT_AUDIO,
   };
 
   return {

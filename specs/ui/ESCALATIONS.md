@@ -33,7 +33,7 @@ contrat gagne.
 | E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Ouvert** — livré débouncé sur les critères, la limite est documentée | rien tant que non tranché ; REQ-UIX-22 **non modifiée** |
 | E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Ouvert** — la photo est **absente** de M-G, le reste de REQ-UI-20 est livré | rien tant que non tranché ; REQ-UI-20 et l'interdit n°11 **non modifiés** |
 | E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H *(numérotée E-11 à l'origine)* | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
-| E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Ouvert** — remonté le 07/08/2026 pendant M-I ; livré avec dégradation bénigne documentée | rien tant qu'il n'est pas tranché ; REQ-UIX-38 **non modifiée** |
+| E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
 
 ---
 
@@ -546,35 +546,56 @@ de réception le jour où il existe.
 
 ## E-14 — Le paramètre de lancement audio/vidéo n'est vérifiable contre aucune version
 
+**Remonté le 07/08/2026 pendant M-I. Tranché le jour même : on épingle.**
+
 **La question.** REQ-UIX-38 demande que « appel audio » et « appel vidéo » passent *les
 paramètres de lancement correspondants* au widget. CLAUDE.md est explicite sur ce genre de
 valeur : « vérifier dans la doc de la version déployée avant usage, ne jamais supposer ».
-Or le dépôt n'épingle **aucune** version d'Element Call — ni image, ni digest, ni
-`docker-compose` : `infra/` ne connaît que LiveKit et lk-jwt. Le déploiement Element Call
-existe (`elementCallUrl` est une donnée de configuration du shard) mais rien n'en fixe la
-version. Le nom du paramètre n'a donc pas pu être relu ; il ne peut qu'être supposé, ce
-que la règle interdit.
+Or le dépôt n'épinglait **aucune** version d'Element Call — ni image, ni digest : `infra/`
+ne connaissait que LiveKit et lk-jwt. Le nom du paramètre ne pouvait qu'être supposé, ce
+que la règle interdit. Même classe que E-08 : deux specs correctes séparément,
+l'incohérence dans la jonction.
 
-C'est la même classe de problème que E-08 : deux specs correctes séparément,
-l'incohérence dans la jonction — ici entre la spec 02 (qui déploie le RTC) et la spec 10
-(qui construit l'URL du widget).
+**Décision (PM).** Auto-hébergement intégral oblige : Element Call rejoint l'overlay
+`rtc/` avec image épinglée par digest, version et URL consignées. Nouvelle **REQ-RTC-08**,
+testée comme les autres valeurs d'infra. `skipLobby` reste absent, le lobby reste le
+filet. REQ-UIX-38 inchangée.
 
-**Ce qui est livré, et pourquoi ce n'est pas un contournement.** `buildCallWidget` émet un
-paramètre `video` valant `"true"` ou `"false"` selon le point d'entrée, dans le fragment
-d'URL, avec le risque de version écrit à côté. **Si Element Call ignore ce nom, l'appel
-fonctionne quand même** : son lobby demande caméra et micro avant l'entrée. Le pire cas
-est une préférence perdue et un geste de plus — pas un bouton inerte, pas un appel cassé.
-C'est pour cette raison que `skipLobby` n'est **pas** envoyé : le lobby est le filet.
+**Ce que l'épinglage a révélé, et c'est tout l'intérêt.** Une fois `v0.23.0` épinglée, la
+relecture de son `src/UrlParams.ts` a montré que **les deux paramètres que le client
+envoyait ne faisaient rien** :
 
-Rien n'est masqué : la limite est dans la docstring de `CallWidgetOptions.video`, et la
-seule chose qui manque pour la lever est une information de déploiement.
+- `video=true|false` — ce paramètre n'existe dans aucune version. Le mécanisme réel est
+  `intent`, un enum `UserIntent` : `start_call` (vidéo) et `start_call_voice` (audio),
+  tous deux avec `skipLobby: false` ;
+- `hideHeader=true` — retiré d'`UrlConfiguration`, remplacé par `header` (`none` /
+  `standard` / `app_bar`). Le commentaire d'amont le dit encore rétrocompatible ; le code
+  ne le lit plus.
 
-**Ce qu'il faut, pour trancher.** L'URL et la **version** du déploiement Element Call,
-consignées comme les digests d'images du compose. Avec elles, le nom se relit dans
-`src/UrlParams.ts` de cette version et la docstring perd son avertissement.
+Aucun des deux ne cassait quoi que ce soit. Aucun des deux ne faisait quoi que ce soit non
+plus, et rien dans le dépôt ne pouvait le dire. C'est exactement le mode de panne que
+l'épinglage ferme.
 
-**Ce que la décision touche.** `packages/calls/src/index.ts` (un nom de paramètre),
-`infra/` (l'épinglage à créer). REQ-UIX-38 n'a pas besoin d'être modifiée.
+**Troisième trouvaille, hors périmètre initial :** `matrix_rtc_mode`. Laissé au défaut,
+c'est le réglage développeur de **chaque utilisateur** qui décide de la forme des
+événements d'appartenance. Sa valeur `matrix_2_0` active les événements *sticky* de
+MSC4354 — précisément la divergence que `packages/calls/README.md` annonçait comme
+« à surveiller », et sous laquelle `activeCall()` cesserait de voir les participants
+**sans erreur bruyante**. La config servie l'épingle à `compatibility`, et REQ-RTC-08 a
+un test qui refuse `matrix_2_0`. La divergence a désormais un interrupteur nommé au lieu
+d'être une inquiétude en prose.
+
+**Livré.** `infra/rtc/docker-compose.yml` (service `element-call`, digest
+`sha256:e352de46…`, v0.23.0 résolue le 07/08/2026), `infra/rtc/element-call.json`,
+`infra/rtc/call.conf` + `infra/proxy/call.conf` (le nom d'hôte `call.<domaine>` ; la pile
+de base n'en sert aucun, même règle que E-08), `specs/02-rtc-backend.md` REQ-RTC-08,
+`infra/rtc/tests/element-call.test.ts`, et `packages/calls` qui envoie maintenant `intent`
+et `header`. La marche à suivre au prochain bump est dans `infra/rtc/README.md`.
+
+**Reste non prouvé :** rien de tout ceci n'a tourné. Le digest est réel et vérifié auprès
+du registre, la relecture est faite sur la source de la v0.23.0, mais la pile n'a pas été
+déployée — le certificat à SAN `call.<domaine>` et le rendu du widget se vérifient sur une
+pile réelle.
 
 ---
 

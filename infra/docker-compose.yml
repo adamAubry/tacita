@@ -164,6 +164,9 @@ services:
       # REQ-RTC-05 — pile sans SFU : le `.well-known` n'annonce aucun focus. L'overlay
       # RTC monte son propre fichier à ce chemin, compose fusionne par cible de montage.
       - ./proxy/well-known.conf:/etc/nginx/well-known.conf:ro
+      # REQ-RTC-08 — même mécanique : pile sans SFU, aucun Element Call servi. Le
+      # fichier est vide de directives ; l'overlay RTC monte le bloc `server` à sa place.
+      - ./proxy/call.conf:/etc/nginx/call.conf:ro
       - ./proxy/certs:/etc/nginx/certs:ro
 
 volumes:

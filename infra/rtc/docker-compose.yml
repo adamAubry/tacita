@@ -46,6 +46,25 @@ services:
       # quel homeserver déclencher la création de salles sur notre SFU.
       LIVEKIT_FULL_ACCESS_HOMESERVERS: ${SERVER_NAME}
 
+  # REQ-RTC-08 — Element Call, le seul client RTC autorisé (interdit n°7), servi par
+  # nous. Épinglé par digest comme tout le compose : c'est lui qui rend vraies les
+  # valeurs que `packages/calls` écrit dans l'URL du widget — un paramètre relu dans
+  # une version, puis servi par une autre, est une jonction non relue (E-14).
+  element-call:
+    image: ghcr.io/element-hq/element-call@sha256:e352de468647777e3780fec45281e2ccc90da69a828f7a3d88700ff9ac04bb0b # v0.23.0, résolu le 2026-08-07
+    restart: unless-stopped
+    # Même motif que `livekit-sfu` ci-dessus : deux valeurs templatées et pas
+    # d'envsubst dans l'image. Le fichier est écrit là où l'image le sert.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sed "s|__SERVER_NAME__|$$SERVER_NAME|g" /conf/config.json > /app/config.json
+        && exec nginx -g "daemon off;"
+    environment:
+      SERVER_NAME: ${SERVER_NAME}
+    volumes:
+      - ./element-call.json:/conf/config.json:ro
+
   proxy:
     # REQ-RTC-06 — le TURN-TLS réclame 443 sur son IP : on épingle le proxy sur
     # l'autre. `!override` remplace la liste de ports au lieu de l'étendre.
@@ -54,5 +73,9 @@ services:
     # REQ-RTC-05 — l'annonce du focus appartient à cet overlay, pas à la pile de base :
     # elle n'est vraie que là où les backends `/livekit/*` existent. Même cible de
     # montage que `proxy/well-known.conf`, que compose remplace au lieu de l'ajouter.
+    #
+    # REQ-RTC-08 — même mécanique pour le service d'Element Call : la pile de base
+    # monte un fichier vide, l'overlay monte le bloc `server` qui le sert.
     volumes:
       - ./well-known.conf:/etc/nginx/well-known.conf:ro
+      - ./call.conf:/etc/nginx/call.conf:ro
