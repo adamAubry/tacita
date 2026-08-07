@@ -27,7 +27,12 @@ export function LogoutButton({ session }: { session: Session }) {
         variant="ghost"
         onClick={() => setConfirmation(true)}
       />
-      <Sheet ouvert={confirmation} onFermer={() => setConfirmation(false)} sortie="form">
+      <Sheet
+        ouvert={confirmation}
+        onFermer={() => setConfirmation(false)}
+        sortie="form"
+        nom="Se déconnecter de cet appareil"
+      >
         <VStack gap={4}>
           <Text type="display-3">Se déconnecter de cet appareil</Text>
           <Text>Cet appareil oubliera :</Text>

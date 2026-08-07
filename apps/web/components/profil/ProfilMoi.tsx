@@ -102,7 +102,12 @@ export function ProfilMoi({ profil, onEnregistrer, onPhoto }: ProfilMoiProps) {
         <Button label="Modifier le profil" variant="primary" onClick={() => setEdition(true)} />
       </div>
 
-      <Sheet ouvert={edition} onFermer={() => setEdition(false)} sortie="form">
+      <Sheet
+        ouvert={edition}
+        onFermer={() => setEdition(false)}
+        sortie="form"
+        nom="Modifier le profil"
+      >
         <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-4)" }}>
           <TextInput label="Nom d'affichage" value={nom} onChange={setNom} />
 

@@ -8,6 +8,7 @@ import { Navbar, ONGLETS } from "../components/foundation/Navbar";
 import { Placeholder } from "../components/foundation/Placeholder";
 import { Sheet } from "../components/foundation/Sheet";
 import { SegmentedControl, SegmentedControlItem, Skeleton } from "../components/foundation/primitives";
+import { RACINE, sansCommentaires, sourcesLivrees } from "./sources";
 
 /**
  * `next/navigation` n'existe pas hors du rendu de Next. Les deux fonctions dont les
@@ -174,18 +175,40 @@ describe("REQ-UIX-05 — primitives partagées", () => {
     // natif, et c'est lui qui permet à la plateforme d'animer l'ouverture et de gérer
     // le piège de focus. On assère donc l'état d'ouverture, pas la présence du texte.
     const { rerender } = render(
-      <Sheet ouvert={false} onFermer={vi.fn()}>
+      <Sheet ouvert={false} onFermer={vi.fn()} nom="Feuille de test">
         <p>Contenu</p>
       </Sheet>,
     );
     expect(document.querySelector("dialog")?.hasAttribute("open")).toBe(false);
 
     rerender(
-      <Sheet ouvert onFermer={vi.fn()}>
+      <Sheet ouvert onFermer={vi.fn()} nom="Feuille de test">
         <p>Contenu</p>
       </Sheet>,
     );
     expect(document.querySelector("dialog")?.hasAttribute("open")).toBe(true);
     expect(screen.getByText("Contenu")).toBeTruthy();
+  });
+
+  /**
+   * WCAG 4.1.2 — audit impeccable du 07/08/2026. Neuf feuilles s'ouvraient sans nom
+   * accessible : un lecteur d'écran annonçait « boîte de dialogue » et s'arrêtait là.
+   * Astryx l'écrivait dans la sortie de nos propres tests, et personne ne la lisait.
+   *
+   * Structurel plutôt que par écran : c'est un oubli qui se refait au prochain `<Sheet>`,
+   * et une feuille d'action n'a pas d'en-tête visible pour le rappeler.
+   */
+  it("aucune feuille ne s'ouvre sans nom accessible", () => {
+    const fautives = sourcesLivrees()
+      .filter(({ code }) => /<Sheet[\s>]/.test(sansCommentaires(code)))
+      .flatMap(({ chemin, code }) =>
+        // `(?<!=)>` : la flèche des callbacks (`onFermer={() => …}`) porte un `>` qui
+        // couperait la capture avant d'atteindre les attributs suivants.
+        [...sansCommentaires(code).matchAll(/<Sheet\b([^]*?)(?<!=)>/g)]
+          .filter(([, attributs]) => !/\b(titre|nom)=/.test(attributs ?? ""))
+          .map(() => chemin.replace(RACINE, "")),
+      );
+
+    expect(fautives).toEqual([]);
   });
 });

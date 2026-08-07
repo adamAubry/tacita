@@ -163,7 +163,11 @@ export function ProfilAutrui({
 
       <Note userId={profil.userId} indexedDB={indexedDB} />
 
-      <Sheet ouvert={options} onFermer={() => setOptions(false)}>
+      <Sheet
+        ouvert={options}
+        onFermer={() => setOptions(false)}
+        nom={`Options concernant ${profil.displayName}`}
+      >
         <ButtonsList
           boutons={[
             ...(estAmi
@@ -199,6 +203,7 @@ export function ProfilAutrui({
         onFermer={() => setConfirmation(null)}
         ancrage="centre"
         sortie="form"
+        nom={texte?.titre ?? "Confirmation"}
       >
         {texte && (
           <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-4)" }}>

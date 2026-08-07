@@ -91,11 +91,21 @@ describe("REQ-UI-03 — le thème porte les valeurs de DESIGN.md, et rien d'autr
     }
   });
 
-  /** DESIGN.md : « aucune valeur hexadécimale dans le code des composants ». */
+  /**
+   * DESIGN.md : « aucune valeur hexadécimale dans le code des composants ».
+   *
+   * Les quatre longueurs, pas seulement six : l'audit impeccable du 07/08/2026 a trouvé
+   * un `#000` dans un masque de `ProfileCard`, que la version à `{6}` laissait passer.
+   * La forme courte est précisément celle qu'on écrit sans y penser.
+   *
+   * Commentaires retirés, comme partout ailleurs (`tests/sources.ts`) : « les interdits
+   * portent sur ce que le shard exécute, pas sur ce qu'il explique ». Un commentaire qui
+   * cite la valeur bannie pour dire de ne pas l'écrire n'est pas une couleur en dur.
+   */
   it("aucune couleur en dur hors du fichier de thème", () => {
     for (const { chemin, code } of sourcesLivrees()) {
       if (chemin.endsWith("/palette.ts")) continue;
-      expect(code.match(/#[0-9a-fA-F]{6}\b/g), chemin).toBeNull();
+      expect(sansCommentaires(code).match(/#[0-9a-fA-F]{3,8}\b/g), chemin).toBeNull();
     }
   });
 });
