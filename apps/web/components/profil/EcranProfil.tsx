@@ -8,7 +8,7 @@ import {
   updateProfile,
   type Profile,
 } from "@tacita/messaging";
-import { downloadAttachment } from "@tacita/media-pipeline";
+import { downloadAttachment, uploadPublicProfileImage } from "@tacita/media-pipeline";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -87,6 +87,11 @@ export function EcranProfil({ userId }: { userId?: string }) {
           await updateProfile(session, changements);
           setRevision((rang) => rang + 1);
         }}
+        // REQ-MED-11 — **l'unique site d'appel du chemin public**, dans tout le dépôt.
+        // Un test structurel du paquet média balaie les sources et échoue s'il en
+        // apparaît un second : c'est ce qui rend la phrase « tout ce qui sort du
+        // pipeline est chiffré, sauf l'unique chemin nommé public » vérifiable.
+        onPhoto={(fichier) => uploadPublicProfileImage(session, env, fichier)}
       />
     );
   }

@@ -235,6 +235,42 @@ export async function uploadAttachment(
 }
 
 /**
+ * REQ-MED-11 — **le seul chemin de ce paquet qui téléverse en clair, et il le dit dans
+ * son nom.**
+ *
+ * Un avatar Matrix est un `mxc://` nu : tout client doit pouvoir l'afficher sans clé.
+ * Chiffré, il n'est un avatar nulle part — un carré cassé chez tous les correspondants.
+ * Le chiffrer serait donc une non-feature, pas une garantie (E-12, voie A) : le seul
+ * choix honnête est de le poser en clair et de le **dire**, comme les réactions et les
+ * épingles (REQ-MSG-05/08).
+ *
+ * Ce qui reste commun avec le reste du pipeline, et pourquoi l'interdit n°11 tient : même
+ * compression, mêmes cibles D-04, même module. Ce qui diffère tient en une ligne — pas de
+ * `encryptAttachment`, et un `mxc://` rendu au lieu d'un `EncryptedFile`.
+ *
+ * **Un seul appelant dans tout le dépôt** (le formulaire de profil, M-G). Ce n'est pas
+ * une consigne de revue : un test structurel balaie les sources et échoue au second. La
+ * phrase « tout ce qui sort du pipeline est chiffré, sauf l'unique chemin nommé public »
+ * ne vaut que tant que « unique » est vérifié par une machine.
+ */
+export async function uploadPublicProfileImage(
+  session: Session,
+  env: MediaEnvironment,
+  file: File,
+): Promise<string> {
+  // La même compression que les images de message : une photo de profil de 8 Mo est un
+  // problème pour tout le monde, chiffrée ou non.
+  const { blob } = await env.resizeImage(file, PROFILES[detectProfile(env.connection)].image);
+  const { content_uri } = await session.client.uploadContent(blob, {
+    // En clair et assumé : aucun `encryptAttachment` sur ce chemin. Le nom du fichier
+    // n'est pas joint — il vient de l'appareil et n'apprend rien d'utile au serveur.
+    includeFilename: false,
+    type: blob.type,
+  });
+  return content_uri;
+}
+
+/**
  * REQ-MED-05 — sauvegarde locale de l'original **non compressé**, volontairement séparée
  * de l'envoi : le destinataire ne reçoit jamais que la version compressée.
  */

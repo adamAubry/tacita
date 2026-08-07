@@ -8,7 +8,7 @@ import { AjouterAmis } from "../components/amis/AjouterAmis";
 import { Demandes } from "../components/amis/Demandes";
 import { Note } from "../components/profil/Note";
 import { ProfilAutrui, CONFIRMATIONS } from "../components/profil/ProfilAutrui";
-import { ProfilMoi } from "../components/profil/ProfilMoi";
+import { AVERTISSEMENT_PHOTO, ProfilMoi } from "../components/profil/ProfilMoi";
 import type { Demande } from "../lib/contacts";
 import { LIBELLE_NOTE, lireNote } from "../lib/notes";
 import { DEBOUNCE_MS } from "../lib/recherche";
@@ -384,7 +384,7 @@ describe("REQ-UIX-30 — bloquer et retirer : la confirmation dit l'effet réel"
 
 describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", () => {
   it("le nom et l'identifiant sont tous deux affichés", () => {
-    render(<ProfilMoi profil={MOI} onEnregistrer={vi.fn()} />);
+    render(<ProfilMoi profil={MOI} onEnregistrer={vi.fn()} onPhoto={vi.fn()} />);
 
     expect(screen.getByText("adam")).toBeTruthy();
     expect(screen.getByText("@adam:tacita.test")).toBeTruthy();
@@ -394,7 +394,7 @@ describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", ()
 
   it("enregistrer n'écrit que ce qui a changé", async () => {
     const onEnregistrer = vi.fn().mockResolvedValue(undefined);
-    render(<ProfilMoi profil={MOI} onEnregistrer={onEnregistrer} />);
+    render(<ProfilMoi profil={MOI} onEnregistrer={onEnregistrer} onPhoto={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Modifier le profil" }));
     await act(async () => {
@@ -405,6 +405,74 @@ describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", ()
     expect(onEnregistrer).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Modifier le profil" }));
+    fireEvent.change(screen.getByLabelText("Nom d'affichage"), { target: { value: "adam a." } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    });
+    expect(onEnregistrer).toHaveBeenCalledWith({ displayName: "adam a." });
+  });
+});
+
+describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle expose", () => {
+  const rendre = () => {
+    const onEnregistrer = vi.fn().mockResolvedValue(undefined);
+    const onPhoto = vi.fn().mockResolvedValue("mxc://tacita.test/avatar");
+    render(<ProfilMoi profil={MOI} onEnregistrer={onEnregistrer} onPhoto={onPhoto} />);
+    fireEvent.click(screen.getByRole("button", { name: "Modifier le profil" }));
+    return { onEnregistrer, onPhoto };
+  };
+
+  const choisir = async () => {
+    const champ = screen.getByLabelText("Choisir une photo de profil") as HTMLInputElement;
+    const fichier = new File(["jpeg"], "moi.jpg", { type: "image/jpeg" });
+    Object.defineProperty(champ, "files", { value: [fichier], configurable: true });
+    await act(async () => {
+      fireEvent.change(champ);
+    });
+    return fichier;
+  };
+
+  it("le champ existe — E-12 close, et il n'est pas grisé", () => {
+    rendre();
+    // Une option grisée est une promesse non tenue affichée (interdit n°13). Avant E-12
+    // le champ était **absent** ; il est maintenant là et il marche.
+    expect(screen.getByRole("button", { name: "Choisir une photo" })).toBeTruthy();
+    expect(screen.getByLabelText("Choisir une photo de profil")).toBeTruthy();
+  });
+
+  it("dit au moment du choix que la photo n'est pas chiffrée", () => {
+    rendre();
+    // La condition qui rend REQ-MED-11 acceptable : dans la feuille où l'on choisit,
+    // pas dans un écran de réglages qu'on n'ouvrira jamais.
+    expect(screen.getByText(AVERTISSEMENT_PHOTO)).toBeTruthy();
+    expect(AVERTISSEMENT_PHOTO).toMatch(/n'est pas chiffrée/);
+  });
+
+  it("téléverse par le chemin injecté et n'enregistre le mxc qu'à la validation", async () => {
+    const { onEnregistrer, onPhoto } = rendre();
+    const fichier = await choisir();
+
+    expect(onPhoto).toHaveBeenCalledWith(fichier);
+    // Choisir n'écrit pas : tant qu'on n'a pas validé, rien ne part dans le profil.
+    expect(onEnregistrer).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    });
+    // Le nom n'a pas bougé : il n'est pas dans le patch (REQ-MSG-18).
+    expect(onEnregistrer).toHaveBeenCalledWith({ avatarUrl: "mxc://tacita.test/avatar" });
+  });
+
+  it("un téléversement en échec le dit et laisse enregistrer le reste", async () => {
+    const onEnregistrer = vi.fn().mockResolvedValue(undefined);
+    const onPhoto = vi.fn().mockRejectedValue(new Error("réseau"));
+    render(<ProfilMoi profil={MOI} onEnregistrer={onEnregistrer} onPhoto={onPhoto} />);
+    fireEvent.click(screen.getByRole("button", { name: "Modifier le profil" }));
+
+    await choisir();
+    expect(screen.getByText(/n'a pas pu être envoyée/)).toBeTruthy();
+
+    // Et le reste du formulaire reste utilisable : une photo ratée ne bloque pas le nom.
     fireEvent.change(screen.getByLabelText("Nom d'affichage"), { target: { value: "adam a." } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));

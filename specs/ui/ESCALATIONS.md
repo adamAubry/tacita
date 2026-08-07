@@ -31,7 +31,7 @@ contrat gagne.
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 | E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Tranché le 07/08/2026** — voie A (contrat aligné sur la primitive), B en parallèle, C refusée | `specs/ui/M-F.md` — **REQ-UIX-22 amendée**. Aucun code repris |
-| E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Ouvert** — la photo est **absente** de M-G, le reste de REQ-UI-20 est livré | rien tant que non tranché ; REQ-UI-20 et l'interdit n°11 **non modifiés** |
+| E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Tranché le 07/08/2026** — voie A : chemin public **nommé** dans le pipeline, site d'appel unique testé | `specs/08-media-pipeline.md` — **REQ-MED-11** (nouvelle) ; `specs/11-ui-shard.md` — REQ-UI-20 amendée. **Interdit n°11 inchangé** |
 | E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H *(numérotée E-11 à l'origine)* | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
 | E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
 
@@ -509,6 +509,38 @@ image serait précisément le mode de panne que la spec 00 nomme.
 **Ce que ce point ne remet pas en cause.** REQ-UI-20 n'est pas modifiée, l'interdit n°11
 non plus : amender l'un ou l'autre est un geste de PM. Le reste de REQ-UIX-24 est livré —
 nom d'affichage modifiable, identifiant affiché, form edit.
+
+**Décision (PM), 07/08/2026 — voie A.** Un avatar chiffré ne s'affiche nulle part : le
+chiffrer est une **non-feature**, pas une garantie. Le supprimer (voie B) sacrifie un
+attendu universel ; le rendre local (voie C) en fait un thème, pas un avatar. Même
+logique que les réactions en clair — on expose, et on le dit.
+
+**Les trois conditions qui rendent la voie A acceptable, et où elles vivent :**
+
+1. **REQ-MED-11** (nouvelle, spec 08) — `uploadPublicProfileImage()`, dans le **même**
+   paquet, avec la **même** compression et les mêmes cibles D-04. Ce qui diffère tient en
+   une ligne : pas de `encryptAttachment`, un `mxc://` rendu au lieu d'un `EncryptedFile`.
+   L'interdit n°11 tient — un seul pipeline —, et le nom porte le mot `Public` ;
+2. **un seul site d'appel**, `apps/web/components/profil/EcranProfil.tsx`. Pas une
+   consigne de revue : un test structurel du paquet média balaie tout le dépôt et échoue
+   au second appelant. « Tout ce qui sort du pipeline est chiffré, **sauf l'unique chemin
+   nommé public** » ne vaut que tant qu'« unique » est vérifié par une machine ;
+3. **l'honnêteté au moment du choix** — « Votre photo de profil est visible de tous et
+   n'est pas chiffrée », dans la feuille où l'on choisit, pas dans un écran de réglages
+   qu'on n'ouvrira pas. La ligne est aussi ajoutée aux limites connues (REQ-UIX-32).
+
+**Livré.** `packages/media-pipeline` (REQ-MED-11 + trois tests, dont le balayage de site
+d'appel), `specs/08-media-pipeline.md`, `specs/11-ui-shard.md` (REQ-UI-20 amendée : elle
+disait « via pipeline média » sans trancher le chiffrement, ce qui la rendait
+inapplicable), `ProfilMoi` (champ photo **présent**, plus absent), `EcranProfil` (le site
+d'appel), `LimitesConnues`.
+
+**Note de conception.** Le composant ne connaît ni `Session` ni le pipeline : il reçoit
+`onPhoto` injecté. C'est ce découplage qui fait qu'il n'existe **qu'un** endroit à
+surveiller, et non un par écran qui afficherait un avatar.
+
+---
+
 ## E-13 — Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre
 
 **Remonté le 06/08/2026, en câblant REQ-UIX-34 (M-H). Ouvert.** Rien n'a été contourné :

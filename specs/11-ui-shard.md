@@ -36,7 +36,7 @@
 
 ### Appels et personnalisation
 - **REQ-UI-19** — Boutons d'appel voix/vidéo intégrant le widget Element Call en iframe (spec 10) ; bandeau « appel en cours — rejoindre » (REQ-CAL-03) ; erreur RtcFociMissing → message d'erreur visible, jamais de bouton inerte (REQ-CAL-02).
-- **REQ-UI-20** — Personnalisation : photo de profil (via pipeline média), fond d'écran de conversation choisi dans la galerie du user (stocké localement en IndexedDB, non synchronisé — YAGNI).
+- **REQ-UI-20** — Personnalisation : **photo de profil** — téléversée par `uploadPublicProfileImage()` (spec 08, REQ-MED-11), donc **non chiffrée**, avec la phrase qui le dit au moment du choix ; fond d'écran de conversation choisi dans la galerie du user (stocké localement en IndexedDB, non synchronisé — YAGNI). *(Amendée le 07/08/2026 — escalade E-12, voie A. La rédaction précédente disait « via pipeline média » sans trancher le chiffrement, ce qui rendait l'exigence inapplicable : chiffrée, la photo n'est un avatar chez aucun client.)*
 
 ## Ce dont le shard hérite
 
