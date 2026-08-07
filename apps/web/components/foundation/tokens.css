@@ -34,3 +34,42 @@
 .tabulaire {
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * DESIGN.md — « Cibles tactiles ≥ 44 px ». **Mesuré au navigateur le 07/08/2026**, ce que
+ * jsdom ne peut pas faire : il ne rend aucune géométrie, et la règle n'était garantie qu'à
+ * un seul endroit du shard (la navbar, qui pose ses 44 px à la main).
+ *
+ * Astryx ne pose aucune hauteur minimale sur ses contrôles — `min-height: auto`, un
+ * padding de 8 px, et la hauteur retombe à 32 px quelle que soit la variante. Le bouton
+ * de retour des headers faisait donc 32×32 sur tous les écrans de l'app.
+ *
+ * Ici plutôt que dans chaque composant : c'est une géométrie du système, au même titre
+ * que le rayon d'avatar juste au-dessus, et un composant qui la recopierait la ferait
+ * diverger. `.astryx-button` est la seule classe stable de la distribution — les autres
+ * sont des classes atomiques StyleX, régénérées à chaque build.
+ */
+.astryx-button,
+/* Le sélecteur de vue (DESIGN.md l'impose comme primitive) : ses options tombaient à
+   28 px — les plus petites cibles de toute l'app, et elles sont sur l'accueil. */
+.astryx-segmented-control-item,
+/* La barre de recherche (REQ-UI-16) : son `<input>` fait 21 px dans un champ de 32.
+   `astryx-field` est le conteneur du contrôle, et la seule classe stable de la chaîne —
+   au-dessus c'est `astryx-power-search`, au-dessous des classes atomiques StyleX. */
+.astryx-field {
+  min-height: 44px;
+}
+
+/*
+ * `border-box` partout. Sans lui, un `width: 100%` additionné à un padding déborde de son
+ * parent : c'est ce qui faisait sortir l'en-tête du profil de 8 px sur un écran de 390 px,
+ * en silence et sans barre de défilement visible.
+ *
+ * Ni Next ni Astryx ne posent ce réglage, et c'est la convention de tout le web depuis
+ * quinze ans — l'absence était l'anomalie.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
