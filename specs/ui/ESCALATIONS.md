@@ -1,9 +1,29 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Dix points sur treize sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
-**E-11, E-12 et E-13 sont ouverts**, relevés le 06/08/2026 en livrant M-F, M-G et M-H. Ce
-fichier garde la question, la décision et son motif : une décision dont on a perdu le motif
-se rediscute tous les six mois.
+**Les quatorze points sont tranchés, et tous appliqués.** E-01 à E-09 le 05/08/2026, E-10
+le 06/08/2026, **E-11 à E-14 le 07/08/2026** — ces quatre-là par le plan de route PM
+(`PLAN-DE-ROUTE.md`), qui a également ratifié les dix premières après audit. Ce fichier
+garde la question, la décision et son motif : une décision dont on a perdu le motif se
+rediscute tous les six mois.
+
+**Ratification du 07/08/2026.** Les dix premières décisions ont été relues contre les
+quatre piliers — une app qui fonctionne, zéro clair serveur, zéro promesse non tenue,
+stack stable — et tiennent toutes. E-09 est **ratifiée formellement** : l'interdit n°6
+protège l'ordre *dans* un salon, pas l'ordre *entre* salons, et le point ne peut plus être
+rouvert qu'avec un ordre serveur disponible sur la version déployée.
+
+**Une classe de panne s'est dégagée à la relecture**, et elle vaut plus que les points pris
+un par un : **E-08, E-13 et E-14 sont le même mode de panne** — deux specs justes, et
+l'incohérence qui vit dans la jonction entre elles. Un focus RTC annoncé sans SFU derrière,
+un `roomId` résolu sans porte pour y entrer, un paramètre d'URL écrit contre une version que
+rien n'épinglait. Aucun de ces trois défauts n'est visible en relisant un module seul. D'où
+la règle permanente ajoutée à `CLAUDE.md` § Prudence outillage : *tout runtime externe que
+le client pointe doit être épinglé dans `infra/` — une URL configurable sans version
+consignée est une jonction non relue.*
+
+**Ce qui reste, et qui n'est pas une escalade** : le spike E-10 (trois versions d'iOS, un
+iPhone réel) n'a pas été exécuté — il demande du matériel, pas un arbitrage. C'est la seule
+chose entre le dépôt et l'allumage du vocal sur iOS.
 
 > **Note de fusion, 06/08/2026.** M-F a été écrite deux fois en parallèle, sur deux
 > branches, et les deux ont numéroté leur escalade « E-11 ». Celle de M-H — le lien de
@@ -28,7 +48,7 @@ contrat gagne.
 | E-06 | Exigences REQ-UIX-01..40 | **Ratifiées** | rien — les tests les nomment |
 | E-07 | Layout d'appel | **Confirmé** : pas de client RTC maison | rien |
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
-| E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
+| E-09 | Ordre de la liste de conversations | **Ratifié le 07/08/2026** — récence du dernier message ; rouvrable seulement avec un ordre serveur | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 | E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Tranché le 07/08/2026** — voie A (contrat aligné sur la primitive), B en parallèle, C refusée | `specs/ui/M-F.md` — **REQ-UIX-22 amendée**. Aucun code repris |
 | E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Tranché le 07/08/2026** — voie A : chemin public **nommé** dans le pipeline, site d'appel unique testé | `specs/08-media-pipeline.md` — **REQ-MED-11** (nouvelle) ; `specs/11-ui-shard.md` — REQ-UI-20 amendée. **Interdit n°11 inchangé** |
@@ -190,10 +210,15 @@ REQ-CAL-02 exige.
 
 ## E-09 — L'ordre de la liste de conversations (M-C)
 
-**Tranché en périmètre technique le 05/08/2026, PM informé.** Ce n'est pas un arbitrage
-produit : ni le périmètre, ni une promesse faite à l'utilisateur, ni une décision de
-`DECISIONS.md` ne bougent. Le PM peut évidemment le rouvrir — il n'a simplement pas eu à
-attendre pour que M-C avance.
+**Tranché en périmètre technique le 05/08/2026, PM informé. Ratifié formellement par le PM
+le 07/08/2026** : le motif est correct — l'interdit n°6 protège l'ordre *dans* un salon,
+pas l'ordre *entre* salons. Le point ne peut désormais être rouvert **qu'avec un ordre
+serveur disponible sur la version déployée**, ce qui ferme la question tant qu'il n'y en a
+pas.
+
+Ce n'était pas un arbitrage produit : ni le périmètre, ni une promesse faite à
+l'utilisateur, ni une décision de `DECISIONS.md` ne bougeaient — M-C n'a donc pas eu à
+attendre. La ratification confirme cette lecture après coup.
 
 **La question.** L'interdit n°6 dit « ne jamais trier par `origin_server_ts` — l'ordre
 canonique est celui du flux /sync » (REQ-COR-04, REQ-MSG-12). REQ-UIX-07 demande un tri

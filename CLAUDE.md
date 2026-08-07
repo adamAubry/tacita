@@ -52,9 +52,10 @@ Usage attendu : avant de coder un composant, vérifier son token/style dans DESI
 
 ## Prudence outillage
 
-**Les trois outils ont été évalués le 05/08/2026** — application Next.js 15 réellement construite, rendu éprouvé, registre npm interrogé. Ce qu'il faut en savoir tient en quatre points ; le reste est dans `specs/11-ui-shard.md` et `specs/ui/M-A.md`, qui sont les contrats.
+**Les trois outils ont été évalués le 05/08/2026** — application Next.js 15 réellement construite, rendu éprouvé, registre npm interrogé. Ce qu'il faut en savoir tient en cinq points ; le reste est dans `specs/11-ui-shard.md` et `specs/ui/M-A.md`, qui sont les contrats.
 
 1. **Seul Astryx s'exécute chez l'utilisateur.** ponytail et impeccable sont des plugins d'agent, sans empreinte à l'exécution — ils ne peuvent être incompatibles ni avec les gestes, ni avec la PWA, ni avec le hors-ligne.
 2. **Trois contraintes de construction, non négociables**, sans lesquelles `next build` échoue : jamais le barrel `@astryxdesign/core` (toujours le sous-chemin) ; le `Theme` d'Astryx enveloppé dans un composant `"use client"` du shard ; une palette fournie par le shard (`defineTheme`), le cœur n'en embarque aucune.
 3. **Astryx est en `0.2.0` et a six semaines.** Version épinglée, CHANGELOG relu avant tout bump — même jurisprudence que les digests d'images du compose.
 4. Toute incompatibilité **découverte depuis** : ne pas contourner silencieusement, escalader au PM.
+5. **Tout runtime externe que le client pointe — widget, service, URL de configuration — est épinglé dans `infra/`, version et digest consignés.** Une URL configurable sans version consignée est une jonction non relue : on ne peut rien vérifier de ce qu'on lui envoie. Règle ajoutée le 07/08/2026 après E-08, E-13 et E-14 — trois pannes de même nature, où deux specs correctes séparément laissaient le défaut vivre entre elles. E-14 l'a montré au prix fort : deux paramètres d'URL écrits de bonne foi ne faisaient **rien du tout**, et rien dans le dépôt ne pouvait le dire.

@@ -5,8 +5,8 @@ Rédigé par le Tech Lead Frontend. **Hiérarchie des sources** : la SPEC 11 fai
 ## Documents
 
 - `M-A.md` … `M-I.md` — les 9 modules frontend, assignables indépendamment
-- `ESCALATIONS.md` — points remontés au PM, propositions V1
-- `ESCALATIONS.md` — les huit points remontés au PM, tous tranchés le 05/08/2026
+- `ESCALATIONS.md` — les quatorze points remontés au PM, tous tranchés
+- `PLAN-DE-ROUTE.md` — audit PM des décisions E-01..E-10 et arbitrages E-11..E-14 (07/08/2026)
 - Racine du repo : `PRODUCT.md` et `DESIGN.md` (impeccable) — à lire avant tout code UI
 
 ## Modules et ordre
@@ -64,4 +64,4 @@ Règles : un composant du wireframe = un composant React nommé, réutilisé par
 
 ## Divergences wireframe déjà arbitrées
 
-Voir ESCALATIONS.md : les huit points sont tranchés (05/08/2026) — filtres de recherche (E-01), note locale à l'appareil (E-02), éphémères abandonnés (E-03), modèle amis natif (E-04), service de liens (E-05), REQ-UIX ratifiées (E-06), call layout (E-07), focus RTC conditionnel (E-08), plus les décisions design (avatar, navbar, formats de date). Le wireframe n'inclut pas : onboarding clé de récupération, bandeau hors ligne, reçus 3 niveaux, capture in-app, mode masqué — **ils sont dans la SPEC 11 et donc au périmètre**, répartis dans les modules.
+Voir ESCALATIONS.md : les **quatorze** points sont tranchés — filtres de recherche (E-01), note locale à l'appareil (E-02), éphémères abandonnés (E-03), modèle amis natif (E-04), service de liens (E-05), REQ-UIX ratifiées (E-06), call layout (E-07), focus RTC conditionnel (E-08), ordre de la liste (E-09), transcodage (E-10), puis les quatre du plan de route PM du 07/08/2026 : recherche débouncée sur les critères (E-11), photo de profil par le chemin public nommé (E-12), lien de groupe en `knock` (E-13), Element Call épinglé (E-14). Plus les décisions design (avatar, navbar, formats de date). Le wireframe n'inclut pas : onboarding clé de récupération, bandeau hors ligne, reçus 3 niveaux, capture in-app, mode masqué — **ils sont dans la SPEC 11 et donc au périmètre**, répartis dans les modules.
