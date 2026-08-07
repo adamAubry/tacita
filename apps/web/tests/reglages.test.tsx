@@ -56,6 +56,9 @@ const listeMembres = vi.fn(() => [
   { userId: "@adam:t", name: "adam", powerLevel: 0 },
 ]);
 const droitKick = vi.fn(() => true);
+const enAttente = vi.fn<() => { userId: string; name: string }[]>(() => []);
+const regleDAcces = vi.fn(() => "invite" as "invite" | "knock");
+const poserRegle = vi.fn(async () => ({ event_id: "$s" }));
 const exclure = vi.fn(async () => ({}));
 const inviter = vi.fn(async () => ({}));
 
@@ -67,6 +70,11 @@ vi.mock("@tacita/messaging", () => ({
   memberCount: () => 4,
   members: () => listeMembres(),
   canKick: (...args: unknown[]) => droitKick(...(args as [])),
+  // E-13 — les demandes d'entrée s'affichent au-dessus des membres. Vide par défaut :
+  // la liste ne doit pas se peupler d'elle-même dans les tests qui n'en parlent pas.
+  knockers: () => enAttente(),
+  joinRule: () => regleDAcces(),
+  setJoinRule: (...args: unknown[]) => poserRegle(...(args as [])),
   kick: (...args: unknown[]) => exclure(...(args as [])),
   invite: (...args: unknown[]) => inviter(...(args as [])),
   powerLevelOf: (_s: unknown, _r: unknown, userId: string) =>
@@ -352,7 +360,7 @@ describe("REQ-UIX-34 — Options : les éphémères n'existent pas, le kick se m
     );
   });
 
-  it("le lien de groupe dit qu'il ne garantit pas que le groupe reste joignable", async () => {
+  it("le lien de groupe dit que le porteur frappera, et qu'un membre confirmera", async () => {
     const liens = {
       lister: vi.fn(async () => []),
       emettreGroupe: vi.fn(async () => ({ id: "l1", token: "jeton-opaque", expiresAt: 0 })),
@@ -360,11 +368,15 @@ describe("REQ-UIX-34 — Options : les éphémères n'existent pas, le kick se m
       // le double en test aussi. Cet écran-ci n'appelle que `emettreGroupe`.
       emettreAmi: vi.fn(async () => ({ id: "l2", token: "jeton-ami", expiresAt: 0 })),
       revoquer: vi.fn(async () => {}),
+      resoudre: vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t", roomId: "!g:t" })),
     };
     render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://tacita.test" />);
 
-    // REQ-INV-15 amendée, interdit n°13 : la limite est au-dessus du bouton.
-    expect(screen.getByText(/ne garantit pas que le groupe reste joignable/i)).toBeTruthy();
+    // REQ-INV-15 amendée, interdit n°13 : ce que le lien fait vraiment est dit au-dessus
+    // du bouton. Depuis E-13 ce n'est plus « l'invitation échouera » mais « un membre
+    // confirmera » — le texte a suivi le mécanisme, au lieu de rester juste par accident.
+    expect(screen.getByText(/frappe à la porte/i)).toBeTruthy();
+    expect(screen.getByText(/n'importe quel membre la confirme/i)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Créer un lien d'invitation" }));
     await waitFor(() =>
@@ -465,5 +477,75 @@ describe("REQ-UIX-37 — les galeries closent le layout info, dans les deux vari
     salons.mockReturnValue([conversation({ roomId: "!g:t", name: "équipe", direct: false, peerId: undefined })]);
     rendreAvecSession(<InfosConversation roomId="!g:t" />);
     expect(await screen.findByLabelText("Contenus partagés")).toBeTruthy();
+  });
+});
+
+describe("REQ-MSG-20 / REQ-INV-15 — le sas d'un groupe suit ses liens, et se referme", () => {
+  const liensAvec = (actifs: { id: string; kind: "friend" | "group"; expiresAt: number; usesLeft: number }[]) => ({
+    lister: vi.fn(async () => actifs),
+    emettreGroupe: vi.fn(async () => ({ id: "l1", token: "jeton", expiresAt: 0 })),
+    emettreAmi: vi.fn(),
+    revoquer: vi.fn(async () => {}),
+    resoudre: vi.fn(),
+  });
+
+  beforeEach(() => {
+    poserRegle.mockClear();
+    enAttente.mockReturnValue([]);
+  });
+
+  it("un lien de groupe actif ouvre le sas", async () => {
+    regleDAcces.mockReturnValue("invite");
+    const liens = liensAvec([{ id: "l1", kind: "group", expiresAt: Date.now(), usesLeft: 1 }]);
+    render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
+
+    await waitFor(() => expect(poserRegle).toHaveBeenCalledWith(expect.anything(), "!g:t", "knock"));
+  });
+
+  it("plus aucun lien : le sas se referme tout seul, même sur expiration", async () => {
+    // La bascule suit la **liste**, pas les gestes : un lien peut expirer sans que
+    // personne ne soit là pour refermer la porte ce jour-là.
+    regleDAcces.mockReturnValue("knock");
+    render(<LienInvitation session={session()} roomId="!g:t" liens={liensAvec([])} origine="https://t.test" />);
+
+    await waitFor(() => expect(poserRegle).toHaveBeenCalledWith(expect.anything(), "!g:t", "invite"));
+  });
+
+  it("n'écrit rien quand l'état est déjà le bon : un événement d'état inutile est du bruit", async () => {
+    regleDAcces.mockReturnValue("knock");
+    const liens = liensAvec([{ id: "l1", kind: "group", expiresAt: Date.now(), usesLeft: 1 }]);
+    render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
+
+    await waitFor(() => expect(liens.lister).toHaveBeenCalled());
+    expect(poserRegle).not.toHaveBeenCalled();
+  });
+
+  it("une bascule refusée par le serveur ne se tait pas", async () => {
+    // Basculer `join_rules` exige le power level d'état. Un membre ordinaire peut créer
+    // un lien et voir l'ouverture refusée : son lien serait valide et ne ferait entrer
+    // personne. C'est la promesse silencieuse que E-13 avait pour but de supprimer.
+    regleDAcces.mockReturnValue("invite");
+    poserRegle.mockRejectedValueOnce(new Error("M_FORBIDDEN"));
+    const liens = liensAvec([{ id: "l1", kind: "group", expiresAt: Date.now(), usesLeft: 1 }]);
+    render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
+
+    expect(await screen.findByText("Ce lien ne fera entrer personne")).toBeTruthy();
+    expect(screen.getByText(/administrateur du groupe/)).toBeTruthy();
+  });
+
+  it("les demandes d'entrée s'affichent aux membres, et laisser entrer est une invitation native", async () => {
+    enAttente.mockReturnValue([{ userId: "@mira:t", name: "mira" }]);
+    render(<MembresGroupe session={session()} roomId="!g:t" />);
+
+    expect(screen.getByText("Demandes d'entrée")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Laisser entrer" }));
+
+    // E-13, voie A : le sas se referme par le chemin de D-09, sans état parallèle.
+    await waitFor(() => expect(inviter).toHaveBeenCalledWith(expect.anything(), "!g:t", "@mira:t"));
+  });
+
+  it("aucune demande : aucune section — pas de titre qui annonce du vide", async () => {
+    render(<MembresGroupe session={session()} roomId="!g:t" />);
+    expect(screen.queryByText("Demandes d'entrée")).toBeNull();
   });
 });

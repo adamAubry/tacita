@@ -32,7 +32,7 @@ contrat gagne.
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 | E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Tranché le 07/08/2026** — voie A (contrat aligné sur la primitive), B en parallèle, C refusée | `specs/ui/M-F.md` — **REQ-UIX-22 amendée**. Aucun code repris |
 | E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Tranché le 07/08/2026** — voie A : chemin public **nommé** dans le pipeline, site d'appel unique testé | `specs/08-media-pipeline.md` — **REQ-MED-11** (nouvelle) ; `specs/11-ui-shard.md` — REQ-UI-20 amendée. **Interdit n°11 inchangé** |
-| E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H *(numérotée E-11 à l'origine)* | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
+| E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Tranché le 07/08/2026** — voie A : `knock`. Le porteur frappe, un membre confirme | `specs/05-messaging.md` — **REQ-MSG-20** (nouvelle) ; `specs/12-invite-tokens.md` — REQ-INV-06/13/15/16 amendées |
 | E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
 
 ---
@@ -594,6 +594,58 @@ supposent un chemin d'entrée), `specs/05-messaging.md` (`createGroupChat` si vo
 (l'écran de réception), et le test REQ-INV-16 de la spec 12 — son balayage interdit à tout
 module hors du service de connaître la route `/resolve`, ce qui devra s'ouvrir au client
 de réception le jour où il existe.
+
+**Décision (PM), 07/08/2026 — voie A : `knock`.** B réinvente un graphe refusé en E-04 ;
+C rend au service le pouvoir Matrix que la ratification n°1 de la spec 12 lui refuse.
+**La promesse produit change et le PM l'assume : un lien de groupe fait frapper à la
+porte, un membre confirme l'entrée.** Pour une app de cercles privés, ce sas est cohérent
+avec le positionnement — ce n'est pas une régression, c'est le produit.
+
+**La mécanique, telle qu'elle est livrée.**
+
+- **Le sas suit le cycle de vie des liens, pas la création du salon.** `join_rule` passe à
+  `knock` à l'émission du premier lien actif et revient à `invite` à la disparition du
+  dernier. Pas de knock permanent sur tous les groupes : `createGroupChat` est inchangé
+  (spec 05 « inchangée par défaut »). L'alignement se fait **à chaque relecture de la
+  liste**, et pas seulement sur les gestes d'émission et de révocation — un lien peut
+  expirer tout seul, et personne n'est là ce jour-là pour refermer la porte.
+- **Réception** (`/i/<token>`, M-G) : résolution → `friend` : invitation de DM native ;
+  `group` : `knock`, puis un **état d'attente terminal et honnête**. L'écran ne promet ni
+  délai ni notification qu'on n'émet pas — il dit que personne n'est prévenu
+  automatiquement, parce que c'est vrai.
+- **Confirmation** : les demandes s'affichent dans les informations du groupe, au-dessus
+  des membres — c'est là qu'on regarde quand on gère un groupe, et **n'importe quel
+  membre** peut confirmer. Accepter est une `invite` native (REQ-MSG-11) : aucun état
+  parallèle à tenir.
+
+**Effet de bord favorable sur REQ-INV-15.** Le service ne voit toujours pas qu'un émetteur
+a quitté son groupe — il n'a aucun droit Matrix, et c'est voulu. Mais la conséquence a
+changé de nature : le `knock` atterrit chez **les membres restants**. Un lien dont
+l'émetteur est parti n'est plus une impasse tant qu'il reste quelqu'un dans le groupe. Le
+texte au-dessus du bouton d'émission a été récrit dans ces termes — il disait
+« l'invitation échouera », ce qui n'est plus vrai.
+
+**REQ-INV-16, la borne déplacée et non levée.** Son balayage interdisait la route
+`/resolve` à **tout** module hors du service — ce qui fermait la porte au client de
+réception que la voie A exige. Elle devient « **un seul appelant, nommé** » :
+`apps/web/lib/liens-invitation.ts`. Un second échoue au test, et un test de plus vérifie
+que le fichier nommé existe encore — sans lui, un renommage désactiverait le balayage en
+silence et tout redeviendrait « conforme ».
+
+**Livré.** `packages/messaging` (REQ-MSG-20 : `joinRule`, `setJoinRule`, `knock`,
+`knockers` + 6 tests), `specs/05-messaging.md`, `specs/12-invite-tokens.md` (quatre REQ
+amendées), `apps/web/lib/liens-invitation.ts` (`resoudre`), `ReceptionLien` + route
+`/i/[token]`, `LienInvitation` (bascule + texte), `MembresGroupe` (demandes d'entrée),
+et le test REQ-INV-16 rouvert.
+
+**Reste non prouvé.** Aucun `knock` n'a été émis contre un vrai Synapse. La suite prouve
+que la bonne règle est écrite, que le bon appel part et que l'UI dit la vérité ; que le
+serveur accepte un knock sur un salon passé en `knock`, et que l'invitation qui suit fasse
+bien entrer, demande la pile déployée. Le sas dépend aussi d'un droit : basculer
+`join_rules` exige le power level d'état. Relevé en écrivant cette trace, et **corrigé
+plutôt que documenté** — un membre ordinaire qui émet un lien voit désormais « Ce lien ne
+fera entrer personne » avec la marche à suivre, au lieu d'un lien valide qui n'ouvre rien.
+C'est la première chose à vérifier sur pile réelle.
 
 ---
 

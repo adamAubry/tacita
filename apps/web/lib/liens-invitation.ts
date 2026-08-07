@@ -22,6 +22,21 @@ export interface LienActif {
   usesLeft: number;
 }
 
+/**
+ * REQ-INV-06 — ce que la résolution rend, et **rien de plus** : le service s'arrête là.
+ * `roomId` n'existe que pour un lien de groupe.
+ *
+ * Ce que le porteur fait ensuite dépend du `kind` et vit dans l'écran de réception
+ * (M-G) : `friend` → invitation de DM native vers l'émetteur ; `group` → `knock` sur le
+ * salon, qu'un membre confirmera (E-13, voie A). Le service n'émet ni l'un ni l'autre —
+ * c'est la ratification n°1 de la spec 12, et elle n'a pas bougé.
+ */
+export interface LienResolu {
+  kind: "friend" | "group";
+  issuer: string;
+  roomId?: string;
+}
+
 /** Ce que l'émission rend. Le token n'est lisible **qu'ici** : le service le stocke haché. */
 export interface LienEmis {
   id: string;
@@ -40,6 +55,12 @@ export interface LiensInvitation {
    */
   emettreAmi(options?: { maxUses?: number; ttlSeconds?: number }): Promise<LienEmis>;
   revoquer(id: string): Promise<void>;
+  /**
+   * REQ-INV-06 — résout un token porté par quelqu'un d'autre. Échoue de la **même
+   * façon** pour un token inconnu, expiré, révoqué ou bloqué (REQ-INV-08) : l'UI ne peut
+   * honnêtement dire que « ce lien n'est plus valide ».
+   */
+  resoudre(token: string): Promise<LienResolu>;
 }
 
 /** REQ-INV-01 — défauts du service, repris ici pour que l'UI puisse les afficher. */
@@ -125,5 +146,8 @@ export function liensDeLaSession(session: Session, fetch = globalThis.fetch): Li
     revoquer: async (id) => {
       await appeler(`/links/${encodeURIComponent(id)}`, { method: "DELETE" });
     },
+
+    resoudre: (token) =>
+      appeler(`/links/${encodeURIComponent(token)}/resolve`, { method: "POST" }) as Promise<LienResolu>,
   };
 }

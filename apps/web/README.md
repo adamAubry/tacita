@@ -4,7 +4,7 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11), **M-G** (social, hors photo de profil — voir `ESCALATIONS` § E-12), **M-H** (réglages et infos de conversation, réception de lien de groupe exceptée — voir `ESCALATIONS` § E-13) et **M-I** (appels et push, paramètre de lancement d'Element Call non vérifiable — voir `ESCALATIONS` § E-14) livrés. Les neuf modules du shard sont posés ; reste l'intégration finale (navigation croisée, passe de cohérence design).
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions), **M-G** (social), **M-H** (réglages et infos de conversation) et **M-I** (appels et push) livrés — les neuf modules du shard sont posés. Les quatre escalades ouvertes ont été tranchées et appliquées le 07/08/2026 (E-11 à E-14) : la recherche dit ce que la primitive permet, la photo de profil est livrée par le chemin public nommé, le lien de groupe fait frapper à la porte, et Element Call est épinglé. Reste l'intégration finale (navigation croisée, passe de cohérence design).
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -67,9 +67,10 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   permissions de l'iframe, message de `RtcFociMissing`, sortie de secours au délai,
   paramètre de lancement — avec le paquet 10 mocké. Qu'Element Call démarre, s'authentifie
   auprès du SFU et rende du média demande la pile RTC déployée (spec 02) ;
-- **le paramètre audio/vidéo passé à Element Call n'a été relu contre aucune version.** Le
-  dépôt n'en épingle aucune (`ESCALATIONS` § E-14). S'il est ignoré, l'appel démarre quand
-  même : le lobby d'Element Call demande caméra et micro avant d'entrer ;
+- **les paramètres d'URL d'Element Call sont relus dans la version épinglée** (E-14 close) :
+  `infra/rtc/` fixe la `v0.23.0` par digest, et le point d'entrée part en `intent`. Ce qui
+  reste non prouvé, c'est le rendu — voir le point précédent. `skipLobby` n'est jamais
+  envoyé : le lobby est le rattrapage d'une intention partie de travers ;
 - **le flux OIDC complet n'a jamais été exécuté d'un bout à l'autre.** Le retour du
   fournisseur est testé sur son symptôme — un jeton dans l'URL, retiré de l'historique —
   pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;
@@ -86,10 +87,11 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **l'envoi de pièce jointe n'a pas de barre de progression**, seulement un état : le
   pipeline (spec 08) ne rapporte rien pendant la compression ni le téléversement, et une
   barre serait une animation inventée plutôt qu'une mesure ;
-- **la photo de profil n'est pas livrée**, et son champ est absent plutôt que grisé : le
-  pipeline chiffre tout ce qu'il téléverse, alors qu'un avatar Matrix est un `mxc://` nu
-  que tout client doit pouvoir afficher. Un avatar chiffré serait un carré cassé partout
-  — `ESCALATIONS` § E-12 ;
+- **la photo de profil est livrée, et elle n'est pas chiffrée** (E-12 close, voie A) : un
+  avatar Matrix est un `mxc://` nu que tout client doit pouvoir afficher, et le chiffrer en
+  ferait un carré cassé partout. Elle passe par `uploadPublicProfileImage()`, **l'unique
+  chemin public du pipeline**, dont le site d'appel unique est gardé par un test. L'écran
+  le dit au moment du choix ;
 - **aucun avatar n'est une image**, pas même celui d'un contact : `ConversationAvatar`
   rend des initiales, la récupération de média authentifié pour les avatars n'étant pas
   branchée ;
@@ -100,8 +102,14 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   notification par salon avec les règles natives, et la suite prouve *quelles* règles partent ;
   que le serveur les évalue comme prévu — mentions qui passent en « mentions uniquement »,
   rien qui passe en « silencieux » — demande une pile déployée ;
-- **un lien d'invitation de groupe s'émet, mais rien ne le consomme encore.** L'écran de
-  réception appartient à M-G, et le mécanisme d'arrivée dans un salon privé est remonté au PM
+- **aucun `knock` n'a été émis contre un vrai Synapse.** Depuis E-13, un lien de groupe
+  ouvre le sas du salon, fait frapper son porteur, et un membre confirme. La suite prouve
+  que la bonne règle est écrite, que le bon appel part et que l'UI dit la vérité ; que le
+  serveur accepte le knock et que l'invitation qui suit fasse entrer demande une pile
+  déployée. À vérifier en premier : la bascule `join_rules` exige un power level d'état,
+  et un membre ordinaire qui émet un lien voit un avertissement au lieu d'un lien muet ;
+- ~~**un lien d'invitation de groupe s'émet, mais rien ne le consomme encore.**~~ L'écran de
+  réception appartient à M-G, et le mécanisme d'arrivée dans un salon privé était remonté au PM
   (`ESCALATIONS` § E-13). L'émission, l'expiration et la révocation, elles, fonctionnent.
 
 ## Où sont les choses

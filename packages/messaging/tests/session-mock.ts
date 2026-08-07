@@ -44,6 +44,10 @@ export interface FakeRoomOptions {
   annuaire?: { user_id: string; display_name?: string; avatar_url?: string }[];
   /** REQ-MSG-11 — niveau exigé par l'état du salon pour l'action `kick`. */
   kickLevel?: number;
+  /** REQ-MSG-20 — la règle d'accès dans l'état du salon. `undefined` = aucun événement. */
+  joinRule?: string;
+  /** REQ-MSG-20 — ceux qui ont frappé et attendent : jamais dans les membres joints. */
+  knockers?: ReturnType<typeof fakeMember>[];
   /** REQ-UIX-36 — les push rules du compte, telles que `/sync` les rend. */
   pushRules?: IPushRules;
 }
@@ -64,6 +68,8 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     annuaire = [],
     kickLevel = 50,
     pushRules = { global: {} },
+    joinRule,
+    knockers = [],
   } = options;
   let ignored = options.ignored ?? [];
 
@@ -73,6 +79,10 @@ export function fakeSession(options: FakeRoomOptions = {}) {
   const room = {
     roomId: "!salon:tacita.test",
     getJoinedMembers: () => members,
+    // REQ-MSG-20 — l'appartenance `knock` est une catégorie à part : quelqu'un qui a
+    // frappé n'est pas joint, et un mock qui le rendrait dans `getJoinedMembers`
+    // laisserait passer une lecture fausse.
+    getMembersWithMembership: (membership: string) => (membership === "knock" ? knockers : []),
     getJoinedMemberCount: () => members.length,
     getMembers: () => members,
     getMember: (userId: string) => members.find((member) => member.userId === userId) ?? null,
@@ -88,9 +98,14 @@ export function fakeSession(options: FakeRoomOptions = {}) {
       })),
     },
     currentState: {
-      getStateEvents: vi.fn((_type: string, _stateKey: string) => ({
-        getContent: () => ({ pinned }),
-      })),
+      getStateEvents: vi.fn((type: string, _stateKey: string) => {
+        // `m.room.join_rules` absent quand le test n'en pose pas : c'est le cas qui doit
+        // se lire « invite », et un mock qui rendrait toujours un objet le masquerait.
+        if (type === "m.room.join_rules") {
+          return joinRule === undefined ? null : { getContent: () => ({ join_rule: joinRule }) };
+        }
+        return { getContent: () => ({ pinned }) };
+      }),
       maySendEvent: vi.fn(() => maySendEvent),
       maySendRedactionForEvent: vi.fn(() => mayRedact),
       // REQ-MSG-11 — le seuil vient de l'état du salon, comme chez le SDK : le test
@@ -127,6 +142,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     // mock et non un tableau figé : `ignoreUser` relit la liste avant d'écrire, et un
     // faux qui rendrait toujours la même chose ne prouverait pas cette relecture.
     joinRoom: vi.fn(async (roomId: string) => ({ roomId })),
+    knockRoom: vi.fn(async (roomId: string) => ({ room_id: roomId })),
     leave: vi.fn(async (_roomId: string) => ({})),
     getIgnoredUsers: vi.fn((): string[] => ignored),
     setIgnoredUsers: vi.fn(async (userIds: string[]) => {

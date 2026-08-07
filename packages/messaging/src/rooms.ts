@@ -2,6 +2,8 @@ import type { Session } from "@tacita/client-core";
 import {
   ConditionKind,
   EventType,
+  JoinRule as SdkJoinRule,
+  KnownMembership,
   Preset,
   PushRuleActionName,
   PushRuleKind,
@@ -155,6 +157,72 @@ export function kick(
 /** REQ-MSG-11 — inviter dans un salon existant. Le chemin natif de D-09, sans détour. */
 export function invite(session: Session, roomId: string, userId: string): Promise<EmptyObject> {
   return session.client.invite(roomId, userId);
+}
+
+/**
+ * REQ-MSG-20 — le sas d'entrée d'un groupe (E-13, voie A).
+ *
+ * Un lien de groupe ne peut pas faire entrer tout seul : son porteur ne peut ni s'inviter
+ * (il faut être membre) ni rejoindre un salon en `join_rule: invite`. Le `knock` natif
+ * ouvre la seule porte qui ne coûte ni un graphe social (voie B) ni un pouvoir Matrix
+ * pour le service de liens (voie C) : **le porteur frappe, un membre confirme.**
+ *
+ * Ces quatre fonctions sont des relais du SDK, et c'est voulu — la règle produit (quand
+ * bascule-t-on, qui confirme) vit dans le shard, l'état vit dans le salon. Rien n'est
+ * mémorisé ici : `joinRule` relit l'état à chaque appel, parce qu'un autre appareil de la
+ * même personne peut avoir révoqué le dernier lien entre-temps.
+ */
+export type JoinRule = "invite" | "knock";
+
+/**
+ * Le SDK a son propre enum ; le shard, lui, n'importe pas matrix-js-sdk (spec 00). On
+ * expose donc une union de littéraux et on traduit ici — une table de deux entrées, pas
+ * un cast : si un jour l'enum d'amont change de valeur, c'est cette ligne qui casse à la
+ * compilation plutôt qu'un `join_rule` silencieusement invalide.
+ */
+const REGLES: Record<JoinRule, SdkJoinRule> = {
+  invite: SdkJoinRule.Invite,
+  knock: SdkJoinRule.Knock,
+};
+
+export function joinRule(session: Session, roomId: string): JoinRule {
+  const contenu = session.client
+    .getRoom(roomId)
+    ?.currentState.getStateEvents(EventType.RoomJoinRules, "")
+    ?.getContent();
+  // Tout ce qui n'est pas explicitement `knock` est traité comme `invite` : c'est le
+  // défaut de `Preset.PrivateChat`, et le sens qu'on veut dans le doute — fermé.
+  return contenu?.join_rule === SdkJoinRule.Knock ? "knock" : "invite";
+}
+
+export function setJoinRule(
+  session: Session,
+  roomId: string,
+  rule: JoinRule,
+): Promise<ISendEventResponse> {
+  return session.client.sendStateEvent(
+    roomId,
+    EventType.RoomJoinRules,
+    { join_rule: REGLES[rule] },
+    "",
+  );
+}
+
+/**
+ * Frapper à la porte. Le `reason` est **en clair** — c'est un événement d'appartenance,
+ * et Matrix ne chiffre pas l'état : on n'en envoie donc aucun. Se présenter se fait dans
+ * le salon, une fois entré.
+ */
+export function knock(session: Session, roomId: string): Promise<{ room_id: string }> {
+  return session.client.knockRoom(roomId);
+}
+
+/**
+ * Ceux qui ont frappé et attendent. `getJoinedMembers()` ne les rend pas — ils ne sont
+ * pas joints —, il faut donc lire l'appartenance `knock` dans l'état du salon.
+ */
+export function knockers(session: Session, roomId: string): RoomMember[] {
+  return session.client.getRoom(roomId)?.getMembersWithMembership(KnownMembership.Knock) ?? [];
 }
 
 /**

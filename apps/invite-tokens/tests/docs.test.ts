@@ -22,11 +22,16 @@ describe("REQ-INV-19 — la métadonnée « qui invite qui » est documentée, p
 
 describe("REQ-INV-16 — l'ajout par identifiant ne passe pas par ce service", () => {
   /**
-   * L'UI de l'ajout par identifiant n'existe pas encore (spec 11) ; ce qui existe et
-   * doit rester vrai, c'est qu'**aucun autre module ne connaît ce service**. Le jour où
-   * `apps/web` arrive, ce test couvre son code sans être réécrit : il balaie tout le
-   * dépôt sauf ce dossier.
+   * Ce qui doit rester vrai : **un seul module hors de ce dossier connaît ce service**,
+   * et c'est le client de liens du shard. Le reste du dépôt l'ignore, ce qui garantit
+   * que l'ajout par identifiant (natif, D-09) ne peut pas dépendre de lui.
+   *
+   * La borne était « aucun » jusqu'au 07/08/2026 — elle fermait la porte au client de
+   * réception qu'E-13 exige (voie A : résoudre, puis frapper). Elle devient « un seul,
+   * nommé ». Un second appelant échoue ici, ce qui est le point : c'est la frontière du
+   * service, pas une interdiction de l'utiliser.
    */
+  const CLIENT_AUTORISE = "/apps/web/lib/liens-invitation.ts";
   const sources = (): { chemin: string; code: string }[] => {
     const fichiers: { chemin: string; code: string }[] = [];
     const parcourir = (dossier: URL) => {
@@ -46,11 +51,20 @@ describe("REQ-INV-16 — l'ajout par identifiant ne passe pas par ce service", (
   };
 
   it("aucun paquet ni autre app n'appelle les routes du service", () => {
-    const autres = sources().filter(({ chemin }) => !chemin.includes("/apps/invite-tokens/"));
+    const autres = sources().filter(
+      ({ chemin }) => !chemin.includes("/apps/invite-tokens/") && !chemin.endsWith(CLIENT_AUTORISE),
+    );
 
     expect(autres.length).toBeGreaterThan(10); // le balayage trouve bien du code
     for (const { chemin, code } of autres) {
       expect(code, chemin).not.toMatch(/\/links\/[^/\s]*\/resolve|INVITE_SERVICE_URL|invite-tokens/);
     }
+  });
+  it("le client autorisé existe : la porte est nommée, pas simplement ouverte", () => {
+    // Sans cette assertion, renommer le fichier désactiverait le balayage en silence —
+    // l'exception ne correspondrait plus à rien et tout redeviendrait « conforme ».
+    const client = sources().find(({ chemin }) => chemin.endsWith(CLIENT_AUTORISE));
+    expect(client, `${CLIENT_AUTORISE} introuvable`).toBeTruthy();
+    expect(client!.code).toContain("/resolve");
   });
 });

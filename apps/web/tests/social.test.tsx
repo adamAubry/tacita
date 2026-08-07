@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import type { Profile } from "@tacita/messaging";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "fake-indexeddb/auto";
@@ -9,16 +12,33 @@ import { Demandes } from "../components/amis/Demandes";
 import { Note } from "../components/profil/Note";
 import { ProfilAutrui, CONFIRMATIONS } from "../components/profil/ProfilAutrui";
 import { AVERTISSEMENT_PHOTO, ProfilMoi } from "../components/profil/ProfilMoi";
+import { ReceptionLien } from "../components/amis/ReceptionLien";
+import { urlDInvitation, type LiensInvitation } from "../lib/liens-invitation";
 import type { Demande } from "../lib/contacts";
 import { LIBELLE_NOTE, lireNote } from "../lib/notes";
 import { DEBOUNCE_MS } from "../lib/recherche";
 
 const pousser = vi.fn();
 const revenir = vi.fn();
+const remplacer = vi.fn();
 vi.mock("next/navigation", () => ({
   usePathname: () => "/profil/@mira:tacita.test",
-  useRouter: () => ({ push: pousser, back: revenir }),
+  useRouter: () => ({ push: pousser, back: revenir, replace: remplacer }),
   useSearchParams: () => new URLSearchParams(),
+}));
+
+/** E-13 — le paquet 05 est mocké à son interface : M-G compose, il ne dérive rien. */
+const frapper = vi.fn(async () => ({ room_id: "!groupe:t" }));
+/** L'interface `Contacts` (E-04) : les écrans se codent contre elle, pas contre le SDK. */
+const inviterContact = vi.fn(async () => "!dm:t");
+vi.mock("../lib/contacts", () => ({
+  contactsDeLaSession: () => ({ inviter: inviterContact }),
+}));
+const regleDAcces = vi.fn(() => "knock" as "knock" | "invite");
+vi.mock("@tacita/messaging", async (original) => ({
+  ...(await original<typeof import("@tacita/messaging")>()),
+  knock: (...args: unknown[]) => frapper(...(args as [])),
+  joinRule: () => regleDAcces(),
 }));
 
 const MIRA: Profile = { userId: "@mira:tacita.test", displayName: "mira" };
@@ -478,5 +498,118 @@ describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle ex
       fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
     });
     expect(onEnregistrer).toHaveBeenCalledWith({ displayName: "adam a." });
+  });
+});
+
+describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membre confirme", () => {
+  const TOKEN = "jeton-opaque";
+  const GROUPE = "!groupe:t";
+
+  /** Le service, mocké à son interface : c'est une API HTTP, pas un paquet. */
+  const service = (resoudre: LiensInvitation["resoudre"]): LiensInvitation => ({
+    lister: vi.fn(async () => []),
+    emettreGroupe: vi.fn(),
+    emettreAmi: vi.fn(),
+    revoquer: vi.fn(async () => {}),
+    resoudre,
+  });
+
+  /** Une session réduite à ce que l'écran en lit : l'appartenance au salon visé. */
+  const session = (membership?: string, nom = "équipe") =>
+    ({
+      client: {
+        getRoom: (roomId: string) =>
+          roomId === GROUPE && membership ? { name: nom, getMyMembership: () => membership } : null,
+      },
+    }) as never;
+
+  beforeEach(() => {
+    frapper.mockClear();
+    regleDAcces.mockReturnValue("knock");
+  });
+
+  it("un lien de groupe fait frapper, puis affiche une attente honnête", async () => {
+    const liens = service(vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t", roomId: GROUPE })));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    await waitFor(() => expect(frapper).toHaveBeenCalledWith(expect.anything(), GROUPE));
+    expect(await screen.findByText("Demande envoyée")).toBeTruthy();
+
+    // Ce que l'écran ne promet pas : ni délai, ni notification qu'on n'émet pas.
+    expect(screen.getByText(/Personne n'est prévenu automatiquement/)).toBeTruthy();
+    // Et surtout : aucune navigation. Frapper n'est pas entrer.
+    expect(remplacer).not.toHaveBeenCalled();
+  });
+
+  it("un lien d'ami passe par le chemin natif de D-09, sans frapper", async () => {
+    const liens = service(vi.fn(async () => ({ kind: "friend" as const, issuer: "@mira:tacita.test" })));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    // REQ-INV-13 — `inviter` rend le DM existant s'il y en a un (REQ-MSG-15) : rien à
+    // distinguer ici, et donc rien à demander à l'utilisateur.
+    await waitFor(() => expect(remplacer).toHaveBeenCalled());
+    expect(frapper).not.toHaveBeenCalled();
+  });
+
+  it("déjà membre : on ouvre la conversation au lieu de frapper à nouveau", async () => {
+    const liens = service(vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t", roomId: GROUPE })));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session("join")} />);
+
+    // REQ-INV-13, succès idempotent : rouvrir un lien déjà utilisé n'est pas une erreur.
+    await waitFor(() => expect(remplacer).toHaveBeenCalledWith(`/c/${encodeURIComponent(GROUPE)}`));
+    expect(frapper).not.toHaveBeenCalled();
+  });
+
+  it("déjà en attente : on réaffiche l'attente sans frapper deux fois", async () => {
+    const liens = service(vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t", roomId: GROUPE })));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session("knock")} />);
+
+    expect(await screen.findByText("Demande envoyée")).toBeTruthy();
+    expect(frapper).not.toHaveBeenCalled();
+  });
+
+  it("un lien invalide ne dit pas laquelle des quatre causes : le service refuse de le dire", async () => {
+    const liens = service(vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t" })));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    // REQ-INV-08 : inconnu, expiré, révoqué et bloqué rendent la même chose. Deviner
+    // laquelle pour l'afficher reconstruirait l'énumérabilité que le service refuse.
+    const message = await screen.findByText("Ce lien n'est plus valide");
+    expect(message).toBeTruthy();
+    for (const cause of [/révoqué seulement/i, /bloqué/i, /inconnu/i]) {
+      expect(screen.queryByText(cause)).toBeNull();
+    }
+  });
+
+  it("service injoignable : l'ajout par identifiant reste proposé (REQ-INV-16)", async () => {
+    const liens = service(vi.fn(async () => Promise.reject(new Error("503"))));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    expect(await screen.findByText("Le lien n'a pas pu être vérifié")).toBeTruthy();
+    // Un lien cassé ne doit jamais rendre le produit inutilisable pour se lier.
+    expect(screen.getByText(/identifiant Matrix/)).toBeTruthy();
+  });
+
+  it("rien n'est journalisé : le token est dans l'URL", async () => {
+    const espions = (["log", "info", "warn", "error", "debug"] as const).map((niveau) =>
+      vi.spyOn(console, niveau).mockImplementation(() => {}),
+    );
+    const liens = service(vi.fn(async () => Promise.reject(new Error(TOKEN))));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    await screen.findByText("Le lien n'a pas pu être vérifié");
+    for (const espion of espions) expect(espion).not.toHaveBeenCalled();
+    for (const espion of espions) espion.mockRestore();
+  });
+
+  it("la route qui consomme le lien est celle que l'émission fabrique", () => {
+    // Les deux moitiés vivent dans deux fichiers que rien ne relie : `urlDInvitation`
+    // écrit `/i/<token>`, et c'est le nom du dossier de route qui le sert. Un renommage
+    // de l'un casserait l'autre en silence — un lien partagé mènerait à un 404.
+    const chemin = new URL(urlDInvitation("https://tacita.test", TOKEN)).pathname;
+    expect(chemin).toBe(`/i/${TOKEN}`);
+    // `join` et non `new URL` : les crochets du segment dynamique de Next seraient
+    // percent-encodés par l'URL, et le fichier deviendrait introuvable.
+    expect(existsSync(join(import.meta.dirname, "../app/i/[token]/page.tsx"))).toBe(true);
   });
 });
