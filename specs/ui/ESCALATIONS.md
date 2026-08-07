@@ -30,7 +30,7 @@ contrat gagne.
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
-| E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Ouvert** — livré débouncé sur les critères, la limite est documentée | rien tant que non tranché ; REQ-UIX-22 **non modifiée** |
+| E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Tranché le 07/08/2026** — voie A (contrat aligné sur la primitive), B en parallèle, C refusée | `specs/ui/M-F.md` — **REQ-UIX-22 amendée**. Aucun code repris |
 | E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Ouvert** — la photo est **absente** de M-G, le reste de REQ-UI-20 est livré | rien tant que non tranché ; REQ-UI-20 et l'interdit n°11 **non modifiés** |
 | E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H *(numérotée E-11 à l'origine)* | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
 | E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
@@ -386,10 +386,11 @@ arbitrage : plus aucune question n'est ouverte, seule reste l'exécution.
 
 ---
 
-## E-11 — `PowerSearch` ne notifie pas la frappe (M-F) — **ouvert**
+## E-11 — `PowerSearch` ne notifie pas la frappe (M-F)
 
-**Relevé le 06/08/2026, au cours de M-F.** Rien n'est bloqué : le module est livré et
-vert. Ce point demande un arbitrage de rédaction, pas une reprise de code.
+**Relevé le 06/08/2026 au cours de M-F. Tranché le 07/08/2026 : voie A maintenant, voie B
+en parallèle, voie C refusée.** Comme annoncé, c'était un arbitrage de rédaction : aucune
+ligne de code n'a été reprise, M-F reste vert tel quel.
 
 **La question.** REQ-UI-16 impose `PowerSearch` comme barre de recherche. REQ-UIX-22
 demande une « recherche débouncée (300 ms) », dont l'objectif mesurable dit « 20 frappes
@@ -431,6 +432,26 @@ REQ-UIX-22, et cela se voit à l'usage.
   champs de saisie côte à côte là où le wireframe en montre un. **Déconseillé** — la
   jurisprudence d'E-10 vaut ici aussi : on ne contourne pas une primitive parce qu'il lui
   manque une prop.
+
+**Décision (PM).** **Voie A**, et REQ-UIX-22 est amendée : « recherche débouncée (300 ms)
+sur les **changements de critères** », objectif mesurable « 20 changements de critères →
+1 appel ». La recherche à la validation devient le comportement **contractuel**, pas une
+dégradation tolérée — la nuance compte, parce qu'une dégradation tolérée se re-signale à
+chaque revue.
+
+**Voie B en parallèle** : la demande d'un `onQueryChange` part en amont. Si elle est
+livrée, la recherche incrémentale reviendra comme **nouvelle exigence**, pas comme dette.
+**Voie C refusée** — recoder la primitive pour une prop manquante est exactement ce que la
+jurisprudence E-10 écarte.
+
+**Livré.** `specs/ui/M-F.md` : REQ-UIX-22 et son objectif mesurable reformulés, avec le
+motif daté. Le test porte le même vocabulaire que le contrat — il s'appelait « 20 frappes »
+alors qu'il rerendait des critères, ce qui est précisément le décalage que l'escalade
+signalait.
+
+**Ce qui reste à faire par un humain :** ouvrir la demande `onQueryChange` chez Astryx. Un
+agent n'a pas de compte sur leur suivi ; la trace est ici, l'action est au Tech Lead
+(action n° 6 du plan de route).
 
 **Recommandation du Tech Lead : A maintenant, B en parallèle.** Rien ne justifie de
 retenir M-F pour cela, et la limite est déjà écrite là où elle se lit — dans la docstring
