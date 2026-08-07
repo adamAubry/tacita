@@ -135,3 +135,33 @@ describe("REQ-MSG-19 — annuaire du homeserver, jamais /search", () => {
     expect(client.searchUserDirectory).not.toHaveBeenCalled();
   });
 });
+
+describe("REQ-MSG-19 — un identifiant complet se résout par son profil", () => {
+  /**
+   * Mesuré contre un vrai Synapse le 07/08/2026 : l'annuaire rend `results: []` pour un
+   * compte qui existe, parce que `search_all_users` est faux par défaut. « Ajouter par
+   * identifiant » ne trouvait donc jamais personne — le parcours d'entrée du produit.
+   */
+  it("ne consulte pas l'annuaire quand on lui donne une adresse", async () => {
+    const { session, client } = fakeSession();
+    const trouves = await searchUsers(session, MIRA);
+
+    expect(client.searchUserDirectory).not.toHaveBeenCalled();
+    expect(client.getProfileInfo).toHaveBeenCalledWith(MIRA);
+    expect(trouves).toEqual([{ userId: MIRA, displayName: "luca", avatarUrl: undefined }]);
+  });
+
+  it("un identifiant que le serveur ne connaît pas ne rend rien", async () => {
+    // `profileOf` retombe sur l'identifiant lui-même quand le profil est introuvable
+    // (REQ-MSG-18) : proposer ce repli ferait « trouver » n'importe quelle saisie.
+    const { session, client } = fakeSession();
+    client.getProfileInfo.mockRejectedValueOnce(new Error("M_NOT_FOUND"));
+    await expect(searchUsers(session, "@inconnu:tacita.test")).resolves.toEqual([]);
+  });
+
+  it("un terme qui n'est pas une adresse passe toujours par l'annuaire", async () => {
+    const { session, client } = fakeSession();
+    await searchUsers(session, "mira");
+    expect(client.searchUserDirectory).toHaveBeenCalledWith({ term: "mira", limit: 20 });
+  });
+});

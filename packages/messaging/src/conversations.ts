@@ -1,5 +1,12 @@
 import type { Session } from "@tacita/client-core";
-import { EventType, KnownMembership, NotificationCountType, RoomEvent, type Room } from "matrix-js-sdk";
+import {
+  ClientEvent,
+  EventType,
+  KnownMembership,
+  NotificationCountType,
+  RoomEvent,
+  type Room,
+} from "matrix-js-sdk";
 
 import { messages, messageText } from "./messages";
 import { createDirectMessage } from "./rooms";
@@ -52,6 +59,38 @@ function directPeers(session: Session): Map<string, string> {
     for (const roomId of roomIds as string[]) peers.set(roomId, userId);
   }
   return peers;
+}
+
+/**
+ * REQ-MSG-15 — **inscrit un salon dans `m.direct`.** Personne d'autre ne le fait.
+ *
+ * `createRoom({ is_direct: true })` ne pose ce drapeau que dans l'invitation envoyée : le
+ * serveur n'écrit **pas** l'account data `m.direct` du créateur, et le SDK non plus. Sans
+ * cette écriture, un DM créé par l'app n'est un DM pour personne — mesuré avec deux
+ * navigateurs contre un vrai Synapse le 07/08/2026, où un DM s'affichait « 2 membres,
+ * c'est le début de ce groupe ».
+ *
+ * Cinq choses en dépendaient, toutes cassées en silence : le libellé et l'avatar du DM,
+ * la liste d'amis (vide, elle filtre sur `peerId`), « retirer un ami » (ne trouvait aucun
+ * salon), et surtout la déduplication de REQ-MSG-15 — sans `m.direct`, `openDirectMessage`
+ * recréait un salon **à chaque fois**, ce que l'exigence interdit explicitement.
+ *
+ * Lecture-modification-écriture : l'account data est un document unique pour tous les
+ * correspondants, l'écraser effacerait les autres DM (même motif que `ignoreUser`).
+ */
+export async function registerDirect(
+  session: Session,
+  userId: string,
+  roomId: string,
+): Promise<void> {
+  const contenu = { ...(session.client.getAccountData(EventType.Direct)?.getContent() ?? {}) };
+  const existants: string[] = Array.isArray(contenu[userId]) ? [...contenu[userId]] : [];
+  if (existants.includes(roomId)) return;
+
+  await session.client.setAccountData(EventType.Direct, {
+    ...contenu,
+    [userId]: [...existants, roomId],
+  });
 }
 
 function describe(session: Session, room: Room, peers: Map<string, string>): Conversation {
@@ -129,6 +168,9 @@ export async function openDirectMessage(session: Session, userId: string): Promi
     if (session.client.getRoom(roomId)?.getMyMembership() === KnownMembership.Join) return roomId;
   }
   const { room_id } = await createDirectMessage(session, userId);
+  // Sans cette ligne, la boucle ci-dessus ne retrouvera jamais ce salon et un second
+  // sera créé au prochain appel — ce que REQ-MSG-15 interdit.
+  await registerDirect(session, userId, room_id);
   return room_id;
 }
 
@@ -136,11 +178,12 @@ export async function openDirectMessage(session: Session, userId: string): Promi
  * REQ-MSG-13 — signal de changement de la liste, branché sur l'émetteur du SDK comme
  * `subscribe()` (spec 05) : aucun store ni bus maison par-dessus.
  *
- * Quatre événements, parce que quatre choses changent la liste : un message (aperçu et
- * récence), un tag (épingle), un reçu (les compteurs de non-lus retombent quand on lit
- * ailleurs) et l'appartenance (invitation acceptée, salon quitté). En manquer un donne
- * une liste qui se fige jusqu'au prochain message — le défaut le plus difficile à voir
- * en revue.
+ * Cinq événements, parce que cinq choses changent la liste : l'apparition d'un salon
+ * (invitation reçue), un message (aperçu et récence), un tag (épingle), un reçu (les
+ * compteurs de non-lus retombent quand on lit ailleurs) et l'appartenance (invitation
+ * acceptée, salon quitté). En manquer un donne une liste qui se fige jusqu'au prochain
+ * message — le défaut le plus difficile à voir en revue, et le premier des cinq a
+ * effectivement manqué jusqu'au 07/08/2026.
  *
  * `RoomEvent.UnreadNotifications` serait le signal direct des badges, mais le
  * `MatrixClient` **ne le réémet pas** (il n'est pas dans son union `RoomEvents`, vérifié
@@ -150,12 +193,28 @@ export async function openDirectMessage(session: Session, userId: string): Promi
 export function subscribeConversations(session: Session, listener: () => void): () => void {
   const notifier = (): void => listener();
 
+  /**
+   * `ClientEvent.Room` — **l'apparition d'un salon**, et non un changement dans un salon
+   * déjà connu. C'est le signal d'une invitation reçue : le salon n'existait pas encore
+   * côté client, donc aucun de ses propres événements n'a pu être réémis à temps.
+   *
+   * Mesuré contre un vrai Synapse le 07/08/2026, avec deux navigateurs : sans lui, une
+   * demande d'ami n'apparaissait **qu'après rechargement complet de la page**. Le serveur
+   * la livrait bien — elle était dans le `/sync` de l'invité — mais rien dans l'app ne
+   * disait qu'il fallait relire. C'est le parcours d'entrée du produit (D-09) : on ne
+   * peut pas commencer une conversation sans que l'autre voie la demande.
+   *
+   * `MyMembership` ne suffit pas et reste nécessaire : il porte l'acceptation et le
+   * départ, sur des salons déjà connus.
+   */
+  session.client.on(ClientEvent.Room, notifier);
   session.client.on(RoomEvent.Timeline, notifier);
   session.client.on(RoomEvent.Tags, notifier);
   session.client.on(RoomEvent.Receipt, notifier);
   session.client.on(RoomEvent.MyMembership, notifier);
 
   return () => {
+    session.client.off(ClientEvent.Room, notifier);
     session.client.off(RoomEvent.Timeline, notifier);
     session.client.off(RoomEvent.Tags, notifier);
     session.client.off(RoomEvent.Receipt, notifier);

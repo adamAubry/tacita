@@ -44,6 +44,8 @@ export interface FakeRoomOptions {
   annuaire?: { user_id: string; display_name?: string; avatar_url?: string }[];
   /** REQ-MSG-11 — niveau exigé par l'état du salon pour l'action `kick`. */
   kickLevel?: number;
+  /** L'invitant, quand le salon est une invitation de DM (REQ-MSG-15). */
+  inviter?: string;
   /** REQ-MSG-20 — la règle d'accès dans l'état du salon. `undefined` = aucun événement. */
   joinRule?: string;
   /** REQ-MSG-20 — ceux qui ont frappé et attendent : jamais dans les membres joints. */
@@ -83,6 +85,9 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     // frappé n'est pas joint, et un mock qui le rendrait dans `getJoinedMembers`
     // laisserait passer une lecture fausse.
     getMembersWithMembership: (membership: string) => (membership === "knock" ? knockers : []),
+    // REQ-MSG-15 — l'invitant d'une invitation de DM : `acceptInvitation` le lit avant
+    // de rejoindre, pour inscrire le salon dans `m.direct`.
+    getDMInviter: () => options.inviter,
     getJoinedMemberCount: () => members.length,
     getMembers: () => members,
     getMember: (userId: string) => members.find((member) => member.userId === userId) ?? null,

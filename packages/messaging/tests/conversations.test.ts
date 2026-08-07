@@ -53,6 +53,12 @@ function fakeClient(salons: SalonFictif[], directs: Record<string, string[]> = {
     setRoomTag: vi.fn(async (_roomId: string, _tag: string, _metadata: object) => ({})),
     deleteRoomTag: vi.fn(async (_roomId: string, _tag: string) => ({})),
     createRoom: vi.fn(async () => ({ room_id: "!neuf:tacita.test" })),
+    // REQ-MSG-15 — `m.direct` s'écrit vraiment : le mock le conserve, pour que la
+    // relecture voie ce que l'écriture a posé.
+    setAccountData: vi.fn(async (type: string, contenu: Record<string, string[]>) => {
+      if (type === "m.direct") Object.assign(directs, contenu);
+      return {};
+    }),
     isEncrypted: vi.fn(async () => true),
     on: vi.fn(),
     off: vi.fn(),
@@ -122,11 +128,19 @@ describe("REQ-MSG-13 — liste des conversations, compteurs natifs, invitations 
     expect(invitations(session)).toEqual([{ roomId: "!invite:t", name: "adam", from: ADAM }]);
   });
 
-  it("l'abonnement couvre les quatre sources de changement, et se défait", () => {
+  /**
+   * `Room` — l'**apparition** d'un salon — a manqué jusqu'au 07/08/2026, et le défaut
+   * n'était visible qu'avec deux navigateurs contre un vrai Synapse : une demande d'ami
+   * n'apparaissait chez l'invité qu'après rechargement complet de la page. Le serveur la
+   * livrait bien ; rien dans l'app ne disait de relire. Un salon invité est **nouveau**
+   * côté client, donc aucun de ses propres événements n'a pu être réémis à temps.
+   */
+  it("l'abonnement couvre les cinq sources de changement, et se défait", () => {
     const { session, client } = fakeClient([]);
     const desabonner = subscribeConversations(session, () => {});
 
     expect(client.on.mock.calls.map(([evenement]) => evenement)).toEqual([
+      "Room",
       "Room.timeline",
       "Room.tags",
       "Room.receipt",
@@ -134,7 +148,10 @@ describe("REQ-MSG-13 — liste des conversations, compteurs natifs, invitations 
     ]);
 
     desabonner();
-    expect(client.off).toHaveBeenCalledTimes(4);
+    // Symétrie stricte : un abonnement non retiré fuit à chaque changement d'écran.
+    expect(client.off.mock.calls.map(([evenement]) => evenement)).toEqual(
+      client.on.mock.calls.map(([evenement]) => evenement),
+    );
   });
 });
 
@@ -173,5 +190,38 @@ describe("REQ-MSG-15 — un seul DM par correspondant", () => {
 
     expect(await openDirectMessage(session, ADAM)).toBe("!neuf:tacita.test");
     expect(client.createRoom).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("REQ-MSG-15 — un DM est inscrit dans m.direct, sinon il n'en est un pour personne", () => {
+  /**
+   * Mesuré avec deux navigateurs contre un vrai Synapse le 07/08/2026 : un DM créé par
+   * l'app s'affichait « 2 membres, c'est le début de ce groupe ». `is_direct` ne pose le
+   * drapeau que dans l'invitation ; ni le serveur ni le SDK n'écrivent l'account data.
+   */
+  it("créer un DM l'inscrit, et un second appel ne recrée rien", async () => {
+    const { session, client } = fakeClient([]);
+
+    const premier = await openDirectMessage(session, ADAM);
+    expect(client.setAccountData).toHaveBeenCalledWith("m.direct", { [ADAM]: [premier] });
+
+    // Le salon existe maintenant côté client : le second appel doit le retrouver.
+    const salon = { roomId: premier, name: "adam", tags: {}, getMyMembership: () => "join" };
+    client.getRooms.mockReturnValue([salon] as never);
+    client.getRoom.mockReturnValue(salon as never);
+    client.createRoom.mockClear();
+
+    expect(await openDirectMessage(session, ADAM)).toBe(premier);
+    // « Jamais un second » : sans `m.direct`, cette ligne échouait et un salon de plus
+    // était créé à chaque ouverture de conversation.
+    expect(client.createRoom).not.toHaveBeenCalled();
+  });
+
+  it("n'écrase pas les autres correspondants déjà inscrits", async () => {
+    const { session, client } = fakeClient([], { "@mira:tacita.test": ["!mira:t"] });
+    await openDirectMessage(session, ADAM);
+
+    const [, contenu] = client.setAccountData.mock.calls.at(-1)!;
+    expect(contenu).toEqual({ "@mira:tacita.test": ["!mira:t"], [ADAM]: ["!neuf:tacita.test"] });
   });
 });

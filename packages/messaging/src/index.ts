@@ -19,6 +19,7 @@ export {
   FAVOURITE_TAG,
   invitations,
   openDirectMessage,
+  registerDirect,
   setFavourite,
   subscribeConversations,
 } from "./conversations";
