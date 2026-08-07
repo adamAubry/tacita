@@ -22,7 +22,12 @@ NAME="${SERVER_NAME:-localhost}"
 # `.env` déclare TURN_DOMAIN comme devant être un SAN du certificat monté
 # (rtc/README.md) : on l'ajoute quand il est défini, sinon la spec 02 hérite d'un
 # certificat qui ne couvre pas son propre domaine.
-ALT="DNS:${NAME}${TURN_DOMAIN:+,DNS:$TURN_DOMAIN}"
+#
+# REQ-RTC-08 — `call.<domaine>` de même : Element Call est servi sous son propre nom
+# d'hôte par l'overlay RTC, et sans ce SAN l'iframe d'appel échoue au TLS. Le shard
+# n'affiche alors que son délai de chargement (REQ-UIX-38), sans pouvoir en dire la
+# cause — une panne muette de plus, pour un nom oublié dans une liste.
+ALT="DNS:${NAME},DNS:call.${NAME}${TURN_DOMAIN:+,DNS:$TURN_DOMAIN}"
 
 # `subjectAltName` n'est pas facultatif. Un certificat qui ne porte qu'un CN est
 # refusé par tout client TLS moderne : les navigateurs depuis 2017, et côté serveur
