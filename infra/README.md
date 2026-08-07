@@ -21,6 +21,43 @@ docker compose exec synapse register_new_matrix_user \
   -c /data/homeserver.yaml http://localhost:8008
 ```
 
+### Résoudre le nom depuis l'hôte
+
+**Quatrième cause de la même famille que les trois du login OIDC ci-dessous, du côté
+de l'hôte au lieu du réseau Docker.** L'alias réseau de `smoke/docker-compose.yml` fait
+résoudre `SERVER_NAME` *entre conteneurs* — il ne fait rien pour le navigateur. Sans
+cette étape, `pnpm --filter web dev` redirige vers `https://${SERVER_NAME}/…` et le
+navigateur n'y trouve personne. Symptôme trompeur : la redirection est **correcte**
+(REQ-UIX-06 renvoie à l'OIDC sans écran intermédiaire), c'est le nom qui ne mène nulle
+part.
+
+Aucune variable du shard n'y change quoi que ce soit. Le flux de connexion **sort de
+l'application** : Synapse répond `302` vers Keycloak sous `https://${SERVER_NAME}/auth`,
+et le navigateur doit résoudre ce nom-là. Pointer `NEXT_PUBLIC_HOMESERVER_URL` vers
+`http://localhost:8008` déplace la panne d'un saut, sans la corriger.
+
+Une ligne dans le fichier hosts, avec les deux noms que porte le certificat :
+
+```
+127.0.0.1 chat.example.org call.chat.example.org
+```
+
+- **Linux / macOS** : `/etc/hosts`.
+- **WSL2** : le navigateur tourne côté **Windows**, donc c'est
+  `C:\Windows\System32\drivers\etc\hosts` (éditeur lancé en administrateur) qui compte —
+  le `/etc/hosts` de WSL ne sert qu'aux appels depuis le shell (`curl`, suite de fumée).
+  `127.0.0.1` suffit dans les deux : WSL2 fait suivre localhost jusqu'au proxy.
+
+Puis **approuver le CA de dev** (`proxy/certs/fullchain.pem`) dans le navigateur.
+Accepter l'exception de sécurité affiche l'application, mais ne suffit pas : sans
+confiance réelle, le service worker ne s'installe pas — REQ-INF-10 exige un contexte
+sécurisé. Pour tester la PWA, il faut l'import.
+
+Le nom lui-même se change dans `infra/.env` (`SERVER_NAME`), suivi de
+`./proxy/generate-dev-certs.sh` pour que les SAN suivent, et de la recopie des trois
+URLs dans `apps/web/.env.local` — voir `apps/web/.env.example`. Les deux fichiers sont
+ignorés par git : chaque environnement garde le sien, le dépôt ne porte que les exemples.
+
 ## Versions épinglées
 
 | Service | Version | Digest |

@@ -7,10 +7,16 @@ dans le paquet concerné, jamais dans un composant.
 État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions), **M-G** (social), **M-H** (réglages et infos de conversation) et **M-I** (appels et push) livrés — les neuf modules du shard sont posés. Les quatre escalades ouvertes ont été tranchées et appliquées le 07/08/2026 (E-11 à E-14) : la recherche dit ce que la primitive permet, la photo de profil est livrée par le chemin public nommé, le lien de groupe fait frapper à la porte, et Element Call est épinglé. Reste l'intégration finale (navigation croisée, passe de cohérence design).
 
 ```sh
+cp .env.example .env.local # les trois URLs, dérivées de SERVER_NAME (infra/.env)
 pnpm --filter web dev      # http://localhost:3000
 pnpm --filter web build
 npx vitest run apps/web    # ou `npm test` à la racine
 ```
+
+`.env.local` est ignoré par git : chaque environnement garde le sien. Avant le premier
+`dev`, le nom doit résoudre depuis le **navigateur** — `infra/README.md`, section
+« Résoudre le nom depuis l'hôte » (le cas WSL2 y est traité). Sans ça la redirection
+vers l'OIDC est correcte et part vers un nom qui ne mène nulle part.
 
 ## Trois contraintes de construction — sans elles, `next build` échoue
 
