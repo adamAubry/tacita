@@ -1,6 +1,7 @@
 import type { Session } from "@tacita/client-core";
 import {
   EventType,
+  MatrixEventEvent,
   MsgType,
   RelationType,
   RoomEvent,
@@ -180,10 +181,24 @@ export function react(
  * sont pas des messages.
  */
 export function messages(session: Session, roomId: string): MatrixEvent[] {
-  return session
-    .timeline(roomId)
-    .events()
-    .filter((event) => event.getType() === EventType.RoomMessage);
+  return (
+    session
+      .timeline(roomId)
+      .events()
+      .filter((event) => event.getType() === EventType.RoomMessage)
+      /*
+       * REQ-MSG-06 — **une modification remplace, elle ne s'ajoute pas.** Un `m.replace`
+       * est lui aussi un `m.room.message` : il restait donc dans la liste, à côté de
+       * l'original dont le SDK a déjà réécrit le contenu sur place. Résultat mesuré au
+       * navigateur le 08/08/2026 : un message modifié s'affichait **deux fois**, avec le
+       * même texte. Et supprimer n'en effaçait qu'un — la redaction vise l'original, la
+       * bulle du remplacement survivait, message compris.
+       *
+       * Filtrer n'est pas trier (REQ-MSG-12) : l'ordre reste celui du flux, on en retire
+       * des événements qui ne sont pas des messages à afficher.
+       */
+      .filter((event) => !event.isRelation(RelationType.Replace))
+  );
 }
 
 /**
@@ -227,8 +242,40 @@ export function subscribe(session: Session, roomId: string, listener: () => void
   const handler = (_event: MatrixEvent, room: Room | undefined): void => {
     if (room?.roomId === roomId) listener();
   };
+
+  /*
+   * **Le déchiffrement n'est pas un événement de timeline.** Un message entre dans la
+   * timeline chiffré, et son texte n'existe qu'au `Decrypted` qui suit — parfois
+   * bien plus tard, quand la clé Megolm arrive par to-device. Sans cet écouteur, rien
+   * ne redemandait un rendu : le message restait une ligne vide, avec son auteur et son
+   * heure, jusqu'à ce qu'un autre événement force la mise à jour.
+   *
+   * En conversation vive, l'événement suivant masquait le défaut. Au rechargement, non :
+   * mesuré au navigateur le 08/08/2026, une conversation rouverte affichait « 13:57 » et
+   * un nom, sans une ligne de texte. Même famille que `ClientEvent.Room` (REQ-MSG-15) —
+   * un événement de moins que ce que la vie réelle exige.
+   */
+  const surDechiffrement = (event: MatrixEvent): void => {
+    if (event.getRoomId() === roomId) listener();
+  };
+
+  /*
+   * **Une suppression n'est pas non plus un événement de timeline.** Le SDK émet
+   * `Room.redaction` et vide l'événement d'origine sur place ; `Room.timeline` ne dit
+   * rien. Sans cet écouteur, REQ-MSG-06 ne tenait qu'à moitié : l'auteur voyait son
+   * message partir, le destinataire continuait de le lire jusqu'au message suivant.
+   * Mesuré au navigateur le 08/08/2026, entre deux sessions réelles.
+   */
+  const surSuppression = (_event: MatrixEvent, room: Room): void => {
+    if (room.roomId === roomId) listener();
+  };
+
   session.client.on(RoomEvent.Timeline, handler);
+  session.client.on(MatrixEventEvent.Decrypted, surDechiffrement);
+  session.client.on(RoomEvent.Redaction, surSuppression);
   return () => {
     session.client.off(RoomEvent.Timeline, handler);
+    session.client.off(MatrixEventEvent.Decrypted, surDechiffrement);
+    session.client.off(RoomEvent.Redaction, surSuppression);
   };
 }

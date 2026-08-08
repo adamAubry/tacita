@@ -15,6 +15,15 @@ export function fakeEvent(
     getType: () => type,
     getSender: () => sender,
     getContent: () => content,
+    /**
+     * `isRelation` fait partie du contrat de `MatrixEvent` que le package lit depuis le
+     * 08/08/2026 : `messages()` écarte les `m.replace`, sans quoi un message modifié
+     * s'affiche deux fois. Le faux le dérive du contenu, comme le SDK.
+     */
+    isRelation: (relType?: string) => {
+      const relation = content["m.relates_to"] as { rel_type?: string } | undefined;
+      return relType ? relation?.rel_type === relType : Boolean(relation?.rel_type);
+    },
   };
 }
 

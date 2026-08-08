@@ -219,3 +219,47 @@ describe("REQ-MSG-12 — ordre repris de OrderedTimeline, aucun tri propre", () 
     expect(code).not.toMatch(/\.sort\(|origin_server_ts|getTs\(/);
   });
 });
+
+describe("REQ-MSG-06 / REQ-MSG-12 — déchiffrement et suppression redemandent un rendu", () => {
+  it("s'abonne aussi à MatrixEventEvent.Decrypted, et se désabonne des deux", () => {
+    // Un message entre dans la timeline **chiffré** ; son texte n'existe qu'au
+    // `Decrypted` qui suit, parfois bien plus tard — la clé Megolm arrive par to-device.
+    // Sans cet écouteur, rien ne redemandait de rendu : mesuré au navigateur le
+    // 08/08/2026, une conversation rouverte affichait une heure et un nom, sans texte.
+    const rafraichir = vi.fn();
+    const off = subscribe(ctx.session, ROOM, rafraichir);
+
+    const ecoutes = ctx.client.on.mock.calls.map((appel: unknown[]) => appel[0] as string);
+    expect(ecoutes).toContain("Room.timeline");
+    expect(ecoutes).toContain("Event.decrypted");
+    // Une suppression non plus n'est pas un événement de timeline : le SDK émet
+    // `Room.redaction` et vide l'événement sur place. Sans elle, l'auteur voyait son
+    // message partir et le destinataire continuait de le lire.
+    expect(ecoutes).toContain("Room.redaction");
+
+    // Le désabonnement doit couvrir les deux : un écouteur oublié survit au changement
+    // de salon et fait rendre une conversation qu'on ne regarde plus.
+    off();
+    const relaches = ctx.client.off.mock.calls.map((appel: unknown[]) => appel[0] as string);
+    expect(relaches).toEqual(expect.arrayContaining(ecoutes));
+  });
+});
+
+describe("REQ-MSG-06 — une modification remplace, elle ne s'ajoute pas à la timeline", () => {
+  it("l'événement `m.replace` n'est pas rendu à côté de l'original", () => {
+    // Un `m.replace` est lui aussi un `m.room.message`. Le SDK réécrit le contenu de
+    // l'original sur place : le garder tous les deux affichait **deux fois** le même
+    // texte. Mesuré au navigateur le 08/08/2026, entre deux sessions réelles — et la
+    // suppression n'en effaçait qu'un, la redaction ne visant que l'original.
+    ctx.setTimeline([
+      fakeEvent("$original", { body: "corrigé" }),
+      fakeEvent("$edition", {
+        body: "* corrigé",
+        "m.new_content": { body: "corrigé" },
+        "m.relates_to": { rel_type: "m.replace", event_id: "$original" },
+      }),
+    ]);
+
+    expect(messages(ctx.session, ROOM).map((event) => event.getId())).toEqual(["$original"]);
+  });
+});
