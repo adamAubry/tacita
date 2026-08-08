@@ -22,6 +22,7 @@ import { NotificationsPush } from "./NotificationsPush";
 import { libelleNiveau } from "./NotificationsSalon";
 import { SettingsProfileCard } from "./SettingsProfileCard";
 import { StockageLocal } from "./StockageLocal";
+import { routeInfos } from "../../lib/routes";
 
 /** Les cinq options de REQ-UIX-31. Chacune ouvre une modal, aucune ne navigue. */
 type Option = "theme" | "confidentialite" | "notifications" | "stockage" | "limites";
@@ -147,7 +148,7 @@ export function Reglages() {
                   cle: conversation.roomId,
                   libelle: conversation.name,
                   description: libelleNiveau(conversation.niveau),
-                  onClick: () => router.push(`/c/${conversation.roomId}/infos`),
+                  onClick: () => router.push(routeInfos(conversation.roomId)),
                 }))}
               />
             )}

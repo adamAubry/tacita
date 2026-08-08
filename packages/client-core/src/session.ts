@@ -1,4 +1,10 @@
-import { createClient, IndexedDBStore, type MatrixClient, type MatrixEvent } from "matrix-js-sdk";
+import {
+  createClient,
+  HttpApiEvent,
+  IndexedDBStore,
+  type MatrixClient,
+  type MatrixEvent,
+} from "matrix-js-sdk";
 // La racine du SDK n'exporte pas les classes de `crypto-api` (seulement des types) et
 // ce mode est une *valeur*, pas un type : le sous-chemin est le seul accès. Module
 // léger, aucun wasm tiré avec lui.
@@ -269,6 +275,27 @@ async function buildSession(
   // REQ-COR-05 — ouvre la boucle /sync, du long-polling HTTP.
   await client.startClient({ initialSyncLimit: 20 });
 
+  /*
+   * REQ-UI-17 — **forcer l'écriture du store quand la page s'en va.**
+   *
+   * `IndexedDBStore` du SDK n'écrit son accumulateur de sync qu'une fois toutes les cinq
+   * minutes (`WRITE_DELAY_MS`). Tout ce qui est arrivé depuis la dernière écriture n'est
+   * nulle part sur disque : mesuré au navigateur le 08/08/2026, une conversation rouverte
+   * hors ligne après rechargement était vide, alors que les messages venaient d'être lus
+   * à l'écran. Une session de moins de cinq minutes ne laissait aucune trace.
+   *
+   * Les deux événements, et pas seulement `pagehide` : sur mobile, une application mise
+   * en arrière-plan puis tuée par le système ne voit jamais `pagehide`.
+   */
+  const persister = () => {
+    void client.store.save(true).catch(() => log.warn("écriture du store SDK échouée"));
+  };
+  const surVisibilite = () => {
+    if (globalThis.document?.visibilityState === "hidden") persister();
+  };
+  globalThis.addEventListener?.("pagehide", persister);
+  globalThis.document?.addEventListener("visibilitychange", surVisibilite);
+
   const wipes = new Map<string, () => Promise<void> | void>();
 
   return {
@@ -358,6 +385,11 @@ async function buildSession(
     // enregistré. L'effacement local ne dépend d'aucune réussite réseau, et l'échec
     // d'un store n'empêche pas les autres d'être effacés.
     async logout() {
+      // Les écouteurs de persistance meurent avec la session : sans cela, une session
+      // suivante dans la même page ferait écrire un store déjà effacé.
+      globalThis.removeEventListener?.("pagehide", persister);
+      globalThis.document?.removeEventListener("visibilitychange", surVisibilite);
+
       // REQ-COR-11 — les credentials partent en premier : si tout le reste échoue,
       // mieux vaut une session locale morte qu'un jeton qui survit à la déconnexion.
       try {
@@ -428,7 +460,38 @@ export async function restoreSession(
   if (!credentials) return null;
 
   try {
-    return await buildSession(credentials, config, saved);
+    const session = await buildSession(credentials, config, saved);
+
+    /*
+     * REQ-UIX-06 — **valider le jeton avant de rendre la session.**
+     *
+     * Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée,
+     * et l'application se rouvrait entièrement — liste des conversations comprise. Les
+     * credentials locaux suffisaient à démarrer, et plus rien ne demandait au serveur
+     * s'ils valaient encore quelque chose. C'était écrit en commentaire ici comme une
+     * limite assumée ; c'en était une trop grande.
+     *
+     * `whoami` est la question exacte, et sa réponse distingue les deux cas qui comptent :
+     * un `M_UNKNOWN_TOKEN` est un refus, tout le reste est un serveur qu'on n'atteint pas.
+     * Traiter le second comme le premier jetterait dehors quelqu'un qui a seulement perdu
+     * le réseau — ce que REQ-UI-17 promet précisément de ne pas faire.
+     */
+    try {
+      await session.client.whoami();
+    } catch (error) {
+      // `errcode` **et** `httpStatus` : selon le chemin d'erreur, le SDK expose l'un ou
+      // l'autre, et un jeton refusé sous une forme qu'on ne reconnaît pas est un jeton
+      // qu'on garde — exactement le défaut qu'on est en train de fermer.
+      const { errcode, httpStatus } = error as { errcode?: string; httpStatus?: number };
+      if (errcode === "M_UNKNOWN_TOKEN" || httpStatus === 401) {
+        createLogger().warn("jeton refusé au démarrage, retour à l'OIDC");
+        await saved.clear().catch(() => {});
+        return null;
+      }
+      // Réseau absent : la session locale reste valable, c'est tout l'intérêt du hors-ligne.
+    }
+
+    return session;
   } catch (error) {
     // Restauration impossible : store crypto corrompu, wasm qui n'a pas chargé,
     // IndexedDB à moitié évincée. On rend `null` sans effacer — un échec de
@@ -445,4 +508,31 @@ export async function restoreSession(
     });
     return null;
   }
+}
+
+/**
+ * REQ-UIX-06 / REQ-COR-11 — **un jeton révoqué doit sortir de la session, pas la hanter.**
+ *
+ * Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée —
+ * l'application se rouvrait normalement et continuait de rendre une session morte. Rien
+ * ne levait : `restoreSession` relit des credentials locaux qu'aucun appel n'a encore
+ * démentis, et le refus du serveur arrive plus tard, dans la boucle /sync.
+ *
+ * `HttpApiEvent.SessionLoggedOut` est **le** signal du SDK pour ça, et il ne se déclenche
+ * que sur un refus explicite du jeton (`M_UNKNOWN_TOKEN`). Un réseau absent ne l'émet
+ * pas : c'est exactement la distinction qui manquait, et sans elle on jetait dehors
+ * quelqu'un qui n'avait perdu que sa connexion.
+ *
+ * Le wipe reste celui de REQ-COR-10 : ce n'est pas à l'appelant de le réinventer.
+ */
+export function onSessionInvalidee(session: Session, rappel: () => void): () => void {
+  const surRefus = (): void => {
+    createLogger().warn("jeton refusé par le serveur, session locale effacée");
+    void session.logout().catch(() => {});
+    rappel();
+  };
+  session.client.on(HttpApiEvent.SessionLoggedOut, surRefus);
+  return () => {
+    session.client.off(HttpApiEvent.SessionLoggedOut, surRefus);
+  };
 }

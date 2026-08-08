@@ -11,6 +11,7 @@ import { LayoutHeader } from "../foundation/LayoutHeader";
 import { Placeholder } from "../foundation/Placeholder";
 import { Button, Text } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
+import { routeConversation } from "../../lib/routes";
 
 /**
  * Les états de la réception. `attente` est un état **terminal et honnête** : on a frappé,
@@ -70,7 +71,7 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
           // REQ-INV-13 — idempotent : `inviter` rend le DM existant s'il y en a un, sinon
           // le crée. Rien à distinguer ici, le paquet s'en charge (REQ-MSG-15).
           const roomId = await contactsDeLaSession(session).inviter(resolu.issuer);
-          if (!annule) router.replace(`/c/${encodeURIComponent(roomId)}`);
+          if (!annule) router.replace(routeConversation(roomId));
           return;
         }
 
@@ -85,7 +86,7 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
         // on rouvre un lien qu'on a déjà utilisé.
         const salon = session.client.getRoom(resolu.roomId);
         if (salon?.getMyMembership() === "join") {
-          if (!annule) router.replace(`/c/${encodeURIComponent(resolu.roomId)}`);
+          if (!annule) router.replace(routeConversation(resolu.roomId));
           return;
         }
 

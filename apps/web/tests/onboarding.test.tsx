@@ -9,9 +9,10 @@ import { LogoutButton } from "../components/onboarding/LogoutButton";
 import { RecoveryGate } from "../components/onboarding/RecoveryGate";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { retirerJetonDeLUrl, urlConnexion } from "../lib/session";
-import { ecrireRefusEducationIOS } from "../lib/preferences";
+import { ecrireRecuperationFaite, ecrireRefusEducationIOS } from "../lib/preferences";
 
 const HOMESERVER = "https://chat.tacita.test";
+const MOI = "@moi:tacita.test";
 
 const initSession = vi.fn<() => Promise<Session>>();
 const restoreSession = vi.fn<() => Promise<Session | null>>();
@@ -34,8 +35,10 @@ function fausseSession(options: { recuperationRequise?: boolean } = {}) {
   const logout = vi.fn(async () => {});
   const session = asSession({
     // `client` est un faux assumé : exiger un vrai `MatrixClient` demanderait 357
-    // propriétés, et le shard n'y touche pas — il passe par les membres de `Session`.
-    client: {},
+    // propriétés. `getUserId` en fait partie depuis le 08/08/2026 — la trace locale de
+    // récupération est **par compte** (voir `lireRecuperationFaite`), sans quoi la porte
+    // sauterait pour le compte suivant qui ouvrirait une session dans ce navigateur.
+    client: { getUserId: () => MOI, on: vi.fn(), off: vi.fn() },
     recoveryRequired: vi.fn(async () => options.recuperationRequise ?? false),
     setupRecoveryKey,
     logout,
@@ -239,5 +242,36 @@ describe("REQ-UI-18 — éducation iOS, au bon moment et une seule fois", () => 
     const { container } = render(<IosPushEducation declenche indexedDB={indexedDB} />);
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(container.textContent).toBe("");
+  });
+});
+
+describe("REQ-UI-04 / REQ-UI-17 — la porte ne se referme pas sur un appareil déjà configuré", () => {
+  it("hors ligne, `recoveryRequired()` rend vrai à tort : la trace locale l'emporte", async () => {
+    // Mesuré au navigateur le 08/08/2026 : sans réseau, le SDK n'a aucune version de
+    // sauvegarde active et `recoveryRequired()` rend `true` pour un compte qui a
+    // pourtant sa clé. La porte remplaçant toute l'app, l'historique promis consultable
+    // par REQ-UI-17 disparaissait avec elle, à chaque rechargement.
+    const indexedDB = new IDBFactory();
+    await ecrireRecuperationFaite(indexedDB, MOI);
+    vi.stubGlobal("indexedDB", indexedDB);
+
+    const { session } = fausseSession({ recuperationRequise: true });
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
+    expect(screen.queryByText("Créer ma clé")).toBeNull();
+  });
+
+  it("la trace est par compte : elle ne fait pas sauter la porte au compte suivant", async () => {
+    // Le store de préférences n'est pas inscrit au registre de wipe (REQ-COR-10 n'y
+    // efface que les notes) : un booléen nu aurait ouvert la porte à quelqu'un d'autre.
+    const indexedDB = new IDBFactory();
+    await ecrireRecuperationFaite(indexedDB, "@quelquun-dautre:tacita.test");
+    vi.stubGlobal("indexedDB", indexedDB);
+
+    const { session } = fausseSession({ recuperationRequise: true });
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Votre clé de récupération")).toBeTruthy());
   });
 });

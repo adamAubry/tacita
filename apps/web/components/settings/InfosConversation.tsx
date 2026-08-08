@@ -37,6 +37,7 @@ import { MembresGroupe } from "./MembresGroupe";
 import { NotificationsSalon, libelleNiveau } from "./NotificationsSalon";
 import { OptionsConversation, type OptionConversation } from "./OptionsConversation";
 import { ThemeConversation } from "./ThemeConversation";
+import { routeConversation } from "../../lib/routes";
 
 /** Ce qui peut être ouvert par-dessus l'écran : une option, ou le panneau « muter ». */
 type Panneau = OptionConversation | "notifications" | "ajouter";
@@ -193,7 +194,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
         onGroupe={(nomGroupe, membres) => {
           if (session) {
             void createGroupChat(session, nomGroupe, membres).then(({ room_id }) =>
-              router.push(`/c/${room_id}`),
+              router.push(routeConversation(room_id)),
             );
           }
         }}

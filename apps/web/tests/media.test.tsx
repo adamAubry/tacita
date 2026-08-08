@@ -247,6 +247,15 @@ describe("REQ-UIX-16 — viewer plein écran : navigation, sauvegarde, fermeture
     return actions;
   };
 
+  it("`Escape` ferme, comme toute modale — le geste n'est pas le seul chemin", () => {
+    // Une modale plein écran qu'aucune touche ne referme est un piège au clavier.
+    // Mesuré au navigateur le 08/08/2026 : le viewer ne se fermait qu'au glissement
+    // vers le bas et au bouton — `Escape` ne faisait rien.
+    const { onFermer } = rendre();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onFermer).toHaveBeenCalled();
+  });
+
   it("navigue entre les médias du salon", async () => {
     rendre();
     expect(screen.getByText("1 / 2")).toBeTruthy();

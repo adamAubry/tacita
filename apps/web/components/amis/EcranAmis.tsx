@@ -10,6 +10,7 @@ import { Placeholder } from "../foundation/Placeholder";
 import { useSession } from "../onboarding/SessionProvider";
 import { AjouterAmis } from "./AjouterAmis";
 import { Demandes } from "./Demandes";
+import { routeConversation } from "../../lib/routes";
 
 /** Le câblage des layouts Add-friends et Friend request. */
 export function EcranAmis({ variation }: { variation: "ajouter" | "demandes" }) {
@@ -55,7 +56,7 @@ export function EcranAmis({ variation }: { variation: "ajouter" | "demandes" }) 
       demandes={demandes}
       onAccepter={contacts.accepter}
       onRefuser={contacts.refuser}
-      onOuvrir={(roomId) => router.push(`/c/${encodeURIComponent(roomId)}`)}
+      onOuvrir={(roomId) => router.push(routeConversation(roomId))}
     />
   );
 }

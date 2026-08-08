@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { Banner } from "./primitives";
 
 export type EtatConnexion = "en-ligne" | "hors-ligne" | "synchronisation";
@@ -29,4 +31,33 @@ export function ConnectionBanner({ etat }: { etat: EtatConnexion }) {
   ) : (
     <Banner status="info" title="Synchronisation…" description="Récupération des messages reçus." />
   );
+}
+
+/**
+ * Le bandeau **branché**. Mesuré au navigateur le 08/08/2026 : `ConnectionBanner` était
+ * écrit, testé unitairement, et rendu par personne — couper le réseau n'affichait rien.
+ * Un composant qu'aucun écran ne monte ne tient aucune promesse.
+ *
+ * La source est `navigator.onLine` et ses deux événements : c'est un fait du navigateur,
+ * pas de la logique métier (SPEC 11), et il n'y a rien à réécrire pour l'obtenir.
+ *
+ * ponytail: `onLine` sait dire « aucun réseau », pas « serveur injoignable » — l'état
+ * « synchronisation » reste donc sans source. Le brancher sur l'état de /sync quand la
+ * Session l'exposera.
+ */
+export function ConnectionBannerLive() {
+  const [horsLigne, setHorsLigne] = useState(false);
+
+  useEffect(() => {
+    const relire = () => setHorsLigne(navigator.onLine === false);
+    relire();
+    addEventListener("online", relire);
+    addEventListener("offline", relire);
+    return () => {
+      removeEventListener("online", relire);
+      removeEventListener("offline", relire);
+    };
+  }, []);
+
+  return <ConnectionBanner etat={horsLigne ? "hors-ligne" : "en-ligne"} />;
 }

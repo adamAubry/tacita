@@ -53,6 +53,20 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
     };
   }, [media, telecharger]);
 
+  /*
+   * `Escape` ferme, comme toute boîte de dialogue modale. Le viewer ne se fermait qu'au
+   * glissement vers le bas et au bouton « Fermer » : sur un clavier, une modale plein
+   * écran qu'aucune touche ne referme est un piège, et c'est la base de l'accessibilité,
+   * pas un raffinement. Mesuré au navigateur le 08/08/2026 — `Escape` ne faisait rien.
+   */
+  useEffect(() => {
+    const surTouche = (evenement: KeyboardEvent) => {
+      if (evenement.key === "Escape") onFermer();
+    };
+    globalThis.addEventListener("keydown", surTouche);
+    return () => globalThis.removeEventListener("keydown", surTouche);
+  }, [onFermer]);
+
   // Fermeture par glissement **vers le bas** : le hook raisonne en horizontal, celui-ci
   // est vertical et local — deux axes, deux gestes, aucun partage à forcer.
   const [departY, setDepartY] = useState<number | null>(null);

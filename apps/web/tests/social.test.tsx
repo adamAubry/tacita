@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AjouterAmis } from "../components/amis/AjouterAmis";
 import { Demandes } from "../components/amis/Demandes";
 import { Note } from "../components/profil/Note";
+import { routeConversation } from "../lib/routes";
 import { ProfilAutrui, CONFIRMATIONS } from "../components/profil/ProfilAutrui";
 import { AVERTISSEMENT_PHOTO, ProfilMoi } from "../components/profil/ProfilMoi";
 import { ReceptionLien } from "../components/amis/ReceptionLien";
@@ -556,7 +557,7 @@ describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membr
     render(<ReceptionLien token={TOKEN} liens={liens} session={session("join")} />);
 
     // REQ-INV-13, succès idempotent : rouvrir un lien déjà utilisé n'est pas une erreur.
-    await waitFor(() => expect(remplacer).toHaveBeenCalledWith(`/c/${encodeURIComponent(GROUPE)}`));
+    await waitFor(() => expect(remplacer).toHaveBeenCalledWith(routeConversation(GROUPE)));
     expect(frapper).not.toHaveBeenCalled();
   });
 

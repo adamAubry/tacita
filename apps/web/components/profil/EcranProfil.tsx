@@ -12,7 +12,7 @@ import { downloadAttachment, uploadPublicProfileImage } from "@tacita/media-pipe
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { routeAppel } from "../../lib/appels";
+import { routeAppel, routeConversation } from "../../lib/routes";
 import { contactsDeLaSession } from "../../lib/contacts";
 import { environnementMedia } from "../../lib/media-env";
 import { enregistrerWipeNotes } from "../../lib/notes";
@@ -105,7 +105,7 @@ export function EcranProfil({ userId }: { userId?: string }) {
       bloque={contacts.bloque(cible)}
       indexedDB={globalThis.indexedDB}
       onMessage={() => {
-        void contacts.inviter(cible).then((roomId) => router.push(`/c/${encodeURIComponent(roomId)}`));
+        void contacts.inviter(cible).then((roomId) => router.push(routeConversation(roomId)));
       }}
       onAppel={() => {
         // REQ-UIX-39 — **le même chemin que le header 1:1**, littéralement le même

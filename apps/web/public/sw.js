@@ -14,8 +14,16 @@
  */
 const VERSION = "tacita-coquille-v1";
 
-/** La coquille : des routes vides et le manifeste. Zéro donnée utilisateur. */
-const COQUILLE = ["/", "/recherche", "/mentions", "/profil", "/manifest.webmanifest"];
+/**
+ * La coquille : des routes vides et le manifeste. Zéro donnée utilisateur.
+ *
+ * `/c` et `/c/infos` en font partie depuis le 08/08/2026 : ce sont les écrans de
+ * conversation, et le salon y voyage en `?room=` (voir `lib/routes.ts`). Tant qu'il était
+ * un segment de chemin, il n'y avait rien à précacher — un salon par URL, et hors ligne
+ * aucune conversation ne s'ouvrait. Ces coquilles sont vides : l'identifiant du salon est
+ * dans l'URL demandée, jamais dans ce qui est mis en cache.
+ */
+const COQUILLE = ["/", "/c", "/c/infos", "/recherche", "/mentions", "/profil", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(COQUILLE)));
@@ -60,7 +68,17 @@ self.addEventListener("fetch", (event) => {
   // REQ-UI-17 — hors ligne, une navigation retombe sur la coquille précachée : l'app
   // s'ouvre et lit son historique local au lieu d'afficher le dinosaure du navigateur.
   if (requete.mode === "navigate") {
-    event.respondWith(fetch(requete).catch(() => caches.match("/").then((r) => r ?? Response.error())));
+    // `ignoreSearch` : `/c?room=!salon` doit retrouver la coquille précachée `/c`. Sans
+    // lui, toute navigation portant un paramètre retombait sur `/` — l'accueil s'affichait
+    // à l'URL d'une conversation, ce qui est la pire des deux réponses possibles.
+    event.respondWith(
+      fetch(requete).catch(() =>
+        caches
+          .match(requete, { ignoreSearch: true })
+          .then((r) => r ?? caches.match("/"))
+          .then((r) => r ?? Response.error()),
+      ),
+    );
   }
 });
 
@@ -135,7 +153,10 @@ self.addEventListener("notificationclick", (event) => {
   const roomId = event.notification.data && event.notification.data.roomId;
   if (!roomId) return;
 
-  const cible = `/c/${encodeURIComponent(roomId)}`;
+  // Même gabarit que `lib/routes.ts`, recopié parce qu'un service worker n'importe pas
+  // le bundle de l'app. Le test de REQ-UI-18 compare les deux : c'est lui qui tient la
+  // paire, pas la vigilance.
+  const cible = `/c?room=${encodeURIComponent(roomId)}`;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
       const fenetre = fenetres[0];

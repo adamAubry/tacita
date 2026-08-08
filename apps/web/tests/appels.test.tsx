@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BandeauAppel } from "../components/appels/BandeauAppel";
 import { EcranAppel, DELAI_CHARGEMENT_MS } from "../components/appels/EcranAppel";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
-import { routeAppel } from "../lib/appels";
+import { routeAppel } from "../lib/routes";
 import { sansCommentaires, sourcesLivrees } from "./sources";
 
 const SALON = "!salon:tacita.test";
@@ -84,7 +84,13 @@ beforeEach(() => {
   decouvrir.mockResolvedValue({ type: "livekit", livekit_service_url: "https://sfu.test" });
   restoreSession.mockResolvedValue(
     asSession({
-      client: { getUserId: () => "@luca:t", getDeviceId: () => "D1", baseUrl: "https://chat.tacita.test" },
+      client: {
+        getUserId: () => "@luca:t",
+        getDeviceId: () => "D1",
+        baseUrl: "https://chat.tacita.test",
+        on: vi.fn(),
+        off: vi.fn(),
+      },
       recoveryRequired: async () => false,
     } as never),
   );
@@ -223,18 +229,18 @@ describe("REQ-UIX-39 — l'appel des Friends interaction buttons prend le même 
     // gabarits d'URL recopiés divergent au premier changement de route, et personne ne
     // le voit — les trois écrans continuent d'ouvrir *une* page d'appel, deux la bonne.
     const recopies = sourcesLivrees()
-      .filter(({ chemin }) => !chemin.endsWith("/lib/appels.ts"))
-      // Un gabarit de route d'appel : `/c/…appel`. Les imports de `lib/appels` n'en
-      // sont pas — ils n'ont pas de `/c/` devant.
-      .filter(({ code }) => /\/c\/[^"'`\n]*appel/.test(sansCommentaires(code)))
+      .filter(({ chemin }) => !chemin.endsWith("/lib/routes.ts"))
+      // Un gabarit de route d'appel : `/c/appel`. Les imports de `lib/routes` n'en
+      // sont pas — ils ne portent pas le chemin en dur.
+      .filter(({ code }) => /["'`]\/c\/appel/.test(sansCommentaires(code)))
       .map(({ chemin }) => chemin);
 
     expect(recopies).toEqual([]);
   });
 
   it("le point d'entrée audio ne demande pas la vidéo, le point d'entrée vidéo si", () => {
-    expect(routeAppel(SALON)).toBe(`/c/${encodeURIComponent(SALON)}/appel`);
-    expect(routeAppel(SALON, true)).toBe(`/c/${encodeURIComponent(SALON)}/appel?video=1`);
+    expect(routeAppel(SALON)).toBe(`/c/appel?room=${encodeURIComponent(SALON)}`);
+    expect(routeAppel(SALON, true)).toBe(`/c/appel?room=${encodeURIComponent(SALON)}&video=1`);
     // Un `!salon:serveur` non encodé couperait la route sur son `/`.
     expect(routeAppel(SALON)).not.toContain("!salon:tacita.test");
   });

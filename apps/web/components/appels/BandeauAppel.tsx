@@ -4,7 +4,7 @@ import { activeCall } from "@tacita/calls";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { routeAppel } from "../../lib/appels";
+import { routeAppel } from "../../lib/routes";
 import { Banner, Button } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
 

@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { OutboxProvider } from "../components/conversation/OutboxProvider";
+import { ConnectionBannerLive } from "../components/foundation/ConnectionBanner";
 import { Theme, type ThemeMode } from "../components/foundation/primitives";
 import { tacitaTheme } from "../components/foundation/theme";
 import { PushNotifications } from "../components/notifications/PushNotifications";
@@ -81,8 +83,16 @@ export function Providers({ children }: { children: ReactNode }) {
         >
           {/* REQ-UI-04 — la porte est **dans** le thème et **autour** de tout le contenu :
             aucune route ne rend quoi que ce soit tant que la clé n'est pas confirmée. */}
+          {/* REQ-UI-17 / REQ-UIX-04 — au-dessus de tout, porte de récupération comprise :
+            perdre le réseau pendant l'onboarding mérite la même explication qu'ailleurs. */}
+          <ConnectionBannerLive />
           <SessionProvider homeserverUrl={HOMESERVER}>
-            <RecoveryGate>{children}</RecoveryGate>
+            {/* REQ-OBX-01 — la file d'envoi est **au-dessus** de la porte et des écrans :
+              ce qui a été écrit doit partir à la reconnexion quel que soit l'écran ouvert,
+              y compris quand aucune conversation n'est affichée. */}
+            <OutboxProvider>
+              <RecoveryGate>{children}</RecoveryGate>
+            </OutboxProvider>
             {/* REQ-UI-18 — la chaîne push est **hors** de la porte de récupération : elle
               ne rend rien tant qu'un message n'est pas arrivé, et elle doit pouvoir
               répondre au service worker quel que soit l'écran affiché. */}

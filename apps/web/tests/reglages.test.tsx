@@ -120,6 +120,9 @@ const session = () =>
       getUserId: () => "@luca:t",
       getUser: () => ({ displayName: "luca" }),
       getAccessToken: () => "jeton",
+      // REQ-UIX-06 — le provider écoute le refus de jeton du SDK depuis le 08/08/2026.
+      on: vi.fn(),
+      off: vi.fn(),
     },
     recoveryRequired: async () => false,
   } as never);

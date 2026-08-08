@@ -12,6 +12,7 @@ import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { PUSH_CONFIG_URL, PUSH_NOTIFY_URL } from "../lib/config";
 import { apercuLocal, TYPE_APERCU } from "../lib/push";
 import { lire } from "./sources";
+import { routeConversation } from "../lib/routes";
 
 const SALON = "!salon:tacita.test";
 const EVENEMENT = "$evt:tacita.test";
@@ -68,7 +69,7 @@ const conversation = (unread: number): Conversation => ({
 
 const session = () =>
   asSession({
-    client: { getUserId: () => "@luca:t", getDeviceId: () => "D1" },
+    client: { getUserId: () => "@luca:t", getDeviceId: () => "D1", on: vi.fn(), off: vi.fn() },
     recoveryRequired: async () => false,
   } as never);
 
@@ -306,7 +307,10 @@ describe("REQ-UIX-40 — le service worker n'écrit rien, ne journalise rien, ne
     });
     await attente;
 
-    expect(naviguer).toHaveBeenCalledWith(`/c/${encodeURIComponent(SALON)}`);
+    // Le service worker ne peut pas importer `lib/routes` : ce test est la seule
+    // chose qui garde les deux gabarits alignés. Une notification qui ouvre une
+    // route morte ne se voit nulle part ailleurs.
+    expect(naviguer).toHaveBeenCalledWith(routeConversation(SALON));
   });
 });
 

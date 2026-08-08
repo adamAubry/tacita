@@ -306,6 +306,38 @@ describe("REQ-COR-11 — reprise de session sans réseau", () => {
   });
 });
 
+describe("REQ-UIX-06 — un jeton refusé ne rouvre pas la session", () => {
+  it("un `M_UNKNOWN_TOKEN` à la reprise rend null et efface les credentials", async () => {
+    // Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée,
+    // et l'application se rouvrait entièrement — liste des conversations comprise. Le
+    // refus n'arrivait que plus tard, dans /sync, où le gestionnaire de sauvegarde du
+    // SDK l'avalait sans que rien ne remonte à l'UI.
+    await initSession(config);
+    ({ crypto, client } = resetSdk());
+    client.whoami.mockRejectedValueOnce(
+      Object.assign(new Error("Invalid access token"), { errcode: "M_UNKNOWN_TOKEN", httpStatus: 401 }),
+    );
+
+    expect(await restoreSession(config)).toBeNull();
+
+    // Effacés : garder un jeton que le serveur refuse ne peut que refaire échouer la
+    // tentative suivante (REQ-COR-11).
+    ({ crypto, client } = resetSdk());
+    expect(await restoreSession(config)).toBeNull();
+  });
+
+  it("un serveur injoignable ne compte pas pour un refus", async () => {
+    // La distinction est tout l'enjeu : traiter une panne réseau comme une révocation
+    // jetterait dehors quelqu'un qui a seulement perdu la connexion — soit l'inverse de
+    // ce que REQ-UI-17 promet.
+    await initSession(config);
+    ({ crypto, client } = resetSdk());
+    client.whoami.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    expect(await restoreSession(config)).not.toBeNull();
+  });
+});
+
 describe("REQ-COR-10 — déconnexion = wipe complet des données locales", () => {
   it("efface les stores SDK et chaque store applicatif enregistré", async () => {
     const session = await initSession(config);

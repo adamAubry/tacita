@@ -19,6 +19,7 @@ import { HomeHeader } from "./HomeHeader";
 import { NewConversationSheet } from "./NewConversationSheet";
 import { RequestsBanner } from "./RequestsBanner";
 import { contactsDeLaSession } from "../../lib/contacts";
+import { routeConversation } from "../../lib/routes";
 
 interface Donnees {
   conversations: Conversation[];
@@ -73,7 +74,7 @@ export function Accueil() {
     [session],
   );
 
-  const ouvrir = useCallback((roomId: string) => router.push(`/c/${roomId}`), [router]);
+  const ouvrir = useCallback((roomId: string) => router.push(routeConversation(roomId)), [router]);
 
   return (
     <>
