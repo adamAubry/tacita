@@ -15,7 +15,13 @@ describe("REQ-INF-10 — reverse proxy TLS avec routes /_matrix, /livekit/jwt, /
   });
 
   it("route /_matrix vers Synapse", () => {
-    expect(nginxConf).toMatch(/location\s+\/_matrix\s*{[^}]*proxy_pass\s+http:\/\/synapse:8008/s);
+    // `set $synapse_upstream` puis `proxy_pass http://$synapse_upstream` : la variable
+    // n'est pas cosmétique. Sans elle nginx résout `synapse` une fois au démarrage et
+    // garde l'IP ; Synapse recréé ensuite, toute l'API répond 502 jusqu'au redémarrage
+    // du proxy. Mesuré le 08/08/2026 : conteneur déplacé de .3 à .9, proxy intact, 200.
+    expect(nginxConf).toMatch(
+      /location\s+\/_matrix\s*{[^}]*set\s+\$synapse_upstream\s+synapse:8008;[^}]*proxy_pass\s+http:\/\/\$synapse_upstream/s,
+    );
   });
 
   it("route /livekit/jwt vers le service d'autorisation", () => {
@@ -38,7 +44,7 @@ describe("REQ-INF-09 — le callback OIDC est réellement joignable", () => {
     expect(pathname).toBe("/_synapse/client/oidc/callback");
     // Pas de `location /` de repli dans nginx : un préfixe non déclaré = 404.
     expect(nginxConf).toMatch(
-      /location\s+\/_synapse\/client\/\s*{[^}]*proxy_pass\s+http:\/\/synapse:8008/s,
+      /location\s+\/_synapse\/client\/\s*{[^}]*set\s+\$synapse_upstream\s+synapse:8008;[^}]*proxy_pass\s+http:\/\/\$synapse_upstream/s,
     );
   });
 
