@@ -119,7 +119,11 @@ export function ConversationPreview({
         </div>
       </ClickableCard>
 
-      <Sheet ouvert={menuOuvert} onFermer={() => setMenuOuvert(false)}>
+      <Sheet
+        ouvert={menuOuvert}
+        onFermer={() => setMenuOuvert(false)}
+        nom={`Actions sur la conversation ${conversation.name}`}
+      >
         <ButtonsList
           boutons={[
             {

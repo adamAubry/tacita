@@ -118,6 +118,25 @@ export const ecrireRefusEducationIOS = (indexedDB: IDBFactory) =>
   ecrirePreference(indexedDB, "education-ios-refusee", true);
 
 /**
+ * REQ-UI-04 / REQ-UI-17 — la clé de récupération a déjà été configurée **sur cet
+ * appareil, pour ce compte**. Mesuré au navigateur le 08/08/2026 : hors ligne,
+ * `recoveryRequired()` rend `true` pour un compte qui a pourtant sa clé — sa source est
+ * la version de sauvegarde active, que le SDK n'a pas tant qu'il n'a pas pu la relire au
+ * serveur. Sans cette trace locale, chaque rechargement sans réseau réaffichait « Créer
+ * ma clé » par-dessus toute l'application, historique compris.
+ *
+ * **L'identifiant de compte fait partie de la valeur, et ce n'est pas un détail** : ce
+ * store n'est pas inscrit au registre de wipe (REQ-COR-10 n'efface ici que les notes).
+ * Un booléen nu ferait sauter la porte au compte *suivant* qui ouvrirait une session
+ * dans ce navigateur.
+ */
+export const lireRecuperationFaite = async (indexedDB: IDBFactory, userId: string) =>
+  (await lirePreference(indexedDB, "recuperation-faite")) === userId;
+
+export const ecrireRecuperationFaite = (indexedDB: IDBFactory, userId: string) =>
+  ecrirePreference(indexedDB, "recuperation-faite", userId);
+
+/**
  * REQ-UI-13 / REQ-RCP-07 — le mode masqué. **Un réglage d'appareil**, pas de compte :
  * le rendre synchronisé le poserait en account data, que le serveur lit en clair.
  *

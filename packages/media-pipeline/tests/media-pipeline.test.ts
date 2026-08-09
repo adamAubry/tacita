@@ -11,8 +11,10 @@ import {
   downloadAttachment,
   encryptAttachment,
   MediaIntegrityError,
+  PROFILES,
   saveOriginal,
   uploadAttachment,
+  uploadPublicProfileImage,
   waveform,
   type AttachmentContent,
   type EncryptedFile,
@@ -411,5 +413,68 @@ describe("REQ-MED-02 — contenu prêt pour la file d'envoi", () => {
    */
   it("aucun chemin d'envoi dans le package : le pipeline ne poste jamais d'événement", () => {
     expect(packageCode()).not.toMatch(/\bsend(Event|Message)\b/);
+  });
+});
+
+describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel unique", () => {
+  const photo = () => new File([bytes("\xFF\xD8\xFF")], "moi.jpg", { type: "image/jpeg" });
+
+  it("téléverse la photo de profil en clair : un avatar chiffré n'est un avatar nulle part", async () => {
+    const uri = await uploadPublicProfileImage(session, env, photo());
+
+    expect(uri).toBe(MXC);
+    const [blob, options] = fake.client.uploadContent.mock.calls[0] as [Blob, { type: string }];
+    // Le contraste avec REQ-MED-02 est tout le sujet : là, `application/octet-stream`,
+    // parce que le serveur ne voit qu'un blob opaque. Ici il doit pouvoir le servir à
+    // des clients qui n'ont aucune clé.
+    expect(options.type).not.toBe("application/octet-stream");
+    expect(options).toMatchObject({ includeFilename: false });
+
+    // Et surtout : ce qui part est **lisible**. La vérification porte sur les octets,
+    // pas sur l'intention — c'est le raster que `resizeImage` a rendu, tel quel.
+    const cible = PROFILES[detectProfile(env.connection)].image;
+    await expect(blob.text()).resolves.toBe(`image ${cible.maxEdge}@${cible.quality}`);
+  });
+
+  it("passe par la même compression que le reste : un seul pipeline (interdit n°11)", async () => {
+    await uploadPublicProfileImage(session, env, photo());
+
+    // Même `resizeImage`, mêmes cibles D-04. Une photo de profil de 8 Mo est un problème
+    // pour tout le monde, chiffrée ou non.
+    expect(env.resizeImage).toHaveBeenCalledTimes(1);
+    expect(env.resizeImage).toHaveBeenCalledWith(expect.anything(), PROFILES[detectProfile(env.connection)].image);
+  });
+
+  it("n'a qu'un seul site d'appel dans tout le dépôt", () => {
+    // La condition qui rend REQ-MED-11 acceptable. « Tout ce qui sort du pipeline est
+    // chiffré, sauf l'unique chemin nommé public » ne vaut que tant qu'« unique » est
+    // vérifié par une machine — une consigne de revue se contourne par distraction.
+    const racine = new URL("../../../", import.meta.url).pathname;
+    const ignores = new Set(["node_modules", ".next", ".git", "dist", "tsconfig.tsbuildinfo"]);
+    const appelants: string[] = [];
+
+    const parcourir = (dossier: string) => {
+      for (const entree of readdirSync(dossier, { withFileTypes: true })) {
+        if (ignores.has(entree.name)) continue;
+        const chemin = `${dossier}/${entree.name}`;
+        if (entree.isDirectory()) parcourir(chemin);
+        else if (/\.tsx?$/.test(entree.name)) {
+          const code = readFileSync(chemin, "utf-8")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/^[ \t]*\/\/.*$/gm, "");
+          // L'appel, pas la mention : `uploadPublicProfileImage(` suivi d'une parenthèse.
+          if (/uploadPublicProfileImage\s*\(/.test(code)) appelants.push(chemin.replace(racine, ""));
+        }
+      }
+    };
+    parcourir(racine.replace(/\/$/, ""));
+
+    // Le câblage du profil (M-G) et lui seul. Pas `ProfilMoi.tsx` : le composant reçoit
+    // `onPhoto` injecté, il ne connaît ni `Session` ni le pipeline. C'est ce découplage
+    // qui fait qu'il n'existe qu'un endroit à surveiller.
+    const produit = appelants.filter(
+      (chemin) => !chemin.includes("/tests/") && !chemin.endsWith("packages/media-pipeline/src/index.ts"),
+    );
+    expect(produit).toEqual(["apps/web/components/profil/EcranProfil.tsx"]);
   });
 });

@@ -18,6 +18,7 @@
 - **REQ-MED-08** — Téléchargement : récupération du blob, vérification du hash SHA-256, déchiffrement local. Hash invalide → média rejeté avec erreur explicite.
 - **REQ-MED-09** — Compatibilité authenticated media : le module consomme les URLs média selon le comportement consigné par l'infra (spec 01, REQ-INF-12) ; aucune URL média publique n'est supposée.
 - **REQ-MED-10** — Aucun contenu média en clair (ni ses clés) dans les logs ou traces d'erreur du module.
+- **REQ-MED-11** — **L'unique chemin public du pipeline** : `uploadPublicProfileImage()` téléverse une photo de profil **non chiffrée**, un avatar Matrix devant être un `mxc://` nu que tout client puisse afficher. Même paquet, même compression, même point d'entrée que le reste — l'interdit n°11 (un seul pipeline) tient. Trois conditions, toutes vérifiables : le nom de la fonction dit `Public` ; **un seul site d'appel** dans tout le dépôt (le formulaire de profil de M-G), gardé par un test structurel qui balaie les sources et échoue si un second apparaît ; et l'UI dit au moment du choix que la photo n'est pas chiffrée. La promesse du module devient « tout ce qui sort du pipeline est chiffré, **sauf l'unique chemin nommé public** » — la précision n'a de valeur que parce que le test empêche la dérive. *(Ajoutée le 07/08/2026 — escalade E-12, voie A. Chiffrer un avatar en fait un carré cassé chez tous les clients : c'est une non-feature, pas une garantie.)*
 
 ## Méthode et contraintes
 
@@ -29,4 +30,4 @@
 
 ## Objectif mesurable
 
-Suite Vitest, une describe par REQ : REQ-MED-01/08 (round-trip chiffrer → déchiffrer = octets identiques ; blob altéré → rejet par hash) ; REQ-MED-02 (un PDF et une image empruntent le même chemin de code d'upload — spy sur la fonction unique) ; REQ-MED-04 (profil réseau contraint injecté → dimensions/bitrate cibles D-04 dans les paramètres de compression) ; REQ-MED-06/07 (sortie déclarée `audio/ogg`, entrée AAC simulée → passage par le transcodeur). APIs navigateur mockées via l'injection prévue.
+Suite Vitest, une describe par REQ : REQ-MED-01/08 (round-trip chiffrer → déchiffrer = octets identiques ; blob altéré → rejet par hash) ; REQ-MED-02 (un PDF et une image empruntent le même chemin de code d'upload — spy sur la fonction unique) ; REQ-MED-04 (profil réseau contraint injecté → dimensions/bitrate cibles D-04 dans les paramètres de compression) ; REQ-MED-06/07 (sortie déclarée `audio/ogg`, entrée AAC simulée → passage par le transcodeur) ; REQ-MED-11 (la photo de profil sort **non chiffrée** et compressée par le même chemin — assertion sur le blob téléversé ; test structurel : un seul site d'appel dans tout le dépôt). APIs navigateur mockées via l'injection prévue.

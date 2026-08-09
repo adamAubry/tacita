@@ -1,7 +1,10 @@
 import type { Session } from "@tacita/client-core";
 import { Direction, RoomStateEvent, type MatrixEvent } from "matrix-js-sdk";
+import { ClientWidgetApi, Widget } from "matrix-widget-api";
 
+import { CallWidgetDriver } from "./driver";
 import {
+  CALL_APPLICATION,
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
   isLivekitFocus,
@@ -59,7 +62,31 @@ export interface CallWidgetOptions {
   parentUrl: string;
   /** Identifiant du widget côté client, repris tel quel par le driver. */
   widgetId: string;
+  /**
+   * Point d'entrée : `true` pour « appel vidéo », `false` pour « appel audio »
+   * (REQ-UIX-38). C'est un **paramètre de lancement**, pas un réglage : la bascule
+   * voix↔vidéo pendant l'appel appartient à Element Call (E-07).
+   *
+   * Traduit en `intent`, relu dans `src/UrlParams.ts` de la **v0.23.0** — la version
+   * qu'épingle `infra/rtc/` (REQ-RTC-08). E-14 close : la version précédente de ce
+   * fichier envoyait `video=true|false`, un paramètre qu'Element Call **ne lit nulle
+   * part**. Il ne cassait rien et ne faisait rien.
+   */
+  video?: boolean;
 }
+
+/**
+ * REQ-UIX-38 — les intentions de lancement d'Element Call, relues dans l'enum
+ * `UserIntent` de la v0.23.0. Elles ne se recopient pas de mémoire : `infra/rtc/README.md`
+ * dit où les relire au prochain bump d'image.
+ *
+ * `start_call` et `start_call_voice` posent tous deux `skipLobby: false` : le lobby
+ * reste, et avec lui le rattrapage si l'intention envoyée n'est pas celle qu'on voulait.
+ * Les variantes `_dm` ne sont volontairement pas utilisées — elles activent sonnerie et
+ * attente de décrochage, ce que la spec 10 a écarté en V1 (YAGNI).
+ */
+const INTENT_AUDIO = "start_call_voice";
+const INTENT_VIDEO = "start_call";
 
 /**
  * REQ-CAL-02 — découverte des foci via `.well-known/matrix/client` (servi par le proxy
@@ -111,17 +138,63 @@ export function buildCallWidget(
     widgetId: options.widgetId,
     parentUrl: options.parentUrl,
     // Mode widget : Element Call se pilote par l'API widget, pas par sa propre navigation.
+    // `widgetId` + `parentUrl` sont ce qui le fait basculer en mode widget (`isWidget`
+    // dans `UrlParams.ts`), et c'est cette bascule qui rend `intent` lisible pour lui.
     embed: "true",
     preload: "true",
-    hideHeader: "true",
-    // Le média reste chiffré par participant : le SFU relaie sans déchiffrer.
+    // `header=none` et non `hideHeader` : ce dernier a disparu de `UrlConfiguration` en
+    // v0.23.0 — le commentaire d'amont le dit rétrocompatible, le code ne le lit plus.
+    header: "none",
+    // Le média reste chiffré par participant : le SFU relaie sans déchiffrer. Explicite
+    // et pas hérité du preset d'`intent` : c'est la garantie du produit, elle ne dépend
+    // pas d'une valeur par défaut d'amont. Les params explicites gagnent sur le preset.
     perParticipantE2EE: "true",
+    // REQ-UIX-38 — le point d'entrée choisi, transmis au lancement. Défaut audio :
+    // allumer la caméra de quelqu'un qui n'a rien demandé se répare mal.
+    intent: options.video ? INTENT_VIDEO : INTENT_AUDIO,
   };
 
   return {
     params,
     url: `${options.elementCallUrl.replace(/\/$/, "")}/room#?${new URLSearchParams(params).toString()}`,
   };
+}
+
+/**
+ * REQ-CAL-05 — branche l'API widget sur une iframe **déjà rendue par le shard UI**.
+ *
+ * Le rendu de l'iframe reste hors de ce paquet (spec 10) ; le pont postMessage, lui, y
+ * est : sans lui le widget n'obtient pas son jeton OpenID et l'appel n'est jamais
+ * autorisé par le SFU. Il vit ici et pas dans le shard parce que REQ-UI-02 tient une
+ * liste close de dépendances qui n'inclut pas `matrix-widget-api` — et n'a pas à
+ * l'inclure : c'est du protocole, pas de l'interface.
+ *
+ * `onReady` est appelé quand le widget **nous a parlé**. C'est le seul signal qui dise
+ * qu'Element Call a démarré : le `load` de l'iframe, lui, se déclenche pour n'importe
+ * quel document — y compris une page d'erreur du serveur qui l'héberge. Le shard s'en
+ * sert pour son délai de chargement (REQ-UIX-38).
+ */
+export function attachCallWidget(
+  session: Session,
+  roomId: string,
+  iframe: HTMLIFrameElement,
+  options: CallWidgetOptions,
+  onReady?: () => void,
+): () => void {
+  const { url } = buildCallWidget(session, roomId, options);
+  const widget = new Widget({
+    id: options.widgetId,
+    creatorUserId: session.client.getUserId() ?? "",
+    type: CALL_APPLICATION,
+    url,
+    // Element Call annonce lui-même son chargement (`preload=true` → `content_loaded`).
+    // Attendre en plus le `load` de l'iframe ferait démarrer la session deux fois.
+    waitForIframeLoad: false,
+  });
+
+  const api = new ClientWidgetApi(widget, iframe, new CallWidgetDriver(session, roomId));
+  if (onReady) api.once("ready", onReady);
+  return () => api.stop();
 }
 
 /**

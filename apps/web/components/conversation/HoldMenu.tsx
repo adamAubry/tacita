@@ -91,7 +91,7 @@ export function HoldMenu({
   ];
 
   return (
-    <Sheet ouvert={ouvert} onFermer={fermer}>
+    <Sheet ouvert={ouvert} onFermer={fermer} nom="Actions sur le message">
       <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
         <div
           role="group"

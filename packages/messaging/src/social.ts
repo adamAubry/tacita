@@ -1,5 +1,7 @@
 import type { Session } from "@tacita/client-core";
 
+import { registerDirect } from "./conversations";
+
 /**
  * Le modèle social de D-09, et rien de plus.
  *
@@ -19,7 +21,15 @@ import type { Session } from "@tacita/client-core";
  * Rend l'identifiant du salon rejoint, celui que l'UI ouvre ensuite.
  */
 export async function acceptInvitation(session: Session, roomId: string): Promise<string> {
+  // L'invitant est lu **avant** le join : une fois entré, le salon n'est plus une
+  // invitation et `getDMInviter()` ne rend plus rien.
+  const invitant = session.client.getRoom(roomId)?.getDMInviter();
   await session.client.joinRoom(roomId);
+
+  // REQ-MSG-15 — côté invité aussi, `m.direct` est à écrire : le drapeau `is_direct` de
+  // l'invitation ne devient jamais de l'account data tout seul. Sans cela, accepter une
+  // demande d'ami donne une conversation qui n'est un DM pour aucun des deux.
+  if (invitant) await registerDirect(session, invitant, roomId);
   return roomId;
 }
 
@@ -129,9 +139,34 @@ export async function searchUsers(
   terme: string,
   limite = 20,
 ): Promise<Profile[]> {
-  if (terme.trim().length === 0) return [];
+  const recherche = terme.trim();
+  if (recherche.length === 0) return [];
 
-  const reponse = await session.client.searchUserDirectory({ term: terme, limit: limite });
+  /**
+   * REQ-MSG-19 — **un identifiant complet se résout par son profil, pas par l'annuaire.**
+   *
+   * Mesuré contre un vrai Synapse le 07/08/2026 : `/user_directory/search` rend
+   * `results: []` pour un compte qui existe pourtant, tandis que `/profile/@…` rend son
+   * nom d'affichage. Ce n'est pas une panne — c'est le défaut de Synapse
+   * (`search_all_users: false`) : l'annuaire ne montre que les gens avec qui on partage
+   * déjà un salon, ou qui sont dans un salon public. Notre déploiement n'en a aucun.
+   *
+   * Conséquence sans ce chemin : « Ajouter par identifiant » (D-09, REQ-UIX-28) ne
+   * trouve **jamais** personne, et il est impossible d'entamer une première
+   * conversation — le parcours d'entrée du produit.
+   *
+   * On ne rend pas pour autant tout le serveur cherchable (`search_all_users: true`
+   * côté infra) : cela exposerait chaque compte à tout autre. Quand on connaît déjà
+   * l'identifiant, on n'a pas besoin d'un annuaire — on a une adresse.
+   */
+  if (/^@[^:\s]+:[^:\s]+$/.test(recherche)) {
+    const profil = await profileOf(session, recherche);
+    // Un identifiant inexistant rend un profil de repli portant l'identifiant lui-même
+    // (REQ-MSG-18) : on ne propose que ce que le serveur a vraiment reconnu.
+    return profil.displayName === recherche ? [] : [profil];
+  }
+
+  const reponse = await session.client.searchUserDirectory({ term: recherche, limit: limite });
   return reponse.results.map((resultat) => ({
     userId: resultat.user_id,
     displayName: resultat.display_name ?? resultat.user_id,

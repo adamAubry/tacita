@@ -8,10 +8,11 @@ import {
   updateProfile,
   type Profile,
 } from "@tacita/messaging";
-import { downloadAttachment } from "@tacita/media-pipeline";
+import { downloadAttachment, uploadPublicProfileImage } from "@tacita/media-pipeline";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { routeAppel, routeConversation } from "../../lib/routes";
 import { contactsDeLaSession } from "../../lib/contacts";
 import { environnementMedia } from "../../lib/media-env";
 import { enregistrerWipeNotes } from "../../lib/notes";
@@ -86,6 +87,11 @@ export function EcranProfil({ userId }: { userId?: string }) {
           await updateProfile(session, changements);
           setRevision((rang) => rang + 1);
         }}
+        // REQ-MED-11 — **l'unique site d'appel du chemin public**, dans tout le dépôt.
+        // Un test structurel du paquet média balaie les sources et échoue s'il en
+        // apparaît un second : c'est ce qui rend la phrase « tout ce qui sort du
+        // pipeline est chiffré, sauf l'unique chemin nommé public » vérifiable.
+        onPhoto={(fichier) => uploadPublicProfileImage(session, env, fichier)}
       />
     );
   }
@@ -99,11 +105,13 @@ export function EcranProfil({ userId }: { userId?: string }) {
       bloque={contacts.bloque(cible)}
       indexedDB={globalThis.indexedDB}
       onMessage={() => {
-        void contacts.inviter(cible).then((roomId) => router.push(`/c/${encodeURIComponent(roomId)}`));
+        void contacts.inviter(cible).then((roomId) => router.push(routeConversation(roomId)));
       }}
       onAppel={() => {
-        // M-I porte l'appel ; on ouvre la conversation, d'où il se déclenche.
-        if (dm) router.push(`/c/${encodeURIComponent(dm.roomId)}`);
+        // REQ-UIX-39 — **le même chemin que le header 1:1**, littéralement le même
+        // constructeur de route. Passer par la conversation pour y cliquer une seconde
+        // fois ferait deux gestes là où le bouton en promet un.
+        if (dm) router.push(routeAppel(dm.roomId));
       }}
       onInviter={async () => {
         await contacts.inviter(cible);

@@ -38,7 +38,10 @@ const LIBELLE_STATUT = {
  */
 export function ProfileCard({ nom, userId, actions, statut }: ProfileCardProps) {
   const router = useRouter();
-  const fondu = "linear-gradient(to bottom, #000 55%, transparent 100%)";
+  // `black` et non `#000` : dans un masque, seule l'**alpha** compte — la couleur n'est
+  // jamais rendue. Un littéral hexadécimal ici ferait croire à une couleur en dur, ce
+  // que DESIGN.md interdit, et le garde-fou de `theme.test.ts` le refuse désormais.
+  const fondu = "linear-gradient(to bottom, black 55%, transparent 100%)";
 
   return (
     <header style={{ position: "relative", display: "grid", justifyItems: "center" }}>

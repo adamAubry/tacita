@@ -53,6 +53,20 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
     };
   }, [media, telecharger]);
 
+  /*
+   * `Escape` ferme, comme toute boîte de dialogue modale. Le viewer ne se fermait qu'au
+   * glissement vers le bas et au bouton « Fermer » : sur un clavier, une modale plein
+   * écran qu'aucune touche ne referme est un piège, et c'est la base de l'accessibilité,
+   * pas un raffinement. Mesuré au navigateur le 08/08/2026 — `Escape` ne faisait rien.
+   */
+  useEffect(() => {
+    const surTouche = (evenement: KeyboardEvent) => {
+      if (evenement.key === "Escape") onFermer();
+    };
+    globalThis.addEventListener("keydown", surTouche);
+    return () => globalThis.removeEventListener("keydown", surTouche);
+  }, [onFermer]);
+
   // Fermeture par glissement **vers le bas** : le hook raisonne en horizontal, celui-ci
   // est vertical et local — deux axes, deux gestes, aucun partage à forcer.
   const [departY, setDepartY] = useState<number | null>(null);
@@ -102,19 +116,38 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
             // porte pas, et en inventer une serait pire que son absence.
             <video src={url} controls style={{ maxWidth: "100%", maxHeight: "100%" }} />
           ) : (
-            <img
-              src={url}
-              alt={media.nom}
+            // WCAG 2.1.1 — le zoom est porté par un `<button>` et non par l'image :
+            // une `<img onClick>` n'est ni focusable ni actionnable au clavier, et le
+            // geste n'avait aucun équivalent visible (DESIGN.md : « chaque geste a un
+            // équivalent »). Le bouton est transparent et épouse l'image ; c'est le même
+            // tap, avec en plus une cible que le clavier et l'assistance atteignent.
+            <button
+              type="button"
+              aria-label={`${media.nom} — agrandir (niveau ${zoom} sur ${ZOOM_MAX})`}
               // Tap = palier suivant, puis retour à 1. Un tableau et un `indexOf` pour
               // trois entiers consécutifs, c'était une addition déguisée.
               onClick={() => setZoom((niveau) => (niveau >= ZOOM_MAX ? 1 : niveau + 1))}
               style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: "center",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "zoom-in",
                 maxWidth: "100%",
                 maxHeight: "100%",
               }}
-            />
+            >
+              <img
+                src={url}
+                alt={media.nom}
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: "center",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  display: "block",
+                }}
+              />
+            </button>
           )
         ) : (
           <Text type="supporting" color="secondary">

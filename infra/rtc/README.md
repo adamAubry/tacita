@@ -96,6 +96,45 @@ qu'un CN : pour tester le chemin TURN en local, lui ajouter le SAN
 correspondant, sinon la négociation TLS du TURN échoue silencieusement et le
 client retombe sur les candidats directs.
 
+## REQ-RTC-08 — Element Call est à nous, donc épinglé
+
+**Version déployée : `v0.23.0`**, image
+`ghcr.io/element-hq/element-call@sha256:e352de468647777e3780fec45281e2ccc90da69a828f7a3d88700ff9ac04bb0b`,
+digest résolu le **2026-08-07** (le tag `latest` pointait alors sur le même).
+**URL servie : `https://call.<SERVER_NAME>`.**
+
+Ces trois lignes ne sont pas décoratives : elles sont ce qui rend relisable ce que
+`packages/calls` écrit dans l'URL du widget. Avant elles, le shard passait un paramètre
+de lancement audio/vidéo qu'aucune version ne pouvait confirmer — escalade E-14. Ce que
+la relecture de `src/UrlParams.ts` de la v0.23.0 a donné :
+
+| Ce que le client envoie | Ce que la v0.23.0 en fait |
+| --- | --- |
+| `intent=start_call` | appel vidéo, lobby affiché |
+| `intent=start_call_voice` | appel audio, lobby affiché |
+| `header=none` | en-tête du widget masqué |
+| ~~`video=true|false`~~ | **rien — ce paramètre n'existe pas** |
+| ~~`hideHeader=true`~~ | **rien — remplacé par `header`** |
+
+Les deux dernières lignes sont l'intérêt de l'exercice : elles étaient écrites de bonne
+foi et ne faisaient rien du tout.
+
+**Trois choses à refaire à chaque bump d'image**, dans cet ordre :
+
+1. relire `src/UrlParams.ts` de la nouvelle version — `UserIntent` et `UrlConfiguration`
+   sont la source, et les noms y bougent (`hideHeader` → `header` en est la preuve) ;
+2. vérifier `MatrixRTCMode` dans `src/config/ConfigOptions.ts`. Notre `element-call.json`
+   épingle `compatibility`. **Ne pas passer à `matrix_2_0`** sans changer d'abord
+   `packages/calls` : ce mode active les événements *sticky* de MSC4354, et `activeCall()`
+   cesserait de voir les participants **sans erreur bruyante** — le salon afficherait
+   simplement « aucun appel ». C'est la divergence que `packages/calls/README.md` annonce ;
+3. mettre à jour version, digest et date ci-dessus. Un digest non consigné est une
+   jonction non relue, quelle que soit la qualité du reste.
+
+Le certificat monté depuis `proxy/certs` doit porter un **SAN pour `call.<SERVER_NAME>`**,
+au même titre que `TURN_DOMAIN`. Sans lui, l'iframe échoue au TLS et le shard n'affiche
+que son délai de chargement (REQ-UIX-38), sans pouvoir en donner la cause.
+
 ## Limites assumées
 
 - **Métadonnées d'appel visibles.** Le média est chiffré de bout en bout

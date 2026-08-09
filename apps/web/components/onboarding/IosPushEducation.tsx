@@ -53,7 +53,7 @@ export function IosPushEducation({ declenche, indexedDB }: IosPushEducationProps
   if (!visible) return null;
 
   return (
-    <Sheet ouvert onFermer={refuser}>
+    <Sheet ouvert onFermer={refuser} nom="Recevoir les notifications sur iPhone">
       <VStack gap={4}>
         <Text type="display-3">Recevoir les notifications sur iPhone</Text>
         <Text>

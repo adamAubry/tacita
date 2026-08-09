@@ -14,8 +14,16 @@
  */
 const VERSION = "tacita-coquille-v1";
 
-/** La coquille : des routes vides et le manifeste. Zéro donnée utilisateur. */
-const COQUILLE = ["/", "/recherche", "/mentions", "/profil", "/manifest.webmanifest"];
+/**
+ * La coquille : des routes vides et le manifeste. Zéro donnée utilisateur.
+ *
+ * `/c` et `/c/infos` en font partie depuis le 08/08/2026 : ce sont les écrans de
+ * conversation, et le salon y voyage en `?room=` (voir `lib/routes.ts`). Tant qu'il était
+ * un segment de chemin, il n'y avait rien à précacher — un salon par URL, et hors ligne
+ * aucune conversation ne s'ouvrait. Ces coquilles sont vides : l'identifiant du salon est
+ * dans l'URL demandée, jamais dans ce qui est mis en cache.
+ */
+const COQUILLE = ["/", "/c", "/c/infos", "/recherche", "/mentions", "/profil", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(COQUILLE)));
@@ -60,6 +68,102 @@ self.addEventListener("fetch", (event) => {
   // REQ-UI-17 — hors ligne, une navigation retombe sur la coquille précachée : l'app
   // s'ouvre et lit son historique local au lieu d'afficher le dinosaure du navigateur.
   if (requete.mode === "navigate") {
-    event.respondWith(fetch(requete).catch(() => caches.match("/").then((r) => r ?? Response.error())));
+    // `ignoreSearch` : `/c?room=!salon` doit retrouver la coquille précachée `/c`. Sans
+    // lui, toute navigation portant un paramètre retombait sur `/` — l'accueil s'affichait
+    // à l'URL d'une conversation, ce qui est la pire des deux réponses possibles.
+    event.respondWith(
+      fetch(requete).catch(() =>
+        caches
+          .match(requete, { ignoreSearch: true })
+          .then((r) => r ?? caches.match("/"))
+          .then((r) => r ?? Response.error()),
+      ),
+    );
   }
+});
+
+/*
+ * REQ-UI-18 / REQ-UIX-40 — les notifications.
+ *
+ * Le payload reçu ne porte que `{event_id, room_id}` (REQ-PSH-02) : le serveur n'a
+ * jamais rien d'autre à donner. Le contenu, lui, se déchiffre **ici**, au sens de « sur
+ * cet appareil » — mais pas dans ce fichier : les clés Megolm vivent dans le store
+ * crypto d'une fenêtre, hors de portée du service worker. Une fenêtre ouverte est donc
+ * interrogée, et c'est elle qui rend l'aperçu.
+ *
+ * Ce qui n'arrive à aucun moment (interdit n°8) : rien de tout cela n'entre au cache —
+ * le `fetch` ci-dessus n'a pas de branche qui y mène —, rien n'est journalisé, et rien
+ * ne survit à l'affichage de la notification. **Aucun `console` dans ce fichier**, pas
+ * même en développement : un payload journalisé est un identifiant d'événement de plus
+ * dans un journal que personne ne relit avant l'incident.
+ */
+const TYPE_APERCU = "tacita-apercu";
+
+/** Au-delà, on considère qu'aucune fenêtre ne répondra — la notification part générique. */
+const DELAI_APERCU_MS = 2000;
+
+function demanderApercu(roomId, eventId) {
+  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
+    // Une seule fenêtre interrogée : un `MessagePort` ne se transfère qu'une fois, et
+    // toutes partagent le même store crypto — la deuxième n'apprendrait rien de plus.
+    const fenetre = fenetres[0];
+    if (!fenetre) return null;
+
+    return new Promise((resolve) => {
+      const canal = new MessageChannel();
+      const minuteur = setTimeout(() => resolve(null), DELAI_APERCU_MS);
+      canal.port1.onmessage = (message) => {
+        clearTimeout(minuteur);
+        resolve(message.data ?? null);
+      };
+      fenetre.postMessage({ type: TYPE_APERCU, roomId, eventId }, [canal.port2]);
+    });
+  });
+}
+
+self.addEventListener("push", (event) => {
+  let charge = null;
+  try {
+    charge = event.data ? event.data.json() : null;
+  } catch {
+    // Un payload illisible ne vient pas de notre passerelle : rien à réveiller.
+  }
+  const roomId = charge && charge.room_id;
+  if (!roomId) return;
+
+  event.waitUntil(
+    demanderApercu(roomId, charge.event_id)
+      .catch(() => null)
+      .then((apercu) =>
+        // REQ-UIX-40 — clés absentes, événement pas encore synchronisé, aucune fenêtre
+        // ouverte : notification **générique**, sans contenu et sans erreur bruyante.
+        self.registration.showNotification(apercu ? apercu.expediteur : "Nouveau message", {
+          body: apercu ? apercu.texte : "",
+          // Groupées par conversation : un salon bavard remplace sa notification au lieu
+          // d'en empiler une par message.
+          tag: roomId,
+          data: { roomId },
+        }),
+      ),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const roomId = event.notification.data && event.notification.data.roomId;
+  if (!roomId) return;
+
+  // Même gabarit que `lib/routes.ts`, recopié parce qu'un service worker n'importe pas
+  // le bundle de l'app. Le test de REQ-UI-18 compare les deux : c'est lui qui tient la
+  // paire, pas la vigilance.
+  const cible = `/c?room=${encodeURIComponent(roomId)}`;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
+      const fenetre = fenetres[0];
+      if (!fenetre) return self.clients.openWindow(cible);
+      // `navigate` n'existe pas partout : à défaut, la fenêtre revient au premier plan
+      // là où elle était — moins bien, mais jamais rien.
+      return fenetre.focus().then((active) => (active.navigate ? active.navigate(cible) : null));
+    }),
+  );
 });

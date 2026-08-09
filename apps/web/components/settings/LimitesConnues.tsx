@@ -66,6 +66,18 @@ const LIMITES: Limite[] = [
       "Le service qui émet les liens n'a aucun pouvoir sur les salons : il ne peut pas voir que l'émetteur a quitté le groupe. Le lien reste valide, l'invitation échoue.",
   },
   {
+    cle: "photo",
+    titre: "Votre photo de profil n'est pas chiffrée",
+    texte:
+      "Un avatar doit pouvoir s'afficher chez tous vos correspondants, y compris ceux qui n'ont aucune de vos clés. Il est donc déposé en clair sur le serveur. Le choisir est facultatif — le reste de votre profil ne l'exige pas.",
+  },
+  {
+    cle: "notifications",
+    titre: "Une notification arrivée application fermée reste sans contenu",
+    texte:
+      "Le serveur n'envoie que de quoi réveiller l'application : il n'a rien d'autre à envoyer. Le déchiffrement demande les clés de cet appareil, qui ne sont accessibles qu'à l'application ouverte — sinon, la notification dit « Nouveau message » et rien de plus.",
+  },
+  {
     cle: "invitations",
     titre: "Le service de liens apprend qui invite qui",
     texte:

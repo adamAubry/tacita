@@ -3,7 +3,17 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/.next/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/.next/**",
+      // Simulations utilisateur : hors dépôt (gitignore), hors `npm test`, hors hooks.
+      // Elles pilotent un navigateur et n'ont ni le même environnement ni les mêmes
+      // règles que le produit — voir l'exception ratifiée de l'interdit n°12.
+      "e2e/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -20,7 +30,19 @@ export default tseslint.config(
     files: ["apps/web/public/sw.js"],
     languageOptions: {
       globals: Object.fromEntries(
-        ["self", "caches", "fetch", "Response", "URL", "Request"].map((nom) => [nom, "readonly"]),
+        [
+          "self",
+          "caches",
+          "fetch",
+          "Response",
+          "URL",
+          "Request",
+          // Le réveil push (REQ-UI-18) : il interroge une fenêtre par `MessageChannel`,
+          // avec un délai au-delà duquel la notification part générique.
+          "MessageChannel",
+          "setTimeout",
+          "clearTimeout",
+        ].map((nom) => [nom, "readonly"]),
       ),
     },
   },

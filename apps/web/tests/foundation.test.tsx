@@ -1,13 +1,17 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ButtonsList } from "../components/foundation/ButtonsList";
-import { ConnectionBanner } from "../components/foundation/ConnectionBanner";
+import { ConnectionBanner, ConnectionBannerLive } from "../components/foundation/ConnectionBanner";
 import { LayoutHeader } from "../components/foundation/LayoutHeader";
 import { Navbar, ONGLETS } from "../components/foundation/Navbar";
 import { Placeholder } from "../components/foundation/Placeholder";
 import { Sheet } from "../components/foundation/Sheet";
 import { SegmentedControl, SegmentedControlItem, Skeleton } from "../components/foundation/primitives";
+import { RACINE, sansCommentaires, sourcesLivrees } from "./sources";
 
 /**
  * `next/navigation` n'existe pas hors du rendu de Next. Les deux fonctions dont les
@@ -174,18 +178,93 @@ describe("REQ-UIX-05 — primitives partagées", () => {
     // natif, et c'est lui qui permet à la plateforme d'animer l'ouverture et de gérer
     // le piège de focus. On assère donc l'état d'ouverture, pas la présence du texte.
     const { rerender } = render(
-      <Sheet ouvert={false} onFermer={vi.fn()}>
+      <Sheet ouvert={false} onFermer={vi.fn()} nom="Feuille de test">
         <p>Contenu</p>
       </Sheet>,
     );
     expect(document.querySelector("dialog")?.hasAttribute("open")).toBe(false);
 
     rerender(
-      <Sheet ouvert onFermer={vi.fn()}>
+      <Sheet ouvert onFermer={vi.fn()} nom="Feuille de test">
         <p>Contenu</p>
       </Sheet>,
     );
     expect(document.querySelector("dialog")?.hasAttribute("open")).toBe(true);
     expect(screen.getByText("Contenu")).toBeTruthy();
+  });
+
+  /**
+   * WCAG 4.1.2 — audit impeccable du 07/08/2026. Neuf feuilles s'ouvraient sans nom
+   * accessible : un lecteur d'écran annonçait « boîte de dialogue » et s'arrêtait là.
+   * Astryx l'écrivait dans la sortie de nos propres tests, et personne ne la lisait.
+   *
+   * Structurel plutôt que par écran : c'est un oubli qui se refait au prochain `<Sheet>`,
+   * et une feuille d'action n'a pas d'en-tête visible pour le rappeler.
+   */
+  it("aucune feuille ne s'ouvre sans nom accessible", () => {
+    const fautives = sourcesLivrees()
+      .filter(({ code }) => /<Sheet[\s>]/.test(sansCommentaires(code)))
+      .flatMap(({ chemin, code }) =>
+        // `(?<!=)>` : la flèche des callbacks (`onFermer={() => …}`) porte un `>` qui
+        // couperait la capture avant d'atteindre les attributs suivants.
+        [...sansCommentaires(code).matchAll(/<Sheet\b([^]*?)(?<!=)>/g)]
+          .filter(([, attributs]) => !/\b(titre|nom)=/.test(attributs ?? ""))
+          .map(() => chemin.replace(RACINE, "")),
+      );
+
+    expect(fautives).toEqual([]);
+  });
+});
+
+describe("REQ-UI-17 / REQ-UIX-04 — le bandeau de connexion est branché, pas seulement écrit", () => {
+  it("il suit navigator.onLine et ses deux événements", async () => {
+    // Mesuré au navigateur le 08/08/2026 : `ConnectionBanner` existait, avait ses tests,
+    // et **aucun écran ne le montait**. Couper le réseau n'affichait rien. Un composant
+    // que personne ne rend ne tient aucune promesse — c'est le branchement qui compte.
+    const etat = { valeur: true };
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => etat.valeur);
+
+    const { container } = render(<ConnectionBannerLive />);
+    expect(container.textContent).toBe("");
+
+    etat.valeur = false;
+    await act(async () => {
+      globalThis.dispatchEvent(new Event("offline"));
+    });
+    expect(container.textContent).toContain("Hors ligne");
+
+    etat.valeur = true;
+    await act(async () => {
+      globalThis.dispatchEvent(new Event("online"));
+    });
+    expect(container.textContent).toBe("");
+  });
+
+  it("le shell le rend, et au-dessus de la porte de récupération", () => {
+    // La porte remplace tout le contenu : un bandeau posé sous elle serait invisible
+    // exactement quand il compte — perdre le réseau pendant l'onboarding.
+    const providers = readFileSync(join(RACINE, "app/providers.tsx"), "utf8");
+    expect(providers).toMatch(/<ConnectionBannerLive\s*\/>/);
+    expect(providers.indexOf("<ConnectionBannerLive")).toBeLessThan(providers.indexOf("<RecoveryGate"));
+  });
+});
+
+describe("REQ-OBX-01 / REQ-UI-17 — la file d'envoi appartient à la session, pas à un écran", () => {
+  it("`createOutbox` n'est appelé que par le provider de session", () => {
+    // Elle vivait dans `Conversation` : créée à l'ouverture d'un salon, `dispose()` au
+    // démontage. Le bandeau hors ligne promet que « ce que vous écrivez partira à la
+    // reconnexion » — c'était faux dès qu'on quittait l'écran. Mesuré au navigateur le
+    // 08/08/2026 : deux messages écrits hors ligne, un rechargement, le réseau revenu,
+    // et rien ne partait. Une promesse qu'on ne tient pas, c'est l'interdit n°13.
+    const appelants = sourcesLivrees()
+      .filter(({ code }) => /\bcreateOutbox\s*\(/.test(sansCommentaires(code)))
+      .map(({ chemin }) => chemin.replace(RACINE, ""));
+
+    expect(appelants).toEqual(["/components/conversation/OutboxProvider.tsx"]);
+  });
+
+  it("le provider enveloppe les écrans dans le shell", () => {
+    const providers = readFileSync(join(RACINE, "app/providers.tsx"), "utf8");
+    expect(providers).toMatch(/<OutboxProvider>/);
   });
 });

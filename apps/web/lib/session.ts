@@ -53,8 +53,33 @@ export function retirerJetonDeLUrl(location: Location, history: History): string
  * muet — l'utilisateur pourrait lire, jamais écrire. L'étape n'est donc pas un confort
  * qu'on pourrait différer, et c'est pour ça qu'elle bloque.
  */
-export async function etatDe(session: Session): Promise<EtatSession> {
-  return (await session.recoveryRequired())
-    ? { phase: "recuperation-requise", session }
-    : { phase: "prete", session };
+export async function etatDe(
+  session: Session,
+  /** Cet appareil a déjà mené ce compte au bout de l'étape (trace locale, voir plus bas). */
+  dejaConfiguree = false,
+): Promise<EtatSession> {
+  if (!(await session.recoveryRequired())) return { phase: "prete", session };
+
+  /*
+   * `recoveryRequired()` confond deux choses : « il n'y a pas de clé » et « je ne peux
+   * pas le vérifier maintenant ». Sa source est la version de sauvegarde active, que le
+   * SDK n'a pas avant d'avoir pu la relire au serveur — hors ligne, donc, elle est nulle.
+   * La porte se refermait sur un compte parfaitement configuré à chaque rechargement sans
+   * réseau, et comme elle *remplace* l'application (RecoveryGate), l'historique que
+   * REQ-UI-17 promet consultable disparaissait avec elle. Mesuré au navigateur le
+   * 08/08/2026 : « Votre clé de récupération / Créer ma clé », réseau coupé.
+   *
+   * Traiter cet inconnu comme « requise » n'est pas prudent : c'est faux dans le sens
+   * qui coûte cher — redemander de créer une clé à quelqu'un qui en a déjà une.
+   *
+   * La trace locale répond, elle, à une question qui a une réponse locale : *cet
+   * appareil* a-t-il déjà mené *ce compte* au bout de l'étape. Si oui, D-08 est satisfait
+   * et il n'y a rien à redemander.
+   *
+   * ponytail: une clé réellement détruite côté serveur ne rouvrira donc plus cette porte
+   * sur cet appareil. C'est correct — la porte est un onboarding, pas un contrôle continu.
+   * Le jour où il faudra le cas, c'est un parcours de re-vérification qu'il faut, pas ce
+   * gardien-ci.
+   */
+  return dejaConfiguree ? { phase: "prete", session } : { phase: "recuperation-requise", session };
 }

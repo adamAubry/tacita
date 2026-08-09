@@ -57,7 +57,11 @@ describe("REQ-UI-01 — PWA installable, service worker de coquille seule", () =
     expect(entrees.length).toBeGreaterThan(0);
     for (const entree of entrees) {
       // Ni API Matrix, ni média, ni identifiant de salon ou d'événement.
-      expect(entree).not.toMatch(/_matrix|\/c\/|mxc:|\$|!|@/);
+      // `/c` et `/c/infos` sont des coquilles d'écran, pas des salons : depuis le
+      // 08/08/2026 le salon voyage en `?room=` (lib/routes.ts) et n'apparaît donc
+      // jamais ici. Ce qu'on refuse, ce sont les identifiants — `!salon`, `@compte`,
+      // `mxc:` — et toute URL portant une requête.
+      expect(entree).not.toMatch(/_matrix|mxc:|\$|!|@|\?/);
       expect(entree).toMatch(/^\//);
     }
   });

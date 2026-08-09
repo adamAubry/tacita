@@ -8,8 +8,9 @@ l'URL et le driver.
 
 ```ts
 const focus = await discoverFocus(homeserverUrl); // lève RtcFociMissingError
-const { url } = buildCallWidget(session, roomId, { elementCallUrl, parentUrl, widgetId });
+const { url } = buildCallWidget(session, roomId, { elementCallUrl, parentUrl, widgetId, video });
 const driver = new CallWidgetDriver(session, roomId); // à passer à ClientWidgetApi
+const detacher = attachCallWidget(session, roomId, iframe, options); // le pont postMessage
 const call = activeCall(session, roomId); // idle → active → ended
 await hangupLocal(session, roomId);
 ```
@@ -24,11 +25,31 @@ et sourcée (`matrix-js-sdk@42.0.0`, `infra/rtc/README.md`).
 `org.matrix.msc3401.call.member` par des événements *sticky* `m.rtc.member` (MSC4354).
 Element Call et le SDK déployé sont encore sur l'ancien préfixe — c'est donc lui qui est
 implémenté. Le jour où le SDK bascule, `activeCall` cessera de voir les participants sans
-erreur bruyante : le salon affichera simplement « aucun appel ». À revérifier à chaque
-montée de version du SDK ou d'Element Call.
+erreur bruyante : le salon affichera simplement « aucun appel ».
+
+**Depuis E-14, cette bascule a un interrupteur nommé** : le `matrix_rtc_mode` servi dans
+`infra/rtc/element-call.json`. Ses trois valeurs (v0.23.0) sont `legacy`, `compatibility`
+et `matrix_2_0` ; seule la dernière active les événements *sticky*. Nous épinglons
+`compatibility`, et REQ-RTC-08 a un test qui refuse `matrix_2_0` — le jour où on voudra y
+passer, c'est ce fichier-ci qu'il faudra changer d'abord.
 
 ## Limites assumées
 
+- **`attachCallWidget` prend une iframe, il n'en rend aucune.** La spec 10 dit « zéro DOM,
+  le shard rend l'iframe » — c'est toujours vrai : le shard la rend, ce paquet branche le
+  pont postMessage dessus. Le pont est ici et non dans le shard parce que REQ-UI-02 tient
+  une liste close de dépendances qui n'inclut pas `matrix-widget-api`, et n'a pas à
+  l'inclure : c'est du protocole, pas de l'interface.
+- **Les paramètres d'URL sont relus dans la version épinglée, jamais de mémoire.** E-14
+  close : `infra/rtc/` épingle Element Call `v0.23.0` par digest (REQ-RTC-08), et
+  `option.video` se traduit en `intent=start_call` / `start_call_voice` d'après
+  `src/UrlParams.ts` de cette version. Le passage a corrigé deux paramètres qui ne
+  faisaient rien — `video`, qui n'existe dans aucune version, et `hideHeader`, remplacé
+  par `header`. **À relire au prochain bump d'image** : la marche à suivre est dans
+  `infra/rtc/README.md`, et elle inclut `matrix_rtc_mode`, dont la valeur `matrix_2_0`
+  rendrait `activeCall()` aveugle sans erreur.
+- **`skipLobby` n'est jamais envoyé.** Le lobby est le rattrapage : une intention partie
+  de travers y est corrigeable avant d'entrer, caméra comprise.
 - **Le driver envoie directement, sans passer par la file d'envoi** (spec 07). Seul
   endroit du dépôt, hors `messaging` et `outbox` lui-même, à appeler `client.sendEvent`.
   C'est voulu et imposé par REQ-CAL-05 : `WidgetDriver.sendEvent` de `matrix-widget-api`

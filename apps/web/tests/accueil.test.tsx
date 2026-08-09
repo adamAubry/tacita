@@ -1,5 +1,6 @@
 import type { Session } from "@tacita/client-core";
 import { asSession } from "@tacita/client-core/testing";
+import { routeConversation } from "../lib/routes";
 import type { Conversation } from "@tacita/messaging";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -329,7 +330,7 @@ describe("REQ-UIX-11 — création : un DM sans doublon, ou un groupe", () => {
       expect(openDirectMessage).toHaveBeenCalledWith(expect.anything(), "@adam:tacita.test"),
     );
     expect(createGroupChat).not.toHaveBeenCalled();
-    await waitFor(() => expect(pousser).toHaveBeenCalledWith("/c/!dm:tacita.test"));
+    await waitFor(() => expect(pousser).toHaveBeenCalledWith(routeConversation("!dm:tacita.test")));
   });
 
   it("un groupe demande un nom et au moins un membre", async () => {
@@ -399,5 +400,8 @@ function rendreAccueil() {
 beforeEach(() => {
   listees.mockReturnValue([]);
   demandes.mockReturnValue([]);
-  restoreSession.mockResolvedValue(asSession({ client: {}, recoveryRequired: async () => false }));
+  restoreSession.mockResolvedValue(asSession({
+      client: { getUserId: () => "@moi:tacita.test", on: vi.fn(), off: vi.fn() },
+      recoveryRequired: async () => false,
+    }));
 });

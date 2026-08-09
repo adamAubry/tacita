@@ -13,9 +13,19 @@ export interface SheetProps {
    * lecteur d'écran annonce « dialogue » sans dire lequel.
    *
    * Facultatif : les feuilles d'action déjà titrées par leur contenu (M-C, M-D) n'en
-   * ont pas besoin, et l'ajouter changerait leur mise en page.
+   * ont pas besoin, et l'ajouter changerait leur mise en page. Dans ce cas, `nom` est
+   * **obligatoire** — sans l'un ni l'autre, la modale s'ouvre sans nom accessible.
    */
   titre?: string;
+  /**
+   * Le nom accessible, quand il ne peut pas être visible. Une feuille d'action tire son
+   * sens de ses boutons, et lui coller un en-tête changerait sa mise en page pour rien —
+   * mais un lecteur d'écran, lui, annonce alors « boîte de dialogue » et s'arrête là.
+   *
+   * Ignoré quand `titre` est fourni : le titre visible fait déjà le nom (WCAG 4.1.2), et
+   * deux noms concurrents en donnent un de trop.
+   */
+  nom?: string;
   /** Une phrase sous le titre, quand la modale a besoin d'un cadre avant son contenu. */
   sousTitre?: string;
   /**
@@ -38,6 +48,7 @@ export function Sheet({
   ouvert,
   onFermer,
   titre,
+  nom,
   sousTitre,
   ancrage = "bas",
   sortie = "info",
@@ -51,6 +62,10 @@ export function Sheet({
       }}
       purpose={sortie}
       position={ancrage === "bas" ? { bottom: 0, left: 0, right: 0 } : undefined}
+      // WCAG 4.1.2 — sans nom, un lecteur d'écran annonce « boîte de dialogue » et
+      // s'arrête là. Le titre visible le fournit déjà : on ne pose `aria-label` que
+      // pour les feuilles d'action, qui n'ont pas d'en-tête et n'en veulent pas.
+      aria-label={titre ? undefined : nom}
     >
       {titre && <DialogHeader title={titre} subtitle={sousTitre} onOpenChange={onFermer} />}
       {children}

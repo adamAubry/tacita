@@ -1,9 +1,29 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Dix points sur treize sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
-**E-11, E-12 et E-13 sont ouverts**, relevés le 06/08/2026 en livrant M-F, M-G et M-H. Ce
-fichier garde la question, la décision et son motif : une décision dont on a perdu le motif
-se rediscute tous les six mois.
+**Les quatorze points sont tranchés, et tous appliqués.** E-01 à E-09 le 05/08/2026, E-10
+le 06/08/2026, **E-11 à E-14 le 07/08/2026** — ces quatre-là par le plan de route PM
+(`PLAN-DE-ROUTE.md`), qui a également ratifié les dix premières après audit. Ce fichier
+garde la question, la décision et son motif : une décision dont on a perdu le motif se
+rediscute tous les six mois.
+
+**Ratification du 07/08/2026.** Les dix premières décisions ont été relues contre les
+quatre piliers — une app qui fonctionne, zéro clair serveur, zéro promesse non tenue,
+stack stable — et tiennent toutes. E-09 est **ratifiée formellement** : l'interdit n°6
+protège l'ordre *dans* un salon, pas l'ordre *entre* salons, et le point ne peut plus être
+rouvert qu'avec un ordre serveur disponible sur la version déployée.
+
+**Une classe de panne s'est dégagée à la relecture**, et elle vaut plus que les points pris
+un par un : **E-08, E-13 et E-14 sont le même mode de panne** — deux specs justes, et
+l'incohérence qui vit dans la jonction entre elles. Un focus RTC annoncé sans SFU derrière,
+un `roomId` résolu sans porte pour y entrer, un paramètre d'URL écrit contre une version que
+rien n'épinglait. Aucun de ces trois défauts n'est visible en relisant un module seul. D'où
+la règle permanente ajoutée à `CLAUDE.md` § Prudence outillage : *tout runtime externe que
+le client pointe doit être épinglé dans `infra/` — une URL configurable sans version
+consignée est une jonction non relue.*
+
+**Ce qui reste, et qui n'est pas une escalade** : le spike E-10 (trois versions d'iOS, un
+iPhone réel) n'a pas été exécuté — il demande du matériel, pas un arbitrage. C'est la seule
+chose entre le dépôt et l'allumage du vocal sur iOS.
 
 > **Note de fusion, 06/08/2026.** M-F a été écrite deux fois en parallèle, sur deux
 > branches, et les deux ont numéroté leur escalade « E-11 ». Celle de M-H — le lien de
@@ -28,11 +48,12 @@ contrat gagne.
 | E-06 | Exigences REQ-UIX-01..40 | **Ratifiées** | rien — les tests les nomment |
 | E-07 | Layout d'appel | **Confirmé** : pas de client RTC maison | rien |
 | E-08 | Focus RTC annoncé sans SFU | **Proposition retenue** — annonce conditionnelle | `specs/02-rtc-backend.md` amendée |
-| E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
+| E-09 | Ordre de la liste de conversations | **Ratifié le 07/08/2026** — récence du dernier message ; rouvrable seulement avec un ordre serveur | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
-| E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Ouvert** — livré débouncé sur les critères, la limite est documentée | rien tant que non tranché ; REQ-UIX-22 **non modifiée** |
-| E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Ouvert** — la photo est **absente** de M-G, le reste de REQ-UI-20 est livré | rien tant que non tranché ; REQ-UI-20 et l'interdit n°11 **non modifiés** |
-| E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H *(numérotée E-11 à l'origine)* | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
+| E-11 | `PowerSearch` ne notifie pas la frappe : REQ-UIX-22 ne peut pas être « au fil de la frappe » | **Tranché le 07/08/2026** — voie A (contrat aligné sur la primitive), B en parallèle, C refusée | `specs/ui/M-F.md` — **REQ-UIX-22 amendée**. Aucun code repris |
+| E-12 | Photo de profil : le pipeline chiffre tout, un avatar Matrix doit être public | **Tranché le 07/08/2026** — voie A : chemin public **nommé** dans le pipeline, site d'appel unique testé | `specs/08-media-pipeline.md` — **REQ-MED-11** (nouvelle) ; `specs/11-ui-shard.md` — REQ-UI-20 amendée. **Interdit n°11 inchangé** |
+| E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Tranché le 07/08/2026** — voie A : `knock`. Le porteur frappe, un membre confirme | `specs/05-messaging.md` — **REQ-MSG-20** (nouvelle) ; `specs/12-invite-tokens.md` — REQ-INV-06/13/15/16 amendées |
+| E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
 
 ---
 
@@ -189,10 +210,15 @@ REQ-CAL-02 exige.
 
 ## E-09 — L'ordre de la liste de conversations (M-C)
 
-**Tranché en périmètre technique le 05/08/2026, PM informé.** Ce n'est pas un arbitrage
-produit : ni le périmètre, ni une promesse faite à l'utilisateur, ni une décision de
-`DECISIONS.md` ne bougent. Le PM peut évidemment le rouvrir — il n'a simplement pas eu à
-attendre pour que M-C avance.
+**Tranché en périmètre technique le 05/08/2026, PM informé. Ratifié formellement par le PM
+le 07/08/2026** : le motif est correct — l'interdit n°6 protège l'ordre *dans* un salon,
+pas l'ordre *entre* salons. Le point ne peut désormais être rouvert **qu'avec un ordre
+serveur disponible sur la version déployée**, ce qui ferme la question tant qu'il n'y en a
+pas.
+
+Ce n'était pas un arbitrage produit : ni le périmètre, ni une promesse faite à
+l'utilisateur, ni une décision de `DECISIONS.md` ne bougeaient — M-C n'a donc pas eu à
+attendre. La ratification confirme cette lecture après coup.
 
 **La question.** L'interdit n°6 dit « ne jamais trier par `origin_server_ts` — l'ordre
 canonique est celui du flux /sync » (REQ-COR-04, REQ-MSG-12). REQ-UIX-07 demande un tri
@@ -385,10 +411,11 @@ arbitrage : plus aucune question n'est ouverte, seule reste l'exécution.
 
 ---
 
-## E-11 — `PowerSearch` ne notifie pas la frappe (M-F) — **ouvert**
+## E-11 — `PowerSearch` ne notifie pas la frappe (M-F)
 
-**Relevé le 06/08/2026, au cours de M-F.** Rien n'est bloqué : le module est livré et
-vert. Ce point demande un arbitrage de rédaction, pas une reprise de code.
+**Relevé le 06/08/2026 au cours de M-F. Tranché le 07/08/2026 : voie A maintenant, voie B
+en parallèle, voie C refusée.** Comme annoncé, c'était un arbitrage de rédaction : aucune
+ligne de code n'a été reprise, M-F reste vert tel quel.
 
 **La question.** REQ-UI-16 impose `PowerSearch` comme barre de recherche. REQ-UIX-22
 demande une « recherche débouncée (300 ms) », dont l'objectif mesurable dit « 20 frappes
@@ -430,6 +457,26 @@ REQ-UIX-22, et cela se voit à l'usage.
   champs de saisie côte à côte là où le wireframe en montre un. **Déconseillé** — la
   jurisprudence d'E-10 vaut ici aussi : on ne contourne pas une primitive parce qu'il lui
   manque une prop.
+
+**Décision (PM).** **Voie A**, et REQ-UIX-22 est amendée : « recherche débouncée (300 ms)
+sur les **changements de critères** », objectif mesurable « 20 changements de critères →
+1 appel ». La recherche à la validation devient le comportement **contractuel**, pas une
+dégradation tolérée — la nuance compte, parce qu'une dégradation tolérée se re-signale à
+chaque revue.
+
+**Voie B en parallèle** : la demande d'un `onQueryChange` part en amont. Si elle est
+livrée, la recherche incrémentale reviendra comme **nouvelle exigence**, pas comme dette.
+**Voie C refusée** — recoder la primitive pour une prop manquante est exactement ce que la
+jurisprudence E-10 écarte.
+
+**Livré.** `specs/ui/M-F.md` : REQ-UIX-22 et son objectif mesurable reformulés, avec le
+motif daté. Le test porte le même vocabulaire que le contrat — il s'appelait « 20 frappes »
+alors qu'il rerendait des critères, ce qui est précisément le décalage que l'escalade
+signalait.
+
+**Ce qui reste à faire par un humain :** ouvrir la demande `onQueryChange` chez Astryx. Un
+agent n'a pas de compte sur leur suivi ; la trace est ici, l'action est au Tech Lead
+(action n° 6 du plan de route).
 
 **Recommandation du Tech Lead : A maintenant, B en parallèle.** Rien ne justifie de
 retenir M-F pour cela, et la limite est déjà écrite là où elle se lit — dans la docstring
@@ -487,6 +534,38 @@ image serait précisément le mode de panne que la spec 00 nomme.
 **Ce que ce point ne remet pas en cause.** REQ-UI-20 n'est pas modifiée, l'interdit n°11
 non plus : amender l'un ou l'autre est un geste de PM. Le reste de REQ-UIX-24 est livré —
 nom d'affichage modifiable, identifiant affiché, form edit.
+
+**Décision (PM), 07/08/2026 — voie A.** Un avatar chiffré ne s'affiche nulle part : le
+chiffrer est une **non-feature**, pas une garantie. Le supprimer (voie B) sacrifie un
+attendu universel ; le rendre local (voie C) en fait un thème, pas un avatar. Même
+logique que les réactions en clair — on expose, et on le dit.
+
+**Les trois conditions qui rendent la voie A acceptable, et où elles vivent :**
+
+1. **REQ-MED-11** (nouvelle, spec 08) — `uploadPublicProfileImage()`, dans le **même**
+   paquet, avec la **même** compression et les mêmes cibles D-04. Ce qui diffère tient en
+   une ligne : pas de `encryptAttachment`, un `mxc://` rendu au lieu d'un `EncryptedFile`.
+   L'interdit n°11 tient — un seul pipeline —, et le nom porte le mot `Public` ;
+2. **un seul site d'appel**, `apps/web/components/profil/EcranProfil.tsx`. Pas une
+   consigne de revue : un test structurel du paquet média balaie tout le dépôt et échoue
+   au second appelant. « Tout ce qui sort du pipeline est chiffré, **sauf l'unique chemin
+   nommé public** » ne vaut que tant qu'« unique » est vérifié par une machine ;
+3. **l'honnêteté au moment du choix** — « Votre photo de profil est visible de tous et
+   n'est pas chiffrée », dans la feuille où l'on choisit, pas dans un écran de réglages
+   qu'on n'ouvrira pas. La ligne est aussi ajoutée aux limites connues (REQ-UIX-32).
+
+**Livré.** `packages/media-pipeline` (REQ-MED-11 + trois tests, dont le balayage de site
+d'appel), `specs/08-media-pipeline.md`, `specs/11-ui-shard.md` (REQ-UI-20 amendée : elle
+disait « via pipeline média » sans trancher le chiffrement, ce qui la rendait
+inapplicable), `ProfilMoi` (champ photo **présent**, plus absent), `EcranProfil` (le site
+d'appel), `LimitesConnues`.
+
+**Note de conception.** Le composant ne connaît ni `Session` ni le pipeline : il reçoit
+`onPhoto` injecté. C'est ce découplage qui fait qu'il n'existe **qu'un** endroit à
+surveiller, et non un par écran qui afficherait un avatar.
+
+---
+
 ## E-13 — Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre
 
 **Remonté le 06/08/2026, en câblant REQ-UIX-34 (M-H). Ouvert.** Rien n'a été contourné :
@@ -540,6 +619,113 @@ supposent un chemin d'entrée), `specs/05-messaging.md` (`createGroupChat` si vo
 (l'écran de réception), et le test REQ-INV-16 de la spec 12 — son balayage interdit à tout
 module hors du service de connaître la route `/resolve`, ce qui devra s'ouvrir au client
 de réception le jour où il existe.
+
+**Décision (PM), 07/08/2026 — voie A : `knock`.** B réinvente un graphe refusé en E-04 ;
+C rend au service le pouvoir Matrix que la ratification n°1 de la spec 12 lui refuse.
+**La promesse produit change et le PM l'assume : un lien de groupe fait frapper à la
+porte, un membre confirme l'entrée.** Pour une app de cercles privés, ce sas est cohérent
+avec le positionnement — ce n'est pas une régression, c'est le produit.
+
+**La mécanique, telle qu'elle est livrée.**
+
+- **Le sas suit le cycle de vie des liens, pas la création du salon.** `join_rule` passe à
+  `knock` à l'émission du premier lien actif et revient à `invite` à la disparition du
+  dernier. Pas de knock permanent sur tous les groupes : `createGroupChat` est inchangé
+  (spec 05 « inchangée par défaut »). L'alignement se fait **à chaque relecture de la
+  liste**, et pas seulement sur les gestes d'émission et de révocation — un lien peut
+  expirer tout seul, et personne n'est là ce jour-là pour refermer la porte.
+- **Réception** (`/i/<token>`, M-G) : résolution → `friend` : invitation de DM native ;
+  `group` : `knock`, puis un **état d'attente terminal et honnête**. L'écran ne promet ni
+  délai ni notification qu'on n'émet pas — il dit que personne n'est prévenu
+  automatiquement, parce que c'est vrai.
+- **Confirmation** : les demandes s'affichent dans les informations du groupe, au-dessus
+  des membres — c'est là qu'on regarde quand on gère un groupe, et **n'importe quel
+  membre** peut confirmer. Accepter est une `invite` native (REQ-MSG-11) : aucun état
+  parallèle à tenir.
+
+**Effet de bord favorable sur REQ-INV-15.** Le service ne voit toujours pas qu'un émetteur
+a quitté son groupe — il n'a aucun droit Matrix, et c'est voulu. Mais la conséquence a
+changé de nature : le `knock` atterrit chez **les membres restants**. Un lien dont
+l'émetteur est parti n'est plus une impasse tant qu'il reste quelqu'un dans le groupe. Le
+texte au-dessus du bouton d'émission a été récrit dans ces termes — il disait
+« l'invitation échouera », ce qui n'est plus vrai.
+
+**REQ-INV-16, la borne déplacée et non levée.** Son balayage interdisait la route
+`/resolve` à **tout** module hors du service — ce qui fermait la porte au client de
+réception que la voie A exige. Elle devient « **un seul appelant, nommé** » :
+`apps/web/lib/liens-invitation.ts`. Un second échoue au test, et un test de plus vérifie
+que le fichier nommé existe encore — sans lui, un renommage désactiverait le balayage en
+silence et tout redeviendrait « conforme ».
+
+**Livré.** `packages/messaging` (REQ-MSG-20 : `joinRule`, `setJoinRule`, `knock`,
+`knockers` + 6 tests), `specs/05-messaging.md`, `specs/12-invite-tokens.md` (quatre REQ
+amendées), `apps/web/lib/liens-invitation.ts` (`resoudre`), `ReceptionLien` + route
+`/i/[token]`, `LienInvitation` (bascule + texte), `MembresGroupe` (demandes d'entrée),
+et le test REQ-INV-16 rouvert.
+
+**Reste non prouvé.** Aucun `knock` n'a été émis contre un vrai Synapse. La suite prouve
+que la bonne règle est écrite, que le bon appel part et que l'UI dit la vérité ; que le
+serveur accepte un knock sur un salon passé en `knock`, et que l'invitation qui suit fasse
+bien entrer, demande la pile déployée. Le sas dépend aussi d'un droit : basculer
+`join_rules` exige le power level d'état. Relevé en écrivant cette trace, et **corrigé
+plutôt que documenté** — un membre ordinaire qui émet un lien voit désormais « Ce lien ne
+fera entrer personne » avec la marche à suivre, au lieu d'un lien valide qui n'ouvre rien.
+C'est la première chose à vérifier sur pile réelle.
+
+---
+
+## E-14 — Le paramètre de lancement audio/vidéo n'est vérifiable contre aucune version
+
+**Remonté le 07/08/2026 pendant M-I. Tranché le jour même : on épingle.**
+
+**La question.** REQ-UIX-38 demande que « appel audio » et « appel vidéo » passent *les
+paramètres de lancement correspondants* au widget. CLAUDE.md est explicite sur ce genre de
+valeur : « vérifier dans la doc de la version déployée avant usage, ne jamais supposer ».
+Or le dépôt n'épinglait **aucune** version d'Element Call — ni image, ni digest : `infra/`
+ne connaissait que LiveKit et lk-jwt. Le nom du paramètre ne pouvait qu'être supposé, ce
+que la règle interdit. Même classe que E-08 : deux specs correctes séparément,
+l'incohérence dans la jonction.
+
+**Décision (PM).** Auto-hébergement intégral oblige : Element Call rejoint l'overlay
+`rtc/` avec image épinglée par digest, version et URL consignées. Nouvelle **REQ-RTC-08**,
+testée comme les autres valeurs d'infra. `skipLobby` reste absent, le lobby reste le
+filet. REQ-UIX-38 inchangée.
+
+**Ce que l'épinglage a révélé, et c'est tout l'intérêt.** Une fois `v0.23.0` épinglée, la
+relecture de son `src/UrlParams.ts` a montré que **les deux paramètres que le client
+envoyait ne faisaient rien** :
+
+- `video=true|false` — ce paramètre n'existe dans aucune version. Le mécanisme réel est
+  `intent`, un enum `UserIntent` : `start_call` (vidéo) et `start_call_voice` (audio),
+  tous deux avec `skipLobby: false` ;
+- `hideHeader=true` — retiré d'`UrlConfiguration`, remplacé par `header` (`none` /
+  `standard` / `app_bar`). Le commentaire d'amont le dit encore rétrocompatible ; le code
+  ne le lit plus.
+
+Aucun des deux ne cassait quoi que ce soit. Aucun des deux ne faisait quoi que ce soit non
+plus, et rien dans le dépôt ne pouvait le dire. C'est exactement le mode de panne que
+l'épinglage ferme.
+
+**Troisième trouvaille, hors périmètre initial :** `matrix_rtc_mode`. Laissé au défaut,
+c'est le réglage développeur de **chaque utilisateur** qui décide de la forme des
+événements d'appartenance. Sa valeur `matrix_2_0` active les événements *sticky* de
+MSC4354 — précisément la divergence que `packages/calls/README.md` annonçait comme
+« à surveiller », et sous laquelle `activeCall()` cesserait de voir les participants
+**sans erreur bruyante**. La config servie l'épingle à `compatibility`, et REQ-RTC-08 a
+un test qui refuse `matrix_2_0`. La divergence a désormais un interrupteur nommé au lieu
+d'être une inquiétude en prose.
+
+**Livré.** `infra/rtc/docker-compose.yml` (service `element-call`, digest
+`sha256:e352de46…`, v0.23.0 résolue le 07/08/2026), `infra/rtc/element-call.json`,
+`infra/rtc/call.conf` + `infra/proxy/call.conf` (le nom d'hôte `call.<domaine>` ; la pile
+de base n'en sert aucun, même règle que E-08), `specs/02-rtc-backend.md` REQ-RTC-08,
+`infra/rtc/tests/element-call.test.ts`, et `packages/calls` qui envoie maintenant `intent`
+et `header`. La marche à suivre au prochain bump est dans `infra/rtc/README.md`.
+
+**Reste non prouvé :** rien de tout ceci n'a tourné. Le digest est réel et vérifié auprès
+du registre, la relecture est faite sur la source de la v0.23.0, mais la pile n'a pas été
+déployée — le certificat à SAN `call.<domaine>` et le rendu du widget se vérifient sur une
+pile réelle.
 
 ---
 

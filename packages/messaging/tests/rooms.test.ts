@@ -8,12 +8,16 @@ import {
   createGroupChat,
   getPinnedEvents,
   invite,
+  joinRule,
   kick,
+  knock,
+  knockers,
   memberCount,
   members,
   PINNED_EVENTS_METADATA,
   powerLevelOf,
   roomNotificationLevel,
+  setJoinRule,
   setPinnedEvents,
   setPowerLevel,
   setRoomNotificationLevel,
@@ -220,5 +224,73 @@ describe("REQ-UIX-36 — trois niveaux de notification, en push rules natives", 
   it("aucune règle absente n'est supprimée — pas de 404 provoqué", async () => {
     await setRoomNotificationLevel(ctx.session, ROOM, "mute");
     expect(ctx.client.deletePushRule).not.toHaveBeenCalled();
+  });
+});
+
+describe("REQ-MSG-20 — le sas d'entrée : knock, et l'invitation native qui le clôt", () => {
+  it("un salon sans règle d'accès lisible compte comme `invite` : dans le doute, fermé", () => {
+    // Le cas réel : `Preset.PrivateChat` n'écrit pas toujours l'événement, et l'état
+    // n'est pas encore là avant le premier /sync. Lire « knock » par défaut ouvrirait un
+    // groupe privé sur une absence de donnée.
+    expect(joinRule(fakeSession({}).session, ROOM)).toBe("invite");
+    expect(joinRule(fakeSession({ joinRule: "invite" }).session, ROOM)).toBe("invite");
+    expect(joinRule(fakeSession({ joinRule: "public" }).session, ROOM)).toBe("invite");
+  });
+
+  it("reconnaît le sas quand il est ouvert", () => {
+    expect(joinRule(fakeSession({ joinRule: "knock" }).session, ROOM)).toBe("knock");
+  });
+
+  it("la bascule s'écrit dans l'état du salon, avec la valeur que Matrix attend", async () => {
+    await setJoinRule(ctx.session, ROOM, "knock");
+    expect(ctx.client.sendStateEvent).toHaveBeenCalledWith(
+      ROOM,
+      "m.room.join_rules",
+      { join_rule: "knock" },
+      "",
+    );
+
+    await setJoinRule(ctx.session, ROOM, "invite");
+    expect(ctx.client.sendStateEvent).toHaveBeenLastCalledWith(
+      ROOM,
+      "m.room.join_rules",
+      { join_rule: "invite" },
+      "",
+    );
+  });
+
+  it("frapper n'envoie aucun motif : l'état de salon n'est jamais chiffré", async () => {
+    await knock(ctx.session, ROOM);
+    expect(ctx.client.knockRoom).toHaveBeenCalledWith(ROOM);
+    // Un `reason` partirait en clair. Se présenter se fait dans le salon, une fois entré.
+    expect(ctx.client.knockRoom.mock.calls[0]).toEqual([ROOM]);
+  });
+
+  it("ceux qui attendent se lisent dans l'appartenance knock, pas dans les membres", () => {
+    const attente = fakeMember("@mira:tacita.test", "mira");
+    const avecKnock = fakeSession({
+      members: [fakeMember("@luca:tacita.test", "luca", 100)],
+      knockers: [attente],
+    });
+
+    expect(knockers(avecKnock.session, ROOM).map((m) => m.userId)).toEqual(["@mira:tacita.test"]);
+    // Et surtout : ils ne sont pas comptés comme membres du groupe.
+    expect(members(avecKnock.session, ROOM).map((m) => m.userId)).toEqual(["@luca:tacita.test"]);
+    expect(memberCount(avecKnock.session, ROOM)).toBe(1);
+  });
+
+  it("accepter est une invitation native, pas un mécanisme de plus", async () => {
+    // E-13 : c'est tout l'intérêt de la voie A — le sas se referme par le chemin de
+    // D-09 déjà éprouvé, aucun état parallèle à tenir.
+    await invite(ctx.session, ROOM, "@mira:tacita.test");
+    expect(ctx.client.invite).toHaveBeenCalledWith(ROOM, "@mira:tacita.test");
+  });
+
+  it("un groupe créé n'est pas en knock : la bascule suit les liens, pas la création", async () => {
+    await createGroupChat(ctx.session, "équipe");
+    const [opts] = ctx.client.createRoom.mock.calls[0]!;
+    // spec 05 « inchangée par défaut » (plan de route E-13) : pas de knock permanent
+    // sur tous les groupes.
+    expect(JSON.stringify(opts)).not.toContain("knock");
   });
 });

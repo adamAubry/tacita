@@ -1,18 +1,23 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
+import { OutboxProvider } from "../components/conversation/OutboxProvider";
+import { ConnectionBannerLive } from "../components/foundation/ConnectionBanner";
 import { Theme, type ThemeMode } from "../components/foundation/primitives";
 import { tacitaTheme } from "../components/foundation/theme";
+import { PushNotifications } from "../components/notifications/PushNotifications";
 import { RecoveryGate } from "../components/onboarding/RecoveryGate";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
+import { HOMESERVER } from "../lib/config";
 import { ecrireTheme, lireTheme } from "../lib/preferences";
-
-/**
- * L'adresse du homeserver est une donnée de déploiement, pas un secret : elle est
- * publique dès le premier appel réseau du client.
- */
-const HOMESERVER = process.env.NEXT_PUBLIC_HOMESERVER_URL ?? "https://chat.example.org";
 
 /**
  * **Le `Theme` d'Astryx doit être ici, dans un composant client à nous.** Posé
@@ -23,7 +28,10 @@ const HOMESERVER = process.env.NEXT_PUBLIC_HOMESERVER_URL ?? "https://chat.examp
 /** DESIGN.md : le clair est le thème de référence ; c'est lui le défaut. */
 export const MODE_DEFAUT: ThemeMode = "light";
 
-const ContexteTheme = createContext<{ mode: ThemeMode; changerMode: (m: ThemeMode) => void }>({
+const ContexteTheme = createContext<{
+  mode: ThemeMode;
+  changerMode: (m: ThemeMode) => void;
+}>({
   mode: MODE_DEFAUT,
   changerMode: () => {},
 });
@@ -56,11 +64,41 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ContexteTheme.Provider value={{ mode, changerMode }}>
       <Theme theme={tacitaTheme} mode={mode}>
-        {/* REQ-UI-04 — la porte est **dans** le thème et **autour** de tout le contenu :
+        {/*
+          Le fond de l'application. **Rien ne le peignait** : `html` et `body` sont
+          transparents, et le conteneur d'Astryx ne fait que porter les tokens sans
+          hauteur propre. En thème clair le blanc du navigateur passait pour le bon fond
+          — en sombre, il serait resté blanc derrière tout espace non couvert.
+          Mesuré au navigateur le 07/08/2026 ; jsdom ne peint pas.
+
+          Ici et pas sur `body` : les tokens sont posés par `Theme` sur son conteneur,
+          donc invisibles depuis `body`. `100dvh` et non `100vh` — sur mobile, la barre
+          d'URL rétractable rend `vh` plus grand que la zone réellement visible.
+        */}
+        <div
+          style={{
+            minHeight: "100dvh",
+            background: "var(--color-background-body)",
+          }}
+        >
+          {/* REQ-UI-04 — la porte est **dans** le thème et **autour** de tout le contenu :
             aucune route ne rend quoi que ce soit tant que la clé n'est pas confirmée. */}
-        <SessionProvider homeserverUrl={HOMESERVER}>
-          <RecoveryGate>{children}</RecoveryGate>
-        </SessionProvider>
+          {/* REQ-UI-17 / REQ-UIX-04 — au-dessus de tout, porte de récupération comprise :
+            perdre le réseau pendant l'onboarding mérite la même explication qu'ailleurs. */}
+          <ConnectionBannerLive />
+          <SessionProvider homeserverUrl={HOMESERVER}>
+            {/* REQ-OBX-01 — la file d'envoi est **au-dessus** de la porte et des écrans :
+              ce qui a été écrit doit partir à la reconnexion quel que soit l'écran ouvert,
+              y compris quand aucune conversation n'est affichée. */}
+            <OutboxProvider>
+              <RecoveryGate>{children}</RecoveryGate>
+            </OutboxProvider>
+            {/* REQ-UI-18 — la chaîne push est **hors** de la porte de récupération : elle
+              ne rend rien tant qu'un message n'est pas arrivé, et elle doit pouvoir
+              répondre au service worker quel que soit l'écran affiché. */}
+            <PushNotifications />
+          </SessionProvider>
+        </div>
       </Theme>
     </ContexteTheme.Provider>
   );

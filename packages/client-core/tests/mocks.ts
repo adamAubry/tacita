@@ -71,6 +71,12 @@ function makeClient(crypto: CryptoMock) {
     initRustCrypto: vi.fn(async (_opts?: unknown) => {}),
     getCrypto: vi.fn((): CryptoMock | undefined => crypto),
     startClient: vi.fn(async (_opts?: unknown) => {}),
+    /**
+     * REQ-UIX-06 — la validation du jeton à la reprise. Elle réussit par défaut : les
+     * tests qui veulent un jeton refusé le disent explicitement, et ceux qui n'en
+     * parlent pas ne doivent pas se voir refuser une session valable.
+     */
+    whoami: vi.fn(async () => ({ user_id: "@luca:tacita.test" })),
     getRoom: vi.fn((_roomId: string): unknown => null),
     logout: vi.fn(async (_stop?: boolean) => ({})),
     clearStores: vi.fn(async () => {}),

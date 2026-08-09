@@ -5,6 +5,23 @@
 server_name: "${SERVER_NAME}"
 pid_file: /data/homeserver.pid
 public_baseurl: "https://${SERVER_NAME}/"
+
+# REQ-INF-09 — **où le client a le droit de revenir après le SSO.**
+#
+# Par défaut, Synapse n'accepte de renvoyer le jeton de connexion que vers l'origine de
+# `public_baseurl`. Or le proxy n'a volontairement aucun `location /` : le shard (spec 11)
+# est servi ailleurs, sur sa propre origine. Sans cette liste, le retour d'OIDC s'arrête
+# sur `/_synapse/client/oidc/callback` et l'utilisateur ne revient jamais dans l'app —
+# alors que `GET /login/sso/redirect` répond bien 302 et que tout paraît correct.
+#
+# Trouvé le 07/08/2026 en pilotant le vrai formulaire Keycloak dans un navigateur : la
+# fumée s'arrêtait à la redirection *vers* Keycloak et ne voyait pas le retour.
+# `SHARD_ORIGIN` vide (défaut) = shard servi sur le domaine du homeserver, rien à ouvrir.
+# Rendu en séquence YAML « flow » sur une seule ligne : le gabarit reste du YAML valide,
+# donc relisible par les tests d'infra. Une entrée vide serait pire qu'absente — Synapse
+# compare la liste **par préfixe**, et `""` est le préfixe de toute URL.
+sso:
+  client_whitelist: ${SSO_CLIENT_WHITELIST}
 report_stats: false
 media_store_path: /data/media_store
 

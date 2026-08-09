@@ -6,6 +6,22 @@ passerelle Web Push (REQ-INF-14) et le service de liens d'invitation (REQ-INF-15
 Hors scope : LiveKit/TURN/well-known (spec 02), le *code* de la passerelle push
 (spec 03) et celui du service de liens (spec 12).
 
+## Deux environnements
+
+Ce README décrit le socle et **la machine de développement**. Le staging — VPS Ubuntu,
+vrai domaine, vrai certificat, shard servi par le proxy — a son propre runbook :
+**`staging/README.md`** (REQ-INF-17). Les deux partagent `docker-compose.yml` ; tout ce
+qui les sépare vit dans un overlay chargé volontairement (D-07, règle 6 de la spec 00) :
+
+| | Compose | Shard | Certificat |
+| --- | --- | --- | --- |
+| dev | `docker-compose.yml` + `smoke/docker-compose.yml` | `pnpm --filter web dev` sur l'hôte, `SHARD_ORIGIN=http://localhost:3000` | auto-signé, CA à importer |
+| staging | `docker-compose.yml` + `staging/docker-compose.yml` | service `web`, servi sur `SERVER_NAME`, `SHARD_ORIGIN` vide | Let's Encrypt |
+
+Les deux overlays ne se composent **jamais** ensemble : `smoke/` publie PostgreSQL et
+l'API Synapse sur l'hôte et installe un CA de développement dans le magasin de confiance
+de Synapse — trois choses qui n'ont rien à faire sur une machine publique.
+
 ## Démarrage
 
 ```sh
@@ -20,6 +36,43 @@ Création d'un compte (REQ-INF-04 — inscription fermée) :
 docker compose exec synapse register_new_matrix_user \
   -c /data/homeserver.yaml http://localhost:8008
 ```
+
+### Résoudre le nom depuis l'hôte
+
+**Quatrième cause de la même famille que les trois du login OIDC ci-dessous, du côté
+de l'hôte au lieu du réseau Docker.** L'alias réseau de `smoke/docker-compose.yml` fait
+résoudre `SERVER_NAME` *entre conteneurs* — il ne fait rien pour le navigateur. Sans
+cette étape, `pnpm --filter web dev` redirige vers `https://${SERVER_NAME}/…` et le
+navigateur n'y trouve personne. Symptôme trompeur : la redirection est **correcte**
+(REQ-UIX-06 renvoie à l'OIDC sans écran intermédiaire), c'est le nom qui ne mène nulle
+part.
+
+Aucune variable du shard n'y change quoi que ce soit. Le flux de connexion **sort de
+l'application** : Synapse répond `302` vers Keycloak sous `https://${SERVER_NAME}/auth`,
+et le navigateur doit résoudre ce nom-là. Pointer `NEXT_PUBLIC_HOMESERVER_URL` vers
+`http://localhost:8008` déplace la panne d'un saut, sans la corriger.
+
+Une ligne dans le fichier hosts, avec les deux noms que porte le certificat :
+
+```
+127.0.0.1 chat.example.org call.chat.example.org
+```
+
+- **Linux / macOS** : `/etc/hosts`.
+- **WSL2** : le navigateur tourne côté **Windows**, donc c'est
+  `C:\Windows\System32\drivers\etc\hosts` (éditeur lancé en administrateur) qui compte —
+  le `/etc/hosts` de WSL ne sert qu'aux appels depuis le shell (`curl`, suite de fumée).
+  `127.0.0.1` suffit dans les deux : WSL2 fait suivre localhost jusqu'au proxy.
+
+Puis **approuver le CA de dev** (`proxy/certs/fullchain.pem`) dans le navigateur.
+Accepter l'exception de sécurité affiche l'application, mais ne suffit pas : sans
+confiance réelle, le service worker ne s'installe pas — REQ-INF-10 exige un contexte
+sécurisé. Pour tester la PWA, il faut l'import.
+
+Le nom lui-même se change dans `infra/.env` (`SERVER_NAME`), suivi de
+`./proxy/generate-dev-certs.sh` pour que les SAN suivent, et de la recopie des trois
+URLs dans `apps/web/.env.local` — voir `apps/web/.env.example`. Les deux fichiers sont
+ignorés par git : chaque environnement garde le sien, le dépôt ne porte que les exemples.
 
 ## Versions épinglées
 

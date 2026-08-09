@@ -10,3 +10,12 @@ infra/proxy/certs/
 .claude/settings.local.json
 *.old
 *.tsbuildinfo
+
+# Simulations utilisateur Playwright — branche feat/m-i-appels-push uniquement.
+# Autorise par le PM le 07/08/2026 : outil exploratoire, hors `npm test`, hors hooks,
+# et aucune exigence ne s'y appuie (interdit n°12, meme regime que le moteur d'URL
+# d'impeccable). Rien de tout ceci n'entre dans le depot.
+e2e/
+
+# Runbook de lancement local — meme regime que e2e/ : machine-dependant, hors depot.
+LAUNCH_README.md

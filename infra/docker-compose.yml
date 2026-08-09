@@ -40,6 +40,26 @@ services:
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/tacita.json:ro
       - keycloak-data:/opt/keycloak/data
+    # REQ-INF-09 — « démarré » ne veut pas dire « realm importé ». Keycloak met une
+    # quinzaine de secondes à publier `/auth/realms/tacita`, et Synapse interroge la
+    # découverte OIDC dès qu'il démarre : il échoue, **met l'échec en cache**, et ne s'en
+    # remet pas sans redémarrage. Un `docker compose up -d` à froid donnait donc une pile
+    # où personne ne pouvait se connecter, sans rien d'anormal dans `ps`.
+    #
+    # La sonde interroge le realm lui-même, pas `/health/ready` : c'est l'import du realm
+    # qui conditionne Synapse, pas la vivacité du serveur. L'image n'embarque ni curl ni
+    # wget (UBI-minimal depuis la 25) — d'où le `/dev/tcp` de bash, qui y est.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf 'GET /auth/realms/tacita/.well-known/openid-configuration HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          head -1 <&3 | grep -q '200'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
 
   minio:
     image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e # RELEASE.2025-09-07
@@ -84,7 +104,9 @@ services:
       postgres:
         condition: service_healthy
       keycloak:
-        condition: service_started
+        # REQ-INF-09 — `service_healthy` et non `service_started` : voir la sonde de
+        # `keycloak`. C'est l'ordre de démarrage qui décidait si le login existait.
+        condition: service_healthy
       minio-init:
         condition: service_completed_successfully
     environment:
@@ -95,6 +117,9 @@ services:
       SYNAPSE_MACAROON_SECRET_KEY: ${SYNAPSE_MACAROON_SECRET_KEY}
       SYNAPSE_FORM_SECRET: ${SYNAPSE_FORM_SECRET}
       SYNAPSE_IP_RANGE_WHITELIST: ${SYNAPSE_IP_RANGE_WHITELIST:-[]}
+      # REQ-INF-09 — origine du shard quand il n'est pas servi sur le domaine du
+      # homeserver. Vide = même domaine, rien à ouvrir. Voir README, « Login OIDC ».
+      SHARD_ORIGIN: ${SHARD_ORIGIN:-}
       KEYCLOAK_OIDC_CLIENT_SECRET: ${KEYCLOAK_OIDC_CLIENT_SECRET}
       S3_BUCKET: ${S3_BUCKET}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
@@ -164,6 +189,9 @@ services:
       # REQ-RTC-05 — pile sans SFU : le `.well-known` n'annonce aucun focus. L'overlay
       # RTC monte son propre fichier à ce chemin, compose fusionne par cible de montage.
       - ./proxy/well-known.conf:/etc/nginx/well-known.conf:ro
+      # REQ-RTC-08 — même mécanique : pile sans SFU, aucun Element Call servi. Le
+      # fichier est vide de directives ; l'overlay RTC monte le bloc `server` à sa place.
+      - ./proxy/call.conf:/etc/nginx/call.conf:ro
       - ./proxy/certs:/etc/nginx/certs:ro
 
 volumes:

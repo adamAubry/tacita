@@ -4,13 +4,19 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions, débounce sur les critères — voir `ESCALATIONS` § E-11), **M-G** (social, hors photo de profil — voir `ESCALATIONS` § E-12) et **M-H** (réglages et infos de conversation, réception de lien de groupe exceptée — voir `ESCALATIONS` § E-13) livrés. Reste **M-I** (appels et push).
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche et mentions), **M-G** (social), **M-H** (réglages et infos de conversation) et **M-I** (appels et push) livrés — les neuf modules du shard sont posés. Les quatre escalades ouvertes ont été tranchées et appliquées le 07/08/2026 (E-11 à E-14) : la recherche dit ce que la primitive permet, la photo de profil est livrée par le chemin public nommé, le lien de groupe fait frapper à la porte, et Element Call est épinglé. Reste l'intégration finale (navigation croisée, passe de cohérence design).
 
 ```sh
+cp .env.example .env.local # les trois URLs, dérivées de SERVER_NAME (infra/.env)
 pnpm --filter web dev      # http://localhost:3000
 pnpm --filter web build
 npx vitest run apps/web    # ou `npm test` à la racine
 ```
+
+`.env.local` est ignoré par git : chaque environnement garde le sien. Avant le premier
+`dev`, le nom doit résoudre depuis le **navigateur** — `infra/README.md`, section
+« Résoudre le nom depuis l'hôte » (le cas WSL2 y est traité). Sans ça la redirection
+vers l'OIDC est correcte et part vers un nom qui ne mène nulle part.
 
 ## Trois contraintes de construction — sans elles, `next build` échoue
 
@@ -53,9 +59,24 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **rien n'a été rendu dans un vrai navigateur.** jsdom prouve la logique et la propagation
   des événements ; il ne prouve ni un doigt sur un écran, ni le conflit entre un swipe et le
   défilement, ni la zone morte de Safari iOS (REQ-UI-08/09, module M-D) ;
-- **le service worker n'a jamais tourné.** Ce qui est testé est sa *forme* : liste de
-  précache sans donnée, et une seule branche d'écriture au cache, étroite. Qu'il se comporte
-  ainsi en production reste à vérifier ;
+- **le service worker n'a jamais tourné dans un navigateur.** Ses gestionnaires `push` et
+  `notificationclick` sont, eux, exercés : la suite évalue **le fichier livré** avec un
+  `self` fourni, et vérifie la notification construite comme celle qui reste générique.
+  Le reste est testé sur sa *forme* : liste de précache sans donnée, une seule branche
+  d'écriture au cache, étroite. Que le navigateur l'installe et le réveille comme prévu
+  reste à vérifier sur une pile déployée ;
+- **une notification arrivée application fermée reste générique.** Les clés Megolm vivent
+  dans le store crypto d'une fenêtre : sans fenêtre ouverte, le service worker ne peut rien
+  déchiffrer et affiche « Nouveau message ». La limite est écrite dans les limites connues
+  (M-H) ; la lever demanderait la crypto Rust dans le service worker ;
+- **aucun appel n'a été passé.** Le shell d'appel est prouvé sur ce qui lui appartient —
+  permissions de l'iframe, message de `RtcFociMissing`, sortie de secours au délai,
+  paramètre de lancement — avec le paquet 10 mocké. Qu'Element Call démarre, s'authentifie
+  auprès du SFU et rende du média demande la pile RTC déployée (spec 02) ;
+- **les paramètres d'URL d'Element Call sont relus dans la version épinglée** (E-14 close) :
+  `infra/rtc/` fixe la `v0.23.0` par digest, et le point d'entrée part en `intent`. Ce qui
+  reste non prouvé, c'est le rendu — voir le point précédent. `skipLobby` n'est jamais
+  envoyé : le lobby est le rattrapage d'une intention partie de travers ;
 - **le flux OIDC complet n'a jamais été exécuté d'un bout à l'autre.** Le retour du
   fournisseur est testé sur son symptôme — un jeton dans l'URL, retiré de l'historique —
   pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;
@@ -72,10 +93,11 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **l'envoi de pièce jointe n'a pas de barre de progression**, seulement un état : le
   pipeline (spec 08) ne rapporte rien pendant la compression ni le téléversement, et une
   barre serait une animation inventée plutôt qu'une mesure ;
-- **la photo de profil n'est pas livrée**, et son champ est absent plutôt que grisé : le
-  pipeline chiffre tout ce qu'il téléverse, alors qu'un avatar Matrix est un `mxc://` nu
-  que tout client doit pouvoir afficher. Un avatar chiffré serait un carré cassé partout
-  — `ESCALATIONS` § E-12 ;
+- **la photo de profil est livrée, et elle n'est pas chiffrée** (E-12 close, voie A) : un
+  avatar Matrix est un `mxc://` nu que tout client doit pouvoir afficher, et le chiffrer en
+  ferait un carré cassé partout. Elle passe par `uploadPublicProfileImage()`, **l'unique
+  chemin public du pipeline**, dont le site d'appel unique est gardé par un test. L'écran
+  le dit au moment du choix ;
 - **aucun avatar n'est une image**, pas même celui d'un contact : `ConversationAvatar`
   rend des initiales, la récupération de média authentifié pour les avatars n'étant pas
   branchée ;
@@ -86,8 +108,14 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   notification par salon avec les règles natives, et la suite prouve *quelles* règles partent ;
   que le serveur les évalue comme prévu — mentions qui passent en « mentions uniquement »,
   rien qui passe en « silencieux » — demande une pile déployée ;
-- **un lien d'invitation de groupe s'émet, mais rien ne le consomme encore.** L'écran de
-  réception appartient à M-G, et le mécanisme d'arrivée dans un salon privé est remonté au PM
+- **aucun `knock` n'a été émis contre un vrai Synapse.** Depuis E-13, un lien de groupe
+  ouvre le sas du salon, fait frapper son porteur, et un membre confirme. La suite prouve
+  que la bonne règle est écrite, que le bon appel part et que l'UI dit la vérité ; que le
+  serveur accepte le knock et que l'invitation qui suit fasse entrer demande une pile
+  déployée. À vérifier en premier : la bascule `join_rules` exige un power level d'état,
+  et un membre ordinaire qui émet un lien voit un avertissement au lieu d'un lien muet ;
+- ~~**un lien d'invitation de groupe s'émet, mais rien ne le consomme encore.**~~ L'écran de
+  réception appartient à M-G, et le mécanisme d'arrivée dans un salon privé était remonté au PM
   (`ESCALATIONS` § E-13). L'émission, l'expiration et la révocation, elles, fonctionnent.
 
 ## Où sont les choses

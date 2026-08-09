@@ -1,4 +1,4 @@
-﻿export { initSession, restoreSession } from "./session";
+﻿export { initSession, onSessionInvalidee, restoreSession } from "./session";
 export type {
   OrderedTimeline,
   RecoveryKey,

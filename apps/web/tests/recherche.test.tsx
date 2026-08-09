@@ -420,7 +420,7 @@ describe("REQ-UIX-21 — filtres servis par l'index, jamais par du plein-texte",
   });
 });
 
-describe("REQ-UIX-22 — débounce, skeletons, et zéro appel réseau", () => {
+describe("REQ-UIX-22 — débounce des changements de critères, skeletons, zéro réseau", () => {
   beforeEach(() => vi.useFakeTimers());
 
   it("vingt changements en rafale ne produisent qu'un seul appel à search", async () => {
@@ -430,7 +430,10 @@ describe("REQ-UIX-22 — débounce, skeletons, et zéro appel réseau", () => {
       { initialProps: { terme: "r" } },
     );
 
-    // Chaque frappe arrive avant la fin de la fenêtre : le minuteur précédent est annulé.
+    // Chaque changement arrive avant la fin de la fenêtre : le minuteur précédent est
+    // annulé. **Des critères, pas des frappes** — `PowerSearch` ne notifie la saisie
+    // qu'à la validation d'un token (E-11, voie A). Éditer la valeur d'un token, en
+    // ajouter un puis en retirer un autre produit bien ces rafales.
     for (let rang = 2; rang <= 20; rang++) {
       rerender({ terme: "r".repeat(rang) });
       act(() => {

@@ -19,6 +19,7 @@ export {
   FAVOURITE_TAG,
   invitations,
   openDirectMessage,
+  registerDirect,
   setFavourite,
   subscribeConversations,
 } from "./conversations";
@@ -31,17 +32,21 @@ export {
   createGroupChat,
   getPinnedEvents,
   invite,
+  joinRule,
   kick,
+  knock,
+  knockers,
   memberCount,
   members,
   PINNED_EVENTS_METADATA,
   powerLevelOf,
   roomNotificationLevel,
+  setJoinRule,
   setPinnedEvents,
   setPowerLevel,
   setRoomNotificationLevel,
 } from "./rooms";
-export type { RoomNotificationLevel } from "./rooms";
+export type { JoinRule, RoomNotificationLevel } from "./rooms";
 
 export {
   acceptInvitation,

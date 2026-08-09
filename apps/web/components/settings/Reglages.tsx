@@ -18,9 +18,11 @@ import { RadioList, RadioListItem, Text, type ThemeMode } from "../foundation/pr
 import { useSession } from "../onboarding/SessionProvider";
 import { Confidentialite } from "./Confidentialite";
 import { LimitesConnues } from "./LimitesConnues";
+import { NotificationsPush } from "./NotificationsPush";
 import { libelleNiveau } from "./NotificationsSalon";
 import { SettingsProfileCard } from "./SettingsProfileCard";
 import { StockageLocal } from "./StockageLocal";
+import { routeInfos } from "../../lib/routes";
 
 /** Les cinq options de REQ-UIX-31. Chacune ouvre une modal, aucune ne navigue. */
 type Option = "theme" | "confidentialite" | "notifications" | "stockage" | "limites";
@@ -125,7 +127,11 @@ export function Reglages() {
         {ouverte === "confidentialite" && <Confidentialite />}
 
         {ouverte === "notifications" && (
-          <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
+          <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
+            {/* REQ-UI-18 — l'abonnement push et son rattrapage (M-I) : d'abord savoir
+                si l'appareil prévient, ensuite quelle conversation est en silence. */}
+            <NotificationsPush />
+
             <Text type="supporting" color="secondary">
               Les notifications se règlent conversation par conversation, depuis ses
               informations. Voici celles qui ne sont pas au niveau « Tout ».
@@ -142,7 +148,7 @@ export function Reglages() {
                   cle: conversation.roomId,
                   libelle: conversation.name,
                   description: libelleNiveau(conversation.niveau),
-                  onClick: () => router.push(`/c/${conversation.roomId}/infos`),
+                  onClick: () => router.push(routeInfos(conversation.roomId)),
                 }))}
               />
             )}

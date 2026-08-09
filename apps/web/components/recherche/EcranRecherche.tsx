@@ -14,6 +14,7 @@ import { CHAMP_CONVERSATION } from "../../lib/recherche";
 import { useSession } from "../onboarding/SessionProvider";
 import { Placeholder } from "../foundation/Placeholder";
 import { Recherche } from "./Recherche";
+import { routeConversation } from "../../lib/routes";
 
 /**
  * Le câblage des deux onglets de recherche : session, worker d'index, conversations.
@@ -93,11 +94,11 @@ export function EcranRecherche({ variation }: { variation?: "search" | "mentions
           : undefined
       }
       indexedDB={globalThis.indexedDB}
-      onOuvrirConversation={(roomId) => router.push(`/c/${encodeURIComponent(roomId)}`)}
+      onOuvrirConversation={(roomId) => router.push(routeConversation(roomId))}
       // REQ-UIX-20 — « positionnée sur le message ». L'ancre passe par l'URL : la
       // conversation sait s'y rendre seule, et le lien reste partageable et rejouable.
       onOuvrirMessage={({ roomId, eventId }) =>
-        router.push(`/c/${encodeURIComponent(roomId)}?m=${encodeURIComponent(eventId)}`)
+        router.push(routeConversation(roomId, eventId))
       }
     />
   );

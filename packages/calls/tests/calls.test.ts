@@ -121,6 +121,41 @@ describe("REQ-CAL-01 — URL Element Call complète et paramétrée", () => {
     expect(url).not.toMatch(/secret|api[_-]?key|token/i);
   });
 
+  it("traduit le point d'entrée en `intent`, celui de la version épinglée", () => {
+    // E-14 close. Relu dans `UserIntent` de la v0.23.0 (REQ-RTC-08) : `start_call` ouvre
+    // en vidéo, `start_call_voice` en audio, et les deux laissent le lobby.
+    const audio = new URLSearchParams(buildCallWidget(session, SALON, WIDGET).params);
+    expect(audio.get("intent")).toBe("start_call_voice");
+
+    const video = new URLSearchParams(
+      buildCallWidget(session, SALON, { ...WIDGET, video: true }).params,
+    );
+    expect(video.get("intent")).toBe("start_call");
+
+    // Le lobby est le rattrapage : ne jamais l'escamoter, sinon une intention envoyée de
+    // travers dépose quelqu'un dans un appel caméra allumée sans lui demander.
+    expect(audio.get("skipLobby")).toBeNull();
+    expect(video.get("skipLobby")).toBeNull();
+  });
+
+  it("n'envoie plus les deux paramètres qu'Element Call ne lit pas", () => {
+    // Ils étaient écrits de bonne foi et ne faisaient rien : `video` n'existe dans
+    // aucune version, `hideHeader` a été remplacé par `header` (v0.23.0). Le test les
+    // nomme pour qu'ils ne reviennent pas par recopie d'un exemple ancien.
+    const { params } = buildCallWidget(session, SALON, { ...WIDGET, video: true });
+    expect(params.video).toBeUndefined();
+    expect(params.hideHeader).toBeUndefined();
+    expect(params.header).toBe("none");
+  });
+
+  it("reste en mode widget, sans quoi `intent` ne serait même pas lu", () => {
+    // `isWidget = !!widgetId && !!parentUrl` dans `UrlParams.ts` : hors de ce mode,
+    // Element Call ignore l'intention et retombe sur ses défauts de SPA.
+    const { params } = buildCallWidget(session, SALON, WIDGET);
+    expect(params.widgetId).toBeTruthy();
+    expect(params.parentUrl).toBeTruthy();
+  });
+
   it("met les paramètres dans le fragment, jamais dans la requête HTTP", () => {
     const { url } = buildCallWidget(session, SALON, WIDGET);
     expect(url.slice(0, url.indexOf("#"))).not.toContain("?");
