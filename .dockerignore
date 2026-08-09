@@ -1,0 +1,19 @@
+# Le Dockerfile du shard prend la racine du monorepo pour contexte (workspace pnpm) :
+# sans cette liste, le contexte embarque les `node_modules` de l'hôte — des centaines de
+# mégaoctets, et surtout des binaires compilés pour la plateforme de l'hôte, que
+# `pnpm install` de l'image ne remplacerait pas.
+node_modules
+**/node_modules
+**/.next
+**/dist
+.git
+
+# Certificats et secrets : jamais dans une image.
+infra/proxy/certs
+**/.env
+**/.env.*
+!**/.env.example
+
+# Hors dépôt (voir .gitignore) : simulations Playwright et runbook local.
+e2e
+LAUNCH_README.md

@@ -1,0 +1,52 @@
+# Overlay de l'environnement de staging (VPS Ubuntu). Même patron que `smoke/` et `rtc/` :
+#
+#   docker compose -f docker-compose.yml -f staging/docker-compose.yml up -d --build
+#
+# Il n'ajoute qu'une chose à la pile de base — le shard, servi par le proxy (REQ-INF-16).
+# Tout le reste est déjà dans `docker-compose.yml`, et c'est voulu : un staging qui
+# diffère du socle par plus qu'un service ne prouve plus rien sur le socle.
+#
+# **Ne jamais le composer avec `smoke/docker-compose.yml`.** Ce dernier publie PostgreSQL
+# sur 55432 et l'API Synapse sur 8008, et installe un CA de développement dans le magasin
+# de confiance de Synapse. Sur une machine publique, les deux premiers sont des ports
+# ouverts sur Internet et le troisième une racine de confiance de trop.
+name: tacita
+
+services:
+  # REQ-INF-16 — l'artefact de production du shard. Construit **sur la machine cible** :
+  # `next build` inline `NEXT_PUBLIC_*` dans le bundle, donc l'image dépend du domaine.
+  # Un registre d'images n'aurait de sens qu'avec une configuration lue au démarrage.
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Les trois dérivent de `SERVER_NAME`, comme `apps/web/.env.example` le dit :
+        # c'est le seul vrai bouton. Les recopier à la main, c'est se donner une
+        # occasion de les désaccorder.
+        NEXT_PUBLIC_HOMESERVER_URL: https://${SERVER_NAME}
+        NEXT_PUBLIC_ELEMENT_CALL_URL: https://call.${SERVER_NAME}
+        # Interne au réseau du compose, et **doit le rester** :
+        # `/_matrix/push/v1/notify` n'a aucune authentification (spec 03).
+        NEXT_PUBLIC_PUSH_NOTIFY_URL: http://push-gateway:8008/_matrix/push/v1/notify
+    restart: unless-stopped
+    # Aucun `ports:`, volontairement. Le shard n'est joignable que par le proxy : publié
+    # sur l'hôte, il offrirait une origine en clair — donc sans `crypto.subtle`, sans
+    # service worker, et sans que l'utilisateur qui l'emprunte comprenne pourquoi.
+
+  proxy:
+    depends_on:
+      - web
+    networks:
+      default:
+        aliases:
+          # D-07 — levier de déploiement, pas artefact de dev. Synapse lit la découverte
+          # OIDC sur `https://${SERVER_NAME}/auth/…` : sans cet alias, il sort vers l'IP
+          # publique du VPS et compte sur le hairpin NAT pour y revenir. Quand ça ne
+          # marche pas, le symptôme est un 503 muet sur tout login.
+          #
+          # Conséquence obligatoire, dans `.env` : l'alias fait résoudre le nom vers une
+          # adresse privée, que la protection SSRF de Synapse refuse par défaut. Il faut
+          # `SYNAPSE_IP_RANGE_WHITELIST=["172.16.0.0/12"]`. Le contrôle de pré-vol de
+          # D-07 est dans README.md, § 6.
+          - ${SERVER_NAME}

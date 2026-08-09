@@ -6,6 +6,22 @@ passerelle Web Push (REQ-INF-14) et le service de liens d'invitation (REQ-INF-15
 Hors scope : LiveKit/TURN/well-known (spec 02), le *code* de la passerelle push
 (spec 03) et celui du service de liens (spec 12).
 
+## Deux environnements
+
+Ce README décrit le socle et **la machine de développement**. Le staging — VPS Ubuntu,
+vrai domaine, vrai certificat, shard servi par le proxy — a son propre runbook :
+**`staging/README.md`** (REQ-INF-17). Les deux partagent `docker-compose.yml` ; tout ce
+qui les sépare vit dans un overlay chargé volontairement (D-07, règle 6 de la spec 00) :
+
+| | Compose | Shard | Certificat |
+| --- | --- | --- | --- |
+| dev | `docker-compose.yml` + `smoke/docker-compose.yml` | `pnpm --filter web dev` sur l'hôte, `SHARD_ORIGIN=http://localhost:3000` | auto-signé, CA à importer |
+| staging | `docker-compose.yml` + `staging/docker-compose.yml` | service `web`, servi sur `SERVER_NAME`, `SHARD_ORIGIN` vide | Let's Encrypt |
+
+Les deux overlays ne se composent **jamais** ensemble : `smoke/` publie PostgreSQL et
+l'API Synapse sur l'hôte et installe un CA de développement dans le magasin de confiance
+de Synapse — trois choses qui n'ont rien à faire sur une machine publique.
+
 ## Démarrage
 
 ```sh
