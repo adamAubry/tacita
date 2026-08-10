@@ -1,7 +1,7 @@
 {
   "realm": "tacita",
   "enabled": true,
-  "registrationAllowed": false,
+  "registrationAllowed": true,
   "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
   "webAuthnPolicyPasswordlessRpEntityName": "Tacita",
