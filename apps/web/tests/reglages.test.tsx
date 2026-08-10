@@ -22,7 +22,7 @@ import { sourcesLivrees, sansCommentaires } from "./sources";
 
 const pousser = vi.fn();
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/reglages",
+  usePathname: () => "/profil",
   useRouter: () => ({ push: pousser, back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -148,15 +148,14 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("REQ-UIX-31 — layout Settings : carte de profil, puis des options en modal", () => {
-  it("rend la carte de profil et mène au profil propre", async () => {
-    rendreAvecSession(<Reglages />);
-
-    const carte = await screen.findByRole("button", { name: "Profil de luca" });
-    expect(screen.getByText("@luca:t")).toBeTruthy();
-
-    fireEvent.click(carte);
-    expect(pousser).toHaveBeenCalledWith("/profil");
+describe("REQ-UIX-31 — les réglages sont une section du profil, en cartes d'option", () => {
+  it("l'écran `/reglages` n'existe plus — aucune route, aucun lien vers lui", () => {
+    // La condition qui rend l'amendement vrai : tant qu'un fichier de route subsiste,
+    // Next la sert, et un lien oublié y mène sans que rien ne rougisse.
+    for (const { chemin, code } of sourcesLivrees()) {
+      expect(chemin, "la route a été supprimée, pas déplacée").not.toContain("/app/reglages/");
+      expect(sansCommentaires(code), chemin).not.toMatch(/["'`]\/reglages/);
+    }
   });
 
   it("les cinq options sont là, et chacune ouvre une modal plutôt qu'un écran", async () => {

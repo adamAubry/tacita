@@ -1,12 +1,11 @@
 "use client";
 
 import type { Profile } from "@tacita/messaging";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { IconeReglages } from "../foundation/icons";
 import { Button, Text, TextInput } from "../foundation/primitives";
 import { Sheet } from "../foundation/Sheet";
+import { Reglages } from "../settings/Reglages";
 import { ProfileCard } from "./ProfileCard";
 
 /**
@@ -54,9 +53,15 @@ export interface ProfilMoiProps {
  * Le formulaire est une feuille et non une page : modifier son nom est une action de
  * quelques secondes, et lui donner une route ajouterait une entrée d'historique dont le
  * retour renverrait au profil qu'on n'a jamais quitté.
+ *
+ * REQ-UIX-31 — **c'est aussi le seul endroit d'où l'on règle l'application** : `/reglages`
+ * n'existe plus, et les réglages sont une section de cet écran. Le même raisonnement que
+ * ci-dessus, un cran plus loin — l'ancienne route commençait par une carte de profil dont
+ * le chevron ramenait ici, et un écran dont le premier élément mène ailleurs est un
+ * couloir. L'engrenage du bandeau flottant part avec elle : il n'a plus de destination, et
+ * un bouton qui ne mène nulle part est pire qu'un bouton absent.
  */
 export function ProfilMoi({ profil, onEnregistrer, onPhoto }: ProfilMoiProps) {
-  const router = useRouter();
   const [edition, setEdition] = useState(false);
   const [nom, setNom] = useState(profil.displayName);
   const [enCours, setEnCours] = useState(false);
@@ -109,21 +114,29 @@ export function ProfilMoi({ profil, onEnregistrer, onPhoto }: ProfilMoiProps) {
         userId={profil.userId}
         avatarUrl={profil.avatarUrl}
         bannerUrl={profil.bannerUrl}
-        actions={
-          <Button
-            label="Réglages"
-            variant="ghost"
-            isIconOnly
-            icon={IconeReglages}
-            onClick={() => router.push("/reglages")}
-          />
-        }
       />
 
-      {/* Composant 22 : bouton accentué, centré. C'est la seule action de l'écran. */}
-      <div style={{ display: "grid", justifyItems: "center", padding: "var(--spacing-4)" }}>
+      {/* Composant 22 : bouton accentué, centré (REQ-UIX-24, inchangée). **La seule action
+          accentuée de l'écran** — les réglages, juste dessous, sont secondaires par
+          construction.
+
+          L'identité au-dessus est alignée à gauche, ce bouton reste centré : c'est l'écart
+          de 32 px qui rend l'axe mixte lisible. À 16 px uniformes il passait pour un
+          membre mal aligné du bloc d'identité ; à 32 px au-dessus et 24 px en dessous, il
+          est son propre temps. Espacement asymétrique, donc, et c'est le point — un
+          padding égal sur les quatre côtés ne dit jamais où commence quoi. */}
+      <div
+        style={{
+          display: "grid",
+          justifyItems: "center",
+          padding: "var(--spacing-8) var(--spacing-3) var(--spacing-6)",
+        }}
+      >
         <Button label="Modifier le profil" variant="primary" onClick={() => setEdition(true)} />
       </div>
+
+      {/* REQ-UIX-31 — les réglages sont une section de cet écran, plus une route. */}
+      <Reglages />
 
       <Sheet
         ouvert={edition}

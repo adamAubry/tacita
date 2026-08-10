@@ -98,7 +98,8 @@ export function PushNotifications() {
         <Sheet ouvert onFermer={() => setRefuse(false)} titre="Notifications non activées">
           <VStack gap={4}>
             <Text>
-              Elles peuvent être réactivées à tout moment depuis Réglages › Notifications.
+              Elles peuvent être réactivées à tout moment depuis Profil › Réglages ›
+              Notifications.
             </Text>
             <Button label="Compris" variant="primary" onClick={() => setRefuse(false)} />
           </VStack>

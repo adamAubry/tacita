@@ -1,6 +1,6 @@
 "use client";
 
-import { ClickableCard, Icon, Text } from "../foundation/primitives";
+import { OptionCard } from "../foundation/OptionCard";
 
 /**
  * REQ-UIX-34 — les options d'une conversation.
@@ -26,11 +26,12 @@ interface Carte {
 }
 
 /**
- * REQ-UIX-34 — composant 15 du wireframe : les Options, en `ClickableCard`.
+ * REQ-UIX-34 — composant 15 du wireframe : les Options, en `OptionCard`.
  *
  * Deux jeux, une seule liste : les variations sont des props, jamais des copies (règle
  * du plan frontend). Ce qui change entre 1:1 et groupe est l'appartenance à la liste,
- * pas le rendu d'une carte.
+ * pas le rendu d'une carte — lequel vit dans `OptionCard`, partagé avec les réglages de
+ * l'application (REQ-UIX-31), qui posent exactement la même carte.
  */
 export function OptionsConversation({
   direct,
@@ -60,19 +61,7 @@ export function OptionsConversation({
       style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}
     >
       {cartes.map(({ cle, titre, detail }) => (
-        <ClickableCard key={cle} label={titre} onClick={() => onOuvrir(cle)}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-            <div style={{ display: "grid", gap: "var(--spacing-1)", flex: 1, minWidth: 0 }}>
-              <Text type="body" weight="bold" maxLines={1}>
-                {titre}
-              </Text>
-              <Text type="supporting" color="secondary" maxLines={1}>
-                {detail}
-              </Text>
-            </div>
-            <Icon icon="chevronRight" />
-          </div>
-        </ClickableCard>
+        <OptionCard key={cle} titre={titre} detail={detail} onClick={() => onOuvrir(cle)} />
       ))}
     </section>
   );

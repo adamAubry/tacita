@@ -11,16 +11,15 @@ import { useMemo, useState } from "react";
 
 import { useModeTheme } from "../../app/providers";
 import { ButtonsList } from "../foundation/ButtonsList";
-import { LayoutHeader } from "../foundation/LayoutHeader";
+import { OptionCard } from "../foundation/OptionCard";
 import { Placeholder } from "../foundation/Placeholder";
 import { Sheet } from "../foundation/Sheet";
-import { RadioList, RadioListItem, Text, type ThemeMode } from "../foundation/primitives";
+import { Divider, RadioList, RadioListItem, Text, type ThemeMode } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
 import { Confidentialite } from "./Confidentialite";
 import { LimitesConnues } from "./LimitesConnues";
 import { NotificationsPush } from "./NotificationsPush";
 import { libelleNiveau } from "./NotificationsSalon";
-import { SettingsProfileCard } from "./SettingsProfileCard";
 import { StockageLocal } from "./StockageLocal";
 import { routeInfos } from "../../lib/routes";
 
@@ -35,6 +34,17 @@ const TITRES: Record<Option, string> = {
   limites: "Limites connues",
 };
 
+/**
+ * La ligne d'état de chaque carte — ce que dit `niveauLibelle` pour une conversation.
+ * `theme` n'y est pas : son état courant est le mode choisi, et il se lit à l'exécution.
+ */
+const DETAILS: Record<Exclude<Option, "theme">, string> = {
+  confidentialite: "Mode masqué, accusés de lecture",
+  notifications: "Cet appareil, et les conversations en silence",
+  stockage: "Index de recherche et caches",
+  limites: "Ce que Tacita ne promet pas",
+};
+
 /** REQ-UI-03 — les trois modes du mécanisme Astryx, dans l'ordre du plus passif. */
 const MODES: { valeur: ThemeMode; libelle: string; effet: string }[] = [
   { valeur: "system", libelle: "Comme le système", effet: "Suit le réglage de votre appareil." },
@@ -43,15 +53,23 @@ const MODES: { valeur: ThemeMode; libelle: string; effet: string }[] = [
 ];
 
 /**
- * Layout Settings (REQ-UIX-31) — la carte de profil, puis les options.
+ * REQ-UIX-31 — les réglages, **une section de son propre profil** (amendé le 10/08/2026).
  *
- * Chaque option ouvre une modal plutôt qu'un écran : ce sont des réglages qu'on pose et
- * qu'on quitte, pas des destinations. Seule la carte de profil navigue, parce qu'elle
- * mène à un écran qui a sa propre vie (M-G).
+ * `/reglages` n'existe plus. L'écran commençait par une carte de profil dont le chevron
+ * ramenait au profil — un écran dont le premier élément mène ailleurs est un couloir, et
+ * la Settings profile card (composant 24) disparaît avec lui.
  *
- * Le shard ne calcule rien ici non plus : le thème vient du provider de M-A, le mode
- * masqué du service d'accusés (spec 06), les niveaux de notification des push rules
- * natives (spec 05).
+ * **Une pile de cartes sur la page, pas une liste dans une feuille.** Exactement la forme
+ * des options d'une conversation (composant 15, `OptionCard` — « Thème de la
+ * conversation » et ses voisines) : titre, ligne d'état, chevron. Le même geste ouvre la
+ * même sorte de chose, et l'état courant se lit sans rien ouvrir. Un cran de moins
+ * qu'avant : les cinq réglages sont visibles, et un seul geste mène à chacun.
+ *
+ * Chaque option reste une modal : ce sont des réglages qu'on pose et qu'on quitte, pas
+ * des destinations. Une seule est ouverte à la fois, et aucune n'en ouvre une autre.
+ *
+ * Le shard ne calcule rien ici : le thème vient du provider de M-A, le mode masqué du
+ * service d'accusés (spec 06), les niveaux de notification des push rules natives.
  */
 export function Reglages() {
   const { etat } = useSession();
@@ -59,12 +77,9 @@ export function Reglages() {
   const { mode, changerMode } = useModeTheme();
   const session: Session | null = etat.phase === "prete" ? etat.session : null;
 
-  const [ouverte, setOuverte] = useState<Option | undefined>();
+  const [option, setOption] = useState<Option | undefined>();
 
-  const identifiant = session?.client.getUserId() ?? "";
-  // Le nom d'affichage quand le SDK le connaît, sinon le pseudo tiré de l'identifiant.
-  // Aucune requête : cet écran ne doit pas attendre le réseau pour se rendre.
-  const nom = session?.client.getUser(identifiant)?.displayName ?? identifiant.split(":")[0]?.slice(1) ?? "";
+  const libelleMode = MODES.find(({ valeur }) => valeur === mode)?.libelle ?? "Clair";
 
   /**
    * REQ-UIX-36 — les conversations dont le niveau n'est pas « tout ». C'est le seul
@@ -80,37 +95,41 @@ export function Reglages() {
         niveau: roomNotificationLevel(session, conversation.roomId),
       }))
       .filter((conversation) => conversation.niveau !== "all");
-    // `ouverte` est la dépendance qui compte : la liste se relit à l'ouverture de la
+    // `option` est la dépendance qui compte : la liste se relit à l'ouverture de la
     // modal, pas à chaque rendu. Interroger les push rules en continu n'apprendrait rien
     // — elles ne changent que depuis un autre écran.
-  }, [session, ouverte]);
+  }, [session, option]);
 
   return (
     <>
-      <LayoutHeader titre="Réglages" />
+      {/* DESIGN.md : « séparation par hairline ou par espace, jamais par changement de
+          fond gratuit ». Le filet suffit à dire qu'on change de sujet — un fond de
+          section en dirait autant en ajoutant une couleur. */}
+      <Divider />
 
-      <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
-        <SettingsProfileCard
-          nom={nom}
-          identifiant={identifiant}
-          onOuvrir={() => router.push("/profil")}
-        />
-
-        <ButtonsList
-          boutons={(Object.keys(TITRES) as Option[]).map((option) => ({
-            cle: option,
-            libelle: TITRES[option],
-            onClick: () => setOuverte(option),
-          }))}
-        />
-      </div>
+      <section
+        aria-label="Réglages"
+        style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}
+      >
+        {(Object.keys(TITRES) as Option[]).map((cle) => (
+          <OptionCard
+            key={cle}
+            titre={TITRES[cle]}
+            // L'apparence dit le mode courant, comme les notifications d'une conversation
+            // disent leur niveau : c'est le seul des cinq réglages dont l'état tient en
+            // un mot, et le cacher obligerait à ouvrir pour savoir.
+            detail={cle === "theme" ? libelleMode : DETAILS[cle]}
+            onClick={() => setOption(cle)}
+          />
+        ))}
+      </section>
 
       <Sheet
-        ouvert={ouverte !== undefined}
-        onFermer={() => setOuverte(undefined)}
-        titre={ouverte ? TITRES[ouverte] : ""}
+        ouvert={option !== undefined}
+        onFermer={() => setOption(undefined)}
+        titre={option ? TITRES[option] : ""}
       >
-        {ouverte === "theme" && (
+        {option === "theme" && (
           <div style={{ padding: "var(--spacing-3)" }}>
             <RadioList
               label="Thème"
@@ -124,9 +143,9 @@ export function Reglages() {
           </div>
         )}
 
-        {ouverte === "confidentialite" && <Confidentialite />}
+        {option === "confidentialite" && <Confidentialite />}
 
-        {ouverte === "notifications" && (
+        {option === "notifications" && (
           <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
             {/* REQ-UI-18 — l'abonnement push et son rattrapage (M-I) : d'abord savoir
                 si l'appareil prévient, ensuite quelle conversation est en silence. */}
@@ -143,20 +162,27 @@ export function Reglages() {
                 explication="Ouvrez les informations d'une conversation pour changer son niveau."
               />
             ) : (
+              // Une liste, et non des boutons comme au-dessus : ce sont des lignes de
+              // données qui portent un libellé **et** un état, pas cinq actions fixes.
               <ButtonsList
                 boutons={filtrees.map((conversation) => ({
                   cle: conversation.roomId,
                   libelle: conversation.name,
                   description: libelleNiveau(conversation.niveau),
-                  onClick: () => router.push(routeInfos(conversation.roomId)),
+                  // Naviguer ferme la modal : la laisser ouverte la ferait retrouver
+                  // au retour, par-dessus un écran qu'on n'a pas demandé.
+                  onClick: () => {
+                    setOption(undefined);
+                    router.push(routeInfos(conversation.roomId));
+                  },
                 }))}
               />
             )}
           </div>
         )}
 
-        {ouverte === "stockage" && <StockageLocal />}
-        {ouverte === "limites" && <LimitesConnues />}
+        {option === "stockage" && <StockageLocal />}
+        {option === "limites" && <LimitesConnues />}
       </Sheet>
     </>
   );
