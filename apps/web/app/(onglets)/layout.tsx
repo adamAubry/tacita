@@ -8,12 +8,16 @@ import { Navbar } from "../../components/foundation/Navbar";
  * d'onglet). Un groupe de routes, plutôt qu'un `if` sur le chemin dans la navbar.
  *
  * Le `padding-bottom` réserve la hauteur de la navbar fixée : sans lui, le dernier
- * élément de chaque liste passe dessous et devient inatteignable.
+ * élément de chaque liste passe dessous et devient inatteignable. Depuis qu'elle flotte,
+ * il faut réserver trois choses et non plus une : ses 60 px, les 12 px qui la décollent
+ * du bas, et 12 px de plus pour que le contenu ne vienne pas se coller sous elle.
  */
 export default function LayoutOnglets({ children }: { children: ReactNode }) {
   return (
     <>
-      <main style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}>{children}</main>
+      <main style={{ paddingBottom: "calc(60px + var(--spacing-3) * 2 + env(safe-area-inset-bottom, 0px))" }}>
+        {children}
+      </main>
       <Navbar />
     </>
   );

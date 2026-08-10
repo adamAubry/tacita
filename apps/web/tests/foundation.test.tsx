@@ -73,73 +73,123 @@ describe("REQ-UIX-01 — navbar : quatre onglets, actif surélevé, sans recharg
     }
   });
 
-  /**
-   * Le libellé au maintien. Sur tactile, `pointerenter` est émis au **poser** du doigt et
-   * `pointerleave` à son relâchement (spec Pointer Events : le pointeur naît au `down` et
-   * meurt au `up`). Le même couple sert donc au survol souris et au maintien du doigt —
-   * c'est ce qu'on assère ici, pas deux chemins distincts.
-   */
-  const libelleDe = (lien: HTMLElement) => lien.querySelector<HTMLElement>("span[aria-hidden]");
-
-  it("au repos la navbar reste en icônes seules", () => {
+  it("le libellé est dans la mise en page, pas dans un survol", () => {
+    // Il était rendu par un tooltip que seuls le survol et le maintien révélaient. Une
+    // information permanente n'a pas besoin d'être révélée — et un libellé visible *est*
+    // la cible de 44 px, au lieu d'être posé au-dessus d'elle.
     render(<Navbar />);
     for (const { libelle } of ONGLETS) {
-      const etiquette = libelleDe(screen.getByLabelText(libelle));
-      // Présente dans le DOM mais transparente : pas de montage conditionnel, donc la
-      // transition a bien deux états à interpoler.
-      expect(etiquette?.textContent).toBe(libelle);
-      expect(etiquette?.style.opacity).toBe("0");
+      const lien = screen.getByLabelText(libelle);
+      expect(lien.textContent).toContain(libelle);
+      // Le tooltip était un `<span aria-hidden>` en position absolue. Il ne reste que les
+      // SVG, légitimement masqués — un pictogramme doublé de son libellé bavarderait.
+      expect(lien.querySelector("span[aria-hidden]")).toBeNull();
     }
   });
 
-  it("le maintien du doigt révèle le libellé, le relâchement le retire", () => {
-    render(<Navbar />);
-    const lien = screen.getByLabelText("Mentions");
+  it("la barre flotte : centrée, décollée du bas, aucun bord touché", () => {
+    // Une barre pleine largeur collée en bas est une lisière de l'écran ; un dock est un
+    // objet posé dessus.
+    const { container } = render(<Navbar />);
+    const barre = container.querySelector("nav") as HTMLElement;
 
-    fireEvent.pointerEnter(lien);
-    expect(libelleDe(lien)?.style.opacity).toBe("1");
-    // Les autres onglets restent muets : un seul aperçu à la fois.
-    expect(libelleDe(screen.getByLabelText("Accueil"))?.style.opacity).toBe("0");
-
-    fireEvent.pointerLeave(lien);
-    expect(libelleDe(lien)?.style.opacity).toBe("0");
+    expect(barre.style.marginInline).toBe("auto");
+    expect(barre.style.width).toContain("var(--spacing-3)");
+    expect(barre.style.bottom).toContain("var(--spacing-3)");
+    // Safe-area iOS : sans elle, en PWA installée, le dock retombe sur la barre de gestes.
+    expect(barre.style.bottom).toContain("env(safe-area-inset-bottom");
+    // DESIGN.md e2 — `surface-raised` + filet + ombre, et jamais d'ombre sans filet.
+    expect(barre.style.background).toContain("--color-background-popover");
+    expect(barre.style.border).toContain("--color-border");
+    expect(barre.style.boxShadow).toContain("--shadow-low");
+    expect(barre.style.borderRadius).toBe("var(--radius-full)");
+    // Sans lui, le navigateur lit le glissement horizontal comme un défilement et
+    // s'empare du pointeur avant le premier `pointermove`.
+    expect(barre.style.touchAction).toBe("none");
   });
 
-  it("le clavier obtient le même repère que le doigt", () => {
-    // Le clavier n'émet aucun événement de pointeur : sans `onFocus`, la navigation au
-    // Tab serait la seule à ne pas savoir sur quel onglet elle se trouve.
-    render(<Navbar />);
-    const lien = screen.getByLabelText("Profil");
-
-    fireEvent.focus(lien);
-    expect(libelleDe(lien)?.style.opacity).toBe("1");
-    fireEvent.blur(lien);
-    expect(libelleDe(lien)?.style.opacity).toBe("0");
+  it("le layout réserve la hauteur du dock **et** ce qui le décolle", () => {
+    // La barre était collée en bas : réserver sa hauteur suffisait. Elle flotte
+    // maintenant à 12 px du bord, et le contenu doit dégager les deux.
+    const layout = readFileSync(join(RACINE, "app/(onglets)/layout.tsx"), "utf8");
+    expect(layout).toContain("calc(60px + var(--spacing-3) * 2 + env(safe-area-inset-bottom, 0px))");
   });
 
-  it("le libellé n'intercepte jamais le geste qui l'a fait naître", () => {
-    // Il flotte au-dessus de la zone tactile. Sans `pointer-events: none`, un doigt qui
-    // glisse le survolerait et le `click` de l'onglet n'aurait jamais lieu.
-    render(<Navbar />);
-    const etiquette = libelleDe(screen.getByLabelText("Recherche"));
-    expect(etiquette?.style.pointerEvents).toBe("none");
-    // Doublon visuel de l'`aria-label` du lien : annoncé deux fois, il bavarderait.
-    expect(etiquette?.getAttribute("aria-hidden")).toBe("true");
+  /**
+   * jsdom ne calcule aucune géométrie : `getBoundingClientRect` y renvoie des zéros, et
+   * la conversion abscisse → onglet retournerait toujours `null`. On lui donne donc une
+   * boîte — 400 px de large à l'origine — pour que la division ait de quoi diviser.
+   *
+   * Ce que ça ne prouve pas : que la barre *fasse* 400 px, ni où elle est. C'est la
+   * conversion et la persistance qu'on assère, pas la mise en page, qui demande un
+   * navigateur.
+   */
+  const barreMesuree = (container: HTMLElement) => {
+    const barre = container.querySelector("nav") as HTMLElement;
+    barre.getBoundingClientRect = () => ({ left: 0, width: 400 }) as DOMRect;
+    return barre;
+  };
+
+  /**
+   * jsdom n'implémente pas `PointerEvent` : `fireEvent.pointerDown` y retombe sur un
+   * `Event` nu, sans `button` ni `clientX`, et le composant s'arrête à son premier garde.
+   * Un `MouseEvent` porte les deux et React le livre tel quel au handler du bon type.
+   */
+  const doigt = (barre: HTMLElement, type: string, clientX: number) =>
+    fireEvent(barre, new MouseEvent(type, { bubbles: true, button: 0, clientX }));
+
+  it("la pastille suit le doigt, et l'attend jusqu'à ce que la route la rejoigne", () => {
+    // Le défaut que ça corrige : au relâchement, remettre la pastille sur `indexActif` la
+    // renvoyait à l'onglet *quitté* pendant toute la durée du changement d'écran. Le doigt
+    // disait déjà où il allait.
+    // `vi.clearAllMocks()` efface les appels, pas les implémentations : sans cette ligne,
+    // la route reste celle qu'un test précédent a posée.
+    chemin.mockReturnValue("/");
+    const { container } = render(<Navbar />);
+    const barre = barreMesuree(container);
+    const pastille = container.querySelector<HTMLElement>(".navbar-curseur");
+
+    // Au repos, elle est sur la route — « Accueil ».
+    expect(pastille?.style.transform).toBe("translateX(0%)");
+
+    // 4 px de liseré, 392 utiles, quatre cellules de 98 : 250 tombe dans la troisième.
+    doigt(barre, "pointerdown", 250);
+    expect(pastille?.style.transform).toBe("translateX(200%)");
+
+    doigt(barre, "pointerup", 250);
+    // Le doigt est levé, la route n'a pas encore changé : la pastille reste où il l'a
+    // laissée au lieu de retomber sur « Accueil ».
+    expect(pastille?.style.transform).toBe("translateX(200%)");
   });
 
-  it("l'icône s'enfonce sous le doigt sans déplacer les cibles voisines", () => {
-    // Le dock d'origine magnifie l'icône survolée *et* ses voisines : sous un doigt, ça
-    // masque ce qui grossit et fait glisser la cible visée. On garde la confirmation,
-    // on la rend centripète.
-    render(<Navbar />);
-    const lien = screen.getByLabelText("Accueil");
-    const icone = lien.querySelector<HTMLElement>("span:not([aria-hidden])");
+  it("un geste annulé ne laisse aucune intention derrière lui", () => {
+    // Le défilement vole le pointeur, une notification système aussi. Rien n'a été
+    // relâché, donc rien n'a été choisi.
+    chemin.mockReturnValue("/");
+    const { container } = render(<Navbar />);
+    const barre = barreMesuree(container);
+    const pastille = container.querySelector<HTMLElement>(".navbar-curseur");
 
-    expect(icone?.style.transform).toBe("");
-    fireEvent.pointerEnter(lien);
-    expect(icone?.style.transform).toBe("scale(0.92)");
-    // La cible du voisin n'a pas bougé d'un pixel.
-    expect(screen.getByLabelText("Recherche").style.minWidth).toBe("44px");
+    doigt(barre, "pointerdown", 250);
+    expect(pastille?.style.transform).toBe("translateX(200%)");
+    doigt(barre, "pointercancel", 250);
+    expect(pastille?.style.transform).toBe("translateX(0%)");
+  });
+
+  it("la souris fait monter l'icône, l'appui l'enfonce", () => {
+    // jsdom n'évalue aucune requête média et ne calcule aucune cascade : les règles
+    // s'assèrent à la source, comme celles des gestes natifs juste en dessous.
+    const feuille = readFileSync(join(RACINE, "components/foundation/tokens.css"), "utf8");
+    const survol = feuille.match(/@media \(hover: hover\) and \(pointer: fine\) \{[^]*?\n\}/)?.[0];
+
+    expect(survol).toMatch(/\.navbar-onglet:hover \.navbar-icone/);
+    expect(survol).toMatch(/transform:\s*translateY\(-4px\)/);
+    // L'appui, lui, ne dépend d'aucun pointeur : c'est le seul retour que le tactile
+    // reçoit quand le doigt ne glisse pas.
+    expect(feuille).toMatch(/\.navbar-onglet:active \.navbar-icone \{[^}]*transform:\s*scale\(0\.92\)/);
+    // La classe que ces règles visent doit exister sur l'icône, sinon elles ne visent rien.
+    render(<Navbar />);
+    expect(screen.getByLabelText("Accueil").querySelector(".navbar-icone")).toBeTruthy();
   });
 
   it("les onglets désarment les gestes natifs qui mangeraient le maintien", () => {

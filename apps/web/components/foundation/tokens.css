@@ -97,6 +97,60 @@
 }
 
 /*
+ * REQ-UIX-01 — la taille des icônes de la navbar. Les quatre SVG portent `width`/`height`
+ * à 24 dans `icons.tsx`, parce que trois autres écrans les rendent à cette taille-là ;
+ * une règle CSS bat l'attribut de présentation, et seule la navbar les grossit.
+ *
+ * Ici et pas dans le composant : c'est une géométrie du système, au même titre que les
+ * cibles de 44 px au-dessus.
+ */
+.navbar-icone > svg {
+  width: 24px;
+  height: 24px;
+}
+
+/*
+ * REQ-UIX-01 — l'onglet visé porte une icône plus grande : 28 px contre 24. Le saut de
+ * taille ne déplace rien, la boîte qui porte l'icône est de hauteur fixe et le libellé est
+ * toujours plus large que le pictogramme.
+ *
+ * `data-dessus` et non `[aria-current="page"]` : pendant un glissement, l'onglet *visé*
+ * n'est pas encore l'onglet *courant*, et c'est le doigt que la barre doit suivre.
+ * `aria-current` continue de dire la vérité à l'assistance technique — la route.
+ */
+.navbar-icone[data-dessus] > svg {
+  width: 28px;
+  height: 28px;
+}
+
+/*
+ * REQ-UIX-01 — **à la souris, l'icône monte ; sous l'appui, elle s'enfonce.** Deux
+ * gestes, deux retours, et c'est le navigateur qui tranche : `hover: hover` n'est vrai
+ * que d'un pointeur capable de survoler sans appuyer, `pointer: fine` que d'un pointeur
+ * précis. Un test de `pointerType` en JavaScript dirait la même chose *après* le premier
+ * événement — cette requête média le dit avant.
+ *
+ * Pourquoi la montée seulement au survol : un curseur est un point et ne masque rien,
+ * donc l'icône peut monter. Une pulpe de doigt couvre 9 à 11 mm et masquerait exactement
+ * ce qui monte ; l'appui reçoit donc l'enfoncement, qui reste lisible à ses bords. Sur
+ * tactile, `:hover` ne s'applique jamais et il ne reste que `:active` — c'est le
+ * comportement voulu, pas un effet de bord.
+ *
+ * `:active` après `:hover` : à la souris les deux peuvent être vrais en même temps, et
+ * c'est l'appui qui doit gagner. Aucun `!important` — depuis que le libellé est
+ * permanent, `Navbar.tsx` ne pose plus aucune `transform` en style inline sur l'icône.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .navbar-onglet:hover .navbar-icone {
+    transform: translateY(-4px);
+  }
+}
+
+.navbar-onglet:active .navbar-icone {
+  transform: scale(0.92);
+}
+
+/*
  * WCAG 2.3.3 — « animation from interactions ». Les transitions inline de la navbar
  * gagneraient sur une règle de même spécificité : `!important` est ici le mécanisme
  * prévu, pas un contournement.
@@ -109,7 +163,10 @@
  */
 @media (prefers-reduced-motion: reduce) {
   .navbar-onglet,
-  .navbar-onglet * {
+  .navbar-onglet *,
+  /* La pastille qui suit le doigt est un frère des onglets, pas un descendant : sans
+     cette ligne, elle serait la seule chose de la barre à glisser encore. */
+  .navbar-curseur {
     transition-duration: 0.01ms !important;
   }
 }

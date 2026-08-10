@@ -15,8 +15,17 @@ export const PALETTE = {
   text: { clair: "#1A1D1C", sombre: "#E9ECEA" },
   textMuted: { clair: "#5E6663", sombre: "#9AA39F" },
   accent: { clair: "#155E4D", sombre: "#4FBD96" },
-  /** `accent` à 10 % en clair, 16 % en sombre. */
-  accentSoft: { clair: "#155E4D1A", sombre: "#4FBD9629" },
+  /**
+   * `accent` à **8 %** en clair, 16 % en sombre.
+   *
+   * Le clair est passé de 10 à 8 % le 10/08/2026 : la pastille de l'onglet actif de la
+   * navbar est le plus grand aplat d'accent atténué de l'app, et 10 % la faisaient lire
+   * comme une surface à part entière plutôt que comme une teinte. Le sombre ne bouge pas
+   * — un aplat translucide y a besoin de plus d'alpha pour exister du tout.
+   *
+   * DESIGN.md § Colors est amendé en conséquence : la valeur ne vit pas ici seule.
+   */
+  accentSoft: { clair: "#155E4D14", sombre: "#4FBD9629" },
   danger: { clair: "#B3352C", sombre: "#E5716A" },
   /**
    * Les fonds d'état, **à 10 %** — le seul taux que DESIGN.md écrive pour un « soft »

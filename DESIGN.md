@@ -25,7 +25,7 @@ Neutres à très léger sous-ton vert (invisible consciemment, cohérent avec l'
 | `text-muted` | #5E6663 | #9AA39F | aperçus, dates, user ids, méta |
 | `accent` | #155E4D | #4FBD96 | actions primaires, état actif, liens, coches « délivré/lu » |
 | `accent-pressed` | #0E463A | #3EA381 | état pressé de l'accent |
-| `accent-soft` | #155E4D à 10 % | #4FBD96 à 16 % | fonds de mention, selector actif, badge @ |
+| `accent-soft` | #155E4D à 8 % | #4FBD96 à 16 % | fonds de mention, selector actif, badge @ |
 | `read` | = `accent` | = `accent` | double coche « lu » — la coche verte est un trait d'identité |
 | `success` | = `accent` | = `accent` | accepter, états positifs (pas de second vert) |
 | `danger` | #B3352C | #E5716A | supprimer, refuser, quitter, bloquer |
