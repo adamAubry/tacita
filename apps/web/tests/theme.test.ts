@@ -83,6 +83,66 @@ describe("REQ-UI-03 — le thème porte les valeurs de DESIGN.md, et rien d'autr
     expect(tokens["--font-weight-bold"]).toBe("600");
   });
 
+  /**
+   * La table de typographie de DESIGN.md, sur les tokens qu'Astryx rend **réellement**.
+   *
+   * Les `--font-size-*` seuls ne suffisaient pas : les styles de `Text` lisent une
+   * seconde famille (`--text-<style>-*`), dérivée une fois pour toutes de l'échelle par
+   * défaut d'Astryx, ancrée sur 14 px. Tout le texte de l'app sortait un cran trop petit,
+   * et les titres d'écran en 29 px graisse 400 au lieu de 22/28 en 600. Ce test regarde
+   * la famille qui décide.
+   */
+  it("les styles de texte portent les tailles de la table de DESIGN.md", () => {
+    // display 22/28/600 — et la graisse, que le défaut d'Astryx laissait à 400.
+    expect(tokens["--text-display-3-size"]).toBe("1.375rem");
+    expect(tokens["--text-display-3-weight"]).toBe("var(--font-weight-bold)");
+    expect(tokens["--text-heading-3-size"]).toBe("1.0625rem"); // title 17
+    expect(tokens["--text-body-size"]).toBe("0.9375rem"); // body 15
+    expect(tokens["--text-supporting-size"]).toBe("0.8125rem"); // secondary 13
+    expect(tokens["--text-label-size"]).toBe("0.9375rem"); // libellés et boutons
+    expect(tokens["--text-code-size"]).toBe("0.9375rem"); // mono, au corps du texte
+    // Les interlignes de la table, au pixel : 28/22, 24/17, 20/15, 18/13.
+    for (const [style, rapport] of [
+      ["display-3", 28 / 22],
+      ["heading-3", 24 / 17],
+      ["body", 20 / 15],
+      ["supporting", 18 / 13],
+    ] as const) {
+      expect(Number(tokens[`--text-${style}-leading`]), style).toBeCloseTo(rapport, 3);
+    }
+  });
+
+  /**
+   * DESIGN.md : « contraste AA vérifié pour chaque paire ». Le texte posé **sur** une
+   * couleur pleine est le seul endroit où la palette peut se contredire sans que rien ne
+   * le montre — et c'est ce qui était arrivé : blanc sur l'accent sombre (#4FBD96, un vert
+   * pâle) tombait à 2,3:1, sur tous les boutons primaires du thème sombre.
+   */
+  it("le texte posé sur une couleur pleine tient le seuil AA, dans les deux modes", () => {
+    const luminance = (hexa: string) => {
+      const canal = (i: number) => Number.parseInt(hexa.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+      const [r, v, b] = [0, 1, 2].map((i) => {
+        const c = canal(i);
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      }) as [number, number, number];
+      return 0.2126 * r + 0.7152 * v + 0.0722 * b;
+    };
+    const contraste = (a: string, b: string) => {
+      const [clair, sombre] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+      return (clair + 0.05) / (sombre + 0.05);
+    };
+
+    for (const mode of ["clair", "sombre"] as const) {
+      for (const [texte, fond] of [
+        ["surAccent", "accent"],
+        ["surWarning", "warning"],
+      ] as const) {
+        const ratio = contraste(COULEURS_DESIGN[texte][mode], COULEURS_DESIGN[fond][mode]);
+        expect(ratio, `${texte} sur ${fond} en ${mode}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
   it("la pile de polices est celle de DESIGN.md, sans webfont", () => {
     expect(tokens["--font-family-body"]).toMatch(/^system-ui,/);
     expect(tokens["--font-family-code"]).toMatch(/^ui-monospace,/);

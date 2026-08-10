@@ -22,14 +22,26 @@ export type EtatConnexion = "en-ligne" | "hors-ligne" | "synchronisation";
 export function ConnectionBanner({ etat }: { etat: EtatConnexion }) {
   if (etat === "en-ligne") return null;
 
+  /*
+   * `container="section"` : ce bandeau est posé en tête d'application, jamais dans une
+   * colonne. En variante `card` — le défaut d'Astryx — il rendait une carte à coins
+   * arrondis plaquée contre les deux bords de la fenêtre, sans marge pour l'expliquer.
+   * La variante pleine largeur est faite pour ça.
+   */
   return etat === "hors-ligne" ? (
     <Banner
+      container="section"
       status="warning"
       title="Hors ligne"
       description="Vos conversations restent consultables. Ce que vous écrivez partira à la reconnexion."
     />
   ) : (
-    <Banner status="info" title="Synchronisation…" description="Récupération des messages reçus." />
+    <Banner
+      container="section"
+      status="info"
+      title="Synchronisation…"
+      description="Récupération des messages reçus."
+    />
   );
 }
 

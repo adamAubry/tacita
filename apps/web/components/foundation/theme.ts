@@ -106,6 +106,44 @@ export const tacitaTheme = defineTheme({
     "--font-size-xs": "0.75rem", // caption 12
     "--font-size-xl": "1.375rem", // display 22
 
+    /*
+     * **La table de DESIGN.md, posée sur les styles qu'Astryx rend réellement.**
+     *
+     * Les six `--font-size-*` ci-dessus ne suffisaient pas, et c'est le genre d'écart
+     * qu'aucun test de jsdom ne voit : les styles de `Text` ne lisent pas ces variables,
+     * ils lisent une seconde famille de tokens (`--text-<style>-*`) que le thème dérive
+     * **une fois pour toutes** de l'échelle par défaut d'Astryx — ancrée, elle, sur 14 px.
+     * Tout le texte de l'app sortait donc un cran en dessous de DESIGN.md : corps à 14 au
+     * lieu de 15, secondaire à 12 au lieu de 13, et les titres d'écran (`display-3`) à
+     * **29 px graisse 400** là où la table écrit 22/28 en 600 — `ProfileCard` compensait
+     * déjà à la main par un `weight="bold"`.
+     *
+     * Valeurs littérales et non `var(--font-size-*)` : c'est cette indirection qui avait
+     * l'air de marcher sans marcher. Mesuré au navigateur le 10/08/2026.
+     *
+     * Ici et pas dans les composants : DESIGN.md interdit qu'une valeur visuelle vive
+     * ailleurs que dans le thème, et huit écrans corrigés un par un divergeraient au neuvième.
+     */
+    // display 22/28/600 — titres d'écran
+    "--text-display-3-size": "1.375rem",
+    "--text-display-3-leading": "1.2727", // 28/22
+    "--text-display-3-weight": "var(--font-weight-bold)", // 600, la plus lourde des deux
+    // title 17/24/600 — titres de layout
+    "--text-heading-3-size": "1.0625rem",
+    "--text-heading-3-leading": "1.4118", // 24/17
+    // body 15/20/400 — messages, contenu courant
+    "--text-body-size": "0.9375rem",
+    "--text-body-leading": "1.3333", // 20/15
+    // secondary 13/18/400 — aperçus, notes, méta
+    "--text-supporting-size": "0.8125rem",
+    "--text-supporting-leading": "1.3846", // 18/13
+    // Libellés et boutons : le corps courant, pas un quatrième pas d'échelle.
+    "--text-label-size": "0.9375rem",
+    "--text-label-leading": "1.3333",
+    // Mono — user ids et clé de récupération, au corps du texte qui les entoure.
+    "--text-code-size": "0.9375rem",
+    "--text-code-leading": "1.3333",
+
     // — Géométrie. `--radius-chat` vaut 28px par défaut : des « coins très arrondis »,
     // interdit explicite de DESIGN.md, et c'est le composer qui le porte.
     "--radius-element": "6px",

@@ -1,4 +1,22 @@
 /*
+ * **L'ordre des couches en cascade, déclaré avant tout le reste.** Cette feuille est
+ * importée *avant* `astryx.css` pour cette seule ligne, qui doit être la première mention
+ * de ces couches dans le document.
+ *
+ * Sans elle, `reset` n'existe qu'au montage du thème — `Theme` l'injecte à l'exécution —
+ * et une couche déclarée en dernier l'emporte sur toutes les précédentes. Les défauts de
+ * prose d'Astryx (`:where(h1)`, `:where(p)`, `:where(code)`), écrits pour être battus par
+ * n'importe quelle classe, battaient donc les styles de ses propres composants : un
+ * `<Text type="display-3" as="h1">` sortait en 24 px demi-gras — la taille `heading-1`
+ * d'Astryx — au lieu des 22 px de DESIGN.md, et le `type` demandé n'y était pour rien.
+ *
+ * Mesuré au navigateur le 10/08/2026 : jsdom ne calcule ni cascade ni taille, et le shard
+ * n'avait donc aucun moyen de le voir. C'est le même angle mort que les cibles de 44 px
+ * plus bas.
+ */
+@layer reset, astryx-base, astryx-theme;
+
+/*
  * Les trois tokens de DESIGN.md qui n'ont aucun logement chez Astryx (voir la table de
  * correspondance, specs/ui/M-A.md). Ils sont consommés par nos composants composés
  * uniquement — jamais par un composant Astryx, qui ne les connaît pas.

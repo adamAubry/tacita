@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 
-import "@astryxdesign/core/astryx.css";
+// `tokens.css` en premier, et l'ordre compte : il ouvre par la déclaration des couches en
+// cascade, qui n'a d'effet que si elle précède la première feuille qui en utilise une.
 import "../components/foundation/tokens.css";
+import "@astryxdesign/core/astryx.css";
 import { PALETTE } from "../components/foundation/palette";
 import { Providers } from "./providers";
 import { RegisterServiceWorker } from "./register-sw";
