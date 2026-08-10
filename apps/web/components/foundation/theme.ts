@@ -124,6 +124,16 @@ export const tacitaTheme = defineTheme({
      * Ici et pas dans les composants : DESIGN.md interdit qu'une valeur visuelle vive
      * ailleurs que dans le thème, et huit écrans corrigés un par un divergeraient au neuvième.
      */
+    /*
+     * display-large 28/32/600 — le nom sur l'écran profil, et lui seul (DESIGN.md, ajouté
+     * le 10/08/2026). Un cran au-dessus des titres d'écran parce que ce n'est pas un
+     * titre : c'est le sujet de la page. `display-2` est le barreau d'Astryx qui le porte
+     * — sans ces trois tokens il retomberait sur l'échelle par défaut de la bibliothèque,
+     * ancrée sur 14 px, et rendrait une taille qui n'est écrite nulle part.
+     */
+    "--text-display-2-size": "1.75rem",
+    "--text-display-2-leading": "1.1429", // 32/28
+    "--text-display-2-weight": "var(--font-weight-bold)",
     // display 22/28/600 — titres d'écran
     "--text-display-3-size": "1.375rem",
     "--text-display-3-leading": "1.2727", // 28/22

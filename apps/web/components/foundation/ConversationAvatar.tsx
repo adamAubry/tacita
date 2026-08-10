@@ -18,7 +18,8 @@ export interface ConversationAvatarProps {
   mxc?: string;
   /** DM ou groupe. Change ce qui est représenté, pas la forme. */
   direct: boolean;
-  taille?: 24 | 36 | 40 | 48 | 96;
+  /** Paliers de l'échelle d'Astryx, et eux seuls — pas de taille hors barreau. */
+  taille?: 24 | 36 | 40 | 48 | 96 | 128;
 }
 
 /**

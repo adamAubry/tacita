@@ -37,13 +37,26 @@
      image choisie par l'utilisateur. */
   --tacita-scrim: light-dark(#ffffffb3, #13151499);
 
-  /* Le bandeau flottant du profil, seul verre de l'app (DESIGN.md § Colors, exception
+  /* Le bouton de retour du profil, seul verre de l'app (DESIGN.md § Colors, exception
      nommée du 10/08/2026). Deux couches indissociables, et c'est pour ça que c'est un
      token et pas deux valeurs recopiées : la teinte translucide **et** le flou. Sans le
-     flou, les boutons passent sur une photo arbitraire choisie par l'utilisateur, où
-     rien ne garantit le contraste. Un navigateur sans `backdrop-filter` garde les 65 %
+     flou, le bouton passe sur une photo arbitraire choisie par l'utilisateur, où rien ne
+     garantit le contraste. Un navigateur sans `backdrop-filter` garde les 65 %
      d'opacité, qui suffisent à lire — l'effet dégrade, la lisibilité non. */
   --tacita-verre: light-dark(#f6f7f6a6, #131514a6);
+  /* Le même verre au survol, à 40 % au lieu de 65 % : sous le doigt ou le curseur, le
+     bouton s'efface au profit de la photo. La lisibilité du chevron tient alors au flou,
+     pas à la teinte — c'est le moment où le couple des deux couches se justifie le plus. */
+  --tacita-verre-survol: light-dark(#f6f7f666, #13151466);
+
+  /* L'ombre de l'avatar du profil, seule ombre diffuse de l'app (DESIGN.md § Elevation,
+     exception nommée du 10/08/2026). Elle ne dit pas une élévation — l'avatar n'est pas
+     surélevé, il est posé dans la bannière : elle sépare son bord d'une photo arbitraire,
+     où aucun contraste n'est vérifiable à l'avance. Même argument structurel que le verre
+     du bouton de retour, sur le même écran, pour la même raison. Plus opaque en sombre :
+     une ombre noire sur un fond sombre ne se voit plus (jurisprudence de `--shadow-high`,
+     0.10 en clair contre 0.40 en sombre). */
+  --tacita-ombre-avatar: 0 0 24px light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
 
   /* DESIGN.md : avatars en **carré arrondi (rayon 25 %)**, signature délibérée face aux
      cercles de toutes les messageries. Astryx n'a pas de token d'avatar — ses avatars
@@ -62,13 +75,20 @@
 }
 
 /*
- * DESIGN.md — « Cibles tactiles ≥ 44 px ». **Mesuré au navigateur le 07/08/2026**, ce que
+ * DESIGN.md — « Cibles tactiles ≥ 36 px ». **Mesuré au navigateur le 07/08/2026**, ce que
  * jsdom ne peut pas faire : il ne rend aucune géométrie, et la règle n'était garantie qu'à
  * un seul endroit du shard (la navbar, qui pose ses 44 px à la main).
  *
  * Astryx ne pose aucune hauteur minimale sur ses contrôles — `min-height: auto`, un
  * padding de 8 px, et la hauteur retombe à 32 px quelle que soit la variante. Le bouton
  * de retour des headers faisait donc 32×32 sur tous les écrans de l'app.
+ *
+ * **Plancher abaissé de 44 à 36 px le 10/08/2026.** 44 px est le chiffre d'Apple (44 pt) et
+ * du niveau AAA de WCAG ; le plancher AA est de 24 px, et 36 le dépasse largement. À 44 le
+ * shard sortait chaque contrôle du barème d'Astryx, qui plafonne à 36 : la pastille de
+ * verre du profil finissait deux fois plus large que son chevron, et c'était vrai partout
+ * ailleurs à moindre bruit. Les composants qui ont besoin de plus posent plus — la navbar
+ * garde ses 44 px à la main, et ses tests les nomment.
  *
  * Ici plutôt que dans chaque composant : c'est une géométrie du système, au même titre
  * que le rayon d'avatar juste au-dessus, et un composant qui la recopierait la ferait
@@ -83,7 +103,51 @@
    `astryx-field` est le conteneur du contrôle, et la seule classe stable de la chaîne —
    au-dessus c'est `astryx-power-search`, au-dessous des classes atomiques StyleX. */
 .astryx-field {
-  min-height: 44px;
+  min-height: 36px;
+}
+
+/*
+ * Le bouton de retour de l'écran profil — la pastille de verre (DESIGN.md § Overview §4).
+ *
+ * **En feuille et non en `style` inline**, contrairement au reste du shard, pour une raison
+ * mécanique : un style inline gagne sur tout, donc il gagne aussi sur `:hover`. Tant que le
+ * verre était posé en ligne, le bouton n'avait aucun état de survol — celui d'Astryx était
+ * écrasé, et aucun autre ne pouvait s'exprimer.
+ *
+ * Les `:not(#\#)` sont l'idiome de StyleX, pas une astuce maison : la distribution place
+ * ses règles à trois `:not(#\#)` (spécificité de trois identifiants) pour se garantir
+ * contre les feuilles applicatives. Quatre passent devant, sans `!important` — dont le
+ * propre de serait précisément d'être inarbitrable au coup suivant.
+ *
+ * Survol : plus transparent **et** plus petit. Les deux disent la même chose — le bouton
+ * s'efface au profit de ce qu'il y a derrière, qui est la photo. `background-image: none`
+ * annule le voile de survol d'Astryx, qui irait dans l'autre sens en opacifiant.
+ * `:active` autant que `:hover` : cette PWA est mobile d'abord, et sur un écran tactile le
+ * survol n'existe pas — sans lui l'effet ne se déclencherait pour presque personne.
+ */
+.tacita-retour:not(#\#):not(#\#):not(#\#):not(#\#) {
+  background-color: var(--tacita-verre);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-full);
+  /* DESIGN.md : 120–180 ms, ease-out, transform et opacité seules. */
+  transition:
+    transform 140ms ease-out,
+    background-color 140ms ease-out;
+}
+
+.tacita-retour:hover:not(#\#):not(#\#):not(#\#):not(#\#),
+.tacita-retour:active:not(#\#):not(#\#):not(#\#):not(#\#) {
+  background-color: var(--tacita-verre-survol);
+  background-image: none;
+  transform: scale(0.92);
+}
+
+/* Le changement reste, la transition part : l'état est une information, l'animation non. */
+@media (prefers-reduced-motion: reduce) {
+  .tacita-retour:not(#\#):not(#\#):not(#\#):not(#\#) {
+    transition: none;
+  }
 }
 
 /*
