@@ -5,7 +5,7 @@ import { MODE_DEFAUT } from "../app/providers";
 import { PALETTE as COULEURS_DESIGN } from "../components/foundation/palette";
 import { FAMILLES_CHROMATIQUES, tacitaTheme } from "../components/foundation/theme";
 import { ecrireTheme, lireTheme } from "../lib/preferences";
-import { sourcesLivrees, sansCommentaires } from "./sources";
+import { lire, sourcesLivrees, sansCommentaires } from "./sources";
 
 const tokens = tacitaTheme.tokens as Record<string, string>;
 /** `defineTheme` résout un couple clair/sombre en une valeur `light-dark()`. */
@@ -166,6 +166,31 @@ describe("REQ-UI-03 — le thème porte les valeurs de DESIGN.md, et rien d'autr
     for (const { chemin, code } of sourcesLivrees()) {
       if (chemin.endsWith("/palette.ts")) continue;
       expect(sansCommentaires(code).match(/#[0-9a-fA-F]{3,8}\b/g), chemin).toBeNull();
+    }
+  });
+
+  /**
+   * DESIGN.md : « espacement uniquement en multiples de 4 ». Un titre qui porte la marge
+   * par défaut du navigateur (`margin-block: 0.67em`, soit ~15 px à 22 px de corps) la
+   * **cumule** avec le `gap` de son `VStack` — les marges d'un enfant flex ne fusionnent
+   * pas. L'écart écrit dans le composant et l'écart rendu divergeaient donc sur chaque
+   * écran à titre, et rien dans le dépôt ne pouvait le dire : jsdom ne rend aucune
+   * géométrie, et le défaut vient de la feuille de l'agent utilisateur.
+   *
+   * Le test lit la feuille plutôt que le rendu, faute de navigateur — c'est ce que le
+   * dépôt fait déjà pour les valeurs de configuration. Il ne prouve pas la géométrie ;
+   * il empêche la ligne qui la tient de disparaître sans que personne ne le voie.
+   */
+  it("les marges d'agent utilisateur des titres sont neutralisées", () => {
+    const feuille = sansCommentaires(lire("components/foundation/tokens.css"));
+    const regle = feuille.match(/:where\(([^)]*h1[^)]*)\)\s*{([^}]*)}/);
+
+    expect(regle, "aucune règle ne remet les marges de titre à zéro").not.toBeNull();
+    expect(regle?.[2]).toMatch(/margin-block:\s*0/);
+    // Les six niveaux et le paragraphe : le titre du prochain écran ne doit pas naître
+    // décalé parce qu'il est en `h2`.
+    for (const balise of ["h1", "h2", "h3", "h4", "h5", "h6", "p"]) {
+      expect(regle?.[1], balise).toContain(balise);
     }
   });
 });

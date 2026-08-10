@@ -91,3 +91,25 @@
 *::after {
   box-sizing: border-box;
 }
+
+/*
+ * Les marges d'agent utilisateur des titres et paragraphes, remises à zéro — même famille
+ * d'oubli que `box-sizing` juste au-dessus.
+ *
+ * `Text as="h1"` rend un `<h1>` nu : Astryx lui donne une taille et une graisse (ses
+ * règles de prose), jamais une marge, et les styles de `Text` n'en posent aucune non plus.
+ * Le navigateur applique donc son défaut, `margin-block: 0.67em` — environ 15 px au-dessus
+ * **et** au-dessous d'un titre de 22 px.
+ *
+ * Ce que ça cassait : dans un `VStack`, les marges d'un enfant flex ne fusionnent jamais,
+ * elles **s'ajoutent** au `gap`. Chaque écran à titre avait donc un écart écrit et un
+ * écart réel, et aucun `gap` du dépôt ne disait la différence. Mesuré au navigateur le
+ * 10/08/2026 ; jsdom ne rend aucune géométrie et ne pouvait pas le voir.
+ *
+ * Ici plutôt que sur chaque titre : ils sont huit, et le neuvième naîtrait décalé.
+ * `:where()` garde la spécificité nulle — un composant qui veut sa marge la reprend sans
+ * avoir à se battre.
+ */
+:where(h1, h2, h3, h4, h5, h6, p) {
+  margin-block: 0;
+}
