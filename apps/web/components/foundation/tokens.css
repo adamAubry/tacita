@@ -79,6 +79,42 @@
 }
 
 /*
+ * REQ-UIX-01 — la navbar lit le maintien du doigt comme un survol (voir `Navbar.tsx`).
+ * Trois réglages que la plateforme impose de désactiver pour que ce maintien existe, et
+ * qu'un `style` inline ne devrait pas porter puisqu'ils ne dépendent d'aucun état :
+ *
+ * - `-webkit-touch-callout` : maintenir le doigt sur un `<a>` ouvre l'aperçu de lien iOS,
+ *   qui avale le geste avant qu'on en voie quoi que ce soit.
+ * - `user-select` : sur Android, le même maintien déclenche la sélection de texte et fait
+ *   apparaître les poignées bleues sur le libellé.
+ * - `touch-action: manipulation` : supprime l'attente de 300 ms du double-tap au zoom, qui
+ *   retarderait la navigation d'autant.
+ */
+.navbar-onglet {
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/*
+ * WCAG 2.3.3 — « animation from interactions ». Les transitions inline de la navbar
+ * gagneraient sur une règle de même spécificité : `!important` est ici le mécanisme
+ * prévu, pas un contournement.
+ *
+ * Volontairement limité à la navbar, et non appliqué à `*` : Astryx anime ses propres
+ * composants (spinners, dialogues — une quinzaine de `@keyframes` dans sa distribution),
+ * et neutraliser en aveugle des animations qu'on n'a pas auditées casserait un
+ * indicateur de chargement plutôt que de l'apaiser. À élargir composant par composant, à
+ * mesure qu'on anime.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .navbar-onglet,
+  .navbar-onglet * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
  * `border-box` partout. Sans lui, un `width: 100%` additionné à un padding déborde de son
  * parent : c'est ce qui faisait sortir l'en-tête du profil de 8 px sur un écran de 390 px,
  * en silence et sans barre de défilement visible.

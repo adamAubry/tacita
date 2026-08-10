@@ -72,6 +72,89 @@ describe("REQ-UIX-01 — navbar : quatre onglets, actif surélevé, sans recharg
       expect(lien.style.minWidth).toBe("44px");
     }
   });
+
+  /**
+   * Le libellé au maintien. Sur tactile, `pointerenter` est émis au **poser** du doigt et
+   * `pointerleave` à son relâchement (spec Pointer Events : le pointeur naît au `down` et
+   * meurt au `up`). Le même couple sert donc au survol souris et au maintien du doigt —
+   * c'est ce qu'on assère ici, pas deux chemins distincts.
+   */
+  const libelleDe = (lien: HTMLElement) => lien.querySelector<HTMLElement>("span[aria-hidden]");
+
+  it("au repos la navbar reste en icônes seules", () => {
+    render(<Navbar />);
+    for (const { libelle } of ONGLETS) {
+      const etiquette = libelleDe(screen.getByLabelText(libelle));
+      // Présente dans le DOM mais transparente : pas de montage conditionnel, donc la
+      // transition a bien deux états à interpoler.
+      expect(etiquette?.textContent).toBe(libelle);
+      expect(etiquette?.style.opacity).toBe("0");
+    }
+  });
+
+  it("le maintien du doigt révèle le libellé, le relâchement le retire", () => {
+    render(<Navbar />);
+    const lien = screen.getByLabelText("Mentions");
+
+    fireEvent.pointerEnter(lien);
+    expect(libelleDe(lien)?.style.opacity).toBe("1");
+    // Les autres onglets restent muets : un seul aperçu à la fois.
+    expect(libelleDe(screen.getByLabelText("Accueil"))?.style.opacity).toBe("0");
+
+    fireEvent.pointerLeave(lien);
+    expect(libelleDe(lien)?.style.opacity).toBe("0");
+  });
+
+  it("le clavier obtient le même repère que le doigt", () => {
+    // Le clavier n'émet aucun événement de pointeur : sans `onFocus`, la navigation au
+    // Tab serait la seule à ne pas savoir sur quel onglet elle se trouve.
+    render(<Navbar />);
+    const lien = screen.getByLabelText("Profil");
+
+    fireEvent.focus(lien);
+    expect(libelleDe(lien)?.style.opacity).toBe("1");
+    fireEvent.blur(lien);
+    expect(libelleDe(lien)?.style.opacity).toBe("0");
+  });
+
+  it("le libellé n'intercepte jamais le geste qui l'a fait naître", () => {
+    // Il flotte au-dessus de la zone tactile. Sans `pointer-events: none`, un doigt qui
+    // glisse le survolerait et le `click` de l'onglet n'aurait jamais lieu.
+    render(<Navbar />);
+    const etiquette = libelleDe(screen.getByLabelText("Recherche"));
+    expect(etiquette?.style.pointerEvents).toBe("none");
+    // Doublon visuel de l'`aria-label` du lien : annoncé deux fois, il bavarderait.
+    expect(etiquette?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("l'icône s'enfonce sous le doigt sans déplacer les cibles voisines", () => {
+    // Le dock d'origine magnifie l'icône survolée *et* ses voisines : sous un doigt, ça
+    // masque ce qui grossit et fait glisser la cible visée. On garde la confirmation,
+    // on la rend centripète.
+    render(<Navbar />);
+    const lien = screen.getByLabelText("Accueil");
+    const icone = lien.querySelector<HTMLElement>("span:not([aria-hidden])");
+
+    expect(icone?.style.transform).toBe("");
+    fireEvent.pointerEnter(lien);
+    expect(icone?.style.transform).toBe("scale(0.92)");
+    // La cible du voisin n'a pas bougé d'un pixel.
+    expect(screen.getByLabelText("Recherche").style.minWidth).toBe("44px");
+  });
+
+  it("les onglets désarment les gestes natifs qui mangeraient le maintien", () => {
+    // L'aperçu de lien iOS et la sélection Android se déclenchent tous deux sur un
+    // maintien : sans la classe, le geste n'atteint jamais le composant.
+    render(<Navbar />);
+    for (const { libelle } of ONGLETS) {
+      expect(screen.getByLabelText(libelle).className).toContain("navbar-onglet");
+    }
+    const feuille = readFileSync(join(RACINE, "components/foundation/tokens.css"), "utf8");
+    expect(feuille).toMatch(/\.navbar-onglet\s*\{[^}]*-webkit-touch-callout:\s*none/);
+    expect(feuille).toMatch(/\.navbar-onglet\s*\{[^}]*touch-action:\s*manipulation/);
+    // WCAG 2.3.3 : le mouvement se neutralise sous `prefers-reduced-motion`.
+    expect(feuille).toMatch(/prefers-reduced-motion:\s*reduce/);
+  });
 });
 
 describe("REQ-UIX-02 — header : titre centré, retour par l'historique", () => {
