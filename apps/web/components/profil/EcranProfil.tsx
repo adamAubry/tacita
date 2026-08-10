@@ -25,10 +25,10 @@ import { ProfilMoi } from "./ProfilMoi";
 /**
  * Le câblage des deux layouts Profile.
  *
- * **La photo de profil de REQ-UI-20 n'est pas ici, et c'est délibéré** — voir
- * `ESCALATIONS` § E-12 : le pipeline chiffre tout, alors qu'un avatar Matrix doit être
- * public pour être affichable. Le champ est **absent** du formulaire plutôt que grisé
- * ou cassé, comme M-E l'a fait pour le vocal. `userId` absent = son propre profil.
+ * La photo de profil et la bannière (REQ-UI-20, REQ-UIX-41) passent par le **même**
+ * `onPhoto` : deux images publiques, une seule fonction de téléversement, donc un seul
+ * site d'appel du chemin public — la condition de REQ-MED-11, vérifiée par un test
+ * structurel du paquet média. `userId` absent = son propre profil.
  *
  * Les composants rendus ne connaissent ni `Session` ni les paquets : ils reçoivent un
  * `Profile`, des booléens et des callbacks. C'est ce qui rend M-G testable avec des

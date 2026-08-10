@@ -297,7 +297,34 @@ export async function downloadAttachment(
   env: MediaEnvironment,
   file: EncryptedFile,
 ): Promise<Bytes> {
-  const url = session.client.mxcUrlToHttp(file.url, undefined, undefined, undefined, false, true, true);
+  const response = await recupererMedia(session, file.url);
+  return decryptAttachment(new Uint8Array(await response.arrayBuffer()), file, env.subtle);
+}
+
+/**
+ * REQ-MED-11 — **le pendant en lecture du chemin public.** Un `mxc://` non chiffré (photo
+ * de profil, bannière) rendu en `Blob`, prêt pour un `URL.createObjectURL`.
+ *
+ * Pourquoi une fonction et pas un `<img src>` : depuis Synapse v1.146 les endpoints média
+ * anonymes répondent 404 (REQ-INF-12), et une balise `img` ne sait pas porter d'en-tête
+ * `Authorization`. Sans ce chemin, une photo de profil correctement téléversée et
+ * correctement posée sur le compte reste invisible — c'était le cas.
+ *
+ * Aucune vignette n'est demandée au serveur : elle le pourrait ici (le média est en
+ * clair), mais ce serait un second chemin de rendu à tenir pour un avatar déjà compressé
+ * par `uploadPublicProfileImage`.
+ */
+export async function downloadPublicImage(session: Session, mxcUrl: string): Promise<Blob> {
+  return (await recupererMedia(session, mxcUrl)).blob();
+}
+
+/**
+ * Les endpoints média non authentifiés répondent 404 depuis Synapse v1.146
+ * (infra/README.md, REQ-INF-12) : aucune URL publique n'est supposée, et aucune vignette
+ * n'est demandée au serveur — il ne saurait pas redimensionner un blob opaque.
+ */
+async function recupererMedia(session: Session, mxcUrl: string): Promise<Response> {
+  const url = session.client.mxcUrlToHttp(mxcUrl, undefined, undefined, undefined, false, true, true);
   if (!url) throw new Error("URL mxc invalide : média non téléchargeable");
 
   const response = await fetch(url, {
@@ -305,5 +332,5 @@ export async function downloadAttachment(
   });
   if (!response.ok) throw new Error(`téléchargement média refusé (HTTP ${response.status})`);
 
-  return decryptAttachment(new Uint8Array(await response.arrayBuffer()), file, env.subtle);
+  return response;
 }

@@ -37,6 +37,14 @@
      image choisie par l'utilisateur. */
   --tacita-scrim: light-dark(#ffffffb3, #13151499);
 
+  /* Le bandeau flottant du profil, seul verre de l'app (DESIGN.md § Colors, exception
+     nommée du 10/08/2026). Deux couches indissociables, et c'est pour ça que c'est un
+     token et pas deux valeurs recopiées : la teinte translucide **et** le flou. Sans le
+     flou, les boutons passent sur une photo arbitraire choisie par l'utilisateur, où
+     rien ne garantit le contraste. Un navigateur sans `backdrop-filter` garde les 65 %
+     d'opacité, qui suffisent à lire — l'effet dégrade, la lisibilité non. */
+  --tacita-verre: light-dark(#f6f7f6a6, #131514a6);
+
   /* DESIGN.md : avatars en **carré arrondi (rayon 25 %)**, signature délibérée face aux
      cercles de toutes les messageries. Astryx n'a pas de token d'avatar — ses avatars
      lisent `--radius-full`. C'est `ConversationAvatar` qui redéfinit ce token dans sa

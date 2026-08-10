@@ -48,7 +48,7 @@ export interface FakeRoomOptions {
   /** REQ-MSG-17 — l'état initial de `m.ignored_user_list`. */
   ignored?: string[];
   /** REQ-MSG-18 — ce que `getProfileInfo` rend. */
-  profile?: { displayname?: string; avatar_url?: string };
+  profile?: { displayname?: string; avatar_url?: string } & Record<string, unknown>;
   /** REQ-MSG-19 — ce que l'annuaire du homeserver rend. */
   annuaire?: { user_id: string; display_name?: string; avatar_url?: string }[];
   /** REQ-MSG-11 — niveau exigé par l'état du salon pour l'action `kick`. */
@@ -166,6 +166,8 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     getProfileInfo: vi.fn(async (_userId: string) => profile),
     setDisplayName: vi.fn(async (_name: string) => ({})),
     setAvatarUrl: vi.fn(async (_url: string) => ({})),
+    /** REQ-MSG-21 — l'écriture d'un champ de profil étendu (MSC4133). */
+    setExtendedProfileProperty: vi.fn(async (_key: string, _value: unknown) => {}),
     searchUserDirectory: vi.fn(async (_options: { term: string; limit?: number }) => ({
       results: annuaire,
       limited: false,

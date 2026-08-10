@@ -457,16 +457,20 @@ describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle ex
     rendre();
     // Une option grisée est une promesse non tenue affichée (interdit n°13). Avant E-12
     // le champ était **absent** ; il est maintenant là et il marche.
-    expect(screen.getByRole("button", { name: "Choisir une photo" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Choisir une photo de profil" })).toBeTruthy();
     expect(screen.getByLabelText("Choisir une photo de profil")).toBeTruthy();
+    // REQ-UIX-41 — la bannière emprunte le même chemin, elle est là au même titre.
+    expect(screen.getByRole("button", { name: "Choisir une bannière" })).toBeTruthy();
   });
 
-  it("dit au moment du choix que la photo n'est pas chiffrée", () => {
+  it("dit au moment du choix que les images ne sont pas chiffrées", () => {
     rendre();
     // La condition qui rend REQ-MED-11 acceptable : dans la feuille où l'on choisit,
-    // pas dans un écran de réglages qu'on n'ouvrira jamais.
+    // pas dans un écran de réglages qu'on n'ouvrira jamais. Une phrase pour les deux
+    // images — c'est la même limite, et la répéter la banaliserait.
     expect(screen.getByText(AVERTISSEMENT_PHOTO)).toBeTruthy();
-    expect(AVERTISSEMENT_PHOTO).toMatch(/n'est pas chiffrée/);
+    expect(AVERTISSEMENT_PHOTO).toMatch(/ne sont pas chiffrées/);
+    expect(AVERTISSEMENT_PHOTO).toMatch(/bannière/);
   });
 
   it("téléverse par le chemin injecté et n'enregistre le mxc qu'à la validation", async () => {

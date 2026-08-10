@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   acceptInvitation,
+  CHAMP_BANNIERE,
   ignoredUsers,
   ignoreUser,
   leaveConversation,
@@ -58,6 +59,41 @@ describe("REQ-MSG-17 — blocage par m.ignored_user_list natif", () => {
     client.setIgnoredUsers.mockClear();
     await unignoreUser(session, "@inconnu:tacita.test");
     expect(client.setIgnoredUsers).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Le seul test de la bannière, et il porte sur ce qui pouvait silencieusement ne rien
+ * faire : le champ **étendu**. Le reste de REQ-MSG-21 (le rendu) n'est pas prouvable en
+ * jsdom — c'est un `fetch` authentifié et une URL d'objet.
+ */
+describe("REQ-MSG-21 — bannière : champ étendu, lu sans requête de plus", () => {
+  it("la bannière voyage dans la réponse de profil, et une valeur non textuelle est ignorée", async () => {
+    const { session, client } = fakeSession({
+      profile: { displayname: "mira", [CHAMP_BANNIERE]: "mxc://tacita.test/banniere" },
+    });
+
+    await expect(profileOf(session, MIRA)).resolves.toMatchObject({
+      bannerUrl: "mxc://tacita.test/banniere",
+    });
+    // Aucun appel de plus : c'est tout l'intérêt du champ étendu contre un `GET` dédié.
+    expect(client.getProfileInfo).toHaveBeenCalledTimes(1);
+
+    const autre = fakeSession({ profile: { [CHAMP_BANNIERE]: { url: "objet" } } });
+    expect((await profileOf(autre.session, MIRA)).bannerUrl).toBeUndefined();
+  });
+
+  it("ne changer que le nom n'écrit aucun champ étendu", async () => {
+    const { session, client } = fakeSession();
+
+    await updateProfile(session, { displayName: "adam" });
+    expect(client.setExtendedProfileProperty).not.toHaveBeenCalled();
+
+    await updateProfile(session, { bannerUrl: "mxc://tacita.test/b" });
+    expect(client.setExtendedProfileProperty).toHaveBeenCalledWith(
+      CHAMP_BANNIERE,
+      "mxc://tacita.test/b",
+    );
   });
 });
 

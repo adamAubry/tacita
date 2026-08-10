@@ -75,13 +75,38 @@ export async function unignoreUser(session: Session, userId: string): Promise<vo
   await session.client.setIgnoredUsers(courants.filter((id) => id !== userId));
 }
 
-/** Ce qu'un profil Matrix porte. Les deux champs sont facultatifs côté protocole. */
+/**
+ * REQ-MSG-21 — la bannière de profil, en champ **étendu** (MSC4133).
+ *
+ * Matrix ne définit que `displayname` et `avatar_url` ; une bannière n'existe nulle part
+ * dans la spec, donc elle vit dans un champ à nous, nommé dans notre espace. Vérifié
+ * contre le Synapse déployé (v1.155.0, digest épinglé dans `infra/synapse/Dockerfile`) :
+ *
+ * - `GET /_matrix/client/v3/profile/{userId}` rend les champs personnalisés **avec** le
+ *   reste du profil (`ProfileHandler.get_profile` : `ret.update(extra_fields)`), donc les
+ *   lire ne coûte aucune requête de plus — `profileOf` les reçoit déjà ;
+ * - la route générique `PUT /_matrix/client/v3/profile/{userId}/{champ}` est enregistrée
+ *   **sans condition** dans cette version : `experimental_features.msc4133_enabled`
+ *   n'ajoute que le préfixe instable `uk.tcpip.msc4133`, et l'infra n'a donc rien à
+ *   changer. `uk.tcpip.msc4133.stable` étant annoncé en dur, matrix-js-sdk part de
+ *   lui-même sur le préfixe `v3` ;
+ * - le nom doit suivre la *Common Namespaced Identifier Grammar*
+ *   (`^[a-z][a-z0-9_.-]{0,254}$`, `synapse/util/stringutils.py`) : celui-ci la respecte.
+ *
+ * À revérifier au prochain bump de Synapse, comme les autres valeurs sensibles aux
+ * versions : une route aujourd'hui inconditionnelle peut repasser derrière le drapeau.
+ */
+export const CHAMP_BANNIERE = "org.tacita.banner_url";
+
+/** Ce qu'un profil Matrix porte. Les champs sont tous facultatifs côté protocole. */
 export interface Profile {
   userId: string;
   /** Le nom d'affichage, ou l'identifiant si le compte n'en a pas posé. */
   displayName: string;
   /** URL `mxc://`, à déchiffrer/résoudre par le pipeline média — jamais une URL http. */
   avatarUrl?: string;
+  /** REQ-MSG-21 — `mxc://` de la bannière, même nature que `avatarUrl` : public, non chiffré. */
+  bannerUrl?: string;
 }
 
 /**
@@ -94,10 +119,15 @@ export interface Profile {
 export async function profileOf(session: Session, userId: string): Promise<Profile> {
   try {
     const profil = await session.client.getProfileInfo(userId);
+    // Le champ étendu voyage dans la même réponse ; le type du SDK ne connaît que les
+    // deux champs de la spec, d'où la lecture par index. Une valeur non textuelle est
+    // ignorée : le champ est libre côté serveur, n'importe qui peut y poser un objet.
+    const banniere = (profil as Record<string, unknown>)[CHAMP_BANNIERE];
     return {
       userId,
       displayName: profil.displayname ?? userId,
       avatarUrl: profil.avatar_url,
+      bannerUrl: typeof banniere === "string" ? banniere : undefined,
     };
   } catch {
     return { userId, displayName: userId };
@@ -109,18 +139,22 @@ export async function profileOf(session: Session, userId: string): Promise<Profi
  * on ne pose que ce qui est fourni, pour qu'un formulaire qui ne change que le nom
  * n'efface pas la photo.
  *
- * `avatarUrl` est un `mxc://` déjà téléversé — le téléversement appartient au pipeline
- * média (spec 08), pas à ce paquet.
+ * `avatarUrl` et `bannerUrl` sont des `mxc://` déjà téléversés — le téléversement
+ * appartient au pipeline média (spec 08), pas à ce paquet.
  */
 export async function updateProfile(
   session: Session,
-  changements: { displayName?: string; avatarUrl?: string },
+  changements: { displayName?: string; avatarUrl?: string; bannerUrl?: string },
 ): Promise<void> {
   if (changements.displayName !== undefined) {
     await session.client.setDisplayName(changements.displayName);
   }
   if (changements.avatarUrl !== undefined) {
     await session.client.setAvatarUrl(changements.avatarUrl);
+  }
+  if (changements.bannerUrl !== undefined) {
+    // REQ-MSG-21 — champ étendu, pas un champ de la spec : voir `CHAMP_BANNIERE`.
+    await session.client.setExtendedProfileProperty(CHAMP_BANNIERE, changements.bannerUrl);
   }
 }
 

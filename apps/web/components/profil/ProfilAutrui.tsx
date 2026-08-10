@@ -99,6 +99,8 @@ export function ProfilAutrui({
     <>
       <ProfileCard
         nom={profil.displayName}
+        avatarUrl={profil.avatarUrl}
+        bannerUrl={profil.bannerUrl}
         statut={bloque ? "bloque" : estAmi ? "ami" : "non-ami"}
         actions={
           <Button

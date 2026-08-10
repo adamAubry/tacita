@@ -7,7 +7,7 @@
 1. **Clair par défaut.** Fond neutre, texte encre. Le sombre existe (réglage, REQ-UI-03) mais n'est pas l'identité. La lumière est ce qui vieillit le mieux et ce qui paraît poli au plus grand nombre.
 2. **Une seule couleur.** Un vert profond, rare et constant. Tout le reste est neutre. La retenue chromatique est ce qui distingue un produit fini d'un prototype.
 3. **Géométrie stricte — c'est la signature.** Grille de 4 pt partout, rayons faibles et constants, filets fins (hairlines de 1 px) plutôt qu'ombres, alignements exacts, chiffres tabulaires pour toute heure et tout compteur. La précision EST le style.
-4. **Zéro effet de mode.** Interdits définitifs : dégradés, glassmorphism/flou décoratif, blobs, néon, ombres portées molles, coins très arrondis, emoji décoratifs dans l'UI, animations démonstratives. Si un effet se remarque, il est de trop.
+4. **Zéro effet de mode.** Interdits définitifs : dégradés, glassmorphism/flou décoratif, blobs, néon, ombres portées molles, coins très arrondis, emoji décoratifs dans l'UI, animations démonstratives. Si un effet se remarque, il est de trop. **Une seule exception, nommée et bornée** (ratifiée le 10/08/2026) : le bandeau flottant de l'écran profil, posé sur la bannière de l'utilisateur. Le mot-clé est *décoratif* — ici le flou est structurel : sous le bandeau il y a une photo arbitraire, choisie par quelqu'un d'autre, où aucune paire de contraste n'est vérifiable à l'avance. Le verre est ce qui rend le retour et les options lisibles quelle que soit l'image ; un fond opaque le ferait aussi, mais en masquant la bannière que le bandeau est précisément censé laisser voir. L'exception ne s'étend à aucun autre écran : partout ailleurs, le fond est un token et le contraste se vérifie.
 
 Géométrie de référence : contrôles r6, cartes et modals r10, bottom-sheets r12 ; **avatars en carré arrondi (rayon 25 %)** — signature délibérée face aux cercles de toutes les messageries ; espacement uniquement en multiples de 4 ; séparation par hairline ou par espace, jamais par changement de fond gratuit. Timeline Discord-style sans bulles, inchangée. Toute couleur passe par les tokens ci-dessous (mappés sur le thème Astryx au spike M-A) ; **aucune valeur hexadécimale dans le code des composants**. Cibles tactiles ≥ 44 px, safe-areas iOS en standalone.
 
@@ -32,8 +32,9 @@ Neutres à très léger sous-ton vert (invisible consciemment, cohérent avec l'
 | `warning` | #9A6A00 | #D9A441 | avertissements (limites connues) |
 | `highlight` | #155E4D à 14 %, texte `text` | #4FBD96 à 22 %, texte `text` | occurrences de recherche, `@me` |
 | `scrim` | #FFFFFF à 70 % | #131514 à 60 % | voile de lisibilité sur fond d'écran personnalisé |
+| `glass` | #F6F7F6 à 65 % | #131514 à 65 % | **bandeau flottant du profil, et lui seul** — teinte **et** `blur(12px)`, indissociables |
 
-Règles : l'accent occupe moins de 5 % de tout écran courant — s'il devient ambiant, c'est un bug de design ; `danger` jamais pour de l'emphase non destructive ; badges de non-lus en `text` sur `accent-soft` (pas de pastille rouge, cf. PRODUCT.md) ; contraste AA vérifié pour chaque paire ; aucune autre couleur n'existe.
+`glass` est un couple, pas une couleur : la teinte seule laisse passer les hautes fréquences d'une photo derrière du texte. Un navigateur sans `backdrop-filter` garde les 65 % d'opacité — l'effet dégrade, la lisibilité non. Règles : l'accent occupe moins de 5 % de tout écran courant — s'il devient ambiant, c'est un bug de design ; `danger` jamais pour de l'emphase non destructive ; badges de non-lus en `text` sur `accent-soft` (pas de pastille rouge, cf. PRODUCT.md) ; contraste AA vérifié pour chaque paire ; aucune autre couleur n'existe.
 
 ## Typography
 
@@ -69,7 +70,7 @@ Jamais d'ombre sans hairline. Le bouton actif de la navbar est « surélevé » 
 
 Primitives Astryx imposées (wireframe) : `SegmentedControl` (fond `accent-soft` sur l'option active), `DropdownMenu` (icône à gauche), `NavIcon` (navbar, listes de boutons), `ClickableCard`, `Toolbar` (headers), `PowerSearch` (tokens selon contexte), `Chat` (composer). Interdiction de recoder une primitive existante d'Astryx.
 
-Composants composés (les 26 du wireframe, mappés dans `specs/ui/00-plan-frontend.md`) : un composant = un fichier nommé, réutilisé partout, variations par props. Obligations transverses : états chargement (Skeleton de même géométrie que le contenu final, zéro layout shift), vide (Placeholder — icône au trait monochrome, pas d'illustration cartoon), erreur et hors ligne ; rendu correct dans les deux thèmes ; avatars en carré arrondi 25 % partout (ConversationAvatar est le seul endroit qui rend un avatar). Traits signature à préserver : regroupement Discord des messages (règle des 5 minutes), coches vertes, séparateur de date au filet, forme d'onde des vocaux en barres verticales strictes sur la grille.
+Composants composés (les 26 du wireframe, mappés dans `specs/ui/00-plan-frontend.md`) : un composant = un fichier nommé, réutilisé partout, variations par props. Obligations transverses : états chargement (Skeleton de même géométrie que le contenu final, zéro layout shift), vide (Placeholder — icône au trait monochrome, pas d'illustration cartoon), erreur et hors ligne ; rendu correct dans les deux thèmes ; avatars en carré arrondi 25 % partout (ConversationAvatar est le seul endroit qui rend un avatar — **image quand le profil en porte une, initiales sinon** ; le `mxc://` se résout par un fetch authentifié, jamais par un `src` direct, l'endpoint média exigeant le jeton). L'écran profil se lit en trois couches : bannière au fond, bandeau d'actions flottant par-dessus, avatar remonté sur la bannière — les deux images se dissolvent par le bas au `mask-image`, jamais par un calque qui devrait connaître la couleur du fond. Traits signature à préserver : regroupement Discord des messages (règle des 5 minutes), coches vertes, séparateur de date au filet, forme d'onde des vocaux en barres verticales strictes sur la grille.
 
 ## Do's and Don'ts
 
@@ -83,7 +84,7 @@ Composants composés (les 26 du wireframe, mappés dans `specs/ui/00-plan-fronte
 
 **Don't**
 - Pas de Tailwind, shadcn, Bootstrap, CSS-in-JS tiers ; pas de copie des couleurs WhatsApp/iMessage — notre vert est profond et rare, pas un vert d'état.
-- Pas de dégradés, glass, néon, blobs, mode sombre « stylé » : le sombre est un réglage d'usage, pas une esthétique.
+- Pas de dégradés, glass, néon, blobs, mode sombre « stylé » : le sombre est un réglage d'usage, pas une esthétique. Seule exception, ratifiée et bornée : le bandeau flottant du profil (`glass`, cf. Overview §4) — un second usage est un écart, pas un précédent.
 - Pas de spinner plein écran : skeletons localisés. Pas d'état vide brut : toujours Placeholder.
 - Pas d'option grisée sans explication, pas de « coming soon », rien d'affiché qui ne marche pas.
 - Pas de pastille rouge de culpabilisation ; `danger` réservé au destructif ; pas de modale d'interruption hors action destructive.
