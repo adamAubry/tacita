@@ -20,19 +20,23 @@ export function RecoveryStep({ session }: { session: Session }) {
   const { recuperationConfirmee } = useSession();
   const [cle, setCle] = useState<string | undefined>();
   const [copiee, setCopiee] = useState(false);
-  const [echec, setEchec] = useState(false);
+  const [echec, setEchec] = useState<"generique" | "origine" | undefined>();
   const [enCours, setEnCours] = useState(false);
 
   const generer = async () => {
     setEnCours(true);
-    setEchec(false);
+    setEchec(undefined);
     try {
       const generee = await session.setupRecoveryKey();
       setCle(generee.encodedPrivateKey);
     } catch {
       // Aucun détail affiché ni journalisé : le message d'erreur du SDK peut porter du
-      // matériel de clé.
-      setEchec(true);
+      // matériel de clé. La seule chose qu'on ait le droit de lire, c'est l'origine de la
+      // page : hors *secure context* (`https://` ou `localhost`), `crypto.subtle` n'existe
+      // pas et le secret storage ne peut pas être chiffré — l'échec est alors certain, et
+      // « réessayez » serait un mensonge. Lu après coup, jamais avant : le serveur rend la
+      // même page pour toutes les origines.
+      setEchec(globalThis.isSecureContext === false ? "origine" : "generique");
     } finally {
       setEnCours(false);
     }
@@ -50,7 +54,11 @@ export function RecoveryStep({ session }: { session: Session }) {
           <Banner
             status="error"
             title="La clé n'a pas pu être créée"
-            description="Vérifiez votre connexion et réessayez."
+            description={
+              echec === "origine"
+                ? "Cette page est ouverte sur une adresse non sécurisée : le chiffrement y est indisponible, et réessayer ne changera rien. Rouvrez l'application en https, ou sur localhost."
+                : "Vérifiez votre connexion et réessayez."
+            }
           />
         ) : null}
         <Button label="Créer ma clé" variant="primary" isLoading={enCours} onClick={generer} />

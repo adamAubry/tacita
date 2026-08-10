@@ -18,12 +18,12 @@ garder.
 
 Ce qui marchera pour la première fois ici, et qui n'a jamais pu marcher en local :
 
-| | |
-| --- | --- |
-| ✅ Un vrai certificat, donc un vrai contexte sécurisé | service worker, PWA installable, `crypto.subtle` |
-| ✅ Ouvrir l'application depuis un téléphone | plus besoin d'un fichier hosts ni d'un CA importé |
-| ⚠️ **Push notifications** | la chaîne est complète pour la première fois ; **rien n'a jamais été délivré de bout en bout**, c'est ici que ça se prouve ou que ça tombe |
-| ❌ **Appels audio/vidéo** | l'overlay `rtc/` exige deux IPv4 publiques (REQ-RTC-06), voir § 9 |
+|                                                       |                                                                                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| ✅ Un vrai certificat, donc un vrai contexte sécurisé | service worker, PWA installable, `crypto.subtle`                                                                                           |
+| ✅ Ouvrir l'application depuis un téléphone           | plus besoin d'un fichier hosts ni d'un CA importé                                                                                          |
+| ⚠️ **Push notifications**                             | la chaîne est complète pour la première fois ; **rien n'a jamais été délivré de bout en bout**, c'est ici que ça se prouve ou que ça tombe |
+| ❌ **Appels audio/vidéo**                             | l'overlay `rtc/` exige deux IPv4 publiques (REQ-RTC-06), voir § 9                                                                          |
 
 L'absence d'appels est **attendue et annoncée correctement** : sans overlay RTC, le
 `.well-known` n'annonce aucun focus (REQ-RTC-05) et l'UI affiche `RtcFociMissing` plutôt
@@ -33,12 +33,12 @@ qu'un appel qui se charge puis meurt.
 
 ## 1. La machine
 
-| | |
-| --- | --- |
-| OS | Ubuntu 24.04 LTS |
-| RAM | **8 Go recommandé, 4 Go le plancher.** `next build` et le build de l'image Synapse tournent sur la machine (§ 6) |
-| Disque | 40 Go |
-| IPv4 | 1 suffit pour tout sauf les appels — voir § 9 avant de commander |
+|        |                                                                                                                  |
+| ------ | ---------------------------------------------------------------------------------------------------------------- |
+| OS     | Ubuntu 24.04 LTS                                                                                                 |
+| RAM    | **8 Go recommandé, 4 Go le plancher.** `next build` et le build de l'image Synapse tournent sur la machine (§ 6) |
+| Disque | 40 Go                                                                                                            |
+| IPv4   | 1 suffit pour tout sauf les appels — voir § 9 avant de commander                                                 |
 
 Sous 4 Go, ajouter du swap **avant** le premier build, sinon le compilateur se fait tuer
 par l'OOM killer et le message ne dit pas que c'est la mémoire :
@@ -122,13 +122,18 @@ Poser le hook de renouvellement **avant** d'émettre le certificat : certbot ex�
 hooks de déploiement dès la première émission, ce qui met les fichiers en place tout seul.
 
 ```sh
-sudo install -m 755 infra/staging/certs-deploy-hook.sh \
+cd /opt/tacita
+sudo install -D -m 755 infra/staging/certs-deploy-hook.sh \
   /etc/letsencrypt/renewal-hooks/deploy/tacita.sh
 ```
 
+`-D` n'est pas décoratif : `/etc/letsencrypt/renewal-hooks/deploy/` n'existe pas tant que
+certbot n'a jamais tourné, et sans lui `install` échoue sur un « No such file or
+directory » qui nomme la destination — pas le script du dépôt.
+
 ```sh
 sudo certbot certonly --standalone \
-  -d chat.<domaine> -d call.chat.<domaine> \
+  -d chat.spleen.blog -d call.chat.spleen.blog \
   --agree-tos -m <ton-email> --no-eff-email
 ```
 
@@ -164,16 +169,16 @@ cp infra/.env.example infra/.env
 
 Les valeurs qui **doivent** changer par rapport à l'exemple :
 
-| Variable | Valeur |
-| --- | --- |
-| `SERVER_NAME` | `chat.<domaine>` |
-| `SHARD_ORIGIN` | **vide** — REQ-INF-16, le shard est servi sur le même domaine, il n'y a pas d'origine à ouvrir |
-| `SYNAPSE_IP_RANGE_WHITELIST` | `["172.16.0.0/12"]` — obligatoire, voir ci-dessous |
-| `POSTGRES_PASSWORD`, `SYNAPSE_*_SECRET*`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_OIDC_CLIENT_SECRET`, `S3_*_KEY*` | `openssl rand -hex 32` pour chacun, jamais deux fois la même |
-| `MINIO_KMS_SECRET_KEY` | `echo "tacita-staging:$(openssl rand -base64 32)"` |
-| `VAPID_SUBJECT` | `mailto:<ton-email>` |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | voir ci-dessous |
-| `TURN_DOMAIN`, `WEB_BIND_IP`, `TURN_BIND_IP` | laisser tel quel : l'overlay RTC n'est pas chargé (§ 9) |
+| Variable                                                                                                        | Valeur                                                                                         |
+| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `SERVER_NAME`                                                                                                   | `chat.<domaine>`                                                                               |
+| `SHARD_ORIGIN`                                                                                                  | **vide** — REQ-INF-16, le shard est servi sur le même domaine, il n'y a pas d'origine à ouvrir |
+| `SYNAPSE_IP_RANGE_WHITELIST`                                                                                    | `["172.16.0.0/12"]` — obligatoire, voir ci-dessous                                             |
+| `POSTGRES_PASSWORD`, `SYNAPSE_*_SECRET*`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_OIDC_CLIENT_SECRET`, `S3_*_KEY*` | `openssl rand -hex 32` pour chacun, jamais deux fois la même                                   |
+| `MINIO_KMS_SECRET_KEY`                                                                                          | `echo "tacita-staging:$(openssl rand -base64 32)"`                                             |
+| `VAPID_SUBJECT`                                                                                                 | `mailto:<ton-email>`                                                                           |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`                                                                        | voir ci-dessous                                                                                |
+| `TURN_DOMAIN`, `WEB_BIND_IP`, `TURN_BIND_IP`                                                                    | laisser tel quel : l'overlay RTC n'est pas chargé (§ 9)                                        |
 
 `SYNAPSE_IP_RANGE_WHITELIST` n'est pas facultatif ici. L'overlay pose un alias réseau qui
 fait résoudre `SERVER_NAME` vers le proxy depuis l'intérieur du compose (levier de D-07,
@@ -334,18 +339,19 @@ docker compose -f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker
 
 ## 10. Dépannage — symptôme vers cause
 
-| Symptôme | Cause | Où |
-| --- | --- | --- |
-| `503` sur `/login/sso/redirect` | Synapse n'atteint pas la découverte OIDC : alias, `SYNAPSE_IP_RANGE_WHITELIST`, ou Keycloak démarré après lui | § 5, § 6 |
-| Formulaire Keycloak OK puis blocage sur `/_synapse/client/oidc/callback` | `SHARD_ORIGIN` non vide alors que le shard est servi sur `SERVER_NAME` | § 5 |
-| `502` sur `/` seul, le reste répond | le service `web` n'est pas monté, ou l'image n'écoute pas sur `0.0.0.0` | § 6 |
-| Erreur TLS sur tous les clients d'un coup | `generate-dev-certs.sh` lancé sur la machine | § 4 |
-| Le certificat expire malgré `certbot.timer` | hook de déploiement absent ou non exécutable | § 4 |
-| Le build est tué sans message | mémoire : ajouter du swap | § 1 |
-| `kcadm.sh` répond `404 Not Found` | `--server` sans `/auth` | § 7 |
-| Une modification de `realm-export.json` n'a aucun effet | le realm n'est importé qu'au premier démarrage du volume | § 7 |
-| `RtcFociMissing` à l'écran d'appel | pile sans SFU — attendu ici | § 9 |
-| Aucune notification push ne parvient | jamais délivré de bout en bout à ce jour ; c'est l'inconnue de cet environnement | § 0 |
+| Symptôme                                                                 | Cause                                                                                                                    | Où       |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | -------- |
+| `503` sur `/login/sso/redirect`                                          | Synapse n'atteint pas la découverte OIDC : alias, `SYNAPSE_IP_RANGE_WHITELIST`, ou Keycloak démarré après lui            | § 5, § 6 |
+| Formulaire Keycloak OK puis blocage sur `/_synapse/client/oidc/callback` | `SHARD_ORIGIN` non vide alors que le shard est servi sur `SERVER_NAME`                                                   | § 5      |
+| `502` sur `/` seul, le reste répond                                      | le service `web` n'est pas monté, ou l'image n'écoute pas sur `0.0.0.0`                                                  | § 6      |
+| Erreur TLS sur tous les clients d'un coup                                | `generate-dev-certs.sh` lancé sur la machine                                                                             | § 4      |
+| Le certificat expire malgré `certbot.timer`                              | hook de déploiement absent ou non exécutable                                                                             | § 4      |
+| `install` : « No such file or directory » à la pose du hook              | destination nommée → `renewal-hooks/deploy/` pas encore créé, utiliser `-D` ; source nommée → mauvais répertoire courant | § 4      |
+| Le build est tué sans message                                            | mémoire : ajouter du swap                                                                                                | § 1      |
+| `kcadm.sh` répond `404 Not Found`                                        | `--server` sans `/auth`                                                                                                  | § 7      |
+| Une modification de `realm-export.json` n'a aucun effet                  | le realm n'est importé qu'au premier démarrage du volume                                                                 | § 7      |
+| `RtcFociMissing` à l'écran d'appel                                       | pile sans SFU — attendu ici                                                                                              | § 9      |
+| Aucune notification push ne parvient                                     | jamais délivré de bout en bout à ce jour ; c'est l'inconnue de cet environnement                                         | § 0      |
 
 Pour ce qui ressemble à une limite du produit plutôt qu'à une panne, la liste « Ce qui
 n'est pas prouvé » d'`apps/web/README.md` fait foi, et `infra/LIMITES.md` porte les

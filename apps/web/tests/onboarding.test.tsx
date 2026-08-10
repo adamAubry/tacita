@@ -66,6 +66,7 @@ afterEach(() => {
   // `restoreAllMocks` et non `clearAllMocks` : les espions posés sur `navigator` et
   // `matchMedia` par les tests iOS survivraient au fichier et casseraient les suivants.
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   initSession.mockReset();
   restoreSession.mockReset();
   rediriger.mockReset();
@@ -114,6 +115,24 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
     // Interdit n°13 : la limite se documente là où elle se joue, pas dans une note.
     await waitFor(() => expect(screen.getByText(/définitivement perdu/)).toBeTruthy());
     expect(screen.getByText(/personne, chez nous, ne peut le récupérer/)).toBeTruthy();
+  });
+
+  it("hors contexte sécurisé, l'échec est nommé — pas « réessayez »", async () => {
+    // Interdit n°13 : `crypto.subtle` n'existe pas hors `https`/`localhost`, donc la clé
+    // ne pourra jamais être créée à cette adresse. Inviter à réessayer serait faux.
+    const { session, setupRecoveryKey } = fausseSession({ recuperationRequise: true });
+    setupRecoveryKey.mockRejectedValueOnce(new TypeError("crypto.subtle is undefined"));
+    // `stubGlobal` et non `spyOn` : jsdom ne définit pas `isSecureContext`, il n'y a donc
+    // aucun accesseur à espionner. Le défaut `undefined` reste traité comme « je ne sais
+    // pas » — seul un `false` explicite nomme l'origine.
+    vi.stubGlobal("isSecureContext", false);
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Créer ma clé")).toBeTruthy());
+    fireEvent.click(screen.getByText("Créer ma clé"));
+
+    await waitFor(() => expect(screen.getByText(/adresse non sécurisée/)).toBeTruthy());
+    expect(screen.queryByText(/Vérifiez votre connexion/)).toBeNull();
   });
 
   it("aucune UI de mot de passe : la connexion part chez le fournisseur", () => {
