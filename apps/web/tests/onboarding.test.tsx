@@ -96,10 +96,14 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
     const { session, setupRecoveryKey } = fausseSession({ recuperationRequise: true });
     monter(session);
 
-    await waitFor(() => expect(screen.getByText("Créer ma clé")).toBeTruthy());
-    fireEvent.click(screen.getByText("Créer ma clé"));
+    await waitFor(() => expect(screen.getByText("Continuer")).toBeTruthy());
+    fireEvent.click(screen.getByText("Continuer"));
 
-    await waitFor(() => expect(screen.getByText(/EsTb ABCD/)).toBeTruthy());
+    // La clé est rendue en groupes de quatre sur une grille — ce qui se transcrit à la
+    // main sans perdre sa place. On lit donc le bloc entier, pas un nœud de texte : c'est
+    // aussi ce qui prouve qu'aucun groupe ne manque.
+    await waitFor(() => expect(screen.getByTestId("cle-de-recuperation")).toBeTruthy());
+    expect(screen.getByTestId("cle-de-recuperation").textContent).toBe("EsTbABCDEFGHIJKL");
     expect(setupRecoveryKey).toHaveBeenCalledTimes(1);
     // La promesse est tenue telle qu'elle est faite : elle ne sera plus affichée.
     expect(screen.getByText(/ne sera plus affichée/)).toBeTruthy();
@@ -117,6 +121,21 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
     expect(screen.getByText(/personne, chez nous, ne peut le récupérer/)).toBeTruthy();
   });
 
+  it("« en savoir plus » sort dans un onglet neuf, sans quitter l'étape", async () => {
+    const { session } = fausseSession({ recuperationRequise: true });
+    monter(session);
+
+    // L'étape bloque toute l'app : une navigation dans le même onglet la détruirait, et
+    // le retour rejouerait le montage de session. `noopener` parce que la page ouverte
+    // garderait sinon une poignée sur celle-ci.
+    const lien = await screen.findByRole("link", { name: /En savoir plus/ });
+    expect(lien.getAttribute("target")).toBe("_blank");
+    expect(lien.getAttribute("rel")).toContain("noopener");
+    expect(lien.getAttribute("href")).toBe(
+      "https://www.google.com/search?q=a+quoi+sert+une+cle+de+recuperation",
+    );
+  });
+
   it("hors contexte sécurisé, l'échec est nommé — pas « réessayez »", async () => {
     // Interdit n°13 : `crypto.subtle` n'existe pas hors `https`/`localhost`, donc la clé
     // ne pourra jamais être créée à cette adresse. Inviter à réessayer serait faux.
@@ -128,8 +147,8 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
     vi.stubGlobal("isSecureContext", false);
     monter(session);
 
-    await waitFor(() => expect(screen.getByText("Créer ma clé")).toBeTruthy());
-    fireEvent.click(screen.getByText("Créer ma clé"));
+    await waitFor(() => expect(screen.getByText("Continuer")).toBeTruthy());
+    fireEvent.click(screen.getByText("Continuer"));
 
     await waitFor(() => expect(screen.getByText(/adresse non sécurisée/)).toBeTruthy());
     expect(screen.queryByText(/Vérifiez votre connexion/)).toBeNull();
@@ -278,7 +297,7 @@ describe("REQ-UI-04 / REQ-UI-17 — la porte ne se referme pas sur un appareil d
     monter(session);
 
     await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
-    expect(screen.queryByText("Créer ma clé")).toBeNull();
+    expect(screen.queryByText("Continuer")).toBeNull();
   });
 
   it("la trace est par compte : elle ne fait pas sauter la porte au compte suivant", async () => {

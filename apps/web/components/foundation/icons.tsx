@@ -79,6 +79,25 @@ export const IconeProfil: ReactNode = (
 );
 
 /**
+ * La clé de récupération (M-B) — Astryx n'a pas de clé, et sa liste de noms reste fermée.
+ *
+ * **La seule icône de l'app rendue en grand** : elle est le sujet de l'écran, pas un
+ * ornement de contrôle. D'où la taille portée ici plutôt que par l'appelant.
+ *
+ * Le trait reste celui des autres, 1,5 : à 56 px il rend 3,5 px à l'écran, soit une ligne
+ * plus franche qu'à 44 px sans qu'on ait à sortir de la géométrie commune. C'est
+ * l'agrandissement qui donne le poids, pas un trait d'exception.
+ */
+export const IconeCle: ReactNode = (
+  <svg {...trait} width={56} height={56}>
+    <circle cx="12" cy="6.75" r="3.75" />
+    <path d="M12 10.5V20.5" />
+    <path d="M12 14.5h3" />
+    <path d="M12 17.5h2.25" />
+  </svg>
+);
+
+/**
  * Les trois icônes des Info buttons (M-H, REQ-UIX-33). Astryx n'a ni cloche, ni
  * réglages, ni « ajouter quelqu'un », et sa liste de noms reste un type fermé.
  *

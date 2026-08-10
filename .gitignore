@@ -17,5 +17,8 @@ infra/proxy/certs/
 # d'impeccable). Rien de tout ceci n'entre dans le depot.
 e2e/
 
+# Captures et references visuelles de travail — machine-dependant, hors depot.
+.screens/
+
 # Runbook de lancement local — meme regime que e2e/ : machine-dependant, hors depot.
 LAUNCH_README.md
