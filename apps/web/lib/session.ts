@@ -1,4 +1,4 @@
-import type { Session } from "@tacita/client-core";
+import type { RecoveryState, Session } from "@tacita/client-core";
 
 /**
  * L'état d'entrée dans l'app, tel que l'UI a besoin de le connaître. Rien de plus :
@@ -8,8 +8,15 @@ export type EtatSession =
   | { phase: "chargement" }
   /** Aucune session restaurable : REQ-UIX-06 renvoie à l'OIDC, sans écran intermédiaire. */
   | { phase: "hors-session" }
-  /** REQ-COR-06 / REQ-UI-04 — la clé de récupération n'est pas configurée. Bloquant. */
-  | { phase: "recuperation-requise"; session: Session }
+  /**
+   * REQ-COR-06 / REQ-UI-04 — cet appareil ne peut pas encore chiffrer. Bloquant.
+   *
+   * `mode` dit **laquelle des deux étapes** : fabriquer la clé (inscription) ou recevoir
+   * celle qui existe déjà (toute reconnexion). Les confondre était le défaut : chaque
+   * `m.login.token` donne un `device_id` neuf, donc un appareil non signé, et l'écran de
+   * création s'ouvrait devant quelqu'un qui avait sa clé depuis longtemps.
+   */
+  | { phase: "recuperation-requise"; session: Session; mode: Exclude<RecoveryState, "prete"> }
   | { phase: "prete"; session: Session };
 
 /** Le paramètre que Synapse ajoute au retour du fournisseur OIDC. */
@@ -45,41 +52,23 @@ export function retirerJetonDeLUrl(location: Location, history: History): string
 }
 
 /**
- * REQ-COR-06 / REQ-UI-04 — la porte. `recoveryRequired()` est la source ; le shard ne
- * dérive rien lui-même.
+ * REQ-COR-06 / REQ-UI-04 — la porte. `recoveryState()` est la source ; le shard ne dérive
+ * rien lui-même — il ne fait que router les trois cas sur deux phases.
  *
- * Sans clé de récupération, **le compte ne peut pas chiffrer du tout** (D-08) :
- * `setupRecoveryKey()` est ce qui amorce le cross-signing, et la sauter rend le client
- * muet — l'utilisateur pourrait lire, jamais écrire. L'étape n'est donc pas un confort
- * qu'on pourrait différer, et c'est pour ça qu'elle bloque.
+ * Sans identité cross-signing sur cet appareil, **le compte ne peut pas chiffrer du
+ * tout** (D-08) : il ne recevrait pas les clés Megolm des autres, et les siennes ne
+ * partiraient à personne. L'étape n'est donc pas un confort qu'on pourrait différer, et
+ * c'est pour ça qu'elle bloque.
+ *
+ * Il n'y a plus de trace locale à consulter (l'ancien `recuperation-faite`, 08/08/2026) :
+ * `recoveryState()` lit le magasin crypto, ce qui répond juste hors ligne **et** distingue
+ * les deux étapes. La trace, elle, ne savait rien du `device_id` — après une
+ * déconnexion/reconnexion dans le même navigateur, elle laissait passer un appareil non
+ * signé, muet et sourd, avec l'application entière derrière.
  */
-export async function etatDe(
-  session: Session,
-  /** Cet appareil a déjà mené ce compte au bout de l'étape (trace locale, voir plus bas). */
-  dejaConfiguree = false,
-): Promise<EtatSession> {
-  if (!(await session.recoveryRequired())) return { phase: "prete", session };
-
-  /*
-   * `recoveryRequired()` confond deux choses : « il n'y a pas de clé » et « je ne peux
-   * pas le vérifier maintenant ». Sa source est la version de sauvegarde active, que le
-   * SDK n'a pas avant d'avoir pu la relire au serveur — hors ligne, donc, elle est nulle.
-   * La porte se refermait sur un compte parfaitement configuré à chaque rechargement sans
-   * réseau, et comme elle *remplace* l'application (RecoveryGate), l'historique que
-   * REQ-UI-17 promet consultable disparaissait avec elle. Mesuré au navigateur le
-   * 08/08/2026 : « Votre clé de récupération / Créer ma clé », réseau coupé.
-   *
-   * Traiter cet inconnu comme « requise » n'est pas prudent : c'est faux dans le sens
-   * qui coûte cher — redemander de créer une clé à quelqu'un qui en a déjà une.
-   *
-   * La trace locale répond, elle, à une question qui a une réponse locale : *cet
-   * appareil* a-t-il déjà mené *ce compte* au bout de l'étape. Si oui, D-08 est satisfait
-   * et il n'y a rien à redemander.
-   *
-   * ponytail: une clé réellement détruite côté serveur ne rouvrira donc plus cette porte
-   * sur cet appareil. C'est correct — la porte est un onboarding, pas un contrôle continu.
-   * Le jour où il faudra le cas, c'est un parcours de re-vérification qu'il faut, pas ce
-   * gardien-ci.
-   */
-  return dejaConfiguree ? { phase: "prete", session } : { phase: "recuperation-requise", session };
+export async function etatDe(session: Session): Promise<EtatSession> {
+  const etat = await session.recoveryState();
+  return etat === "prete"
+    ? { phase: "prete", session }
+    : { phase: "recuperation-requise", session, mode: etat };
 }

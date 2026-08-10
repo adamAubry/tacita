@@ -40,12 +40,37 @@ function makeCrypto() {
       this.isolationMode = mode;
     }),
     getActiveSessionBackupVersion: vi.fn(async (): Promise<string | null> => "1"),
+    /**
+     * REQ-COR-06 — la source de `recoveryState()`. Par défaut l'appareil est signé :
+     * le cas normal est une session déjà utilisable, et les tests qui veulent une porte
+     * fermée le disent.
+     */
+    getDeviceVerificationStatus: vi.fn(
+      async (_userId: string, _deviceId: string): Promise<{ signedByOwner: boolean } | null> => ({
+        signedByOwner: true,
+      }),
+    ),
+    /** `null` = ce compte n'a aucune sauvegarde côté serveur, donc une inscription. */
+    getKeyBackupInfo: vi.fn(async (): Promise<unknown> => null),
+    loadSessionBackupPrivateKeyFromSecretStorage: vi.fn(async () => {}),
+    checkKeyBackupAndEnable: vi.fn(async () => null),
     isEncryptionEnabledInRoom: vi.fn(async (_roomId: string) => true),
     createRecoveryKeyFromPassphrase: vi.fn(async () => ({
       privateKey: new Uint8Array(32),
       encodedPrivateKey: "EsTb ABCD EFGH",
     })),
-    bootstrapCrossSigning: vi.fn(async (_opts: unknown) => {}),
+    /**
+     * REQ-COR-06 — `authUploadDeviceSigningKeys` est typé ici parce que les tests d'UIA
+     * le rappellent : c'est le SDK qui l'invoque en vrai, avec la requête à envoyer.
+     */
+    bootstrapCrossSigning: vi.fn(
+      async (_opts: {
+        setupNewCrossSigning?: boolean;
+        authUploadDeviceSigningKeys?: (
+          envoyer: (auth: unknown) => Promise<void>,
+        ) => Promise<void>;
+      }) => {},
+    ),
     bootstrapSecretStorage: vi.fn(
       async (opts: { createSecretStorageKey?: () => Promise<unknown> }) => {
         await opts.createSecretStorageKey?.();
@@ -77,6 +102,23 @@ function makeClient(crypto: CryptoMock) {
      * parlent pas ne doivent pas se voir refuser une session valable.
      */
     whoami: vi.fn(async () => ({ user_id: "@luca:tacita.test" })),
+    /**
+     * REQ-COR-06 — le secret storage tel que `unlockRecovery` l'interroge : quelle clé
+     * protège ce compte, et celle qu'on lui présente est-elle la bonne. `checkKey` accepte
+     * par défaut ; les tests de saisie fausse la font refuser.
+     */
+    secretStorage: {
+      getKey: vi.fn(async (): Promise<[string, unknown] | null> => ["cleId", { algorithm: "m.secret_storage.v1.aes-hmac-sha2" }]),
+      checkKey: vi.fn(async (_key: Uint8Array, _info: unknown) => true),
+    },
+    /**
+     * REQ-COR-06 — la page de repli SSO que `setupRecoveryKey` fait ouvrir quand Synapse
+     * exige une UIA pour remplacer une identité. Même forme que le SDK.
+     */
+    getFallbackAuthUrl: vi.fn(
+      (loginType: string, sessionId: string) =>
+        `https://tacita.test/_matrix/client/v3/auth/${loginType}/fallback/web?session=${sessionId}`,
+    ),
     getRoom: vi.fn((_roomId: string): unknown => null),
     logout: vi.fn(async (_stop?: boolean) => ({})),
     clearStores: vi.fn(async () => {}),

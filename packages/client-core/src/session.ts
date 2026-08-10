@@ -10,7 +10,7 @@ import {
 // léger, aucun wasm tiré avec lui.
 // ponytail: casse si le SDK réorganise ses chemins ; repasser à la racine le jour où
 // elle réexporte crypto-api.
-import { OnlySignedDevicesIsolationMode } from "matrix-js-sdk/lib/crypto-api";
+import { decodeRecoveryKey, OnlySignedDevicesIsolationMode } from "matrix-js-sdk/lib/crypto-api";
 
 import { createLogger } from "./logger";
 
@@ -38,6 +38,64 @@ interface StoredCredentials {
   deviceId: string;
 }
 
+/**
+ * REQ-COR-06 — l'état de la clé de récupération **du point de vue de cet appareil-ci**,
+ * en trois cas et pas deux. C'est la distinction qui manquait : un booléen « clé requise »
+ * confond « ce compte n'a pas de clé » et « ce compte en a une, que cet appareil n'a pas
+ * reçue ». Le second est le cas normal de toute reconnexion — chaque `m.login.token`
+ * donne un `device_id` neuf — et le traiter comme le premier proposait de *créer* une clé
+ * à quelqu'un qui en a déjà une, donc d'écraser sa sauvegarde.
+ *
+ * - `prete` — cet appareil est signé par l'identité de son propriétaire ; il peut chiffrer.
+ * - `creation` — le compte n'a aucune sauvegarde : c'est l'inscription (REQ-UI-04).
+ * - `deverrouillage` — la sauvegarde existe ; cet appareil attend la clé (`unlockRecovery`).
+ */
+export type RecoveryState = "prete" | "creation" | "deverrouillage";
+
+/** Les deux cas de `setupRecoveryKey`. Voir le membre de `Session` pour le contrat. */
+export interface SetupRecoveryOptions {
+  reinitialiser?: boolean;
+  /**
+   * REQ-COR-06 — **le passage obligé du « j'ai perdu ma clé ».** Synapse laisse déposer
+   * une identité cross-signing sans authentification la *première* fois (MSC3967), mais
+   * exige une UIA pour en **remplacer** une (`rest/client/keys.py`, v1.155.0). Sans mot
+   * de passe natif (REQ-INF-09), le seul flow proposé est `m.login.sso` : il n'a pas de
+   * réponse à calculer, il se termine dans le navigateur, chez Keycloak.
+   *
+   * Le module rend donc l'URL et attend ; ouvrir une fenêtre est un geste d'UI, et il
+   * doit partir d'un clic sous peine d'être bloqué comme pop-up. La promesse résolue
+   * signifie « l'utilisateur a confirmé » ; rejetée, l'opération s'arrête là.
+   *
+   * Absent, un 401 remonte tel quel à l'appelant — c'était le défaut du 09/08/2026 :
+   * `bootstrapCrossSigning` partait sans rappel, prenait le 401, et l'écran de
+   * réinitialisation échouait après avoir déjà remplacé le secret storage.
+   */
+  confirmerIdentite?: (url: string) => Promise<void>;
+}
+
+/**
+ * Le défi UIA `m.login.sso` d'une erreur, s'il y en a un — l'identifiant de session à
+ * rejouer une fois l'utilisateur revenu.
+ *
+ * Lu en canard plutôt que par `instanceof MatrixError` : la suite mocke `matrix-js-sdk`
+ * (spec 04) et n'exporte que ce que le module utilise vraiment. On ne fait ici que lire
+ * la forme documentée de la réponse 401.
+ *
+ * Un flow à plusieurs étapes est ignoré volontairement : rejouer la session après le seul
+ * SSO ne l'achèverait pas, et faire comme si serait une garantie qu'on n'offre pas.
+ */
+function defiSso(erreur: unknown): string | undefined {
+  const { httpStatus, data } = (erreur ?? {}) as {
+    httpStatus?: number;
+    data?: { session?: string; flows?: { stages?: string[] }[] };
+  };
+  if (httpStatus !== 401) return undefined;
+  const sso = data?.flows?.some(
+    (flow) => flow.stages?.length === 1 && flow.stages[0] === "m.login.sso",
+  );
+  return sso ? data?.session : undefined;
+}
+
 export interface OrderedTimeline {
   /**
    * REQ-COR-04 — ordre canonique du flux /sync, tel que le SDK l'a accumulé.
@@ -51,11 +109,6 @@ export interface Session {
   readonly client: MatrixClient;
   timeline(roomId: string): OrderedTimeline;
   /**
-   * REQ-COR-06 — `true` tant qu'aucun backup de clés n'est actif. L'UI d'onboarding
-   * (spec 11) bloque dessus : sans clé de récupération, l'historique est perdu au
-   * premier nouvel appareil.
-   */
-  /**
    * REQ-COR-12 — état de chiffrement du salon, en **prédicat** : il rend `false`,
    * il ne lève jamais. Les gardes d'envoi des specs 05 et 07 s'appuient dessus.
    *
@@ -64,8 +117,40 @@ export interface Session {
    * Aucune mémorisation ici ; une garde qui ment est pire que pas de garde.
    */
   isEncrypted(roomId: string): Promise<boolean>;
-  recoveryRequired(): Promise<boolean>;
-  setupRecoveryKey(): Promise<RecoveryKey>;
+  /**
+   * REQ-COR-06 — l'état de la porte d'onboarding (spec 11). Voir {@link RecoveryState}
+   * pour ce que chaque valeur engage.
+   *
+   * La question qu'il pose est **locale** : cet appareil porte-t-il la signature de son
+   * propriétaire ? Le magasin crypto y répond sans réseau, et c'est ce qui rend la porte
+   * juste hors ligne. L'ancienne source — « une version de sauvegarde est-elle active ? » —
+   * ne le pouvait pas : le SDK ne la connaît qu'après l'avoir relue au serveur.
+   */
+  recoveryState(): Promise<RecoveryState>;
+  /**
+   * REQ-COR-06 — l'inscription : une clé neuve, la sauvegarde amorcée, le cross-signing
+   * en place. Rend la clé **une seule fois**, à afficher (spec 11) ; elle n'est jamais
+   * persistée.
+   *
+   * `reinitialiser` est le cas « j'ai perdu ma clé » : il remplace le secret storage et
+   * l'identité cross-signing existants. **Il est destructif** — l'historique chiffré sous
+   * l'ancienne sauvegarde devient définitivement illisible — et l'UI doit le dire avant
+   * de l'appeler. Sans lui, une clé perdue est un compte mort sans recours.
+   *
+   * Ce cas-là **exige `confirmerIdentite`** : le serveur réclame une ré-authentification
+   * SSO pour remplacer une identité, et sans rappel l'appel échoue sur un 401.
+   */
+  setupRecoveryKey(options?: SetupRecoveryOptions): Promise<RecoveryKey>;
+  /**
+   * REQ-COR-06 — **la deuxième connexion.** Déverrouille le secret storage avec la clé
+   * que l'utilisateur a conservée, signe cet appareil de son identité cross-signing (sans
+   * quoi D-08 le laisse muet *et* sourd), et rebranche la sauvegarde de clés.
+   *
+   * Lève, et c'est normatif : sur une clé malformée, sur une clé qui ne correspond pas au
+   * secret storage du compte, sur un compte qui n'en a pas. Une saisie fausse acceptée en
+   * silence débloquerait l'UI devant un client qui ne déchiffrera rien (interdit n°13).
+   */
+  unlockRecovery(encodedKey: string): Promise<void>;
   /**
    * REQ-COR-07 / D-08 — `true` quand cet utilisateur a **changé d'identité** depuis
    * qu'on l'a vue pour la première fois. Ses anciennes signatures ne valent alors plus
@@ -318,17 +403,55 @@ async function buildSession(
       }
     },
 
-    async recoveryRequired() {
-      return (await requireCrypto(client).getActiveSessionBackupVersion()) === null;
+    async recoveryState() {
+      const crypto = requireCrypto(client);
+
+      /*
+       * La seule question qui décide vraiment : **cet appareil peut-il chiffrer ?**
+       * `signedByOwner` dit qu'il porte la signature de l'identité cross-signing de son
+       * propriétaire, ce que D-08 exige pour qu'il reçoive et envoie des clés Megolm.
+       * C'est une lecture du magasin crypto local — aucun réseau, donc juste hors ligne,
+       * là où « une sauvegarde est-elle active ? » rendait `true` à tort et refermait la
+       * porte sur un appareil parfaitement configuré (mesuré au navigateur le 08/08/2026).
+       */
+      const appareil = await crypto.getDeviceVerificationStatus(
+        credentials.userId,
+        credentials.deviceId,
+      );
+      if (appareil?.signedByOwner) return "prete";
+
+      /*
+       * Non signé. Reste à savoir laquelle des deux étapes il lui faut, et **seul le
+       * serveur le sait** : la sauvegarde du compte ne vit pas ici.
+       *
+       * Injoignable, on répond `deverrouillage`. Ce n'est pas neutre et c'est délibéré :
+       * des deux erreurs possibles, celle-là ne coûte qu'un écran inutile à un compte
+       * neuf, quand `creation` proposerait d'écraser la sauvegarde d'un compte qui en a
+       * une. La création reste atteignable depuis l'écran de saisie, elle n'est pas
+       * perdue — seulement placée derrière un geste explicite.
+       */
+      try {
+        return (await crypto.getKeyBackupInfo()) ? "deverrouillage" : "creation";
+      } catch {
+        return "deverrouillage";
+      }
     },
 
-    async setupRecoveryKey() {
+    async setupRecoveryKey({ reinitialiser = false, confirmerIdentite }: SetupRecoveryOptions = {}) {
       const crypto = requireCrypto(client);
       let generated: RecoveryKey | undefined;
 
-      await crypto.bootstrapCrossSigning({});
+      /*
+       * **Le secret storage d'abord, le cross-signing ensuite** — l'ordre inverse ne
+       * survit pas à `reinitialiser`. `resetCrossSigning` réexporte les nouvelles clés
+       * d'identité vers le secret storage *courant* : lancé en premier, il les chiffrerait
+       * avec l'ancienne clé 4S, celle que l'utilisateur vient précisément de perdre, et
+       * `getSecretStorageKey` n'aurait rien à rendre. L'inscription, elle, s'accommode des
+       * deux ordres — un seul chemin suffit donc aux deux cas.
+       */
       await crypto.bootstrapSecretStorage({
         setupNewKeyBackup: true,
+        setupNewSecretStorage: reinitialiser,
         createSecretStorageKey: async () => {
           generated = await crypto.createRecoveryKeyFromPassphrase();
           // Publiée aussitôt pour `getSecretStorageKey` : le SDK la redemande dans
@@ -343,7 +466,66 @@ async function buildSession(
         // pas rendre une clé qu'on n'a pas générée, et en inventer une serait pire.
         throw new Error("aucune clé de récupération générée : secret storage déjà initialisé");
       }
+
+      await crypto.bootstrapCrossSigning({
+        setupNewCrossSigning: reinitialiser,
+        /*
+         * Le dépôt de l'identité est la seule requête de tout le flux qui puisse demander
+         * une UIA. On tente d'abord sans : c'est le chemin de l'inscription, que Synapse
+         * laisse passer tant qu'aucune identité n'existe (MSC3967). Le 401 n'arrive donc
+         * qu'en réinitialisation, et il n'est pas une panne — c'est la question posée.
+         */
+        authUploadDeviceSigningKeys: async (envoyer) => {
+          try {
+            return await envoyer(null);
+          } catch (erreur) {
+            const sessionUia = defiSso(erreur);
+            if (sessionUia === undefined || !confirmerIdentite) throw erreur;
+            await confirmerIdentite(client.getFallbackAuthUrl("m.login.sso", sessionUia));
+            // Rien d'autre que la session : le SSO se prouve côté serveur, la page de
+            // repli l'a déjà marquée franchie. Le client ne transporte aucun secret ici.
+            return await envoyer({ session: sessionUia });
+          }
+        },
+      });
       return generated;
+    },
+
+    async unlockRecovery(encodedKey) {
+      const crypto = requireCrypto(client);
+
+      // `decodeRecoveryKey` ne retire que les espaces ; une clé collée depuis un
+      // gestionnaire de mots de passe traîne souvent un retour à la ligne. Il vérifie
+      // ensuite préfixe, longueur et parité — une faute de frappe lève ici, avant tout
+      // appel réseau.
+      const privateKey = decodeRecoveryKey(encodedKey.replace(/\s+/g, ""));
+
+      const cle = await client.secretStorage.getKey();
+      if (!cle) throw new Error("ce compte n'a pas de clé de récupération à déverrouiller");
+      const [, description] = cle;
+      if (!(await client.secretStorage.checkKey(privateKey, description))) {
+        // Une clé bien formée mais qui n'est pas celle du compte. Vérifié **avant**
+        // d'amorcer quoi que ce soit : à moitié bootstrapé, l'appareil resterait dans un
+        // état que rien ne sait rattraper.
+        throw new Error("clé de récupération incorrecte");
+      }
+
+      // Publiée pour `getSecretStorageKey` : tout ce qui suit relit le secret storage.
+      recoveryKey = { privateKey, encodedPrivateKey: encodedKey };
+
+      // Importe l'identité cross-signing depuis le secret storage **et signe cet
+      // appareil** : c'est ce geste-là qui le sort du silence de D-08. Aucune UIA en jeu,
+      // les clés d'identité existent déjà côté serveur — on ne fait que les redescendre.
+      await crypto.bootstrapCrossSigning({});
+
+      await crypto.loadSessionBackupPrivateKeyFromSecretStorage();
+      await crypto.checkKeyBackupAndEnable();
+
+      // ponytail: pas de `restoreKeyBackup()` intégral — le SDK doc l'annonce à plusieurs
+      // heures sur un gros compte, et la clé de sauvegarde étant désormais en magasin, il
+      // va rechercher les clés manquantes message par message, à la première non-déchiffre.
+      // Le jour où une restauration en tâche de fond est demandée, c'est un écran avec une
+      // progression qu'il faut, pas un `await` de plus ici.
     },
 
     async identityResetOf(userId) {

@@ -53,14 +53,142 @@ const EN_SAVOIR_PLUS =
 const groupesDe4 = (cle: string) =>
   cle.replace(/\s+/g, "").match(/.{1,4}/g) ?? [];
 
-export function RecoveryStep({ session }: { session: Session }) {
+export interface RecoveryStepProps {
+  session: Session;
+  /**
+   * REQ-UI-04 — le chemin « je n'ai plus ma clé » (`RecoveryUnlock`). Le même écran, mais
+   * **il détruit** : la sauvegarde et l'identité existantes sont remplacées, et tout ce
+   * qui était chiffré sous l'ancienne clé devient définitivement illisible.
+   *
+   * Un écran séparé aurait été deux versions du même propos à maintenir, dont une
+   * finirait par mentir. Ce qui change ici est ce qui doit changer : ce que l'écran
+   * annonce avant de le faire, et la couleur du bouton qui le fait.
+   */
+  reinitialiser?: boolean;
+}
+
+/**
+ * REQ-UI-04 — **la ré-authentification que le serveur exige** pour remplacer une identité
+ * cross-signing (voir `setupRecoveryKey`). Elle n'a lieu que sur « j'ai perdu ma clé » :
+ * l'inscription, elle, dépose sa première identité sans rien demander.
+ *
+ * Pourquoi un écran et non une fenêtre ouverte toute seule : un `window.open` qui ne part
+ * pas d'un clic est bloqué comme pop-up, et l'étape resterait figée sans que rien ne le
+ * dise. Le clic est donc ici, et il est celui de la personne.
+ */
+function ConfirmationIdentite({
+  url,
+  faite,
+  abandon,
+}: {
+  url: string;
+  faite: () => void;
+  abandon: () => void;
+}) {
+  const [bloquee, setBloquee] = useState(false);
+
+  /*
+   * Synapse termine sa page de repli par `window.opener.postMessage("authDone", "*")`
+   * (template `sso_auth_success.html`, v1.155.0). C'est le seul signal de fin : l'onglet
+   * se ferme parfois tout seul, et rien ne revient par l'URL de cette page-ci.
+   *
+   * L'origine est vérifiée avant tout : `postMessage` accepte n'importe quel émetteur, et
+   * on ne franchit pas une étape de sécurité sur la parole d'une fenêtre inconnue.
+   */
+  useEffect(() => {
+    const origine = new URL(url).origin;
+    const ecouter = (evenement: MessageEvent) => {
+      if (evenement.origin === origine && evenement.data === "authDone") faite();
+    };
+    window.addEventListener("message", ecouter);
+    return () => window.removeEventListener("message", ecouter);
+  }, [url, faite]);
+
+  return (
+    <VStack style={{ gap: "var(--spacing-12)" }}>
+      <VStack hAlign="center">
+        <div
+          aria-hidden
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 88,
+            height: 88,
+            borderRadius: "var(--radius-full)",
+            backgroundColor: "var(--color-accent-muted)",
+            color: "var(--color-accent)",
+          }}
+        >
+          {IconeCle}
+        </div>
+      </VStack>
+
+      <VStack gap={8}>
+        <VStack gap={5}>
+          <Text type="display-3" as="h1" style={{ textWrap: "balance" }}>
+            Confirmez que c&apos;est bien vous
+          </Text>
+          <VStack gap={4}>
+            <Text style={{ textWrap: "pretty" }}>
+              Remplacer votre clé donne à cet appareil le droit de lire vos futures
+              conversations. Votre compte demande donc une reconnexion avant de
+              l&apos;accorder.
+            </Text>
+            <Text style={{ textWrap: "pretty", marginBottom: "var(--spacing-4)" }}>
+              Une fenêtre va s&apos;ouvrir sur votre compte. Une fois la confirmation
+              donnée, revenez ici : la nouvelle clé s&apos;affichera.
+            </Text>
+          </VStack>
+        </VStack>
+
+        {bloquee ? (
+          <Banner
+            status="error"
+            title="La fenêtre a été bloquée"
+            description="Votre navigateur a empêché son ouverture. Autorisez les fenêtres pour ce site, puis réessayez."
+          />
+        ) : null}
+
+        <VStack gap={4}>
+          <Button
+            label="Confirmer avec mon compte"
+            variant="primary"
+            onClick={() => {
+              /*
+               * `window.open` et non un lien : depuis 2021, `target="_blank"` implique
+               * `rel="noopener"`, et la page de repli n'aurait plus de `window.opener` à
+               * qui annoncer la fin. C'est l'exception exacte à la règle qu'on applique
+               * partout ailleurs — ici la fenêtre ouverte est notre propre serveur.
+               */
+              setBloquee(window.open(url, "_blank") === null);
+            }}
+          />
+          <VStack hAlign="center">
+            <Button label="Annuler" variant="ghost" onClick={abandon} />
+          </VStack>
+        </VStack>
+      </VStack>
+    </VStack>
+  );
+}
+
+export function RecoveryStep({ session, reinitialiser = false }: RecoveryStepProps) {
   const { recuperationConfirmee } = useSession();
   const [cle, setCle] = useState<string | undefined>();
   const [copie, setCopie] = useState<"aucune" | "faite" | "impossible">(
     "aucune",
   );
-  const [echec, setEchec] = useState<"generique" | "origine" | undefined>();
+  const [echec, setEchec] = useState<
+    "generique" | "origine" | "confirmation" | undefined
+  >();
   const [enCours, setEnCours] = useState(false);
+  /** La ré-authentification en cours, quand le serveur l'a demandée. */
+  const [confirmation, setConfirmation] = useState<{
+    url: string;
+    faite: () => void;
+    abandon: () => void;
+  }>();
   const titre = useRef<HTMLElement>(null);
 
   /*
@@ -83,13 +211,42 @@ export function RecoveryStep({ session }: { session: Session }) {
     return () => clearTimeout(minuteur);
   }, [copie]);
 
+  /** Marqueur interne : « l'utilisateur a annulé », qui n'est pas une panne. */
+  const ABANDON = "confirmation abandonnée";
+
   const generer = async () => {
     setEnCours(true);
     setEchec(undefined);
     try {
-      const generee = await session.setupRecoveryKey();
+      const generee = await session.setupRecoveryKey({
+        reinitialiser,
+        confirmerIdentite: (url) =>
+          new Promise<void>((resoudre, rejeter) => {
+            setConfirmation({
+              url,
+              faite: () => {
+                setConfirmation(undefined);
+                resoudre();
+              },
+              abandon: () => {
+                setConfirmation(undefined);
+                rejeter(new Error(ABANDON));
+              },
+            });
+          }),
+      });
       setCle(generee.encodedPrivateKey);
-    } catch {
+    } catch (erreur) {
+      /*
+       * L'annulation se dit autrement qu'une panne, et **elle ne se tait pas** : à ce
+       * stade la sauvegarde a déjà été remplacée côté serveur, mais l'identité, non. Tant
+       * que la confirmation n'a pas eu lieu, cet appareil ne chiffre toujours pas — le
+       * laisser croire l'inverse serait l'interdit n°13.
+       */
+      if (erreur instanceof Error && erreur.message === ABANDON) {
+        setEchec("confirmation");
+        return; // `finally` relâche `enCours`.
+      }
       // Aucun détail affiché ni journalisé : le message d'erreur du SDK peut porter du
       // matériel de clé. La seule chose qu'on ait le droit de lire, c'est l'origine de la
       // page : hors *secure context* (`https://` ou `localhost`), `crypto.subtle` n'existe
@@ -101,6 +258,13 @@ export function RecoveryStep({ session }: { session: Session }) {
       setEnCours(false);
     }
   };
+
+  /*
+   * La confirmation **remplace** l'écran, elle ne se pose pas dessus : l'appel est déjà
+   * parti, il n'y a rien d'autre à faire ici tant qu'elle n'a pas eu lieu. Un dialogue
+   * par-dessus aurait laissé un bouton « Créer une nouvelle clé » cliquable derrière.
+   */
+  if (confirmation) return <ConfirmationIdentite {...confirmation} />;
 
   if (!cle) {
     return (
@@ -155,7 +319,7 @@ export function RecoveryStep({ session }: { session: Session }) {
         <VStack gap={8}>
           <VStack gap={5}>
             <Text type="display-3" as="h1" style={{ textWrap: "balance" }}>
-              Votre clé de récupération
+              {reinitialiser ? "Repartir d'une clé neuve" : "Votre clé de récupération"}
             </Text>
             {/*
               **Trois paragraphes, dans cet ordre : quoi, pourquoi, ce que ça vous
@@ -178,15 +342,24 @@ export function RecoveryStep({ session }: { session: Session }) {
               centrées se relisent en cherchant chaque début de ligne.
             */}
             <VStack gap={4}>
+              {/*
+                En réinitialisation, le premier paragraphe n'explique plus ce qu'est une
+                clé — la personne le sait, elle en a eu une — mais **ce qu'elle perd**, au
+                présent et sans détour. C'est le seul endroit où le dire : après le clic,
+                l'ancienne sauvegarde n'existe plus.
+
+                Une phrase sobre et non un bandeau d'alerte (DESIGN.md) : le propos de
+                l'écran *est* cette conséquence, pas un avertissement posé à côté.
+              */}
               <Text style={{ textWrap: "pretty" }}>
-                Une clé de récupération est une suite de caractères tirée au
-                hasard. Elle est créée sur cet appareil, et vous êtes seul à la
-                connaître.
+                {reinitialiser
+                  ? "Vos conversations d'avant resteront chiffrées avec la clé que vous avez perdue : ni vous, ni nous ne pourrons plus les lire. Une nouvelle clé ne les rouvre pas — elle protège la suite."
+                  : "Une clé de récupération est une suite de caractères tirée au hasard. Elle est créée sur cet appareil, et vous êtes seul à la connaître."}
               </Text>
               <Text style={{ textWrap: "pretty" }}>
-                Elle vous permettra de retrouver vos conversations sur un nouvel
-                appareil. Sans elle, votre historique est définitivement perdu —
-                personne, chez nous, ne peut le récupérer.
+                {reinitialiser
+                  ? "Vos amis et vos conversations, eux, restent en place. Ce sont les messages déjà envoyés qui deviennent illisibles sur tous vos appareils."
+                  : "Elle vous permettra de retrouver vos conversations sur un nouvel appareil. Sans elle, votre historique est définitivement perdu — personne, chez nous, ne peut le récupérer."}
               </Text>
               {/*
                 Le dernier paragraphe ferme le bloc sur le même écart que celui qui
@@ -207,11 +380,21 @@ export function RecoveryStep({ session }: { session: Session }) {
           {echec ? (
             <Banner
               status="error"
-              title="La clé n'a pas pu être créée"
+              title={
+                echec === "confirmation"
+                  ? "L'étape n'est pas terminée"
+                  : "La clé n'a pas pu être créée"
+              }
               description={
-                echec === "origine"
-                  ? "Cette page est ouverte sur une adresse non sécurisée : le chiffrement y est indisponible, et réessayer ne changera rien. Rouvrez l'application en https, ou sur localhost."
-                  : "Vérifiez votre connexion et réessayez."
+                {
+                  // Dire ce qui reste vrai, et rien de plus : la nouvelle clé n'est pas
+                  // active tant que le compte n'a pas confirmé.
+                  confirmation:
+                    "Sans la confirmation de votre compte, votre nouvelle clé n'est pas active et cet appareil ne peut toujours pas chiffrer. Reprenez quand vous êtes prêt.",
+                  origine:
+                    "Cette page est ouverte sur une adresse non sécurisée : le chiffrement y est indisponible, et réessayer ne changera rien. Rouvrez l'application en https, ou sur localhost.",
+                  generique: "Vérifiez votre connexion et réessayez.",
+                }[echec]
               }
             />
           ) : null}
@@ -230,9 +413,15 @@ export function RecoveryStep({ session }: { session: Session }) {
             du texte, pas celui qui les sépare l'un de l'autre.
           */}
           <VStack gap={4}>
+            {/*
+              `destructive` en réinitialisation : DESIGN.md réserve `danger` au destructif,
+              et c'est très exactement ce qu'il est ici. Le libellé nomme l'acte plutôt que
+              d'avancer — « Continuer » sur un bouton qui détruit un historique serait la
+              définition d'un libellé malhonnête.
+            */}
             <Button
-              label="Continuer"
-              variant="primary"
+              label={reinitialiser ? "Créer une nouvelle clé" : "Continuer"}
+              variant={reinitialiser ? "destructive" : "primary"}
               isLoading={enCours}
               onClick={generer}
             />

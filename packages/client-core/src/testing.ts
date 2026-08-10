@@ -35,8 +35,9 @@ export function asSession(mock: { client: unknown } & Partial<Omit<Session, "cli
   return {
     timeline: absent("timeline"),
     isEncrypted: absent("isEncrypted"),
-    recoveryRequired: absent("recoveryRequired"),
+    recoveryState: absent("recoveryState"),
     setupRecoveryKey: absent("setupRecoveryKey"),
+    unlockRecovery: absent("unlockRecovery"),
     identityResetOf: absent("identityResetOf"),
     confirmIdentityOf: absent("confirmIdentityOf"),
     registerWipe: absent("registerWipe"),

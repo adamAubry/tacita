@@ -91,7 +91,7 @@ beforeEach(() => {
         on: vi.fn(),
         off: vi.fn(),
       },
-      recoveryRequired: async () => false,
+      recoveryState: async () => "prete" as const,
     } as never),
   );
 });

@@ -70,7 +70,7 @@ const conversation = (unread: number): Conversation => ({
 const session = () =>
   asSession({
     client: { getUserId: () => "@luca:t", getDeviceId: () => "D1", on: vi.fn(), off: vi.fn() },
-    recoveryRequired: async () => false,
+    recoveryState: async () => "prete" as const,
   } as never);
 
 /** Le service worker vu depuis la fenêtre : un simple bus de messages. */

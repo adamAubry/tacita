@@ -1,6 +1,6 @@
-import type { Session } from "@tacita/client-core";
+import type { RecoveryState, Session } from "@tacita/client-core";
 import { asSession } from "@tacita/client-core/testing";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,7 +9,7 @@ import { LogoutButton } from "../components/onboarding/LogoutButton";
 import { RecoveryGate } from "../components/onboarding/RecoveryGate";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { retirerJetonDeLUrl, urlConnexion } from "../lib/session";
-import { ecrireRecuperationFaite, ecrireRefusEducationIOS } from "../lib/preferences";
+import { ecrireRefusEducationIOS } from "../lib/preferences";
 
 const HOMESERVER = "https://chat.tacita.test";
 const MOI = "@moi:tacita.test";
@@ -27,23 +27,28 @@ vi.mock("@tacita/client-core", async (original) => ({
  * ajouté au contrat de `Session` doit casser la compilation d'un seul fichier, pas
  * disparaître en `undefined is not a function` à l'exécution (specs/00-conventions.md).
  */
-function fausseSession(options: { recuperationRequise?: boolean } = {}) {
-  const setupRecoveryKey = vi.fn(async () => ({
-    encodedPrivateKey: "EsTb ABCD EFGH IJKL",
-    privateKey: new Uint8Array(32),
-  }));
+function fausseSession(options: { recuperation?: RecoveryState } = {}) {
+  const setupRecoveryKey = vi.fn(
+    async (_options?: {
+      reinitialiser?: boolean;
+      confirmerIdentite?: (url: string) => Promise<void>;
+    }) => ({
+      encodedPrivateKey: "EsTb ABCD EFGH IJKL",
+      privateKey: new Uint8Array(32),
+    }),
+  );
+  const unlockRecovery = vi.fn(async (_cle: string) => {});
   const logout = vi.fn(async () => {});
   const session = asSession({
     // `client` est un faux assumé : exiger un vrai `MatrixClient` demanderait 357
-    // propriétés. `getUserId` en fait partie depuis le 08/08/2026 — la trace locale de
-    // récupération est **par compte** (voir `lireRecuperationFaite`), sans quoi la porte
-    // sauterait pour le compte suivant qui ouvrirait une session dans ce navigateur.
+    // propriétés.
     client: { getUserId: () => MOI, on: vi.fn(), off: vi.fn() },
-    recoveryRequired: vi.fn(async () => options.recuperationRequise ?? false),
+    recoveryState: vi.fn(async () => options.recuperation ?? "prete"),
     setupRecoveryKey,
+    unlockRecovery,
     logout,
   });
-  return { session, setupRecoveryKey, logout };
+  return { session, setupRecoveryKey, unlockRecovery, logout };
 }
 
 const rediriger = vi.fn();
@@ -74,7 +79,7 @@ afterEach(() => {
 
 describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () => {
   it("tant que la récupération est requise, aucun contenu d'app n'est rendu", async () => {
-    const { session } = fausseSession({ recuperationRequise: true });
+    const { session } = fausseSession({ recuperation: "creation" });
     monter(session);
 
     await waitFor(() => expect(screen.getByText("Votre clé de récupération")).toBeTruthy());
@@ -83,7 +88,7 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
   });
 
   it("elle ne se contourne pas par l'URL : ce n'est pas une route, c'est le shell", async () => {
-    const { session } = fausseSession({ recuperationRequise: true });
+    const { session } = fausseSession({ recuperation: "creation" });
     // Quelle que soit l'adresse demandée, c'est l'étape qui rend.
     globalThis.history.replaceState(null, "", "/c/!salon:tacita.test");
     monter(session, <p>Conversations</p>);
@@ -93,7 +98,7 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
   });
 
   it("la clé est affichée une fois, et la confirmation libère l'accès", async () => {
-    const { session, setupRecoveryKey } = fausseSession({ recuperationRequise: true });
+    const { session, setupRecoveryKey } = fausseSession({ recuperation: "creation" });
     monter(session);
 
     await waitFor(() => expect(screen.getByText("Continuer")).toBeTruthy());
@@ -113,7 +118,7 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
   });
 
   it("dit la vérité sur ce qu'on perd sans la clé", async () => {
-    const { session } = fausseSession({ recuperationRequise: true });
+    const { session } = fausseSession({ recuperation: "creation" });
     monter(session);
 
     // Interdit n°13 : la limite se documente là où elle se joue, pas dans une note.
@@ -122,7 +127,7 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
   });
 
   it("« en savoir plus » sort dans un onglet neuf, sans quitter l'étape", async () => {
-    const { session } = fausseSession({ recuperationRequise: true });
+    const { session } = fausseSession({ recuperation: "creation" });
     monter(session);
 
     // L'étape bloque toute l'app : une navigation dans le même onglet la détruirait, et
@@ -139,7 +144,7 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
   it("hors contexte sécurisé, l'échec est nommé — pas « réessayez »", async () => {
     // Interdit n°13 : `crypto.subtle` n'existe pas hors `https`/`localhost`, donc la clé
     // ne pourra jamais être créée à cette adresse. Inviter à réessayer serait faux.
-    const { session, setupRecoveryKey } = fausseSession({ recuperationRequise: true });
+    const { session, setupRecoveryKey } = fausseSession({ recuperation: "creation" });
     setupRecoveryKey.mockRejectedValueOnce(new TypeError("crypto.subtle is undefined"));
     // `stubGlobal` et non `spyOn` : jsdom ne définit pas `isSecureContext`, il n'y a donc
     // aucun accesseur à espionner. Le défaut `undefined` reste traité comme « je ne sais
@@ -283,33 +288,164 @@ describe("REQ-UI-18 — éducation iOS, au bon moment et une seule fois", () => 
   });
 });
 
-describe("REQ-UI-04 / REQ-UI-17 — la porte ne se referme pas sur un appareil déjà configuré", () => {
-  it("hors ligne, `recoveryRequired()` rend vrai à tort : la trace locale l'emporte", async () => {
-    // Mesuré au navigateur le 08/08/2026 : sans réseau, le SDK n'a aucune version de
-    // sauvegarde active et `recoveryRequired()` rend `true` pour un compte qui a
-    // pourtant sa clé. La porte remplaçant toute l'app, l'historique promis consultable
-    // par REQ-UI-17 disparaissait avec elle, à chaque rechargement.
-    const indexedDB = new IDBFactory();
-    await ecrireRecuperationFaite(indexedDB, MOI);
-    vi.stubGlobal("indexedDB", indexedDB);
+describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé, elle n'en refait pas une", () => {
+  const saisir = (valeur: string) =>
+    fireEvent.change(screen.getByLabelText(/Clé de récupération/), { target: { value: valeur } });
 
-    const { session } = fausseSession({ recuperationRequise: true });
+  it("un appareil neuf sur un compte qui a sa clé : on la demande, on ne propose pas d'en créer une", async () => {
+    // Le défaut réparé. Chaque `m.login.token` donne un `device_id` neuf, donc un
+    // appareil non signé : l'écran de création s'ouvrait devant quelqu'un qui avait sa
+    // clé depuis des mois, et son seul bouton aurait écrasé la sauvegarde du compte.
+    const { session } = fausseSession({ recuperation: "deverrouillage" });
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Entrez votre clé de récupération")).toBeTruthy());
+    expect(screen.queryByText("Votre clé de récupération")).toBeNull();
+    expect(screen.queryByText("Continuer")).toBeNull();
+    expect(screen.queryByText("Conversations")).toBeNull();
+  });
+
+  it("la clé saisie déverrouille l'appareil et libère l'accès", async () => {
+    const { session, unlockRecovery } = fausseSession({ recuperation: "deverrouillage" });
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Déverrouiller")).toBeTruthy());
+    saisir("EsTb ABCD EFGH");
+    fireEvent.click(screen.getByText("Déverrouiller"));
+
+    await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
+    expect(unlockRecovery).toHaveBeenCalledWith("EsTb ABCD EFGH");
+  });
+
+  it("une clé refusée le dit sur le champ, et n'ouvre rien", async () => {
+    // Interdit n°13 : une saisie fausse acceptée en silence débloquerait l'UI devant un
+    // client qui ne déchiffrera jamais rien.
+    const { session, unlockRecovery } = fausseSession({ recuperation: "deverrouillage" });
+    unlockRecovery.mockRejectedValueOnce(new Error("clé de récupération incorrecte"));
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Déverrouiller")).toBeTruthy());
+    saisir("EsTb ZZZZ ZZZZ");
+    fireEvent.click(screen.getByText("Déverrouiller"));
+
+    await waitFor(() => expect(screen.getByText(/ne correspond pas à ce compte/)).toBeTruthy());
+    expect(screen.queryByText("Conversations")).toBeNull();
+  });
+
+  it("une panne ne se dit pas comme une clé fausse", async () => {
+    // La différence est utile : une clé refusée se corrige en la retapant, une panne non.
+    const { session, unlockRecovery } = fausseSession({ recuperation: "deverrouillage" });
+    unlockRecovery.mockRejectedValueOnce(new Error("Failed to fetch"));
+    const { container } = monter(session);
+
+    await waitFor(() => expect(screen.getByText("Déverrouiller")).toBeTruthy());
+    saisir("EsTb ABCD EFGH");
+    fireEvent.click(screen.getByText("Déverrouiller"));
+
+    await waitFor(() => expect(screen.getByText(/Vérifiez votre connexion/)).toBeTruthy());
+    // `container` et non `screen` : Astryx pose sa région `aria-live` sur `document.body`,
+    // hors de l'arbre rendu, et elle garde l'annonce du test précédent.
+    expect(within(container).queryByText(/ne correspond pas à ce compte/)).toBeNull();
+  });
+
+  it("« je n'ai plus ma clé » dit ce qu'il détruit avant de le faire", async () => {
+    const { session, setupRecoveryKey } = fausseSession({ recuperation: "deverrouillage" });
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Je n'ai plus ma clé")).toBeTruthy());
+    fireEvent.click(screen.getByText("Je n'ai plus ma clé"));
+
+    // Rien n'est encore détruit : l'écran annonce, il n'agit pas.
+    await waitFor(() => expect(screen.getByText("Repartir d'une clé neuve")).toBeTruthy());
+    expect(screen.getByText(/ni vous, ni nous ne pourrons plus les lire/)).toBeTruthy();
+    expect(setupRecoveryKey).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Créer une nouvelle clé"));
+    await waitFor(() =>
+      expect(setupRecoveryKey).toHaveBeenCalledWith(
+        expect.objectContaining({ reinitialiser: true }),
+      ),
+    );
+  });
+
+  /*
+   * La ré-authentification que Synapse exige pour **remplacer** une identité cross-signing
+   * (v1.155.0 : le premier dépôt passe sans UIA, pas le second). Sans mot de passe natif
+   * (REQ-INF-09), elle se joue chez Keycloak, dans une fenêtre, et se termine par un
+   * `postMessage` de la page de repli du serveur.
+   *
+   * Le défaut du 09/08/2026 : rien de tout ça n'existait. L'écran appelait, prenait un 401
+   * en pleine figure et affichait « vérifiez votre connexion » — alors que la connexion
+   * n'y était pour rien et que la sauvegarde venait d'être remplacée.
+   */
+  const URL_SSO = `${HOMESERVER}/_matrix/client/v3/auth/m.login.sso/fallback/web?session=s1`;
+
+  const jusquAuRemplacement = async (setupRecoveryKey: ReturnType<typeof fausseSession>["setupRecoveryKey"]) => {
+    await waitFor(() => expect(screen.getByText("Je n'ai plus ma clé")).toBeTruthy());
+    fireEvent.click(screen.getByText("Je n'ai plus ma clé"));
+    await waitFor(() => expect(screen.getByText("Repartir d'une clé neuve")).toBeTruthy());
+    fireEvent.click(screen.getByText("Créer une nouvelle clé"));
+    await waitFor(() => expect(setupRecoveryKey).toHaveBeenCalled());
+  };
+
+  it("quand le compte exige une reconnexion, elle est demandée — et n'aboutit que sur le bon émetteur", async () => {
+    const { session, setupRecoveryKey } = fausseSession({ recuperation: "deverrouillage" });
+    setupRecoveryKey.mockImplementation(async (options) => {
+      await options?.confirmerIdentite?.(URL_SSO);
+      return { encodedPrivateKey: "EsTb ABCD EFGH IJKL", privateKey: new Uint8Array(32) };
+    });
+    const ouvrir = vi.spyOn(window, "open").mockReturnValue({} as Window);
+
+    monter(session);
+    await jusquAuRemplacement(setupRecoveryKey);
+
+    await waitFor(() => expect(screen.getByText("Confirmez que c'est bien vous")).toBeTruthy());
+    fireEvent.click(screen.getByText("Confirmer avec mon compte"));
+    // Sans `noopener` : la page de repli a besoin de `window.opener` pour annoncer la fin,
+    // et un `target="_blank"` le lui retirerait d'office.
+    expect(ouvrir).toHaveBeenCalledWith(URL_SSO, "_blank");
+
+    // Une fenêtre étrangère qui crie « c'est bon » ne franchit rien : `postMessage` accepte
+    // n'importe quel émetteur, l'origine est donc vérifiée avant tout.
+    window.dispatchEvent(
+      new MessageEvent("message", { data: "authDone", origin: "https://ailleurs.test" }),
+    );
+    expect(screen.getByText("Confirmez que c'est bien vous")).toBeTruthy();
+
+    window.dispatchEvent(new MessageEvent("message", { data: "authDone", origin: HOMESERVER }));
+    await waitFor(() => expect(screen.getByText("Notez cette clé maintenant")).toBeTruthy());
+  });
+
+  it("annuler la reconnexion le dit sans mentir sur ce qui reste à faire", async () => {
+    // À cet instant la sauvegarde a déjà été remplacée côté serveur, mais pas l'identité :
+    // « réessayez plus tard » laisserait croire à une session utilisable (interdit n°13).
+    const { session, setupRecoveryKey } = fausseSession({ recuperation: "deverrouillage" });
+    setupRecoveryKey.mockImplementation(async (options) => {
+      await options?.confirmerIdentite?.(URL_SSO);
+      return { encodedPrivateKey: "EsTb ABCD EFGH IJKL", privateKey: new Uint8Array(32) };
+    });
+
+    monter(session);
+    await jusquAuRemplacement(setupRecoveryKey);
+
+    await waitFor(() => expect(screen.getByText("Confirmez que c'est bien vous")).toBeTruthy());
+    fireEvent.click(screen.getByText("Annuler"));
+
+    await waitFor(() => expect(screen.getByText("L'étape n'est pas terminée")).toBeTruthy());
+    expect(screen.getByText(/n'est pas active et cet appareil ne peut toujours pas chiffrer/)).toBeTruthy();
+    // L'écran de remplacement est toujours là, prêt à reprendre.
+    expect(screen.getByText("Créer une nouvelle clé")).toBeTruthy();
+  });
+
+  it("hors ligne, un appareil déjà signé n'a plus rien à prouver : REQ-UI-17 tient", async () => {
+    // Mesuré au navigateur le 08/08/2026 : sans réseau, « une sauvegarde est-elle
+    // active ? » rendait `true` pour un compte parfaitement configuré, et la porte —
+    // qui *remplace* l'app — emportait l'historique promis consultable. `recoveryState()`
+    // lit le magasin crypto local : la trace `recuperation-faite` n'a plus lieu d'être.
+    const { session } = fausseSession({ recuperation: "prete" });
     monter(session);
 
     await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
-    expect(screen.queryByText("Continuer")).toBeNull();
-  });
-
-  it("la trace est par compte : elle ne fait pas sauter la porte au compte suivant", async () => {
-    // Le store de préférences n'est pas inscrit au registre de wipe (REQ-COR-10 n'y
-    // efface que les notes) : un booléen nu aurait ouvert la porte à quelqu'un d'autre.
-    const indexedDB = new IDBFactory();
-    await ecrireRecuperationFaite(indexedDB, "@quelquun-dautre:tacita.test");
-    vi.stubGlobal("indexedDB", indexedDB);
-
-    const { session } = fausseSession({ recuperationRequise: true });
-    monter(session);
-
-    await waitFor(() => expect(screen.getByText("Votre clé de récupération")).toBeTruthy());
+    expect(screen.queryByText("Entrez votre clé de récupération")).toBeNull();
   });
 });

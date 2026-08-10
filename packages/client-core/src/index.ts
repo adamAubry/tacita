@@ -2,8 +2,10 @@
 export type {
   OrderedTimeline,
   RecoveryKey,
+  RecoveryState,
   Session,
   SessionConfig,
+  SetupRecoveryOptions,
 } from "./session";
 
 export { createLogger, eventRef } from "./logger";

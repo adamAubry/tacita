@@ -8,12 +8,15 @@ import {
 } from "@tacita/client-core";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-import { ecrireRecuperationFaite, lireRecuperationFaite } from "../../lib/preferences";
 import { etatDe, retirerJetonDeLUrl, urlConnexion, type EtatSession } from "../../lib/session";
 
 interface Contexte {
   etat: EtatSession;
-  /** REQ-UI-04 — appelé par l'étape de récupération une fois la clé confirmée. */
+  /**
+   * REQ-UI-04 — appelé par l'étape de récupération une fois la clé confirmée (création)
+   * ou l'appareil déverrouillé (reconnexion). Les deux gestes finissent au même endroit :
+   * cet appareil est désormais signé, la porte s'ouvre.
+   */
   recuperationConfirmee: () => void;
   /** REQ-UIX-06 — wipe complet (REQ-COR-10), après confirmation explicite. */
   deconnecter: (session: Session) => Promise<void>;
@@ -71,15 +74,7 @@ export function SessionProvider({ children, homeserverUrl, rediriger }: SessionP
           versOidc();
           return;
         }
-        const compte = session.client.getUserId() ?? "";
-        const suivant = await etatDe(
-          session,
-          await lireRecuperationFaite(globalThis.indexedDB, compte).catch(() => false),
-        );
-        if (suivant.phase === "prete") {
-          void ecrireRecuperationFaite(globalThis.indexedDB, compte).catch(() => {});
-        }
-        setEtat(suivant);
+        setEtat(await etatDe(session));
       } catch {
         // Jeton révoqué, crypto indisponible, réseau absent au premier appel : dans tous
         // les cas l'entrée passe par l'OIDC. Rien n'est journalisé — un message d'erreur
@@ -113,14 +108,11 @@ export function SessionProvider({ children, homeserverUrl, rediriger }: SessionP
   }, [etat, versOidc]);
 
   const recuperationConfirmee = useCallback(() => {
-    setEtat((precedent) => {
-      if (precedent.phase !== "recuperation-requise") return precedent;
-      // La trace locale s'écrit ici aussi : c'est le seul chemin par lequel un compte
-      // franchit l'étape pour la première fois.
-      const compte = precedent.session.client.getUserId() ?? "";
-      void ecrireRecuperationFaite(globalThis.indexedDB, compte).catch(() => {});
-      return { phase: "prete", session: precedent.session };
-    });
+    setEtat((precedent) =>
+      precedent.phase === "recuperation-requise"
+        ? { phase: "prete", session: precedent.session }
+        : precedent,
+    );
   }, []);
 
   const deconnecter = useCallback(

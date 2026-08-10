@@ -402,6 +402,6 @@ beforeEach(() => {
   demandes.mockReturnValue([]);
   restoreSession.mockResolvedValue(asSession({
       client: { getUserId: () => "@moi:tacita.test", on: vi.fn(), off: vi.fn() },
-      recoveryRequired: async () => false,
+      recoveryState: async () => "prete" as const,
     }));
 });

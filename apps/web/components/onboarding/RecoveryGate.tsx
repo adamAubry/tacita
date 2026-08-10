@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Placeholder } from "../foundation/Placeholder";
 import { Skeleton, VStack } from "../foundation/primitives";
 import { RecoveryStep } from "./RecoveryStep";
+import { RecoveryUnlock } from "./RecoveryUnlock";
 import { useSession } from "./SessionProvider";
 
 /**
@@ -77,9 +78,19 @@ export function RecoveryGate({ children }: { children: ReactNode }) {
   }
 
   if (etat.phase === "recuperation-requise") {
+    /*
+     * Deux écrans, pas un. `mode` vient de `recoveryState()` (spec 04) : le shard ne
+     * dérive rien. La porte ne proposait que la création, et l'ouvrait donc à chaque
+     * reconnexion — chaque `m.login.token` donne un `device_id` neuf, non signé, ce que
+     * l'ancienne source confondait avec « ce compte n'a pas de clé ».
+     */
     return (
       <EcranDePorte>
-        <RecoveryStep session={etat.session} />
+        {etat.mode === "creation" ? (
+          <RecoveryStep session={etat.session} />
+        ) : (
+          <RecoveryUnlock session={etat.session} />
+        )}
       </EcranDePorte>
     );
   }
