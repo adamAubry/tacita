@@ -90,6 +90,29 @@ export const IconeCle: ReactNode = (
 );
 
 /**
+ * Les deux actions de son propre profil (REQ-UIX-24). Astryx n'a ni crayon ni sortie, et
+ * sa liste de noms reste un type fermé.
+ *
+ * Le trait du crayon traverse le corps de bord à bord — c'est la virole, et c'est elle
+ * qui empêche la forme de se lire comme une simple flèche. La sortie garde le battant
+ * ouvert du côté de la flèche : une porte fermée traversée par une flèche dit l'entrée.
+ */
+export const IconeEdition: ReactNode = (
+  <svg {...trait}>
+    <path d="m4.5 19.5 1-4 11-11a1.8 1.8 0 0 1 2.5 0l.5.5a1.8 1.8 0 0 1 0 2.5l-11 11z" />
+    <path d="m14.5 6.5 3 3" />
+  </svg>
+);
+
+export const IconeDeconnexion: ReactNode = (
+  <svg {...trait}>
+    <path d="M15.5 7.5v-2A1.5 1.5 0 0 0 14 4H6a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6 20h8a1.5 1.5 0 0 0 1.5-1.5v-2" />
+    <path d="M9 12h11" />
+    <path d="m17 9 3 3-3 3" />
+  </svg>
+);
+
+/**
  * Les trois icônes des Info buttons (M-H, REQ-UIX-33). Astryx n'a ni cloche, ni
  * réglages, ni « ajouter quelqu'un », et sa liste de noms reste un type fermé.
  *

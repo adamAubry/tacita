@@ -432,6 +432,29 @@ describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", ()
     });
     expect(onEnregistrer).toHaveBeenCalledWith({ displayName: "adam a." });
   });
+
+  it("la déconnexion est posée à droite de la modification, dans la même rangée", () => {
+    // REQ-UIX-06 — `LogoutButton` était testé mais rendu par aucun écran : la
+    // déconnexion n'existait dans aucun parcours. Ce test garde le point de branchement.
+    render(
+      <ProfilMoi
+        profil={MOI}
+        onEnregistrer={vi.fn()}
+        onPhoto={vi.fn()}
+        deconnexion={<button type="button">Se déconnecter</button>}
+      />,
+    );
+
+    const modifier = screen.getByRole("button", { name: "Modifier le profil" });
+    const deconnecter = screen.getByRole("button", { name: "Se déconnecter" });
+    // Même parent : c'est ce qui fait la rangée. Deux blocs empilés passeraient les deux
+    // assertions ci-dessus sans rien dire de la disposition demandée.
+    expect(deconnecter.parentElement).toBe(modifier.parentElement);
+    // Et dans cet ordre : modifier d'abord, la sortie ensuite.
+    expect(modifier.compareDocumentPosition(deconnecter)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
 });
 
 describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle expose", () => {

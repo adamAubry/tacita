@@ -1,8 +1,9 @@
 "use client";
 
 import type { Profile } from "@tacita/messaging";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
+import { IconeEdition } from "../foundation/icons";
 import { Button, Text, TextInput } from "../foundation/primitives";
 import { Sheet } from "../foundation/Sheet";
 import { Reglages } from "../settings/Reglages";
@@ -44,6 +45,14 @@ export interface ProfilMoiProps {
    * sites d'appel du chemin public là où le contrat de REQ-MED-11 en autorise un.
    */
   onPhoto: (fichier: File) => Promise<string>;
+  /**
+   * REQ-UIX-06 — la déconnexion, posée à droite de « Modifier le profil ».
+   *
+   * Un `ReactNode` et non un callback : `LogoutButton` porte sa propre confirmation, et
+   * celle-ci a besoin de la `Session` — que ce composant ne connaît pas, et ne doit pas
+   * connaître (cf. l'en-tête d'`EcranProfil`). Même geste que l'`actions` de `ProfileCard`.
+   */
+  deconnexion?: ReactNode;
 }
 
 /**
@@ -61,7 +70,7 @@ export interface ProfilMoiProps {
  * couloir. L'engrenage du bandeau flottant part avec elle : il n'a plus de destination, et
  * un bouton qui ne mène nulle part est pire qu'un bouton absent.
  */
-export function ProfilMoi({ profil, onEnregistrer, onPhoto }: ProfilMoiProps) {
+export function ProfilMoi({ profil, onEnregistrer, onPhoto, deconnexion }: ProfilMoiProps) {
   const [edition, setEdition] = useState(false);
   const [nom, setNom] = useState(profil.displayName);
   const [enCours, setEnCours] = useState(false);
@@ -116,23 +125,40 @@ export function ProfilMoi({ profil, onEnregistrer, onPhoto }: ProfilMoiProps) {
         bannerUrl={profil.bannerUrl}
       />
 
-      {/* Composant 22 : bouton accentué, centré (REQ-UIX-24, inchangée). **La seule action
-          accentuée de l'écran** — les réglages, juste dessous, sont secondaires par
-          construction.
+      {/* Composant 22 : les deux actions de son propre profil, centrées (REQ-UIX-24).
+          **Une seule des deux est accentuée** — modifier son profil est ce qu'on vient
+          faire ici ; se déconnecter est ce qu'on cherche quand on ne le trouve nulle part
+          ailleurs, et c'était le cas jusqu'ici (`LogoutButton` n'était rendu par aucun
+          écran). Les réglages, juste dessous, restent secondaires par construction.
 
-          L'identité au-dessus est alignée à gauche, ce bouton reste centré : c'est l'écart
-          de 32 px qui rend l'axe mixte lisible. À 16 px uniformes il passait pour un
-          membre mal aligné du bloc d'identité ; à 32 px au-dessus et 24 px en dessous, il
-          est son propre temps. Espacement asymétrique, donc, et c'est le point — un
-          padding égal sur les quatre côtés ne dit jamais où commence quoi. */}
+          L'identité au-dessus est alignée à gauche, cette paire reste centrée : c'est
+          l'écart de 32 px qui rend l'axe mixte lisible. À 16 px uniformes elle passait
+          pour un membre mal aligné du bloc d'identité ; à 32 px au-dessus et 24 px en
+          dessous, elle est son propre temps. Espacement asymétrique, donc, et c'est le
+          point — un padding égal sur les quatre côtés ne dit jamais où commence quoi.
+
+          12 px entre les deux, et non 8 : à 8 px ils formeraient un groupe segmenté, une
+          seule chose en deux morceaux. Ce sont deux actions sans rapport l'une avec
+          l'autre, et l'écart doit le dire — sans les envoyer aux deux bords, ce qui les
+          ferait lire comme les boutons d'une barre plutôt que comme les actions de cet
+          écran. Les icônes portent la distinction avant la lecture : un crayon modifie,
+          une flèche qui sort part. */}
       <div
         style={{
-          display: "grid",
-          justifyItems: "center",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "var(--spacing-3)",
           padding: "var(--spacing-8) var(--spacing-3) var(--spacing-6)",
         }}
       >
-        <Button label="Modifier le profil" variant="primary" onClick={() => setEdition(true)} />
+        <Button
+          label="Modifier le profil"
+          variant="primary"
+          icon={IconeEdition}
+          onClick={() => setEdition(true)}
+        />
+        {deconnexion}
       </div>
 
       {/* REQ-UIX-31 — les réglages sont une section de cet écran, plus une route. */}

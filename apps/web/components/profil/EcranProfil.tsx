@@ -18,6 +18,7 @@ import { environnementMedia } from "../../lib/media-env";
 import { enregistrerWipeNotes } from "../../lib/notes";
 import { ConversationCollections } from "../media/ConversationCollections";
 import { Placeholder } from "../foundation/Placeholder";
+import { LogoutButton } from "../onboarding/LogoutButton";
 import { useSession } from "../onboarding/SessionProvider";
 import { ProfilAutrui, type ActionProfil } from "./ProfilAutrui";
 import { ProfilMoi } from "./ProfilMoi";
@@ -92,6 +93,10 @@ export function EcranProfil({ userId }: { userId?: string }) {
         // apparaît un second : c'est ce qui rend la phrase « tout ce qui sort du
         // pipeline est chiffré, sauf l'unique chemin nommé public » vérifiable.
         onPhoto={(fichier) => uploadPublicProfileImage(session, env, fichier)}
+        // REQ-UIX-06 — la déconnexion est **branchée ici et nulle part ailleurs** : c'est
+        // le seul écran qui parle de « moi », et jusqu'à aujourd'hui `LogoutButton`
+        // n'était rendu par aucun composant — testé, mais inatteignable.
+        deconnexion={<LogoutButton session={session} />}
       />
     );
   }

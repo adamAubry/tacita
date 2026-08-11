@@ -3,6 +3,7 @@
 import type { Session } from "@tacita/client-core";
 import { useState } from "react";
 
+import { IconeDeconnexion } from "../foundation/icons";
 import { Button, List, ListItem, Text, VStack } from "../foundation/primitives";
 import { Sheet } from "../foundation/Sheet";
 import { useSession } from "./SessionProvider";
@@ -22,9 +23,15 @@ export function LogoutButton({ session }: { session: Session }) {
 
   return (
     <>
+      {/* `secondary` et non `ghost` : depuis qu'il est posé à côté de « Modifier le
+          profil » (REQ-UIX-24), il forme une paire avec un bouton plein, et un fantôme
+          dans cette paire se lit comme du texte plutôt que comme une action. Il reste
+          plus clair que l'accentué — c'est l'écart qui dit lequel des deux est l'action
+          courante. Le destructif est dans la feuille, là où il détruit vraiment. */}
       <Button
         label="Se déconnecter"
-        variant="ghost"
+        variant="secondary"
+        icon={IconeDeconnexion}
         onClick={() => setConfirmation(true)}
       />
       <Sheet
