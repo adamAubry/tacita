@@ -53,9 +53,8 @@ export function IosPushEducation({ declenche, indexedDB }: IosPushEducationProps
   if (!visible) return null;
 
   return (
-    <Sheet ouvert onFermer={refuser} nom="Recevoir les notifications sur iPhone">
+    <Sheet ouvert onFermer={refuser} titre="Recevoir les notifications sur iPhone">
       <VStack gap={4}>
-        <Text type="display-3">Recevoir les notifications sur iPhone</Text>
         <Text>
           Sur iPhone, les notifications ne fonctionnent que si Tacita est ajoutée à votre écran
           d&apos;accueil. Ouvrez le menu de partage de Safari, puis « Sur l&apos;écran

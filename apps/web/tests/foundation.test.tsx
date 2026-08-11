@@ -351,6 +351,83 @@ describe("REQ-UIX-05 — primitives partagées", () => {
   });
 
   /**
+   * **Deux sorties sur toutes les feuilles**, décidées le 11/08/2026 : le bouton, et le
+   * clic sur le fond.
+   *
+   * Le défaut qu'elles ferment était un cul-de-sac réel : `purpose="form"` d'Astryx bloque
+   * le clic sur le fond et ne laisse qu'Échap — touche qui **n'existe pas sur un
+   * téléphone**. Cinq feuilles l'utilisaient, dont deux sans le moindre bouton de sortie :
+   * `PhotoCapture` sur caméra refusée n'affichait qu'un paragraphe, et l'écran de nouvelle
+   * conversation deux boutons qui s'enfoncent d'un cran.
+   *
+   * Le bouton se teste au rendu ; l'absence de blocage se lit à la source, `purpose` ne
+   * laissant aucune trace observable dans le DOM de jsdom.
+   */
+  it("une feuille se ferme par son bouton, avec ou sans titre", () => {
+    for (const props of [{ nom: "Feuille sans titre" }, { titre: "Feuille titrée" }]) {
+      const onFermer = vi.fn();
+      render(
+        <Sheet ouvert onFermer={onFermer} {...props}>
+          <p>Contenu</p>
+        </Sheet>,
+      );
+
+      // Un seul, et en français : celui d'Astryx dirait « Close » — son `fr-FR.json`
+      // porte 3 clés sur 219, et le shard ne monte aucun fournisseur i18n.
+      const fermer = screen.getAllByRole("button", { name: "Fermer" });
+      expect(fermer).toHaveLength(1);
+
+      fireEvent.click(fermer[0]!);
+      expect(onFermer).toHaveBeenCalledTimes(1);
+      cleanup();
+    }
+  });
+
+  it("aucune feuille ne peut interdire la sortie par le fond", () => {
+    // Le code, pas les commentaires : ce fichier **explique** le piège de `purpose="form"`
+    // et le mot y figure. Même distinction que pour les autres interdits structurels.
+    const code = sansCommentaires(
+      readFileSync(join(RACINE, "components/foundation/Sheet.tsx"), "utf8"),
+    );
+    // `info` est le defaut d'Astryx : ne rien passer, c'est laisser Echap **et** le fond.
+    expect(code).not.toMatch(/purpose=/);
+    // Et la prop qui permettait de le refuser n'existe plus : tant qu'elle vivait, la
+    // prochaine feuille pouvait refaire le piege.
+    expect(code).not.toMatch(/sortie/);
+    const fautives = sourcesLivrees()
+      .filter(({ code: source }) => /sortie=/.test(sansCommentaires(source)))
+      .map(({ chemin }) => chemin.replace(RACINE, ""));
+    expect(fautives).toEqual([]);
+  });
+
+  /**
+   * La géométrie du bottom-sheet, lue à la source : jsdom ne calcule ni largeur, ni
+   * débordement, ni coins. Ce test ne prouve pas le rendu — il empêche les lignes qui le
+   * tiennent de disparaître, chacune ayant corrigé un défaut visible.
+   */
+  it("le bottom-sheet prend toute la largeur, s'arrondit en haut, et defile", () => {
+    const source = readFileSync(join(RACINE, "components/foundation/Sheet.tsx"), "utf8");
+
+    // Astryx sort `width: 400px` + `max-width: 90vw` ; avec `left: 0` et `right: 0`, une
+    // largeur explicite rend `right` inoperant — la feuille sortait collee au bord gauche.
+    expect(source).toContain('width={bas ? "100%" : 400}');
+    expect(source).toContain('maxWidth: "none"');
+    // DESIGN.md § Overview : r12 pour les bottom-sheets, et seulement en haut — les deux
+    // coins du bas entaillaient le bord de l'ecran contre lequel la feuille est collee.
+    expect(source).toContain('borderRadius: "var(--radius-page) var(--radius-page) 0 0"');
+    // DESIGN.md e2 : `surface-raised` + hairline + ombre basse, et jamais d'ombre sans
+    // filet. Astryx pose `surface` + `--shadow-high` sans bordure.
+    expect(source).toContain("var(--color-background-popover)");
+    expect(source).toContain("1px solid var(--color-border)");
+    expect(source).toContain("var(--shadow-low)");
+    // Le conteneur interne d'Astryx est en `overflow: hidden` : sans ces trois lignes, le
+    // contenu passe `maxHeight` est coupe et inatteignable (liste des membres, reglages).
+    expect(source).toContain('overflowY: "auto"');
+    expect(source).toContain("minHeight: 0");
+    expect(source).toContain("env(safe-area-inset-bottom, 0px)");
+  });
+
+  /**
    * WCAG 4.1.2 — audit impeccable du 07/08/2026. Neuf feuilles s'ouvraient sans nom
    * accessible : un lecteur d'écran annonçait « boîte de dialogue » et s'arrêtait là.
    * Astryx l'écrivait dans la sortie de nos propres tests, et personne ne la lisait.

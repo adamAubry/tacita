@@ -57,7 +57,7 @@ export function NewConversationSheet({
   };
 
   return (
-    <Sheet ouvert={ouvert} onFermer={fermer} sortie="form" nom="Nouvelle conversation">
+    <Sheet ouvert={ouvert} onFermer={fermer} nom="Nouvelle conversation">
       {etape === "choix" && (
         <ButtonsList
           boutons={[

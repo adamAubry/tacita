@@ -204,14 +204,10 @@ export function ProfilAutrui({
         ouvert={confirmation !== null}
         onFermer={() => setConfirmation(null)}
         ancrage="centre"
-        sortie="form"
-        nom={texte?.titre ?? "Confirmation"}
+        titre={texte?.titre ?? "Confirmation"}
       >
         {texte && (
           <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-4)" }}>
-            <Text type="label" size="lg">
-              {texte.titre}
-            </Text>
             <Text type="body" color="secondary">
               {texte.corps}
             </Text>

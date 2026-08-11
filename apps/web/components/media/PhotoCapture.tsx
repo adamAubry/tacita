@@ -76,7 +76,7 @@ export function PhotoCapture({ ouvert, onFermer, onEnregistrer, onEnvoyer }: Pho
   const nom = `photo-${new Date().toISOString().slice(0, 19).replaceAll(":", "-")}.jpg`;
 
   return (
-    <Sheet ouvert={ouvert} onFermer={onFermer} sortie="form" nom="Prendre une photo">
+    <Sheet ouvert={ouvert} onFermer={onFermer} nom="Prendre une photo">
       <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
         {refus ? (
           <Text type="body">

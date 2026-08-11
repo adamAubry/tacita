@@ -167,7 +167,6 @@ export function ProfilMoi({ profil, onEnregistrer, onPhoto, deconnexion }: Profi
       <Sheet
         ouvert={edition}
         onFermer={() => setEdition(false)}
-        sortie="form"
         nom="Modifier le profil"
       >
         <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-4)" }}>
