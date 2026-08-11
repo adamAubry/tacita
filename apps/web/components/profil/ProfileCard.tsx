@@ -168,7 +168,10 @@ export function ProfileCard({
   // un fond neutre mais dans une photo, et une longue rampe d'image sur image ne lit pas
   // comme une dissolution — elle lit comme du flou. La distance ne bouge donc pas ; c'est
   // la **courbe** qui adoucit (voir `fonduDoux`), et elle le fait sans rien coûter au dessin.
-  const fonduAvatar = fonduDoux(`${AVATAR_OPAQUE}px`, AVATAR_BAS - AVATAR_OPAQUE);
+  const fonduAvatar = fonduDoux(
+    `${AVATAR_OPAQUE}px`,
+    AVATAR_BAS - AVATAR_OPAQUE,
+  );
   // La bannière est pleine sur toute la hauteur qui porte l'avatar, puis s'éteint sur les
   // 72 px de `QUEUE_FONDU`. Le départ n'est pas un pourcentage mais `ZONE_OPAQUE` : un
   // pourcentage aurait glissé dès que la safe-area change la hauteur, et l'avatar se serait
@@ -179,12 +182,20 @@ export function ProfileCard({
   // moins marge de 24), et un dépassement horizontal fait défiler la page entière de côté.
   // L'ombre est coupée au bord de l'écran, où elle n'était de toute façon pas visible.
   return (
-    <header style={{ position: "relative", display: "grid", overflow: "hidden" }}>
+    <header
+      style={{ position: "relative", display: "grid", overflow: "hidden" }}
+    >
       {/* La bannière est décorative : le nom et l'identifiant, juste dessous, disent qui
           on regarde. Une description alternative n'ajouterait rien et se lirait à chaque
-          visite. */}
+          visite.
+
+          Elle ne se rend qu'à demi (`.tacita-banniere`) : c'est un fond, et un fond qui
+          lutte avec ce qu'il porte n'est plus un fond. La valeur vit dans tokens.css avec
+          son pourquoi — et surtout **pas ici** : `opacity` est validée comme un nombre par
+          le CSSOM, donc un `style` inline la réduirait à `NaN` sans rien dire. */}
       <div
         aria-hidden
+        className="tacita-banniere"
         style={{
           height: HAUTEUR_BANNIERE,
           background: banniere
@@ -235,7 +246,13 @@ export function ProfileCard({
           onClick={() => router.back()}
         />
 
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--spacing-2)",
+          }}
+        >
           {statut && (
             <Badge
               label={LIBELLE_STATUT[statut]}
@@ -243,7 +260,9 @@ export function ProfileCard({
               // seul des trois statuts qui doive se remarquer sans être lu.
               style={{
                 background:
-                  statut === "bloque" ? "var(--color-error-muted)" : "var(--color-accent-muted)",
+                  statut === "bloque"
+                    ? "var(--color-error-muted)"
+                    : "var(--color-accent-muted)",
                 color: "var(--color-text-primary)",
               }}
             />
@@ -282,9 +301,15 @@ export function ProfileCard({
             display: "flex",
             borderRadius: "var(--tacita-radius-avatar)",
             boxShadow: "var(--tacita-ombre-avatar)",
+            padding: "var(--spacing-3)",
           }}
         >
-          <ConversationAvatar nom={nom} mxc={avatarUrl} direct taille={TAILLE_AVATAR} />
+          <ConversationAvatar
+            nom={nom}
+            mxc={avatarUrl}
+            direct
+            taille={TAILLE_AVATAR}
+          />
         </div>
       </div>
 

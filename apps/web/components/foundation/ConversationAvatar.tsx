@@ -39,7 +39,12 @@ export interface ConversationAvatarProps {
  * ce chaînon qui manquait — jusqu'ici ce composant ne rendait que des initiales, et une
  * photo de profil pouvait être téléversée, posée et relue sans jamais s'afficher.
  */
-export function ConversationAvatar({ nom, mxc, direct, taille = 40 }: ConversationAvatarProps) {
+export function ConversationAvatar({
+  nom,
+  mxc,
+  direct,
+  taille = 40,
+}: ConversationAvatarProps) {
   const src = useImageMxc(mxc);
 
   return (
@@ -49,7 +54,9 @@ export function ConversationAvatar({ nom, mxc, direct, taille = 40 }: Conversati
       size={taille}
       tooltip={false}
       alt={direct ? nom : `Groupe ${nom}`}
-      style={{ "--radius-full": "var(--tacita-radius-avatar)" } as CSSProperties}
+      style={
+        { "--radius-full": "var(--tacita-radius-avatar)" } as CSSProperties
+      }
     />
   );
 }

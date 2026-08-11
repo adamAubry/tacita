@@ -56,13 +56,14 @@
      du bouton de retour, sur le même écran, pour la même raison. Plus opaque en sombre :
      une ombre noire sur un fond sombre ne se voit plus (jurisprudence de `--shadow-high`,
      0.10 en clair contre 0.40 en sombre). */
-  --tacita-ombre-avatar: 0 0 24px light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
+  --tacita-ombre-avatar: 0 0 24px
+    light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
 
   /* DESIGN.md : avatars en **carré arrondi (rayon 25 %)**, signature délibérée face aux
      cercles de toutes les messageries. Astryx n'a pas de token d'avatar — ses avatars
      lisent `--radius-full`. C'est `ConversationAvatar` qui redéfinit ce token dans sa
      propre portée ; la valeur, elle, vit ici, avec les autres géométries. */
-  --tacita-radius-avatar: 25%;
+  --tacita-radius-avatar: 40%;
 }
 
 /*
@@ -148,6 +149,32 @@
   .tacita-retour:not(#\#):not(#\#):not(#\#):not(#\#) {
     transition: none;
   }
+}
+
+/*
+ * La bannière du profil ne se rend qu'à moitié (DESIGN.md § Components, 11/08/2026).
+ * Elle est un fond, pas un sujet : à pleine force, une photo choisie par l'utilisateur
+ * entre en concurrence avec l'avatar et le nom posés dessus, et l'écran n'a plus de
+ * premier élément. La reculer d'un demi-ton la remet à sa place sans la censurer.
+ *
+ * **Une classe et non un `style` inline, et ce n'est pas un rangement.** `opacity` est
+ * validée comme un nombre par le CSSOM : `element.style.opacity = "var(--x)"` ne stocke
+ * pas la référence, il stocke `NaN`, et la couche reste à pleine force. Écrit de bonne
+ * foi, sans effet, et rien à l'écran ne le dit — le mode de panne d'E-14. Une feuille
+ * n'a pas ce problème : le parseur de règles substitue les variables au calcul.
+ *
+ * Un `opacity` sur la couche et non une alpha dans le masque : le masque dit *où* l'image
+ * s'éteint (la courbe de `fonduDoux`), cette règle dit *à quelle force* elle se rend
+ * partout ailleurs. Les deux se multiplient — la rampe part donc de 50 % et non de 100 %
+ * — et rester deux choses permet d'en régler une sans toucher l'autre.
+ *
+ * L'avatar et le bandeau sont des frères de cette couche, pas ses enfants : eux gardent
+ * leur pleine force, ce qui est précisément le but. L'aplat d'accent qui remplace une
+ * bannière absente s'atténue aussi — cohérent (un fond reste un fond) et rare depuis
+ * qu'un compte neuf naît avec sa constellation.
+ */
+.tacita-banniere {
+  opacity: 0.5;
 }
 
 /*

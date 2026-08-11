@@ -193,6 +193,31 @@ describe("REQ-UI-03 — le thème porte les valeurs de DESIGN.md, et rien d'autr
       expect(regle?.[1], balise).toContain(balise);
     }
   });
+
+  /**
+   * DESIGN.md § Components : la bannière du profil ne se rend qu'à 50 %, **depuis une
+   * feuille**. La contrainte n'est pas cosmétique : `opacity` est validée comme un nombre
+   * par le CSSOM, donc `element.style.opacity = "var(--x)"` ne stocke pas la référence,
+   * il stocke `NaN` — la couche reste à pleine force, et rien ne le signale. Écrit une
+   * première fois de bonne foi le 11/08/2026, sans effet.
+   *
+   * Le test lit la feuille et la source, faute de navigateur — comme les deux au-dessus.
+   * Il ne prouve pas le rendu ; il empêche la règle de repartir en `style` inline, où
+   * elle ne ferait à nouveau rien.
+   */
+  it("l'opacité de la bannière vient d'une feuille, jamais d'un style inline", () => {
+    const feuille = sansCommentaires(lire("components/foundation/tokens.css"));
+    // La **présence** de la règle, pas sa valeur : DESIGN.md dit à quoi elle sert, la
+    // feuille dit combien. Verrouiller le nombre ici ferait échouer le test au premier
+    // ajustement de dessin légitime, et remettrait la valeur à deux endroits.
+    expect(feuille).toMatch(/\.tacita-banniere\s*{[^}]*opacity:\s*[\d.]+/);
+
+    const carte = sansCommentaires(lire("components/profil/ProfileCard.tsx"));
+    expect(carte).toContain('className="tacita-banniere"');
+    // La forme qui ne marche pas, dans le fichier qui a la classe : `opacity` n'a rien à
+    // faire dans un objet `style` ici, avec ou sans `var()`.
+    expect(carte).not.toMatch(/opacity:/);
+  });
 });
 
 describe("REQ-UI-03 — le choix de thème est persisté en IndexedDB", () => {
