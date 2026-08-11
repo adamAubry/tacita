@@ -3,7 +3,7 @@
 import type { EncryptedFile } from "@tacita/media-pipeline";
 import { useEffect, useState } from "react";
 
-import { Button, Skeleton, Text } from "../foundation/primitives";
+import { Skeleton, Text } from "../foundation/primitives";
 import { VoicePlayer } from "./VoicePlayer";
 import { dureeLisible, tailleLisible, type Media, type Telecharger } from "./media";
 
@@ -39,6 +39,13 @@ function useBlob(fichier: EncryptedFile | undefined, telecharger: Telecharger, m
 
   return { url, erreur };
 }
+
+/**
+ * La géométrie de la tuile. Deux nombres et pas un style : le squelette et l'image les
+ * lisent tous les deux, et c'est ce partage qui fait que la timeline ne saute pas.
+ */
+const LARGEUR_TUILE = 240;
+const HAUTEUR_TUILE_MAX = 320;
 
 export interface MediaMessageProps {
   media: Media;
@@ -108,33 +115,69 @@ export function MediaMessage({ media, telecharger, onOuvrir }: MediaMessageProps
     );
   }
 
-  if (!visuel.url) return <Skeleton width={240} height={180} />;
+  // La boîte de la tuile, **calculée avant le déchiffrement** : le squelette et l'image
+  // partagent ces deux nombres, donc l'arrivée de la vignette ne déplace rien (DESIGN.md,
+  // « Skeleton de même géométrie »). Le repli 4:3 ne sert qu'aux événements d'un client
+  // qui n'écrit pas `info.w`/`info.h` ; le plafond garde une photo en mode portrait de
+  // prendre toute la hauteur de l'écran.
+  const hauteur = Math.min(
+    media.largeur && media.hauteur
+      ? Math.round((LARGEUR_TUILE * media.hauteur) / media.largeur)
+      : Math.round((LARGEUR_TUILE * 3) / 4),
+    HAUTEUR_TUILE_MAX,
+  );
+
+  if (!visuel.url) return <Skeleton width={LARGEUR_TUILE} height={hauteur} />;
 
   return (
-    <Button
-      label={
-        media.msgtype === "m.video"
-          ? `Vidéo ${media.nom}${media.dureeMs ? `, ${dureeLisible(media.dureeMs)}` : ""}`
-          : `Image ${media.nom}`
-      }
-      variant="ghost"
-      onClick={onOuvrir}
-    >
-      <img
-        src={visuel.url}
-        alt={media.nom}
+    <div style={{ display: "grid", gap: "var(--spacing-1)", justifyItems: "start" }}>
+      {/*
+        Un `<button>` nu, et non le `Button` d'Astryx : celui-ci est un contrôle de
+        formulaire à **hauteur fixe** (`--size-element-md`, 32 px) avec son rembourrage
+        horizontal. Une vignette de 240 px y était placée en enfant — l'image débordait
+        d'un cadre huit fois trop court, se posait par-dessus les messages voisins et
+        l'alignement de toute la colonne partait avec elle. C'était le défaut visible de
+        l'envoi de photo.
+
+        Le motif est celui du zoom dans `MediaViewer` : un bouton transparent qui épouse
+        son image, ce qui garde la cible clavier et l'étiquette accessible sans imposer la
+        géométrie d'un bouton à une photo.
+      */}
+      <button
+        type="button"
+        aria-label={
+          media.msgtype === "m.video"
+            ? `Vidéo ${media.nom}${media.dureeMs ? `, ${dureeLisible(media.dureeMs)}` : ""}`
+            : `Image ${media.nom}`
+        }
+        onClick={onOuvrir}
         style={{
-          maxWidth: 240,
-          maxHeight: 240,
+          width: LARGEUR_TUILE,
+          height: hauteur,
+          maxWidth: "100%",
+          padding: 0,
+          border: "none",
+          background: "none",
           borderRadius: "var(--radius-container)",
+          overflow: "hidden",
+          cursor: onOuvrir ? "pointer" : "default",
           display: "block",
         }}
-      />
+      >
+        <img
+          src={visuel.url}
+          alt={media.nom}
+          // `cover` sur une boîte au ratio de l'original ne rogne rien ; il ne rogne que
+          // le repli 4:3, là où l'événement ne dit pas ses dimensions.
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      </button>
+
       {media.msgtype === "m.video" && media.dureeMs !== undefined && (
         <Text type="supporting" color="secondary" hasTabularNumbers>
           {dureeLisible(media.dureeMs)}
         </Text>
       )}
-    </Button>
+    </div>
   );
 }

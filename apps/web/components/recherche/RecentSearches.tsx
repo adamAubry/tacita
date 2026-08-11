@@ -99,6 +99,12 @@ export function RecentSearches({ profils, onChoisir, onPurger }: RecentSearchesP
                   gap: "var(--spacing-1)",
                   width: LARGEUR_PROFIL,
                   padding: "var(--spacing-1)",
+                  // `Button` est un contrôle à **hauteur fixe** (`--size-element-md`,
+                  // 32 px). L'avatar en fait 40 à lui seul, le nom en ajoute une ligne :
+                  // le contenu débordait de son propre bouton. Les autres dimensions
+                  // étaient déjà reprises ici, la hauteur avait été oubliée — même défaut
+                  // que la vignette de la timeline, à un endroit de moins.
+                  height: "auto",
                 }}
               >
                 <ConversationAvatar nom={profil.nom} direct />

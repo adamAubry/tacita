@@ -22,6 +22,15 @@ export interface Media {
   /** Vignette chiffrée à part, avec sa propre clé. Absente sur audio et fichier. */
   vignette?: EncryptedFile;
   taille?: number;
+  /**
+   * Dimensions de l'original, telles que le pipeline les écrit dans `info.w`/`info.h`
+   * (REQ-MED-03). Elles servent à **réserver la boîte** de la vignette avant de l'avoir
+   * déchiffrée : sans elles, la tuile n'a pas de hauteur connue et la timeline saute au
+   * moment où l'image arrive. Absentes d'un événement envoyé par un autre client qui ne
+   * les renseigne pas — d'où le repli.
+   */
+  largeur?: number;
+  hauteur?: number;
   dureeMs?: number;
   /** REQ-MED-06 — pics MSC1767, entiers 0–1024. */
   ondes?: number[];
@@ -55,6 +64,8 @@ export function mediaDe(evenement: EvenementLu): Media | undefined {
     fichier,
     vignette: info.thumbnail_file as EncryptedFile | undefined,
     taille: typeof info.size === "number" ? info.size : undefined,
+    largeur: typeof info.w === "number" ? info.w : undefined,
+    hauteur: typeof info.h === "number" ? info.h : undefined,
     dureeMs: typeof info.duration === "number" ? info.duration : audio?.duration,
     ondes: audio?.waveform,
   };

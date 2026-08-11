@@ -86,6 +86,54 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
     expect(screen.queryByAltText("plage.jpg")).toBeNull();
   });
 
+  /**
+   * La tuile n'est **pas** un `Button` d'Astryx.
+   *
+   * Celui-ci est un contrôle de formulaire à hauteur fixe — `--size-element-md`, 32 px —
+   * avec son rembourrage horizontal, et la vignette de 240 px y était passée en enfant.
+   * L'image débordait d'un cadre huit fois trop court, se posait par-dessus les messages
+   * voisins, et l'alignement de la colonne partait avec elle : c'était le défaut visible
+   * de l'envoi de photo.
+   *
+   * Ce que le test tient, c'est la **boîte**. jsdom ne calcule aucune géométrie, mais il
+   * lit les styles déclarés, et ce sont eux qui étaient absents : une hauteur déclarée sur
+   * la tuile est ce qui manquait pour que la photo cesse de déborder.
+   */
+  it("la tuile réserve la boîte de la vignette, au ratio de l'original", async () => {
+    const portrait = mediaDe(
+      evenement({
+        msgtype: "m.image",
+        body: "plage.jpg",
+        file: FICHIER,
+        info: { size: 2048, thumbnail_file: VIGNETTE, w: 1200, h: 1600 },
+      }),
+    )!;
+    expect(portrait.largeur).toBe(1200);
+    expect(portrait.hauteur).toBe(1600);
+
+    // 240 × 1600 / 1200 = 320, qui est aussi le plafond : une photo en mode portrait ne
+    // prend pas toute la hauteur de l'écran.
+    const { container, unmount } = render(
+      <MediaMessage media={portrait} telecharger={() => new Promise<Blob>(() => {})} />,
+    );
+    // StyleX passe ses valeurs dynamiques par des variables CSS en attribut `style` :
+    // c'est l'attribut brut qu'on lit, `element.style.height` y est vide.
+    expect(container.firstElementChild?.getAttribute("style")).toContain("320px");
+    unmount();
+
+    render(<MediaMessage media={portrait} telecharger={telecharger} />);
+    await waitFor(() => expect(screen.getByAltText("plage.jpg")).toBeTruthy());
+
+    // La même boîte une fois l'image arrivée : c'est ce partage qui fait que la timeline
+    // ne saute pas au déchiffrement (DESIGN.md, « Skeleton de même géométrie »).
+    const tuile = screen.getByRole("button", { name: "Image plage.jpg" });
+    expect(tuile.style.width).toBe("240px");
+    expect(tuile.style.height).toBe("320px");
+    expect(tuile.style.overflow).toBe("hidden");
+    // Et aucune hauteur de contrôle de formulaire n'est imposée à la photo.
+    expect(tuile.style.padding).toBe("0px");
+  });
+
   it("un média indéchiffrable le dit, sans repli inventé", async () => {
     render(
       <MediaMessage
@@ -214,6 +262,64 @@ describe("REQ-UI-15 — capture : « sur votre appareil » et « envoyé » ne s
     fireEvent.click(screen.getByRole("button", { name: /Enregistrer sur votre appareil/ }));
     expect(onEnregistrer).toHaveBeenCalledTimes(1);
     expect(onEnvoyer).not.toHaveBeenCalled();
+  });
+
+  /**
+   * La prise ne survit pas à la fermeture.
+   *
+   * `<dialog>` garde son contenu dans le DOM même fermé, et rien ne remettait `prise` à
+   * zéro : la feuille rouverte affichait la photo précédente à la place de la caméra. Une
+   * photo au premier plan d'un écran censé en prendre une nouvelle, dont le seul moyen de
+   * sortir était de recharger la page.
+   */
+  it("une feuille rouverte montre la caméra, jamais la photo d'avant", async () => {
+    const { rerender } = render(
+      <PhotoCapture ouvert onFermer={vi.fn()} onEnregistrer={vi.fn()} onEnvoyer={vi.fn()} />,
+    );
+    await prendre();
+
+    rerender(
+      <PhotoCapture
+        ouvert={false}
+        onFermer={vi.fn()}
+        onEnregistrer={vi.fn()}
+        onEnvoyer={vi.fn()}
+      />,
+    );
+    rerender(<PhotoCapture ouvert onFermer={vi.fn()} onEnregistrer={vi.fn()} onEnvoyer={vi.fn()} />);
+
+    expect(screen.queryByAltText("Photo prise")).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText("Aperçu de la caméra")).toBeTruthy());
+  });
+
+  it("la même prise part sous le même nom qu'elle est enregistrée", async () => {
+    const onEnregistrer = vi.fn();
+    const onEnvoyer = vi.fn();
+    render(
+      <PhotoCapture ouvert onFermer={vi.fn()} onEnregistrer={onEnregistrer} onEnvoyer={onEnvoyer} />,
+    );
+    await prendre();
+
+    fireEvent.click(screen.getByRole("button", { name: /Enregistrer sur votre appareil/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Envoyer \(version compressée\)/ }));
+
+    // Le nom était recalculé à chaque rendu depuis l'horloge : une seconde entre les deux
+    // clics suffisait à donner deux noms à une seule photo.
+    expect(onEnregistrer.mock.calls[0]![1]).toBe(onEnvoyer.mock.calls[0]![0].name);
+  });
+
+  it("sans API caméra, la feuille le dit — et ne renvoie pas vers un réglage inexistant", async () => {
+    // Hors contexte sécurisé, `mediaDevices` est absent. L'optionnel court-circuitait
+    // toute la chaîne : ni flux, ni erreur, un bouton désactivé et pas un mot.
+    Object.defineProperty(globalThis.navigator, "mediaDevices", {
+      configurable: true,
+      value: undefined,
+    });
+
+    render(<PhotoCapture ouvert onFermer={vi.fn()} onEnregistrer={vi.fn()} onEnvoyer={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/ne donne pas accès à la caméra/)).toBeTruthy());
+    // Deux causes, deux phrases : celle-ci ne se rattrape pas dans les réglages.
+    expect(screen.queryByText(/réglages de votre navigateur/)).toBeNull();
   });
 
   it("un refus de caméra s'explique et se rattrape", async () => {
