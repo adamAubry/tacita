@@ -78,6 +78,42 @@ const ZONE_OPAQUE = `calc(${BANDEAU} + ${TAILLE_AVATAR}px)`;
 const HAUTEUR_BANNIERE = `calc(${ZONE_OPAQUE} + ${QUEUE_FONDU}px)`;
 
 /**
+ * **Le fondu, en courbe et non en pente.**
+ *
+ * Un `linear-gradient` à deux arrêts fait varier l'alpha à vitesse constante, ce qui
+ * paraît doux au milieu mais casse aux deux bouts : là où l'opacité quitte 1 et là où
+ * elle atteint 0, la dérivée saute d'un coup, et l'œil lit ces deux ruptures comme des
+ * lignes — un bord haut de fondu au-dessus de l'avatar, un bord bas au ras du nom. C'est
+ * précisément ce qu'on voyait : les deux masques *étaient* des dégradés, et paraissaient
+ * quand même coupés.
+ *
+ * La rampe est donc échantillonnée sur un **smoothstep** (`t²(3−2t)`), dont la pente est
+ * nulle aux deux extrémités : le fondu naît et meurt sans arête. C'est la forme la plus
+ * douce qu'on puisse donner à une distance donnée — la contrepartie est un milieu 1,5 fois
+ * plus raide, invisible parce que c'est justement là qu'il n'y a aucun repère.
+ *
+ * Échantillonné et non calculé par le navigateur : CSS n'a pas de fonction d'assouplissement
+ * dans les dégradés (les « interpolation hints » ne donnent qu'une exponentielle, qui
+ * adoucit un bout en durcissant l'autre). Douze paliers suffisent — l'écart au vrai
+ * smoothstep reste sous le demi-pour-cent d'alpha, très en dessous du seuil de bande.
+ *
+ * `color-mix` sur `black` et `transparent` plutôt qu'un `rgb()` : dans un masque seule
+ * l'alpha compte, et n'écrire que des mots-clés garde la règle de DESIGN.md littérale —
+ * aucune valeur de couleur en dur dans un composant, pas même une qui ne sera jamais
+ * rendue.
+ */
+const PALIERS = 12;
+function fonduDoux(debut: string, longueur: number): string {
+  const arrets = Array.from({ length: PALIERS + 1 }, (_, rang) => {
+    const t = rang / PALIERS;
+    // 1 − smoothstep(t) : opaque au départ, transparent à l'arrivée.
+    const opacite = Math.round((1 - t * t * (3 - 2 * t)) * 100);
+    return `color-mix(in srgb, black ${opacite}%, transparent) calc(${debut} + ${Math.round(longueur * t)}px)`;
+  });
+  return `linear-gradient(to bottom, ${arrets.join(", ")})`;
+}
+
+/**
  * Le rail gauche de l'écran. `--spacing-3` n'est pas un choix local : c'est la gouttière
  * de tous les écrans de l'app (listes, réglages, infos de conversation). L'avatar, le nom,
  * l'identifiant et le bouton de retour s'alignent donc sur **la même verticale** que les
@@ -130,14 +166,14 @@ export function ProfileCard({
   // La rampe ne prend que les 40 derniers pixels des 128. Elle en a pris les deux tiers un
   // moment : depuis que l'avatar est **dans** la bannière, ce fondu ne se dissout plus dans
   // un fond neutre mais dans une photo, et une longue rampe d'image sur image ne lit pas
-  // comme une dissolution — elle lit comme du flou. Assez pour que le bord bas ne soit pas
-  // une arête, pas plus.
-  const fonduAvatar = `linear-gradient(to bottom, black ${AVATAR_OPAQUE}px, transparent ${AVATAR_BAS}px)`;
-  // La bannière est pleine sur toute la hauteur qui porte l'avatar, puis s'éteint. Le
-  // point d'arrêt n'est pas un pourcentage mais `ZONE_OPAQUE` : un pourcentage aurait
-  // glissé dès que la safe-area change la hauteur, et l'avatar se serait retrouvé dans le
-  // fondu sur un appareil à encoche et pas sur un autre.
-  const fonduBanniere = `linear-gradient(to bottom, black ${ZONE_OPAQUE}, transparent 100%)`;
+  // comme une dissolution — elle lit comme du flou. La distance ne bouge donc pas ; c'est
+  // la **courbe** qui adoucit (voir `fonduDoux`), et elle le fait sans rien coûter au dessin.
+  const fonduAvatar = fonduDoux(`${AVATAR_OPAQUE}px`, AVATAR_BAS - AVATAR_OPAQUE);
+  // La bannière est pleine sur toute la hauteur qui porte l'avatar, puis s'éteint sur les
+  // 72 px de `QUEUE_FONDU`. Le départ n'est pas un pourcentage mais `ZONE_OPAQUE` : un
+  // pourcentage aurait glissé dès que la safe-area change la hauteur, et l'avatar se serait
+  // retrouvé dans le fondu sur un appareil à encoche et pas sur un autre.
+  const fonduBanniere = fonduDoux(ZONE_OPAQUE, QUEUE_FONDU);
 
   // `overflow: hidden` : la boîte d'ombre de l'avatar dépasse de 12 px à gauche (rail de 12
   // moins marge de 24), et un dépassement horizontal fait défiler la page entière de côté.
