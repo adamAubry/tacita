@@ -9,6 +9,7 @@ dist/
 infra/proxy/certs/
 .claude/settings.local.json
 *.old
+*.old.*
 *.tsbuildinfo
 
 # Simulations utilisateur Playwright — branche feat/m-i-appels-push uniquement.
@@ -20,9 +21,8 @@ e2e/
 # Captures et references visuelles de travail — machine-dependant, hors depot.
 .screens/
 
-# Runbook de lancement local — meme regime que e2e/ : machine-dependant, hors depot.
-LAUNCH_README.md
-
-# Runbook sysadmin (pics memoire, dimensionnement WSL) — chiffres mesures sur une
-# machine precise, faux ailleurs. Meme regime que LAUNCH_README.md.
-OPS_README.md
+# Documentation de travail locale — runbook de lancement, notes de workflow. Meme regime
+# que .screens/ : les mesures qui s'y trouvent viennent d'une machine precise et seraient
+# trompeuses commitees. Les *regles* qui en sortent vivent dans CLAUDE.md, qui lui est
+# suivi — un document hors depot ne gouverne rien (cf. § Boucle de developpement).
+docs/

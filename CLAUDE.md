@@ -6,7 +6,7 @@ PWA de messagerie chiffrée de bout en bout remplaçant les DM/groupes Instagram
 
 Spec-driven development : les specs sont exécutables, le code les implémente, jamais l'inverse.
 
-- `specs/00-conventions.md` — architecture, IDs d'exigence, workflow. **Lire en premier.**
+- `specs/00-conventions.md` — architecture du monorepo, IDs d'exigence, séquencement. **Les règles de comportement qui y vivaient sont désormais ici** (§ Boucle de développement, § Tests, § Sept règles) : ce fichier-ci est chargé à chaque session, pas lui, et une règle rangée là où personne ne la lit au bon moment n'a jamais rien empêché. Un fait, une maison — si les deux fichiers se contredisent, c'est un bug à corriger, pas une préséance à appliquer.
 - `specs/01..12-*.md` — un contrat par module. Ne travailler que dans le module assigné.
 - `DECISIONS.md` — arbitrages produit tranchés (D-01 à D-09). Ne pas les rediscuter dans le code ; escalader au PM.
 - `specs/ui/` — découpage frontend du shard UI (modules M-A à M-I, plan, ESCALATIONS.md). Pour tout travail dans `apps/web`, le module M-X assigné est le contrat ; la SPEC 11 reste l'autorité fonctionnelle.
@@ -45,10 +45,46 @@ Usage attendu : avant de coder un composant, vérifier son token/style dans DESI
 
 ## Workflow
 
-- Dev par blocs : un bloc = des REQ ; commit seulement si les tests du bloc passent. Hooks pré-commit bloquants (lint, typecheck, tests) — jamais de `--no-verify`.
+- Dev par blocs : un bloc = des REQ ; commit seulement si les tests du bloc passent. Waterfall jusqu'au ship : les specs 01–10 se développent en parallèle, la 11 s'intègre en dernier ; CI/CD après le ship uniquement.
 - **Chaque test Vitest nomme son exigence** : `describe("REQ-XXX-NN — ...")`. Test sans ID = rejeté en revue.
-- Un module est terminé quand toutes ses REQ ont un test nommé vert.
+- Un module est terminé quand 100 % de ses REQ ont un test nommé vert et que la suite du paquet passe. Ce n'est pas la même porte que « le produit marche » (règle 4).
 - Valeurs sensibles aux versions (défauts Synapse, préfixes MatrixRTC, authenticated media) : vérifier dans la doc de la version déployée avant usage, ne jamais supposer.
+- **Porte de commit — l'auteur choisit la portée des tests, et l'écrit dans le message.** Hooks bloquants, jamais de `--no-verify`. `typecheck` reste **toujours complet** : c'est lui qui tient les jonctions au niveau des types, et c'est le moins cher des deux. Les tests, eux, se scopent au projet touché **quand le commit est peu impactant**, et couvrent tout le workspace sinon — c'est le défaut, on ne l'obtient pas en le demandant, on le perd en le refusant, et ce refus laisse une trace dans la commande : `TACITA_TESTS="--project @tacita/outbox" git commit -m "…"`. Les noms sont ceux des `package.json`, pas ceux des répertoires : paquets préfixés (`@tacita/outbox`), apps non (`web`, `infra`, `push-gateway`, `invite-tokens`). Mesuré : `@tacita/outbox` 4,6 s contre 85 s pour tout.
+  - **Impactant, donc complet** : interface exportée par un paquet, fichier partagé par plusieurs modules, contrat entre deux specs, composant réutilisé, token ou règle de `DESIGN.md`, configuration de build ou de test.
+  - **Peu impactant, donc scopable** : changement confiné à l'intérieur d'un seul paquet, ou à un seul écran qui n'exporte rien.
+  - En cas de doute, complet. Et le gain est faible quand le projet touché est `apps/web`, qui porte l'essentiel du poids : scoper vaut pour les paquets, presque pas pour le shard.
+
+## Boucle de développement
+
+**Le coût d'exécution fait partie du travail.** Ces règles viennent de comportements mesurés sur ce dépôt. Les gestes sont **tous ici** : c'est le seul fichier chargé, donc le seul qui gouverne. Les relevés qui les ont produits vivent dans `docs/WORKFLOW.md`, hors dépôt parce que machine-dépendant — s'y référer est utile, en dépendre ne l'est pas.
+
+- **La suite complète appartient à la porte, pas à la boucle.** Pendant l'itération, ne lancer que les fichiers de test qui lisent ce qu'on vient de toucher : `grep -rl "<FichierTouché>" apps/web/tests/`. Mesuré ici — un fichier ≈ 9 s, le projet `web` entier 85 s de mur pour **185 s de CPU de collecte**. Filtrer par **chemin** : filtrer par `--project` ne sauve pas la collecte.
+- **Capturer une fois, relire autant qu'on veut.** `2>&1 | tee` vers un fichier, puis `grep` dessus. Ne jamais relancer une suite pour changer un filtre : c'est cher, et la seconde mesure est *pire* que la première puisqu'on charge la machine en la mesurant.
+- **Un échec non reproduit en isolation n'est pas une régression.** Une cible qui se déplace d'un run à l'autre est de la famine mémoire, pas un bug. Reproduire fichier par fichier avant d'accuser le diff.
+- **Le plafond de workers ne se relève pas.** `--maxWorkers=4` dans `package.json` : les outils se dimensionnent sur les cœurs et jamais sur la RAM, et chaque worker retransforme pour lui seul les dépendances `deps.inline`. Avant un run large, couper les piles Docker étrangères au projet. Allonger `testTimeout` masquerait la famine sans la retirer.
+- **Écrire le test permanent avant la sonde jetable.** Il échoue et apprend la même chose, à ceci près qu'il reste. Une sonde qui a trouvé quelque chose de vrai ne se jette pas : elle devient un test.
+- **Ne pas inventer l'en-tête d'une sonde** — copier celui d'un test voisin qui touche le même composant : il porte déjà les mocks, les alias et le bon chemin.
+- **`git status` immédiatement avant tout `stash`, `checkout` ou `reset`.** Un état de dépôt vaut à l'instant où on le lit ; l'instantané de début de session est périmé, et un éditeur ouvert écrit pendant qu'on réfléchit.
+
+## Tests — ce qui prouve quoi
+
+- **Vitest uniquement** ; composants en jsdom/happy-dom, gestes simulés par événements pointer. La config infra (specs 01–02) est testée aussi : les tests parsent les fichiers YAML rendus et assertent les valeurs critiques.
+- **Mocker `Session` passe par `asSession()`** (`@tacita/client-core/testing`), jamais par un `as unknown as Session`. Sinon un membre **ajouté** au contrat n'apparaît nulle part — ni à la compilation, ni au démarrage, seulement en `undefined is not a function`. Aujourd'hui, ajouter un membre casse la compilation d'un seul fichier, `packages/client-core/src/testing.ts`, qui est le site de compilation du contrat.
+- **Toute passation entre deux paquets a un site de compilation.** Aucun paquet ne dépendant de deux autres, une promesse d'interface entre modules n'est vérifiée par *rien* — ni compilateur, ni test. Motif à reproduire : `packages/media-pipeline/tests/jonction-outbox.ts`, un fichier sans test qui **est** le test — s'il cesse de compiler, la passation est cassée.
+- **Un test qui passe sous Vitest ne prouve pas que le code démarre.** Vitest transpile ; `node --experimental-strip-types`, qui fait tourner les services d'`apps/`, *retire* les types sans les transformer et refuse toute construction TypeScript qui génère du code (propriété de paramètre, `enum`, `namespace`). Un service peut avoir 100 % de ses REQ vertes et ne pas booter. Là où un service est lancé par ce moteur, un test charge ses modules **avec ce moteur** (`infra/tests/invite-tokens.test.ts`).
+- **jsdom ne rend rien** : ni géométrie, ni cascade, ni style calculé. Ce que seul un navigateur voit se mesure à la main, se consigne avec sa date, et se garde ensuite par un test **structurel** qui lit la feuille ou la source — jamais par un navigateur piloté (interdit n°12). Ce garde-fou ne prouve pas le rendu ; il empêche la ligne qui le tient de disparaître sans que personne ne le voie.
+
+## Sept règles nées de défauts réels
+
+Valeur de jurisprudence : chacune a été posée sur un cas vécu **dans ce dépôt**, avec son motif. Les ignorer, c'est recommettre le défaut qui les a produites.
+
+1. **Chaque jonction entre modules a un propriétaire nommé dans une spec.** Cent pour cent des défauts critiques de ce dépôt étaient des jonctions. Cas d'école : la garde de chiffrement existait dans `messaging` et pas dans `outbox`, parce que la spec 05 met la file hors scope et que la spec 07 ne parlait pas de chiffrement. Les deux specs respectées, le trou entre elles.
+2. **Une erreur se classe par sa résolubilité, pas par sa classe HTTP.** Un 401 de jeton expiré se résout par un renouvellement, pas par un renvoi manuel message par message. `failed` doit vouloir dire « l'utilisateur doit agir sur *ce* message ».
+3. **Ne jamais valider une hypothèse contre un substitut qui la confirme par construction.** Un mock qui fixe lui-même l'ordre d'émission du SDK ne peut pas infirmer une hypothèse sur cet ordre. Une imitation de base monothread ne peut pas éprouver l'atomicité d'une transaction. `SSL_CERT_FILE` vérifié en Python quand le client HTTP de Synapse est Twisted valide un chemin que Synapse n'emprunte jamais.
+4. **« Module terminé » et « produit qui marche » sont deux portes distinctes.** Les tests de configuration attestent le contenu des fichiers ; la cible de fumée atteste un comportement contre un vrai serveur. La spec 01 a été « 100 % conforme » pendant que personne ne pouvait se connecter, et le service de la spec 12 a eu ses vingt REQ vertes avant de pouvoir démarrer.
+5. **Tenir la promesse ou la retirer — jamais la laisser affichée sans la tenir.** C'est l'interdit n°13. Chaque spec liste ses limites assumées ; elles se documentent, jamais ne se masquent.
+6. **Aucun besoin de développement ne modifie un artefact de production.** Les écarts dev/prod vivent dans des overlays explicites, chargés volontairement (D-07).
+7. **Une valeur écrite là où rien ne la lit est indétectable** *(ajoutée le 11/08/2026)*. Deux cas en quatre jours : deux paramètres d'URL retirés du schéma d'Element Call deux versions plus tôt — acceptés, ignorés, silencieux (E-14) ; et `opacity: "var(--token)"` dans un `style` inline React, que le CSSOM valide comme un **nombre** et réduit à `NaN` — le code disait 50 %, l'écran disait 100 %, et les deux avaient raison. Toute valeur posée à une jonction que personne ne relit exige un **test structurel qui la relie à son site de lecture** : lire la feuille et lire la source suffit, aucun rendu n'est nécessaire. Et si ce test est impossible à écrire, ce n'est pas le test qui manque — c'est la valeur qui est au mauvais endroit.
 
 ## Prudence outillage
 
@@ -58,4 +94,12 @@ Usage attendu : avant de coder un composant, vérifier son token/style dans DESI
 2. **Trois contraintes de construction, non négociables**, sans lesquelles `next build` échoue : jamais le barrel `@astryxdesign/core` (toujours le sous-chemin) ; le `Theme` d'Astryx enveloppé dans un composant `"use client"` du shard ; une palette fournie par le shard (`defineTheme`), le cœur n'en embarque aucune.
 3. **Astryx est en `0.2.0` et a six semaines.** Version épinglée, CHANGELOG relu avant tout bump — même jurisprudence que les digests d'images du compose.
 4. Toute incompatibilité **découverte depuis** : ne pas contourner silencieusement, escalader au PM.
-5. **Tout runtime externe que le client pointe — widget, service, URL de configuration — est épinglé dans `infra/`, version et digest consignés.** Une URL configurable sans version consignée est une jonction non relue : on ne peut rien vérifier de ce qu'on lui envoie. Règle ajoutée le 07/08/2026 après E-08, E-13 et E-14 — trois pannes de même nature, où deux specs correctes séparément laissaient le défaut vivre entre elles. E-14 l'a montré au prix fort : deux paramètres d'URL écrits de bonne foi ne faisaient **rien du tout**, et rien dans le dépôt ne pouvait le dire.
+5. **Tout runtime externe que le client pointe — widget, service, URL de configuration — est épinglé dans `infra/`, version et digest consignés.** Une URL configurable sans version consignée est une jonction non relue : on ne peut rien vérifier de ce qu'on lui envoie. Règle ajoutée le 07/08/2026 après E-08, E-13 et E-14 — trois pannes de même nature, où deux specs correctes séparément laissaient le défaut vivre entre elles. C'est le cas particulier de la règle 7, appliqué aux runtimes externes.
+
+## Ce qui ne se décide pas dans le code
+
+Trois choses s'escaladent au PM plutôt que de se trancher dans une PR :
+
+- toute **incompatibilité d'outillage** constatée (Astryx en `0.2.0`, cf. § Prudence outillage) — ne pas contourner en silence ;
+- tout affaiblissement d'une décision de `DECISIONS.md`, en particulier D-08 et REQ-COR-07 ;
+- toute **contradiction entre deux specs** découverte en les composant. C'est le mode de panne dominant de ce dépôt : chaque spec est respectée, et l'espace entre elles ne l'est pas. Consigner dans `specs/ui/ESCALATIONS.md` pour le shard.

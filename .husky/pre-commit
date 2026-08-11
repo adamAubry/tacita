@@ -1,4 +1,26 @@
 npx lint-staged
-# ponytail: full-repo typecheck/test, scope to the changed package via lint-staged once there are enough packages for this to be slow
+
+# `typecheck` reste toujours complet : il est le moins cher des deux, et c'est lui qui
+# tient les jonctions inter-modules au niveau des types (regle 1 + sites de compilation).
 npm run typecheck
-npm run test
+
+# Portee des tests : choisie par l'auteur du commit, cf. CLAUDE.md § Workflow.
+# Defaut = tout le workspace. Peu impactant = scoper au projet touche, explicitement :
+#
+#   TACITA_TESTS="--project @tacita/outbox" git commit -m "..."
+#
+# Les noms de projet sont ceux des package.json, pas ceux des repertoires : les paquets
+# sont prefixes (`@tacita/outbox`), les apps ne le sont pas (`web`, `infra`,
+# `push-gateway`, `invite-tokens`). Un nom faux ne scope pas, il fait echouer le hook —
+# ce qui est le bon sens de l'echec.
+#
+# Le defaut est le complet : on ne l'obtient pas en le demandant, on le perd en le
+# refusant — et ce refus laisse une trace dans la commande.
+#
+# ponytail: ferme le 11/08/2026. Le commentaire precedent prevoyait de scoper le hook
+# via lint-staged « une fois que ce serait lent ». Ca l'est devenu, et scoper d'office
+# reste la mauvaise sortie : la regle 1 dit que 100 % des defauts critiques de ce depot
+# etaient des jonctions, et un run scope est exactement ce qui ne les voit pas. Le cout
+# se traite au niveau transformation (deps.optimizer sur matrix-js-sdk et Astryx), pas
+# au niveau portee. Ce qui est scopable l'est desormais par decision explicite.
+npx vitest run --maxWorkers=4 $TACITA_TESTS
