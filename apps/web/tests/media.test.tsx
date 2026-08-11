@@ -435,6 +435,39 @@ describe("REQ-UIX-17 / REQ-UIX-18 — galeries partagées : quatre onglets, pér
     expect(screen.getByText(/Aucune photo ni vidéo/)).toBeTruthy();
   });
 
+  /**
+   * REQ-UIX-17 — la planche contact : trois carrés par ligne, comme Instagram.
+   *
+   * Les médias sortaient en **liste verticale de tuiles au ratio de leur original** — la
+   * géométrie de la timeline, où une photo est un message et garde le cadrage de son
+   * auteur. Dans une galerie elle devient une planche contact, et trois cadrages
+   * différents par ligne donnent une grille en dents de scie qu'on ne balaie plus.
+   *
+   * jsdom ne calcule aucune grille ; ce sont les styles **déclarés** qu'on lit, et c'est
+   * bien eux qui manquaient.
+   */
+  it("les médias se pavent en trois carrés par ligne ; le texte reste en liste", async () => {
+    const { container } = render(
+      <ConversationCollections evenements={evenements} epingles={["$txt"]} telecharger={telecharger} />,
+    );
+
+    const grille = container.querySelector("ul") as HTMLElement;
+    expect(grille.style.gridTemplateColumns).toBe("repeat(3, 1fr)");
+
+    // La cellule commande, et elle est carrée : ni largeur de 240 px, ni ratio d'origine.
+    await waitFor(() => expect(screen.getByAltText("plage.jpg")).toBeTruthy());
+    const tuile = screen.getByRole("button", { name: "Image plage.jpg" });
+    expect(tuile.style.aspectRatio).toBe("1 / 1");
+    expect(tuile.style.width).toBe("100%");
+    expect(tuile.style.overflow).toBe("hidden");
+    // Le pavage fait la planche contact : douze coins ronds par écran la dissolvent.
+    expect(tuile.style.borderRadius).toBe("0");
+
+    // Les onglets de texte gardent la liste : une ligne de lien n'est pas une vignette.
+    fireEvent.click(screen.getByText("Épinglés"));
+    expect((container.querySelector("ul") as HTMLElement).style.gridTemplateColumns).toBe("");
+  });
+
   it("les quatre onglets sont ceux du wireframe, dans l'ordre", () => {
     render(<ConversationCollections evenements={[]} epingles={[]} telecharger={telecharger} />);
     const section = within(screen.getByLabelText("Contenus partagés"));

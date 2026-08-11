@@ -52,6 +52,16 @@ export interface MediaMessageProps {
   telecharger: Telecharger;
   /** Ouvre le viewer plein écran (REQ-UIX-16). Absent sur audio et fichier. */
   onOuvrir?: () => void;
+  /**
+   * REQ-UIX-17 — la tuile **remplit sa cellule, en carré**, pour la grille de la galerie.
+   *
+   * Deux contextes, deux géométries : dans la timeline une photo garde le cadrage de son
+   * auteur, parce qu'elle *est* le message ; dans une galerie elle devient une planche
+   * contact, où le carré régulier est ce qui rend la grille lisible d'un coup d'œil. C'est
+   * la même règle que celle d'Instagram, et pour la même raison — trois cadrages
+   * différents par ligne donnent une grille en dents de scie qu'on ne balaie plus.
+   */
+  carre?: boolean;
 }
 
 /**
@@ -64,7 +74,7 @@ export interface MediaMessageProps {
  * Un média qu'on n'a pas encore déchiffré rend un Skeleton **de la même géométrie**, pour
  * que l'arrivée de l'image ne déplace pas la timeline (DESIGN.md).
  */
-export function MediaMessage({ media, telecharger, onOuvrir }: MediaMessageProps) {
+export function MediaMessage({ media, telecharger, onOuvrir, carre = false }: MediaMessageProps) {
   // La vignette d'abord : c'est elle qui est petite. Le média entier n'est déchiffré
   // qu'à l'ouverture du viewer.
   const visuel = useBlob(media.vignette ?? undefined, telecharger, "image/jpeg");
@@ -127,23 +137,35 @@ export function MediaMessage({ media, telecharger, onOuvrir }: MediaMessageProps
     HAUTEUR_TUILE_MAX,
   );
 
-  if (!visuel.url) return <Skeleton width={LARGEUR_TUILE} height={hauteur} />;
+  // En grille, la cellule commande : la tuile prend toute sa largeur et se contraint au
+  // carré. En timeline, c'est la photo qui commande, et elle garde le cadrage de son
+  // auteur. Le squelette lit la même boîte dans les deux cas.
+  const boite = carre
+    ? ({ width: "100%", aspectRatio: "1 / 1" } as const)
+    : ({ width: LARGEUR_TUILE, height: hauteur, maxWidth: "100%" } as const);
 
-  return (
-    <div style={{ display: "grid", gap: "var(--spacing-1)", justifyItems: "start" }}>
-      {/*
-        Un `<button>` nu, et non le `Button` d'Astryx : celui-ci est un contrôle de
-        formulaire à **hauteur fixe** (`--size-element-md`, 32 px) avec son rembourrage
-        horizontal. Une vignette de 240 px y était placée en enfant — l'image débordait
-        d'un cadre huit fois trop court, se posait par-dessus les messages voisins et
-        l'alignement de toute la colonne partait avec elle. C'était le défaut visible de
-        l'envoi de photo.
+  if (!visuel.url)
+    return carre ? (
+      <div style={boite}>
+        <Skeleton width="100%" height="100%" />
+      </div>
+    ) : (
+      <Skeleton width={LARGEUR_TUILE} height={hauteur} />
+    );
 
-        Le motif est celui du zoom dans `MediaViewer` : un bouton transparent qui épouse
-        son image, ce qui garde la cible clavier et l'étiquette accessible sans imposer la
-        géométrie d'un bouton à une photo.
-      */}
-      <button
+  /*
+    Un `<button>` nu, et non le `Button` d'Astryx : celui-ci est un contrôle de formulaire
+    à **hauteur fixe** (`--size-element-md`, 32 px) avec son rembourrage horizontal. Une
+    vignette de 240 px y était placée en enfant — l'image débordait d'un cadre huit fois
+    trop court, se posait par-dessus les messages voisins et l'alignement de toute la
+    colonne partait avec elle. C'était le défaut visible de l'envoi de photo.
+
+    Le motif est celui du zoom dans `MediaViewer` : un bouton transparent qui épouse son
+    image, ce qui garde la cible clavier et l'étiquette accessible sans imposer la
+    géométrie d'un bouton à une photo.
+  */
+  const tuile = (
+    <button
         type="button"
         aria-label={
           media.msgtype === "m.video"
@@ -152,13 +174,13 @@ export function MediaMessage({ media, telecharger, onOuvrir }: MediaMessageProps
         }
         onClick={onOuvrir}
         style={{
-          width: LARGEUR_TUILE,
-          height: hauteur,
-          maxWidth: "100%",
+          ...boite,
           padding: 0,
           border: "none",
           background: "none",
-          borderRadius: "var(--radius-container)",
+          // En grille, pas d'arrondi : c'est le pavage régulier qui fait la planche
+          // contact, et douze coins ronds par écran le dissolvent en confettis.
+          borderRadius: carre ? 0 : "var(--radius-container)",
           overflow: "hidden",
           cursor: onOuvrir ? "pointer" : "default",
           display: "block",
@@ -167,11 +189,32 @@ export function MediaMessage({ media, telecharger, onOuvrir }: MediaMessageProps
         <img
           src={visuel.url}
           alt={media.nom}
-          // `cover` sur une boîte au ratio de l'original ne rogne rien ; il ne rogne que
-          // le repli 4:3, là où l'événement ne dit pas ses dimensions.
+          // En timeline, `cover` sur une boîte au ratio de l'original ne rogne rien — il
+          // ne rogne que le repli 4:3, là où l'événement ne dit pas ses dimensions. En
+          // grille, il rogne au carré, et c'est **le but** : une planche contact se lit
+          // par son pavage, pas par le cadrage de chaque photo.
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
       </button>
+  );
+
+  // En grille, la cellule ne porte que la tuile : une légende sous une case romprait
+  // l'alignement des lignes, et la durée est déjà dans le nom accessible du bouton.
+  if (carre) return tuile;
+
+  return (
+    // La marge verticale est celle de la timeline **seule** : une photo y est un bloc
+    // entre deux lignes de texte, et sans elle son bord touche le nom au-dessus et l'heure
+    // en dessous. La grille, elle, ne la veut surtout pas — sa cellule est un pavé.
+    <div
+      style={{
+        display: "grid",
+        gap: "var(--spacing-1)",
+        justifyItems: "start",
+        margin: "var(--spacing-2) 0",
+      }}
+    >
+      {tuile}
 
       {media.msgtype === "m.video" && media.dureeMs !== undefined && (
         <Text type="supporting" color="secondary" hasTabularNumbers>

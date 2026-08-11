@@ -22,6 +22,28 @@ const ONGLETS: { cle: Onglet; libelle: string; vide: string }[] = [
   { cle: "fichiers", libelle: "Fichiers", vide: "Aucun fichier dans l'historique téléchargé." },
 ];
 
+/**
+ * REQ-UIX-17 — **la planche contact : trois carrés par ligne**, comme Instagram.
+ *
+ * Trois colonnes et pas un nombre calculé : c'est le compte qui garde une vignette
+ * reconnaissable sur la largeur d'un téléphone, et le même sur un écran large — où la
+ * galerie vit dans une colonne, pas dans toute la page. `1fr` et non une largeur fixe :
+ * les cellules se partagent ce qu'il y a, quel que soit l'écran.
+ *
+ * L'espace entre les cases est le plus petit de l'échelle (2 px). Une grille de photos se
+ * lit comme une surface continue ; l'écart n'est là que pour séparer deux images de teintes
+ * voisines, pas pour aérer.
+ */
+const GRILLE = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, 1fr)",
+  gap: "var(--spacing-0-5)",
+  listStyle: "none",
+} as const;
+
+/** Épinglés, liens et fichiers restent une liste : ce sont des lignes de texte. */
+const LISTE = { display: "grid", gap: "var(--spacing-2)", listStyle: "none" } as const;
+
 export interface ConversationCollectionsProps {
   /** L'historique **déjà téléchargé**, tel que le paquet le rend. */
   evenements: EvenementLu[];
@@ -87,7 +109,7 @@ export function ConversationCollections({
       {courant.length === 0 ? (
         <Placeholder titre={vide} />
       ) : (
-        <ul style={{ display: "grid", gap: "var(--spacing-2)", listStyle: "none" }}>
+        <ul style={onglet === "medias" ? GRILLE : LISTE}>
           {courant.map((evenement, rang) => {
             const media = mediaDe(evenement);
             return (
@@ -96,6 +118,7 @@ export function ConversationCollections({
                   <MediaMessage
                     media={media}
                     telecharger={telecharger}
+                    carre={onglet === "medias"}
                     onOuvrir={onglet === "medias" ? () => onOuvrirMedia?.(rang) : undefined}
                   />
                 ) : (
