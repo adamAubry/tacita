@@ -61,6 +61,8 @@ export {
 } from "./social";
 export type { Profile } from "./social";
 
+export { imagesParDefaut, poserImagesParDefaut, TAILLE_IDENTITE } from "./identite";
+
 export { EVERYONE, mentionCandidates, parseMentions, ROOM_MENTION } from "./mentions";
 export type { MentionCandidate, MentionContent } from "./mentions";
 

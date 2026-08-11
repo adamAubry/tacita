@@ -6,6 +6,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@dicebear/core": "10.4.0",
+    "@dicebear/styles": "10.4.0",
     "@tacita/client-core": "workspace:*",
     "matrix-js-sdk": "42.0.0"
   },

@@ -8,6 +8,7 @@ import {
 } from "@tacita/client-core";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
+import { poserIdentiteParDefaut } from "../../lib/identite-par-defaut";
 import { etatDe, retirerJetonDeLUrl, urlConnexion, type EtatSession } from "../../lib/session";
 
 interface Contexte {
@@ -108,12 +109,30 @@ export function SessionProvider({ children, homeserverUrl, rediriger }: SessionP
   }, [etat, versOidc]);
 
   const recuperationConfirmee = useCallback(() => {
-    setEtat((precedent) =>
-      precedent.phase === "recuperation-requise"
-        ? { phase: "prete", session: precedent.session }
-        : precedent,
-    );
-  }, []);
+    if (etat.phase !== "recuperation-requise") return;
+
+    /*
+     * REQ-MSG-22 — **le seul endroit du produit où « le compte vient d'être créé » est
+     * une information disponible.** `mode` vaut `creation` quand le compte n'a aucune
+     * identité cross-signing, c'est-à-dire à la toute première ouverture et à ce
+     * moment-là seulement ; toute reconnexion passe par `deverrouillage`. Poser les
+     * images ailleurs — au premier /sync, à l'ouverture du profil — aurait demandé un
+     * marqueur local à maintenir, alors que la porte le sait déjà.
+     *
+     * Sans attendre, et sans bruit si ça échoue : l'étape qui vient de se terminer est
+     * celle du chiffrement, et rien ne justifie de retenir l'entrée dans l'app pour deux
+     * images décoratives. `poserImagesParDefaut` est sans effet au second appel, ce qui
+     * rend ce départ sans garde sûr. Rien n'est journalisé — un échec de téléversement
+     * porte l'URL d'un média (interdit n°8).
+     *
+     * ponytail: pas de reprise si le réseau tombe pile ici ; le compte reste sur ses
+     * initiales jusqu'à ce qu'il choisisse une photo. Ajouter une reprise le jour où
+     * l'écran de profil montre que c'est arrivé pour de vrai.
+     */
+    if (etat.mode === "creation") void poserIdentiteParDefaut(etat.session).catch(() => {});
+
+    setEtat({ phase: "prete", session: etat.session });
+  }, [etat]);
 
   const deconnecter = useCallback(
     async (session: Session) => {

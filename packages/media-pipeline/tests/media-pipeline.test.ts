@@ -445,10 +445,13 @@ describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel
     expect(env.resizeImage).toHaveBeenCalledWith(expect.anything(), PROFILES[detectProfile(env.connection)].image);
   });
 
-  it("n'a qu'un seul site d'appel dans tout le dépôt", () => {
+  it("n'a que ses deux sites d'appel nommés dans tout le dépôt", () => {
     // La condition qui rend REQ-MED-11 acceptable. « Tout ce qui sort du pipeline est
-    // chiffré, sauf l'unique chemin nommé public » ne vaut que tant qu'« unique » est
-    // vérifié par une machine — une consigne de revue se contourne par distraction.
+    // chiffré, sauf le chemin nommé public » ne vaut que tant que ses appelants sont
+    // comptés par une machine — une consigne de revue se contourne par distraction.
+    //
+    // Deux depuis le 11/08/2026, et l'assertion reste une **égalité** : ce qui compte
+    // n'est pas le nombre mais la liste, chaque entrée ayant été relue une fois.
     const racine = new URL("../../../", import.meta.url).pathname;
     const ignores = new Set(["node_modules", ".next", ".git", "dist", "tsconfig.tsbuildinfo"]);
     const appelants: string[] = [];
@@ -469,12 +472,16 @@ describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel
     };
     parcourir(racine.replace(/\/$/, ""));
 
-    // Le câblage du profil (M-G) et lui seul. Pas `ProfilMoi.tsx` : le composant reçoit
-    // `onPhoto` injecté, il ne connaît ni `Session` ni le pipeline. C'est ce découplage
-    // qui fait qu'il n'existe qu'un endroit à surveiller.
+    // Le câblage du profil (M-G) et celui des images par défaut (REQ-MSG-22), et rien
+    // d'autre. Pas `ProfilMoi.tsx` ni `identite.ts` du paquet messagerie : l'un reçoit
+    // `onPhoto` injecté, l'autre reçoit `televerser` — ils ne connaissent ni `Session`
+    // ni le pipeline. C'est ce découplage qui garde la liste courte.
     const produit = appelants.filter(
       (chemin) => !chemin.includes("/tests/") && !chemin.endsWith("packages/media-pipeline/src/index.ts"),
     );
-    expect(produit).toEqual(["apps/web/components/profil/EcranProfil.tsx"]);
+    expect(produit.sort()).toEqual([
+      "apps/web/components/profil/EcranProfil.tsx",
+      "apps/web/lib/identite-par-defaut.ts",
+    ]);
   });
 });
