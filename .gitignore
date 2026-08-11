@@ -22,3 +22,7 @@ e2e/
 
 # Runbook de lancement local — meme regime que e2e/ : machine-dependant, hors depot.
 LAUNCH_README.md
+
+# Runbook sysadmin (pics memoire, dimensionnement WSL) — chiffres mesures sur une
+# machine precise, faux ailleurs. Meme regime que LAUNCH_README.md.
+OPS_README.md
