@@ -9,6 +9,7 @@ import {
   edit,
   getPinnedEvents,
   memberCount,
+  members,
   mentionCandidates,
   messages as listerMessages,
   messageText,
@@ -35,7 +36,7 @@ import { lireFondEcran } from "../../lib/preferences";
 import { videoTranscodable } from "../../lib/transcode-video";
 import { BandeauAppel } from "../appels/BandeauAppel";
 import { LayoutHeader } from "../foundation/LayoutHeader";
-import { IconeAppel, IconeVideo } from "../foundation/icons";
+import { IconeAppel, IconeCamera, IconeVideo } from "../foundation/icons";
 import { Button, Icon } from "../foundation/primitives";
 import { MediaPicker } from "../media/MediaPicker";
 import { MediaViewer } from "../media/MediaViewer";
@@ -170,6 +171,23 @@ export function Conversation({ roomId }: { roomId: string }) {
     [candidats],
   );
 
+  /**
+   * La photo d'un auteur. Elle vient de son **appartenance au salon** — c'est là que
+   * Matrix la porte — et non d'un `profileOf` par personne : ce serait un aller-retour
+   * réseau par ligne de timeline pour une image que `/sync` a déjà livrée.
+   *
+   * Sans elle, `ConversationAvatar` ne recevait aucun `mxc` et ne rendait que des
+   * initiales : la photo était posée, synchronisée, et jamais affichée.
+   */
+  const membres = useMemo(
+    () => (session ? members(session, roomId) : []),
+    [session, roomId, version],
+  );
+  const avatarDe = useCallback(
+    (userId: string) => membres.find((membre) => membre.userId === userId)?.getMxcAvatarUrl(),
+    [membres],
+  );
+
   const salon = useMemo(
     () => (session ? conversations(session).find((c) => c.roomId === roomId) : undefined),
     [session, roomId, version],
@@ -186,6 +204,7 @@ export function Conversation({ roomId }: { roomId: string }) {
         eventId: evenement.getId(),
         auteur,
         nom: nomDe(auteur),
+        avatar: avatarDe(auteur),
         texte: messageText(evenement),
         horodatage: evenement.getTs(),
         moi: auteur === moi,
@@ -198,7 +217,7 @@ export function Conversation({ roomId }: { roomId: string }) {
     });
 
     const attente = (outbox?.pending(roomId) ?? []).map((entree) =>
-      depuisFile(entree, nomDe(moi), moi),
+      depuisFile(entree, nomDe(moi), moi, avatarDe(moi)),
     );
     // REQ-UI-06 — les entrées en attente vont **à la fin**, sans exception : elles n'ont
     // pas encore d'ordre dans /sync, et leur donner une place au milieu supposerait un
@@ -208,7 +227,7 @@ export function Conversation({ roomId }: { roomId: string }) {
     // `version` est la dépendance qui compte : les paquets rendent des vues, et c'est
     // l'abonnement qui dit qu'elles ont changé.
     return [...timeline, ...attente];
-  }, [session, roomId, outbox, nomDe, version]);
+  }, [session, roomId, outbox, nomDe, avatarDe, version]);
 
   // REQ-UI-13 — l'accusé se rend sur le dernier message envoyé, et sur lui seul.
   const dernierEnvoye = [...messages].reverse().find((message) => message.moi && message.eventId);
@@ -295,104 +314,119 @@ export function Conversation({ roomId }: { roomId: string }) {
 
   return (
     <>
-      <LayoutHeader
-        titre={salon?.name ?? "Conversation"}
-        fin={
-          <div style={{ display: "flex", gap: "var(--spacing-1)" }}>
-            {/* M-D fournit l'emplacement, M-I le comportement (REQ-UI-19) : les deux
-                boutons routent vers l'écran d'appel, qui embarque Element Call. Rien
-                n'est composé ici (interdit n°7), et **aucun des deux n'est désactivé**
-                sans focus RTC — la cause s'affiche dans l'écran (REQ-CAL-02). */}
-            <Button
-              label="Appel audio"
-              variant="ghost"
-              isIconOnly
-              icon={IconeAppel}
-              onClick={() => router.push(routeAppel(roomId))}
-            />
-            <Button
-              label="Appel vidéo"
-              variant="ghost"
-              isIconOnly
-              icon={IconeVideo}
-              onClick={() => router.push(routeAppel(roomId, true))}
-            />
-            {/* Le point d'entrée du layout Conversation info (M-H) : sans lui, l'écran
-                des options n'est atteignable par aucun geste. */}
-            <Button
-              label="Informations"
-              variant="ghost"
-              isIconOnly
-              icon={<Icon icon="info" />}
-              onClick={() => router.push(routeInfos(roomId))}
-            />
-          </div>
-        }
-      />
+      {/* La colonne de l'écran, et la seule raison pour laquelle la barre d'écriture est
+          en bas : header et composer aux deux bouts, timeline au milieu — c'est elle qui
+          défile. Sans hauteur fixée, tout suit le flux du document et la barre se pose
+          sous le dernier message, donc au milieu d'une conversation qui commence.
 
-      {/* REQ-UI-19 — « appel en cours — rejoindre », dans le salon concerné. */}
-      <BandeauAppel roomId={roomId} />
-
-      <Timeline
-        messages={messages}
-        chargement={!pret}
-        ancre={ancre ?? undefined}
-        fondEcran={fondEcran}
-        starter={
-          <ConversationStarter
-            nom={salon?.name ?? ""}
-            sousTitre={
-              salon?.direct
-                ? (salon.peerId ?? "")
-                : `${session ? memberCount(session, roomId) : 0} membres`
-            }
-            direct={salon?.direct ?? false}
-          />
-        }
-        reactions={(message) =>
-          session && message.eventId ? listerReactions(session, roomId, message.eventId) : []
-        }
-        recu={recu}
-        onRepondre={(message) => setIntention({ quoi: "repondre", message })}
-        onHold={setHoldSur}
-        onReagir={reagir}
-        onRenvoyer={(message) => void outbox?.retry(message.cle)}
-        onAbandonner={(message) => void outbox?.remove(message.cle)}
-        telecharger={telecharger}
-        onOuvrirMedia={(message) => {
-          const rang = medias.findIndex((media) => media === message.media);
-          if (rang >= 0) setViewer(rang);
-        }}
-      />
-
-      <Composer
-        // Remonter le composer sur changement d'intention est ce qui remplit le champ
-        // avec le texte à modifier : un état contrôlé par le parent ferait un aller-retour
-        // à chaque frappe pour un besoin qui n'existe qu'au changement.
-        key={intention?.quoi === "modifier" ? intention.message.cle : "nouveau"}
-        mentions={candidats}
-        texteInitial={intention?.quoi === "modifier" ? intention.message.texte : ""}
-        contexte={
-          intention && {
-            libelle: intention.quoi === "repondre" ? `Réponse à ${intention.message.nom}` : "Modification",
-            extrait: texteAffiche(intention.message.texte),
-            onAnnuler: () => setIntention(undefined),
+          `100dvh` et non `100vh` : la barre d'URL rétractable des mobiles (même raison
+          qu'en M-B, `RecoveryGate`). */}
+      <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
+        <LayoutHeader
+          titre={salon?.name ?? "Conversation"}
+          fin={
+            <div style={{ display: "flex", gap: "var(--spacing-1)" }}>
+              {/* M-D fournit l'emplacement, M-I le comportement (REQ-UI-19) : les deux
+                  boutons routent vers l'écran d'appel, qui embarque Element Call. Rien
+                  n'est composé ici (interdit n°7), et **aucun des deux n'est désactivé**
+                  sans focus RTC — la cause s'affiche dans l'écran (REQ-CAL-02). */}
+              <Button
+                label="Appel audio"
+                variant="ghost"
+                isIconOnly
+                icon={IconeAppel}
+                onClick={() => router.push(routeAppel(roomId))}
+              />
+              <Button
+                label="Appel vidéo"
+                variant="ghost"
+                isIconOnly
+                icon={IconeVideo}
+                onClick={() => router.push(routeAppel(roomId, true))}
+              />
+              {/* Le point d'entrée du layout Conversation info (M-H) : sans lui, l'écran
+                  des options n'est atteignable par aucun geste. */}
+              <Button
+                label="Informations"
+                variant="ghost"
+                isIconOnly
+                icon={<Icon icon="info" />}
+                onClick={() => router.push(routeInfos(roomId))}
+              />
+            </div>
           }
-        }
-        onEnvoyer={envoyer}
-        onFrappe={() => typing.current?.keystroke(roomId)}
-        ecrivent={session ? typingUsers(session, roomId).map(nomDe) : []}
-        actions={
-          <>
+        />
+
+        {/* REQ-UI-19 — « appel en cours — rejoindre », dans le salon concerné. */}
+        <BandeauAppel roomId={roomId} />
+
+        <Timeline
+          messages={messages}
+          chargement={!pret}
+          ancre={ancre ?? undefined}
+          fondEcran={fondEcran}
+          starter={
+            <ConversationStarter
+              nom={salon?.name ?? ""}
+              sousTitre={
+                salon?.direct
+                  ? (salon.peerId ?? "")
+                  : `${session ? memberCount(session, roomId) : 0} membres`
+              }
+              direct={salon?.direct ?? false}
+            />
+          }
+          reactions={(message) =>
+            session && message.eventId ? listerReactions(session, roomId, message.eventId) : []
+          }
+          recu={recu}
+          onRepondre={(message) => setIntention({ quoi: "repondre", message })}
+          onHold={setHoldSur}
+          onReagir={reagir}
+          onRenvoyer={(message) => void outbox?.retry(message.cle)}
+          onAbandonner={(message) => void outbox?.remove(message.cle)}
+          telecharger={telecharger}
+          onOuvrirMedia={(message) => {
+            const rang = medias.findIndex((media) => media === message.media);
+            if (rang >= 0) setViewer(rang);
+          }}
+        />
+
+        <Composer
+          // Remonter le composer sur changement d'intention est ce qui remplit le champ
+          // avec le texte à modifier : un état contrôlé par le parent ferait un aller-retour
+          // à chaque frappe pour un besoin qui n'existe qu'au changement.
+          key={intention?.quoi === "modifier" ? intention.message.cle : "nouveau"}
+          mentions={candidats}
+          texteInitial={intention?.quoi === "modifier" ? intention.message.texte : ""}
+          contexte={
+            intention && {
+              libelle: intention.quoi === "repondre" ? `Réponse à ${intention.message.nom}` : "Modification",
+              extrait: texteAffiche(intention.message.texte),
+              onAnnuler: () => setIntention(undefined),
+            }
+          }
+          onEnvoyer={envoyer}
+          onFrappe={() => typing.current?.keystroke(roomId)}
+          ecrivent={session ? typingUsers(session, roomId).map(nomDe) : []}
+          actions={
             <MediaPicker
               onFichiers={(fichiers) => void joindre(fichiers)}
               enCours={envoiMedia}
               videoAutorisee={videoAutorisee}
             />
-            <Button label="Prendre une photo" variant="ghost" onClick={() => setCapture(true)} />
-          </>
-        }
-      />
+          }
+          actionsEnvoi={
+            <Button
+              label="Prendre une photo"
+              variant="ghost"
+              isIconOnly
+              icon={IconeCamera}
+              onClick={() => setCapture(true)}
+            />
+          }
+        />
+      </div>
 
       <PhotoCapture
         ouvert={capture}

@@ -55,6 +55,7 @@ contrat gagne.
 | E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Tranché le 07/08/2026** — voie A : `knock`. Le porteur frappe, un membre confirme | `specs/05-messaging.md` — **REQ-MSG-20** (nouvelle) ; `specs/12-invite-tokens.md` — REQ-INV-06/13/15/16 amendées |
 | E-15 | La bannière de profil n'existe ni dans Matrix ni dans le projet, et le bandeau flottant qu'elle appelle demande du verre — que DESIGN.md interdit | **Tranché le 10/08/2026** — bannière en champ étendu MSC4133 (aucun changement d'infra : vérifié contre Synapse v1.155.0) ; exception glass **nommée et bornée** au seul bandeau du profil, ratifiée par le PM | `specs/05-messaging.md` — **REQ-MSG-21** (nouvelle) ; `specs/ui/M-G.md` — **REQ-UIX-41** (nouvelle), REQ-UIX-23 amendée ; `specs/11-ui-shard.md` — REQ-UI-20 amendée ; `specs/08-media-pipeline.md` — REQ-MED-11 étendue (lecture) ; **DESIGN.md** — Overview §4, Colors (`glass`), Components, Don'ts. **Interdit n°11 inchangé : un seul site d'appel du chemin public** |
 | E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
+| E-16 | `ChatComposer` d'Astryx est un composer d'assistant : son corps est une colonne dont la rangée d'actions est rendue sous le champ, inconditionnellement. Une barre de messagerie est une rangée | **Ouverte le 11/08/2026** — le shard compose la rangée lui-même à partir de `ChatComposerInput` (mentions, Entrée, IME, collage) et de `Button` ; aucune primitive recodée, `ChatComposer` n'est plus réexporté | **DESIGN.md** — Components (barre d'écriture) ; `specs/ui/M-D.md` — REQ-UIX-15 à amender (le contrat dit « sur `Chat` »). Aucune exigence fonctionnelle modifiée |
 
 ---
 
@@ -727,6 +728,62 @@ et `header`. La marche à suivre au prochain bump est dans `infra/rtc/README.md`
 du registre, la relecture est faite sur la source de la v0.23.0, mais la pile n'a pas été
 déployée — le certificat à SAN `call.<domaine>` et le rendu du widget se vérifient sur une
 pile réelle.
+
+---
+
+## E-16 — `ChatComposer` a la forme d'un composer d'assistant, pas d'une barre de messagerie — **ouverte**
+
+**Constaté le 11/08/2026**, sur signalement du concepteur : la barre d'écriture ne
+ressemblait pas à celle de WhatsApp ou de Discord.
+
+**Le fait, lu dans la source d'`@astryxdesign/core@0.2.0`.** Le corps de `ChatComposer`
+est un `flex-direction: column` de trois enfants — `[en-tête ?] [champ] [rangée
+d'actions]` — et la rangée d'actions est rendue **inconditionnellement**, bouton d'envoi
+compris (`sendButton ?? <ChatSendButton />`). Ses deux emplacements d'actions,
+`footerActions` et `sendActions`, sont donc à gauche et à droite d'une **seconde ligne,
+sous le champ**. Aucun prop ne les remonte : `density` ne change que le rembourrage,
+`xstyle` n'atteint que le corps et ne peut pas faire grandir l'enveloppe du champ, et
+`className`/`style` n'atteignent que la racine. C'est la silhouette d'un composer
+d'assistant — ChatGPT, Claude —, où l'on soumet une requête à une machine.
+
+**Pourquoi ce n'est pas un détail.** Dans une messagerie on écrit dix fois plus souvent
+qu'on ne joint : le champ doit prendre toute la largeur restante et les gestes rares se
+réduisent à des cibles carrées à ses deux bouts. Une seconde ligne d'icônes dépense de la
+hauteur — la ressource rare au-dessus d'un clavier logiciel — pour des actions
+secondaires, et éloigne le bouton d'envoi du pouce. Toutes les messageries ont convergé
+sur la même rangée ; s'en écarter, c'est faire réapprendre une forme connue.
+
+**Ce qui a été fait, sans attendre l'arbitrage.** Le shard compose la rangée lui-même :
+
+- `ChatComposerInput` est **repris tel quel** — c'est lui qui porte tout ce qui est
+  difficile (menu de mentions REQ-UI-12, Entrée-pour-envoyer, garde de composition IME,
+  collage, jetons, `maxRows`). Il lit le contexte du shell en **optionnel** et expose un
+  prop pour chacune de ses valeurs : hors du shell, il fonctionne pleinement.
+- `Button` d'Astryx pour les quatre boutons, dont l'envoi.
+- Ce que le shard écrit à la place du shell : une rangée flex et le prédicat `canSend`.
+
+**Aucune primitive n'est recodée** — c'est de la composition avec les pièces publiées, et
+`ChatComposer` n'est plus réexporté par `primitives.ts` pour que l'écart soit visible au
+prochain qui cherchera un composer.
+
+**Trouvaille annexe, corrigée au passage.** `ChatSendButton` tire son libellé du
+dictionnaire d'Astryx ; `locales/fr-FR.json` **n'a pas** la clé `@astryx.chatSendButton.send`,
+et le composant repose son propre `aria-label` *après* les props reçues — le libellé n'est
+donc pas remplaçable. Le bouton d'envoi s'annonçait « Send » dans une interface française,
+et le défaut était invisible tant qu'il venait implicitement du shell. C'est un cas de la
+règle 7 : une valeur posée à une jonction que personne ne relit.
+
+**Ce qu'on demande au PM.** REQ-UIX-15 (M-D) et DESIGN.md § Components nomment `Chat`
+comme primitive imposée du composer. Deux lectures possibles, et c'est l'arbitrage :
+
+1. la primitive imposée est le **champ** (`ChatComposerInput`), la mise en rangée revient
+   au shard — le contrat se reformule, le code reste ;
+2. la primitive imposée est le **shell**, et alors le produit accepte la forme d'un
+   composer d'assistant — le code revient en arrière.
+
+**À revérifier au prochain bump d'Astryx**, comme les digests d'images : si une version
+ultérieure expose une disposition en rangée, ou rend la rangée d'actions conditionnelle,
+cette escalade se referme d'elle-même.
 
 ---
 

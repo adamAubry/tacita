@@ -81,6 +81,10 @@ export function HomeHeader({
     >
       <SegmentedControl
         label="Conversations ou ajout d'amis"
+        // DESIGN.md — un sélecteur occupe toute la largeur de son conteneur et ses
+        // options se la partagent également. `hug`, le défaut d'Astryx, laissait les
+        // deux boutons collés à gauche dans un cadre trop grand pour eux.
+        layout="fill"
         value="conversations"
         onChange={(valeur) => {
           if (valeur === "amis") onAjouterDesAmis();

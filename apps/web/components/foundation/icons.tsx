@@ -63,6 +63,29 @@ export const IconePlus: ReactNode = (
   </svg>
 );
 
+/**
+ * Les deux icônes de la barre d'écriture (M-E, M-D). Astryx n'a ni appareil photo ni
+ * avion — sa liste de noms reste un type fermé, même motif qu'`IconeVideo` plus haut.
+ *
+ * L'avion plutôt que la flèche vers le haut d'Astryx (`arrowUp`) : la flèche est le
+ * signe des assistants, où l'on « soumet » une requête. Ici on **envoie** un message à
+ * quelqu'un, et c'est l'avion que toutes les messageries ont appris à leurs
+ * utilisateurs.
+ */
+export const IconeCamera: ReactNode = (
+  <svg {...trait}>
+    <path d="M3.5 8.5h3l1.5-2h6l1.5 2h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1" />
+    <circle cx="12" cy="13" r="3.25" />
+  </svg>
+);
+
+export const IconeEnvoyer: ReactNode = (
+  <svg {...trait}>
+    <path d="M20 12 4.5 5.5l2.5 6.5-2.5 6.5z" />
+    <path d="M7 12h13" />
+  </svg>
+);
+
 export const IconeProfil: ReactNode = (
   <svg {...trait}>
     <circle cx="12" cy="8" r="3.75" />

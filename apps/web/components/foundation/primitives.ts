@@ -16,7 +16,10 @@ export { Badge } from "@astryxdesign/core/Badge";
 export { Banner } from "@astryxdesign/core/Banner";
 export { Button } from "@astryxdesign/core/Button";
 export { Card } from "@astryxdesign/core/Card";
-export { ChatComposer, ChatComposerInput } from "@astryxdesign/core/Chat";
+// `ChatComposer` n'est pas réexporté : son shell est une colonne `[champ] [actions]`,
+// la forme d'un composer d'assistant, et la barre d'écriture d'une messagerie est une
+// rangée (escalade E-16). Seul le champ, lui, est repris tel quel.
+export { ChatComposerInput } from "@astryxdesign/core/Chat";
 export { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
 export { ClickableCard } from "@astryxdesign/core/ClickableCard";
 export { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";

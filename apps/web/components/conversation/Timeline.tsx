@@ -95,7 +95,17 @@ export function Timeline({
       <div
         aria-label="Chargement des messages"
         aria-busy="true"
-        style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}
+        style={{
+          // Même place dans la colonne que la timeline chargée : sinon le composer
+          // remonte au moment où les squelettes cèdent la place aux messages.
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          display: "grid",
+          alignContent: "start",
+          gap: "var(--spacing-3)",
+          padding: "var(--spacing-3)",
+        }}
       >
         {[0, 1, 2, 3].map((rang) => (
           <Skeleton key={rang} height={40} />
@@ -110,6 +120,13 @@ export function Timeline({
       aria-label="Messages"
       aria-live="polite"
       style={{
+        // La timeline **est** la zone défilante de l'écran : c'est ce qui tient le
+        // composer au bas de la fenêtre. `minHeight: 0` parce qu'un enfant de flex refuse
+        // par défaut de descendre sous la taille de son contenu — sans lui, la colonne
+        // s'allonge et c'est la page entière qui défile, composer compris.
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
         paddingBottom: "var(--spacing-3)",
         // Le voile est **au-dessus** de l'image et sous le texte : c'est lui qui rend les
         // messages lisibles quel que soit le fond choisi (DESIGN.md, token `scrim`). Sans

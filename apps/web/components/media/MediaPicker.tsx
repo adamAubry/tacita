@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { IconePlus } from "../foundation/icons";
 import { Button, Text } from "../foundation/primitives";
 
 const SANS_VIDEO = "image/*,application/pdf,application/zip,text/*";
@@ -41,8 +42,27 @@ export function MediaPicker({
   const champ = useRef<HTMLInputElement>(null);
   const [refus, setRefus] = useState<string>();
 
+  /**
+   * Les deux messages flottent **au-dessus** de la rangée du composer, jamais dedans.
+   *
+   * Dedans, « Envoi en cours… » et son bouton d'annulation prenaient la moitié d'un écran
+   * de téléphone et écrasaient le champ de saisie le temps d'un téléversement — la barre
+   * changeait de forme pendant qu'on écrit. Hors flux, la rangée garde la largeur du seul
+   * bouton, et le message paraît là où l'indicateur de frappe paraît déjà.
+   */
+  const messageFlottant = {
+    position: "absolute",
+    bottom: "100%",
+    insetInlineStart: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing-2)",
+    whiteSpace: "nowrap",
+    paddingBottom: "var(--spacing-1)",
+  } as const;
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
+    <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
       <input
         ref={champ}
         type="file"
@@ -69,21 +89,35 @@ export function MediaPicker({
         }}
       />
 
-      {enCours ? (
-        <>
+      {/* Une icône seule, comme le « + » de WhatsApp et de Discord : dans une barre où
+          l'on écrit dix fois plus souvent qu'on ne joint, un libellé coûterait la largeur
+          qui revient au texte. Le bouton **reste en place** pendant l'envoi — il tourne au
+          lieu de disparaître : une rangée dont un élément s'efface se réorganise sous le
+          doigt, et c'est le champ voisin qui bouge. */}
+      <Button
+        label="Joindre"
+        variant="ghost"
+        isIconOnly
+        icon={IconePlus}
+        isLoading={enCours}
+        onClick={() => champ.current?.click()}
+      />
+
+      {enCours && (
+        <div style={messageFlottant}>
           <Text type="supporting" color="secondary">
             Envoi en cours…
           </Text>
           {onAnnuler && <Button label="Annuler l'envoi" variant="ghost" onClick={onAnnuler} />}
-        </>
-      ) : (
-        <Button label="Joindre" variant="ghost" onClick={() => champ.current?.click()} />
+        </div>
       )}
 
       {refus && (
-        <Text type="supporting" color="secondary">
-          {refus}
-        </Text>
+        <div style={messageFlottant}>
+          <Text type="supporting" color="secondary">
+            {refus}
+          </Text>
+        </div>
       )}
     </div>
   );

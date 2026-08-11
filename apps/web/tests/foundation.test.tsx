@@ -287,6 +287,30 @@ describe("REQ-UIX-05 — primitives partagées", () => {
     expect(choisir).toHaveBeenCalledWith("medias");
   });
 
+  /**
+   * DESIGN.md — un sélecteur occupe la largeur de son conteneur, et ses options se la
+   * partagent également. Le défaut d'Astryx est `hug` : chaque option se contente de son
+   * texte, et les trois sélecteurs de l'app rendaient deux ou quatre boutons serrés à
+   * gauche d'un cadre trop large pour eux — la même incohérence à trois écrans.
+   *
+   * Structurel, et non par écran : jsdom ne calcule aucune largeur (il ne rend ni flex ni
+   * cascade), et c'est un oubli qui se refait au prochain `<SegmentedControl>` — d'autant
+   * que le prop manquant est *silencieux*, il rend simplement moins bien.
+   */
+  it("aucun sélecteur ne laisse ses options se serrer à gauche", () => {
+    const fautifs = sourcesLivrees()
+      .filter(({ code }) => /<SegmentedControl[\s>]/.test(sansCommentaires(code)))
+      .flatMap(({ chemin, code }) =>
+        // `(?<!=)>` : la flèche des callbacks (`onChange={() => …}`) porte un `>` qui
+        // couperait la capture avant les attributs suivants (même motif que `<Sheet>`).
+        [...sansCommentaires(code).matchAll(/<SegmentedControl\b([^]*?)(?<!=)>/g)]
+          .filter(([, attributs]) => !/\blayout="fill"/.test(attributs ?? ""))
+          .map(() => chemin.replace(RACINE, "")),
+      );
+
+    expect(fautifs).toEqual([]);
+  });
+
   it("la liste de boutons rend les actions et les déclenche", () => {
     const ouvrir = vi.fn();
     render(

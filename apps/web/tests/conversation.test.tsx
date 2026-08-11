@@ -8,6 +8,7 @@ import { HoldMenu } from "../components/conversation/HoldMenu";
 import { MessageObject } from "../components/conversation/MessageObject";
 import { Timeline } from "../components/conversation/Timeline";
 import {
+  depuisFile,
   FENETRE_GROUPE_MS,
   nouveauJour,
   shouldShowHeader,
@@ -15,6 +16,7 @@ import {
   type MessageAffiche,
 } from "../components/conversation/message";
 import { SEUIL_GLISSEMENT, ZONE_MORTE_BORD } from "../lib/gestes";
+import { lire } from "./sources";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/c/!salon",
@@ -105,6 +107,40 @@ describe("REQ-UIX-12 — regroupement Discord : la table de cas de shouldShowHea
     cleanup();
     rendreMessage({ entete: false });
     expect(screen.queryByText("adam")).toBeNull();
+  });
+
+  /**
+   * La photo de l'auteur, de son appartenance au salon jusqu'à `ConversationAvatar`.
+   *
+   * Trois maillons, et le défaut était au dernier : la photo était posée, synchronisée,
+   * et l'en-tête appelait `ConversationAvatar` **sans `mxc`** — donc des initiales, pour
+   * tout le monde, toujours. Règle 7 : une valeur qu'aucun site de lecture ne relit est
+   * indétectable, et celle-ci l'a été jusqu'à ce qu'un œil humain la cherche.
+   *
+   * Le rendu de l'image, lui, n'est pas ici : il demande une session et un
+   * `fetch` authentifié (`useImageMxc`), que jsdom ne fournit pas. Ce qu'on tient, c'est
+   * la chaîne — et c'est elle qui avait cédé.
+   */
+  it("la photo de l'auteur va du salon à l'avatar, sans se perdre en route", () => {
+    const entree = {
+      txnId: "txn1",
+      roomId: "!salon:tacita.test",
+      content: { msgtype: "m.text", body: "coucou" },
+      queuedAt: LUNDI_10H,
+      nextAttemptAt: LUNDI_10H,
+      status: "queued" as const,
+      attempts: 0,
+    };
+    expect(depuisFile(entree, "adam", "@adam:tacita.test", "mxc://tacita.test/photo").avatar).toBe(
+      "mxc://tacita.test/photo",
+    );
+
+    // Les deux bouts de la jonction, à la source : le câblage lit l'appartenance au
+    // salon, l'en-tête la passe à la primitive. Que l'un des deux disparaisse, et la
+    // photo redevient invisible sans qu'aucun test de rendu ne s'en aperçoive.
+    expect(lire("components/conversation/Conversation.tsx")).toContain("avatar: avatarDe(auteur)");
+    expect(lire("components/conversation/Conversation.tsx")).toMatch(/getMxcAvatarUrl\(\)/);
+    expect(lire("components/conversation/MessageObject.tsx")).toContain("mxc={message.avatar}");
   });
 });
 
@@ -443,5 +479,73 @@ describe("REQ-UI-11 / REQ-UI-12 — typing en lecture, mentions à la saisie", (
     // REQ-MSG-10 : le corps porte le littéral que la push rule cherche ; l'utilisateur
     // a tapé `@everyone` et doit le relire tel quel.
     expect(texteAffiche("salut @room")).toBe("salut @everyone");
+  });
+});
+
+/**
+ * REQ-UIX-15 / REQ-UI-14 / REQ-UI-15 — la barre d'écriture, telle qu'on l'attend d'une
+ * messagerie : joindre à gauche, capture contre le bouton d'envoi, et la barre au bas de
+ * l'écran plutôt qu'accrochée au dernier message.
+ */
+describe("REQ-UIX-15 — la barre d'écriture : une seule rangée, et le bas de l'écran", () => {
+  /**
+   * Le cœur du composant : **quatre éléments sur une ligne, dans cet ordre**. Le défaut
+   * qu'il ferme n'était pas une absence — les boutons étaient bien là, et bien à gauche
+   * et à droite — mais une *forme* : les emplacements de `ChatComposer` les rangeaient
+   * sur une seconde ligne sous le champ, la silhouette d'un composer d'assistant. Un test
+   * de présence restait vert ; c'est l'ordre et le parent commun qui disent la rangée.
+   */
+  it("joindre, champ, photo, envoyer — une ligne, dans cet ordre", () => {
+    render(
+      <Composer
+        mentions={[]}
+        onEnvoyer={vi.fn()}
+        onFrappe={vi.fn()}
+        actions={<button type="button">joindre</button>}
+        actionsEnvoi={<button type="button">photo</button>}
+      />,
+    );
+
+    const joindre = screen.getByText("joindre");
+    const rangee = joindre.parentElement!;
+    expect(rangee.style.display).toBe("flex");
+    // `flex-end` et non `center` : les boutons suivent la dernière ligne d'un champ qui
+    // a grandi, au lieu de flotter au milieu du pavé de texte.
+    expect(rangee.style.alignItems).toBe("flex-end");
+
+    const enfants = [...rangee.children];
+    expect(enfants).toHaveLength(4);
+    expect(enfants[0]).toBe(joindre);
+    // Le champ est le seul à porter une enveloppe : c'est elle qui tient la surface et
+    // le `flex: 1` qui lui donne toute la largeur restante.
+    expect(enfants[1]!.contains(screen.getAllByLabelText("Message")[0]!)).toBe(true);
+    expect((enfants[1] as HTMLElement).style.flexGrow).toBe("1");
+    expect(enfants[2]).toBe(screen.getByText("photo"));
+    expect(enfants[3]).toBe(screen.getByRole("button", { name: "Envoyer" }));
+  });
+
+  it("l'envoi est refusé tant qu'il n'y a rien à envoyer", () => {
+    render(<Composer mentions={[]} onEnvoyer={vi.fn()} onFrappe={vi.fn()} />);
+    // `canSend` venait du shell d'Astryx ; il est recalculé ici, et c'est exactement le
+    // genre de règle qu'on croit acquise et qui repart à zéro quand le shell s'en va.
+    expect(screen.getByRole("button", { name: "Envoyer" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  /**
+   * jsdom ne calcule ni hauteur ni défilement : la colonne se lit à la source, comme les
+   * règles de la navbar. Ce que ce test tient, ce n'est pas la mise en page — c'est que
+   * la ligne qui la produit ne disparaisse pas sans que personne ne le voie.
+   */
+  it("l'écran est une colonne dont la timeline est la seule partie qui défile", () => {
+    const ecran = lire("components/conversation/Conversation.tsx");
+    expect(ecran).toContain('height: "100dvh"');
+    expect(ecran).toContain('flexDirection: "column"');
+
+    const timeline = lire("components/conversation/Timeline.tsx");
+    expect(timeline).toContain('overflowY: "auto"');
+    // Sans `minHeight: 0`, un enfant de flex refuse de descendre sous son contenu : la
+    // colonne s'allonge, la page entière défile, et la barre repart sous le dernier
+    // message — exactement le défaut qu'on corrige, avec l'`overflow` en place.
+    expect(timeline).toContain("minHeight: 0");
   });
 });

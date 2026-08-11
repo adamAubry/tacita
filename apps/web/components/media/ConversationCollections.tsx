@@ -58,6 +58,9 @@ export function ConversationCollections({
         // la section *est* les contenus. Deux étiquettes identiques rendent les deux
         // introuvables à l'assistance technique comme au test.
         label="Type de contenu"
+        // Même règle qu'à l'accueil et qu'au sélecteur Actions/Activity juste au-dessus
+        // de ce composant : les options se partagent la largeur, à parts égales.
+        layout="fill"
         value={onglet}
         onChange={(valeur) => setOnglet(valeur as Onglet)}
       >

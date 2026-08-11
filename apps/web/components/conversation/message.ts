@@ -15,6 +15,11 @@ export interface MessageAffiche {
   auteur: string;
   /** Nom d'affichage, ou l'identifiant à défaut. */
   nom: string;
+  /**
+   * `mxc://` de la photo de l'auteur, telle que son appartenance au salon la porte.
+   * Absente = les initiales, qui sont toujours vraies (`ConversationAvatar`).
+   */
+  avatar?: string;
   texte: string;
   horodatage: number;
   /** Absent = le message est dans la timeline ; présent = encore dans la file. */
@@ -32,12 +37,18 @@ export interface MessageAffiche {
 }
 
 /** Une entrée de file, rendue comme un message. Le contenu n'est jamais journalisé. */
-export function depuisFile(entree: OutboxEntry, nom: string, auteur: string): MessageAffiche {
+export function depuisFile(
+  entree: OutboxEntry,
+  nom: string,
+  auteur: string,
+  avatar?: string,
+): MessageAffiche {
   const body = entree.content.body;
   return {
     cle: entree.txnId,
     auteur,
     nom,
+    avatar,
     texte: typeof body === "string" ? body : "",
     horodatage: entree.queuedAt,
     envoi: entree.status,
