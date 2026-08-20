@@ -1,6 +1,6 @@
 import type { MediaEnvironment, Raster } from "@tacita/media-pipeline";
 
-import { transcoderVideo } from "./transcode-video";
+import type { DemandeTranscodage, ReponseTranscodage } from "./transcode-worker";
 
 /**
  * L'implémentation navigateur du `MediaEnvironment` que le pipeline (spec 08) attend
@@ -32,8 +32,8 @@ import { transcoderVideo } from "./transcode-video";
  * **dans le paquet** — jamais une dépendance d'`apps/web`, REQ-UI-02 restant close.
  */
 export class TranscodageIndisponible extends Error {
-  constructor(quoi: "video" | "audio") {
-    super(`transcodage ${quoi} indisponible dans le shard : voir ESCALATIONS E-10`);
+  constructor(quoi: "video" | "audio", detail?: string) {
+    super(detail ?? `transcodage ${quoi} indisponible dans le shard : voir ESCALATIONS E-10`);
     this.name = "TranscodageIndisponible";
   }
 }
@@ -125,9 +125,27 @@ export function environnementMedia(): MediaEnvironment {
       }
     },
 
-    // REQ-MED-04 — décodage par la balise `video`, réencodage par `WebCodecs`,
+    // REQ-MED-04 — démuxage par le paquet, décodage et réencodage par `WebCodecs`,
     // empaquetage par le muxeur du paquet (E-10). Le shard n'écrit aucun format.
-    transcodeVideo: (blob, cibles) => transcoderVideo(blob, cibles),
+    //
+    // **Dans un worker**, comme la spec 08 l'exige depuis l'origine : un transcodage tient
+    // le processeur pendant des secondes, et sur le thread de rendu c'est la timeline qui
+    // se fige. Un worker par transcodage, terminé aussitôt après — pas de pool à tenir
+    // pour une opération que l'utilisateur déclenche une fois de temps en temps.
+    transcodeVideo: (blob, cibles) =>
+      new Promise((resoudre, rejeter) => {
+        const worker = new Worker(new URL("./transcode-worker.ts", import.meta.url));
+        worker.onmessage = ({ data }: MessageEvent<ReponseTranscodage>) => {
+          worker.terminate();
+          if (data.ok) resoudre({ blob: data.blob, width: data.width, height: data.height, durationMs: data.durationMs });
+          else rejeter(new TranscodageIndisponible("video", data.message));
+        };
+        worker.onerror = () => {
+          worker.terminate();
+          rejeter(new TranscodageIndisponible("video"));
+        };
+        worker.postMessage({ blob, cibles } satisfies DemandeTranscodage);
+      }),
 
     transcodeAudio() {
       return Promise.reject(new TranscodageIndisponible("audio"));

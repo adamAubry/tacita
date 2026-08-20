@@ -1,24 +1,44 @@
 import {
+  CODECS_H264,
   ecrireMp4,
+  lireMp4,
+  remuxable,
   TIMESCALE_US,
   type Bytes,
   type EchantillonVideo,
   type Raster,
+  type Rotation,
+  type SourceVideo,
+  type VideoTargets,
 } from "@tacita/media-pipeline";
 
 /**
- * REQ-MED-04, côté shard — **l'encodage vit ici, l'empaquetage dans le paquet** (E-10).
+ * REQ-MED-04, côté shard — **l'encodage vit ici, le conteneur dans le paquet** (E-10).
  *
- * Le navigateur décode (une balise `video` sait démuxer ce qu'un téléphone produit),
- * `WebCodecs` réencode aux cibles D-04, et `ecrireMp4` range le résultat. Aucun démuxeur à
- * écrire : c'est ce qui rend ce chemin tenable sans dépendance.
+ * Le paquet démuxe et muxe des octets ; `WebCodecs` décode et réencode. Aucun élément
+ * `<video>`, aucun canvas dans le chemin nominal — c'est tout l'objet de la refonte.
+ *
+ * **Ce qui a été retiré, et ce que ça coûtait.** La version précédente *jouait* le fichier
+ * dans une balise `<video>` cachée et repeignait chaque image sur un `OffscreenCanvas` :
+ * envoyer trois minutes de vidéo prenait trois minutes, à la seconde près, parce que le
+ * lecteur cadençait tout. Le détour par canvas coûtait en plus un aller-retour
+ * NV12 → RGBA → NV12 par image — plus cher que l'encodage lui-même, et destructeur pour le
+ * sous-échantillonnage chroma.
  */
-
-/** Codec de sortie : H.264 baseline niveau 3.1, le plus largement décodé. */
-const CODEC = "avc1.42001f";
 
 /** Une image clé toutes les deux secondes : sans elles, aucun déplacement dans la vidéo. */
 const INTERVALLE_CLE_US = 2 * TIMESCALE_US;
+
+/**
+ * Plafond des files de `WebCodecs`, en images.
+ *
+ * **Obligatoire depuis qu'il n'y a plus de lecteur.** Le lecteur cadençait le décodage à
+ * la vitesse de lecture ; sans lui, le décodeur produit aussi vite que le fichier se lit
+ * et l'encodeur ne suit pas — les `VideoFrame` s'empilent, et une image 1080p pèse environ
+ * 3 Mo en mémoire GPU. Huit images, c'est de quoi ne jamais affamer l'encodeur sans jamais
+ * laisser la file grossir.
+ */
+const FILE_MAX = 8;
 
 /**
  * Dimensions cibles : on réduit à la hauteur demandée, jamais on n'agrandit, et les deux
@@ -31,133 +51,192 @@ export function dimensionsCibles(largeur: number, hauteur: number, hauteurCible:
 }
 
 /**
- * Recopie les octets d'une description de codec — **une copie, jamais une vue** :
- * `WebCodecs` réutilise ses tampons, et garder une vue rendrait la description
- * silencieusement fausse au morceau suivant.
+ * REQ-MED-04 / D-04 — la première configuration supportée de l'échelle High → Main →
+ * Baseline. Rien n'est supposé : chaque cran est soumis au navigateur.
  */
-function copier(source: AllowSharedBufferSource): Bytes {
-  const vue = ArrayBuffer.isView(source)
-    ? new Uint8Array(source.buffer as ArrayBuffer, source.byteOffset, source.byteLength)
-    : new Uint8Array(source as ArrayBuffer);
-  return new Uint8Array(vue);
+async function configuration(base: {
+  width: number;
+  height: number;
+  bitrate?: number;
+}): Promise<VideoEncoderConfig | undefined> {
+  if (typeof VideoEncoder === "undefined") return undefined;
+  for (const codec of CODECS_H264) {
+    try {
+      const { supported, config } = await VideoEncoder.isConfigSupported({
+        ...base,
+        codec,
+        // `avc: { format: "avc" }` produit des NAL préfixées de leur longueur — la forme
+        // qu'attend un MP4. Le défaut (`annexb`) donnerait un flux illisible en conteneur.
+        avc: { format: "avc" },
+        // D-04 — débit **variable** : un débit fixe gaspille sur une source statique et
+        // sature sur du mouvement rapide.
+        bitrateMode: "variable",
+      });
+      if (supported && config) return config;
+    } catch {
+      // Une configuration refusée par une exception plutôt que par `supported: false` est
+      // un refus comme un autre : on passe au cran suivant.
+    }
+  }
+  return undefined;
 }
 
-/** `true` si ce navigateur sait encoder du H.264 à ces dimensions. Mesuré, jamais supposé. */
-export async function videoTranscodable(hauteur: number): Promise<boolean> {
-  if (typeof VideoEncoder === "undefined") return false;
-  try {
-    const { supported } = await VideoEncoder.isConfigSupported({
-      codec: CODEC,
-      width: Math.round((hauteur * 16) / 9 / 2) * 2,
-      height: hauteur,
-    });
-    return supported === true;
-  } catch {
-    return false;
-  }
+/** Le calibre du fichier de sortie, tel que l'événement doit le décrire. */
+function calibre(largeur: number, hauteur: number, rotation: Rotation, dureeMs: number) {
+  // REQ-MED-14 — `info.w`/`info.h` décrivent ce que l'utilisateur **verra**. Une rotation
+  // d'un quart de tour échange les deux à l'écran sans toucher aux pixels codés.
+  const pivote = rotation === 90 || rotation === 270;
+  return { width: pivote ? hauteur : largeur, height: pivote ? largeur : hauteur, durationMs: dureeMs };
+}
+
+const enMp4 = (octets: Bytes): Blob => new Blob([octets as BlobPart], { type: "video/mp4" });
+
+/** Laisse les files se vider avant d'en remettre : le seul garde-fou mémoire du chemin. */
+async function attendre(pleine: () => boolean): Promise<void> {
+  while (pleine()) await new Promise((suite) => setTimeout(suite, 1));
 }
 
 /**
- * ponytail: la vidéo est relue **en temps réel** pour être décodée — une minute de vidéo
- * prend une minute. Le raccourci serait un démuxeur MP4 côté paquet, qui alimenterait
- * `VideoDecoder` directement ; c'est un second format binaire à écrire, pour un gain qui ne
- * se mesure que sur les longues vidéos. À reprendre si l'attente devient le reproche.
+ * REQ-MED-04 / E-18 — **le chemin rapide** : une source déjà conforme change de
+ * conteneur, pas de pixels. Zéro attente, zéro génération de perte.
+ */
+function remuxer(source: SourceVideo): Raster & { durationMs: number } {
+  return {
+    blob: enMp4(
+      ecrireMp4({
+        largeur: source.largeur,
+        hauteur: source.hauteur,
+        description: source.description,
+        echantillons: source.echantillons,
+        rotation: source.rotation,
+      }),
+    ),
+    ...calibre(source.largeur, source.hauteur, source.rotation, source.dureeMs),
+  };
+}
+
+/** Le format des octets encodés que `WebCodecs` rend, recopiés pour le muxeur. */
+function echantillonDe(morceau: EncodedVideoChunk): EchantillonVideo {
+  const donnees = new Uint8Array(morceau.byteLength) as Bytes;
+  morceau.copyTo(donnees);
+  return { donnees, timestampUs: morceau.timestamp, cle: morceau.type === "key" };
+}
+
+/**
+ * REQ-MED-04 — démuxeur → décodeur → encodeur → muxeur, sans lecteur et sans canvas.
+ *
+ * Lève quand ce navigateur ne sait pas encoder : c'est le message d'échec dédié de l'UI
+ * qui prend le relais (REQ-MED-04), jamais un fichier approximatif.
  */
 export async function transcoderVideo(
   blob: Blob,
-  cibles: { height: number; bitrate: number },
+  cibles: VideoTargets,
 ): Promise<Raster & { durationMs: number }> {
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.src = URL.createObjectURL(blob);
+  const source = await lireMp4(new Uint8Array(await blob.arrayBuffer()) as Bytes);
 
-  try {
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("vidéo illisible : transcodage impossible"));
-    });
+  if (remuxable(source, cibles)) return remuxer(source);
 
-    const { largeur, hauteur } = dimensionsCibles(
-      video.videoWidth,
-      video.videoHeight,
-      cibles.height,
-    );
+  const { largeur, hauteur } = dimensionsCibles(source.largeur, source.hauteur, cibles.height);
+  const config = await configuration({ width: largeur, height: hauteur, bitrate: cibles.bitrate });
+  if (!config || typeof VideoDecoder === "undefined") {
+    throw new Error("cet appareil ne sait pas encoder de vidéo : compression impossible");
+  }
 
-    const echantillons: EchantillonVideo[] = [];
-    let description: Bytes | undefined;
+  const echantillons: EchantillonVideo[] = [];
+  let description: Bytes | undefined;
+  let erreur: Error | undefined;
 
-    const encodeur = new VideoEncoder({
-      output: (morceau, metadonnees) => {
-        // La description n'arrive qu'avec le premier morceau, et une seule fois : sans
-        // elle, `ecrireMp4` refuse — un MP4 sans paramètres de codec ne décode pas.
-        const brute = metadonnees?.decoderConfig?.description;
-        if (brute && !description) description = copier(brute);
+  const encodeur = new VideoEncoder({
+    output: (morceau, metadonnees) => {
+      // La description n'arrive qu'avec le premier morceau, et une seule fois : sans
+      // elle, `ecrireMp4` refuse — un MP4 sans paramètres de codec ne décode pas.
+      const brute = metadonnees?.decoderConfig?.description;
+      if (brute && !description) {
+        const vue = ArrayBuffer.isView(brute)
+          ? new Uint8Array(brute.buffer as ArrayBuffer, brute.byteOffset, brute.byteLength)
+          : new Uint8Array(brute as ArrayBuffer);
+        // Une **copie**, jamais une vue : `WebCodecs` réutilise ses tampons, et garder une
+        // vue rendrait la description silencieusement fausse au morceau suivant.
+        description = new Uint8Array(vue) as Bytes;
+      }
+      echantillons.push(echantillonDe(morceau));
+    },
+    error: (cause) => {
+      // L'erreur ne cite jamais le média (REQ-MED-10) : seulement qu'il y en a eu une.
+      erreur ??= new Error(`encodage vidéo interrompu : ${cause.name}`);
+    },
+  });
+  encodeur.configure(config);
 
-        const donnees = new Uint8Array(morceau.byteLength);
-        morceau.copyTo(donnees);
-        echantillons.push({
-          donnees,
-          timestampUs: morceau.timestamp,
-          cle: morceau.type === "key",
-        });
-      },
-      error: () => {
-        /* L'erreur remonte par `flush()` ; la journaliser ici citerait le média. */
-      },
-    });
+  let derniereCleUs = -INTERVALLE_CLE_US;
+  const decodeur = new VideoDecoder({
+    output: (image) => {
+      const cle = image.timestamp - derniereCleUs >= INTERVALLE_CLE_US;
+      if (cle) derniereCleUs = image.timestamp;
 
-    encodeur.configure({
-      codec: CODEC,
-      width: largeur,
-      height: hauteur,
-      bitrate: cibles.bitrate,
-      // `avc: { format: "avc" }` produit des NAL préfixées de leur longueur — la forme
-      // qu'attend un MP4. Le défaut (`annexb`) donnerait un flux illisible en conteneur.
-      avc: { format: "avc" },
-    });
-
-    const canvas = new OffscreenCanvas(largeur, hauteur);
-    const contexte = canvas.getContext("2d");
-    if (!contexte) throw new Error("contexte 2d indisponible : transcodage impossible");
-
-    let derniereCleUs = -INTERVALLE_CLE_US;
-
-    await new Promise<void>((resolve, reject) => {
-      const surImage = (_temps: number, metadonnees: { mediaTime: number }) => {
-        const timestamp = Math.round(metadonnees.mediaTime * TIMESCALE_US);
-        contexte.drawImage(video, 0, 0, largeur, hauteur);
-
-        const cle = timestamp - derniereCleUs >= INTERVALLE_CLE_US;
-        if (cle) derniereCleUs = timestamp;
-
-        const image = new VideoFrame(canvas, { timestamp });
+      if (largeur === source.largeur && hauteur === source.hauteur) {
         encodeur.encode(image, { keyFrame: cle });
         image.close();
+        return;
+      }
 
-        if (!video.ended) video.requestVideoFrameCallback(surImage);
-      };
+      /*
+       * Le scaler **natif** de `VideoFrame`, et non un canvas : il reste dans l'espace
+       * couleur du décodeur, là où le canvas imposait NV12 → RGBA → NV12 par image.
+       *
+       * `close()` sur les deux, et sans faute : les `VideoFrame` tiennent de la mémoire
+       * GPU que le ramasse-miettes ne libère pas à temps — une seule oubliée par image
+       * suffit à faire tomber l'onglet sur une vidéo un peu longue.
+       */
+      const reduite = new VideoFrame(image, {
+        visibleRect: { x: 0, y: 0, width: source.largeur, height: source.hauteur },
+        displayWidth: largeur,
+        displayHeight: hauteur,
+      });
+      image.close();
+      encodeur.encode(reduite, { keyFrame: cle });
+      reduite.close();
+    },
+    error: (cause) => {
+      erreur ??= new Error(`décodage vidéo interrompu : ${cause.name}`);
+    },
+  });
+  decodeur.configure({
+    codec: source.codec,
+    description: source.description as BufferSource,
+    codedWidth: source.largeur,
+    codedHeight: source.hauteur,
+  });
 
-      video.onended = () => resolve();
-      video.onerror = () => reject(new Error("lecture interrompue : transcodage abandonné"));
-      video.requestVideoFrameCallback(surImage);
-      void video.play();
-    });
+  try {
+    for (const echantillon of source.echantillons) {
+      if (erreur) throw erreur;
+      // Contrôle de flux : sans lecteur pour cadencer, c'est la seule chose qui empêche
+      // le décodeur de prendre toute la mémoire disponible.
+      await attendre(() => encodeur.encodeQueueSize > FILE_MAX || decodeur.decodeQueueSize > FILE_MAX);
+      decodeur.decode(
+        new EncodedVideoChunk({
+          type: echantillon.cle ? "key" : "delta",
+          timestamp: echantillon.timestampUs,
+          data: echantillon.donnees as BufferSource,
+        }),
+      );
+    }
 
+    await decodeur.flush();
     await encodeur.flush();
-    encodeur.close();
-
-    if (!description) throw new Error("aucun paramètre de codec produit : transcodage abandonné");
-
-    return {
-      blob: new Blob([ecrireMp4({ largeur, hauteur, description, echantillons }) as BlobPart], {
-        type: "video/mp4",
-      }),
-      width: largeur,
-      height: hauteur,
-      durationMs: Math.round(video.duration * 1000),
-    };
   } finally {
-    URL.revokeObjectURL(video.src);
+    if (decodeur.state !== "closed") decodeur.close();
+    if (encodeur.state !== "closed") encodeur.close();
   }
+
+  if (erreur) throw erreur;
+  if (!description) throw new Error("aucun paramètre de codec produit : transcodage abandonné");
+
+  return {
+    blob: enMp4(
+      ecrireMp4({ largeur, hauteur, description, echantillons, rotation: source.rotation }),
+    ),
+    ...calibre(largeur, hauteur, source.rotation, source.dureeMs),
+  };
 }

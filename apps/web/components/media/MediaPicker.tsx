@@ -1,28 +1,35 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 import { IconePlus } from "../foundation/icons";
 import { Button, Text } from "../foundation/primitives";
 
-const SANS_VIDEO = "image/*,application/pdf,application/zip,text/*";
-
 /**
- * Ce que le pipeline sait produire. La vidéo n'y entre que si **ce navigateur-ci** sait
- * l'encoder : `WebCodecs` est large mais pas universel, et le mesurer coûte un appel
- * (`videoTranscodable`). Là où il ne sait pas, la vidéo n'est pas grisée — elle n'est pas
- * proposée du tout.
+ * Ce que le pipeline accepte — **la vidéo comprise, partout** (E-18, 20/08/2026).
+ *
+ * Elle était conditionnée à la capacité d'encodage de ce navigateur, mesurée avant
+ * d'afficher quoi que ce soit. Depuis le chemin rapide, une source déjà conforme aux
+ * cibles est **remuxée**, ce qui ne demande aucun encodeur : conditionner le choix
+ * reviendrait à refuser d'avance des vidéos que l'appareil sait parfaitement traiter.
+ *
+ * Ce que ça déplace, et que REQ-MED-04 impose de traiter : l'échec devient un **résultat**
+ * et non plus un prédicat. Une source non conforme sur un appareil sans encodeur échoue,
+ * et elle échoue avec sa phrase à elle (`erreur`), pas avec un bouton absent.
  */
-export const typesAcceptes = (videoAutorisee: boolean) =>
-  videoAutorisee ? `${SANS_VIDEO},video/*` : SANS_VIDEO;
+export const TYPES_ACCEPTES = "image/*,video/*,application/pdf,application/zip,text/*";
 
 export interface MediaPickerProps {
   onFichiers: (fichiers: File[]) => void;
   /** Envoi en cours : le pipeline n'expose pas de progression, seulement un état. */
   enCours?: boolean;
   onAnnuler?: () => void;
+  /**
+   * REQ-MED-04 — l'échec dédié de la compression, quand il arrive. Distinct de l'absence
+   * de bouton : « ça n'a pas marché ici » n'est pas « ce n'est pas proposé ».
+   */
+  erreur?: string;
   /** Mesuré au montage par le câblage, jamais supposé. */
-  videoAutorisee?: boolean;
 }
 
 /**
@@ -37,10 +44,9 @@ export function MediaPicker({
   onFichiers,
   enCours = false,
   onAnnuler,
-  videoAutorisee = false,
+  erreur,
 }: MediaPickerProps) {
   const champ = useRef<HTMLInputElement>(null);
-  const [refus, setRefus] = useState<string>();
 
   /**
    * Les deux messages flottent **au-dessus** de la rangée du composer, jamais dedans.
@@ -67,24 +73,12 @@ export function MediaPicker({
         ref={champ}
         type="file"
         multiple
-        accept={typesAcceptes(videoAutorisee)}
+        accept={TYPES_ACCEPTES}
         aria-label="Joindre des fichiers"
         hidden
         onChange={(evenement) => {
           const choisis = [...(evenement.target.files ?? [])];
-          const estVideo = (fichier: File) => fichier.type.startsWith("video/");
-          // Le champ n'accepte que ce que l'OS veut bien filtrer ; un glisser-déposer ou
-          // un sélecteur permissif peuvent toujours livrer une vidéo là où ce navigateur
-          // ne sait pas l'encoder. On le dit ici plutôt que d'échouer plus tard.
-          const refuses = videoAutorisee ? [] : choisis.filter(estVideo);
-          setRefus(
-            refuses.length > 0
-              ? "Ce navigateur ne sait pas encoder de vidéo : envoi impossible."
-              : undefined,
-          );
-
-          const acceptes = choisis.filter((fichier) => !refuses.includes(fichier));
-          if (acceptes.length > 0) onFichiers(acceptes);
+          if (choisis.length > 0) onFichiers(choisis);
           evenement.target.value = "";
         }}
       />
@@ -112,10 +106,10 @@ export function MediaPicker({
         </div>
       )}
 
-      {refus && (
+      {erreur && !enCours && (
         <div style={messageFlottant}>
           <Text type="supporting" color="secondary">
-            {refus}
+            {erreur}
           </Text>
         </div>
       )}

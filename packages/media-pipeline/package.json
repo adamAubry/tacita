@@ -7,10 +7,11 @@
   },
   "dependencies": {
     "@tacita/client-core": "workspace:*",
-    "matrix-js-sdk": "42.0.0"
+    "matrix-js-sdk": "42.0.0",
+    "mp4box": "2.4.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7",
-    "@tacita/outbox": "workspace:*"
+    "@tacita/outbox": "workspace:*",
+    "@types/node": "^22.10.7"
   }
 }

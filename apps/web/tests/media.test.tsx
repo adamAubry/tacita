@@ -2,7 +2,7 @@ import type { EncryptedFile } from "@tacita/media-pipeline";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { lire } from "./sources";
+import { lire, sansCommentaires } from "./sources";
 import { ConversationCollections } from "../components/media/ConversationCollections";
 import { MediaMessage } from "../components/media/MediaMessage";
 import { MediaPicker } from "../components/media/MediaPicker";
@@ -223,34 +223,38 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
     expect(tailleLisible(5 * 1024 * 1024)).toBe("5.0 Mo");
   });
 
-  it("là où le navigateur n'encode pas la vidéo, elle n'est pas proposée — et le dit si elle passe", () => {
+  /**
+   * E-18 — **la vidéo est proposée partout**, depuis que le chemin rapide existe : une
+   * source déjà conforme aux cibles se remuxe, ce qui ne demande aucun encodeur.
+   *
+   * Ce que ça déplace : l'échec devient un résultat, plus un prédicat. Le test qui vivait
+   * ici vérifiait qu'une vidéo était **refusée d'avance** là où le navigateur n'encode
+   * pas — ce refus était le contournement de l'absence de message d'échec, et c'est lui
+   * qui disparaît, pas la garantie.
+   */
+  it("la vidéo est acceptée comme le reste, sans mesure préalable", () => {
     const onFichiers = vi.fn();
     render(<MediaPicker onFichiers={onFichiers} />);
-
-    const champ = screen.getByLabelText("Joindre des fichiers") as HTMLInputElement;
-    expect(champ.getAttribute("accept")).not.toContain("video/");
-
-    const video = new File(["x"], "clip.mp4", { type: "video/mp4" });
-    const photo = new File(["y"], "photo.jpg", { type: "image/jpeg" });
-    fireEvent.change(champ, { target: { files: [video, photo] } });
-
-    // La photo part, la vidéo est refusée avec une phrase — pas en silence.
-    expect(onFichiers).toHaveBeenCalledWith([photo]);
-    expect(screen.getByText(/ne sait pas encoder de vidéo/)).toBeTruthy();
-  });
-
-  it("là où il l'encode, la vidéo passe comme le reste", () => {
-    const onFichiers = vi.fn();
-    render(<MediaPicker onFichiers={onFichiers} videoAutorisee />);
 
     const champ = screen.getByLabelText("Joindre des fichiers") as HTMLInputElement;
     expect(champ.getAttribute("accept")).toContain("video/*");
 
     const video = new File(["x"], "clip.mp4", { type: "video/mp4" });
-    fireEvent.change(champ, { target: { files: [video] } });
+    const photo = new File(["y"], "photo.jpg", { type: "image/jpeg" });
+    fireEvent.change(champ, { target: { files: [video, photo] } });
 
-    expect(onFichiers).toHaveBeenCalledWith([video]);
-    expect(screen.queryByText(/ne sait pas encoder/)).toBeNull();
+    expect(onFichiers).toHaveBeenCalledWith([video, photo]);
+  });
+
+  it("un échec de compression se dit, à sa place et avec sa phrase", () => {
+    render(<MediaPicker onFichiers={vi.fn()} erreur="Impossible de compresser cette vidéo sur cet appareil." />);
+    expect(screen.getByText(/Impossible de compresser cette vidéo/)).toBeTruthy();
+  });
+
+  it("pendant l'envoi, l'échec précédent ne reste pas affiché sous le nouveau", () => {
+    render(<MediaPicker onFichiers={vi.fn()} enCours erreur="Impossible de compresser cette vidéo sur cet appareil." />);
+    expect(screen.getByText("Envoi en cours…")).toBeTruthy();
+    expect(screen.queryByText(/Impossible de compresser/)).toBeNull();
   });
 
   it("les dimensions cibles réduisent sans agrandir, et restent paires", () => {
@@ -797,5 +801,57 @@ describe("REQ-MED-15 — au-delà du plafond, pas de lecteur", () => {
     expect(source).toContain("env.ouvrirEcriture");
     expect(source).toContain("downloadAttachmentToFile(session, env, media.fichier, media.nom)");
     expect(source).toContain("saveOriginal(env, blob, media.nom)");
+  });
+});
+
+/**
+ * REQ-MED-04 — **la refonte du transcodage, par ce que jsdom peut en dire.**
+ *
+ * Le chemin nominal demande `WebCodecs`, que jsdom n'a pas : ce qui se mesure vraiment —
+ * 1080p de 3 min sous 30 s, aucun long task, mémoire stable — se mesure au navigateur et
+ * se consigne avec sa date. Ce que ces tests tiennent, c'est que les lignes qui portent
+ * ces propriétés ne disparaissent pas en silence (règle 7).
+ */
+describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", () => {
+  // Commentaires retirés, comme partout ailleurs : « les interdits portent sur ce que le
+  // shard exécute, pas sur ce qu'il explique » — et ce fichier explique longuement ce
+  // qu'il ne fait plus.
+  const source = sansCommentaires(lire("lib/transcode-video.ts"));
+
+  it("plus de lecteur ni de canvas dans le chemin nominal", () => {
+    // Les deux lignes qui coûtaient « trois minutes pour trois minutes ».
+    expect(source).not.toContain("createElement(\"video\")");
+    expect(source).not.toContain("requestVideoFrameCallback");
+    expect(source).not.toContain("OffscreenCanvas");
+    expect(source).not.toContain("drawImage");
+    // Le scaler natif remplace le canvas, et les deux images sont refermées.
+    expect(source).toContain("new VideoFrame(image, {");
+    expect(source).toContain("displayWidth: largeur");
+    expect(source).toContain("reduite.close()");
+  });
+
+  it("le contrôle de flux borne les deux files, pas une", () => {
+    // Sans lecteur pour cadencer, c'est la seule chose entre le décodeur et la mémoire.
+    expect(source).toContain("encodeur.encodeQueueSize > FILE_MAX");
+    expect(source).toContain("decodeur.decodeQueueSize > FILE_MAX");
+  });
+
+  it("l'échelle de repli est parcourue dans l'ordre, et mesurée", () => {
+    expect(source).toContain("for (const codec of CODECS_H264)");
+    expect(source).toContain("VideoEncoder.isConfigSupported");
+    expect(source).toContain('bitrateMode: "variable"');
+  });
+
+  it("le transcodage tourne dans un worker, jamais sur le thread de rendu", () => {
+    // Spec 08 § Méthode l'exigeait depuis l'origine ; rien ne le portait.
+    const env = sansCommentaires(lire("lib/media-env.ts"));
+    expect(env).toContain('new Worker(new URL("./transcode-worker.ts", import.meta.url))');
+    expect(env).toContain("worker.terminate()");
+  });
+
+  it("la rotation de la source traverse jusqu'au conteneur et jusqu'aux dimensions", () => {
+    expect(source).toContain("rotation: source.rotation");
+    // REQ-MED-14 — `info.w`/`info.h` décrivent ce qui sera vu, pas ce qui est codé.
+    expect(source).toContain('const pivote = rotation === 90 || rotation === 270;');
   });
 });

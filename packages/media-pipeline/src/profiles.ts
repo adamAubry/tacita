@@ -49,3 +49,51 @@ export function detectProfile(connection?: NetworkInformation): NetworkProfile {
     ? "constrained"
     : "good";
 }
+
+/**
+ * REQ-MED-04 / D-04 — **l'échelle de repli du profil H.264**, du meilleur au plus sûr.
+ *
+ * High 4.0 d'abord : Baseline interdit CABAC et les images B, soit 15 à 25 % de débit
+ * perdu à qualité perçue égale. La configuration retenue est la **première supportée**,
+ * mesurée par `VideoEncoder.isConfigSupported` et jamais supposée — c'est le shard qui
+ * mesure, ces chaînes ne sont que la liste et son ordre.
+ */
+export const CODECS_H264 = ["avc1.640028", "avc1.4d401f", "avc1.42001f"] as const;
+
+/**
+ * Marge au-dessus de la cible en deçà de laquelle un réencodage ne rendrait rien.
+ * Réencoder une source à 3,1 Mbit/s pour viser 2,5 coûte une génération de perte et une
+ * attente, pour un gain que personne ne voit.
+ */
+const MARGE_DEBIT = 1.3;
+
+/**
+ * REQ-MED-04 / E-18 — **le chemin rapide : une source déjà conforme se remuxe, elle ne
+ * se réencode pas.**
+ *
+ * Ce que le prédicat exige, et pourquoi :
+ * - **H.264**, parce que c'est ce que notre conteneur sait décrire (D-04) ;
+ * - **hauteur sous le plafond**, parce qu'au-dessus il faut bien réduire ;
+ * - **débit sous la cible et sa marge**, même raison ;
+ * - **au plus deux pistes** : une vidéo, éventuellement du son. Au-delà — angles
+ *   multiples, sous-titres, piste de timecode — la source n'est pas ordinaire, et la
+ *   remuxer perdrait sans le dire ce que le conteneur ne sait pas porter.
+ *
+ * Le son d'une source à deux pistes **est** perdu, sur ce chemin comme sur celui du
+ * réencodage : le muxeur n'écrit qu'une piste tant que REQ-MED-13 n'est pas livrée. Ce
+ * n'est donc pas une régression du chemin rapide, c'est la lacune du muxeur — et elle est
+ * la même des deux côtés.
+ */
+export function remuxable(
+  source: { codec: string; hauteur: number; debitBps: number; pistes: number },
+  cibles: VideoTargets,
+): boolean {
+  return (
+    source.codec.startsWith("avc1") &&
+    source.hauteur > 0 &&
+    source.hauteur <= cibles.height &&
+    source.debitBps > 0 &&
+    source.debitBps <= cibles.bitrate * MARGE_DEBIT &&
+    source.pistes <= 2
+  );
+}

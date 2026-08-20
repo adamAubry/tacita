@@ -13,14 +13,18 @@ await saveOriginal(env, originalBlob, "IMG_0001.heic"); // REQ-MED-05, hors chem
 ## Ce que le package ne fournit pas
 
 `MediaEnvironment` est l'unique frontière avec le navigateur : le package n'a aucune
-dépendance DOM et **n'embarque aucun codec**. L'app (spec 11) fournit les
+dépendance DOM et **n'embarque aucun codec**. Il porte **une** dépendance runtime depuis
+le 20/08/2026 — `mp4box@2.4.1`, pour **démuxer** ce qui entre (E-17). Elle ne touche pas
+`WebCodecs` et tourne dans Node : c'est ce qui la rendait admissible, et les tests de
+`demux.ts` en sont la preuve permanente. Version épinglée, digest au lockfile, CHANGELOG
+relu avant tout bump. L'app (spec 11) fournit les
 implémentations, et c'est elle qui décide de les faire tourner en Web Worker — le
 transcodage vidéo et l'encodage Opus ne doivent jamais toucher le thread principal.
 
 | Adaptateur                      | Implémentation attendue                          |
 | ------------------------------- | ------------------------------------------------ |
 | `resizeImage`                   | OffscreenCanvas (sert aussi aux vignettes)        |
-| `transcodeVideo`, `extractPoster` | WebCodecs, repli ffmpeg.wasm                    |
+| `transcodeVideo`, `extractPoster` | WebCodecs, dans un Worker (spec 08 § Méthode)   |
 | `transcodeAudio`                | encodeur Opus WASM (REQ-MED-07)                   |
 | `decodeAudio`                   | `AudioContext.decodeAudioData`, ramené au mono    |
 | `saveViaFilePicker` / `saveViaDownload` | File System Access, sinon téléchargement  |
@@ -53,6 +57,12 @@ la spec 11, pas une hypothèse à valider dans le code de ce package.
   encodeur. En revanche, **le chemin Safari/iOS (MP4/AAC) reste ouvert** : lui demande un
   vrai encodage, que `transcodeAudio` porte et que le spike E-10 doit encore situer
   (`WebCodecs` natif, ou encodeur WASM dans ce paquet).
+- **On écrit nos conteneurs, on ne lit pas ceux des autres.** Le muxeur MP4 et le muxeur
+  Ogg sont écrits ici, parce que ce qu'ils produisent est borné et connu. Le **démuxage**
+  d'une source entrante ne l'est pas — listes d'édition, pistes multiples, `moov`
+  fragmenté, rotation dans le `tkhd` —, et il passe donc par `mp4box`. La frontière est
+  là, et elle a une raison : notre sortie, notre code ; l'entrée du monde, une
+  bibliothèque qui l'a déjà rencontré.
 - **Le muxeur Ogg et le lecteur WebM sont écrits à la main, et volontairement étroits.**
   Le lecteur ne démuxe pas Matroska : il sort une piste audio Opus et son `OpusHead`, rien
   d'autre. Un bloc lacé le fait lever plutôt que de produire un vocal muet.

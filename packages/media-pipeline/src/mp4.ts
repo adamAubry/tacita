@@ -35,7 +35,19 @@ export interface Mp4Options {
    */
   description: Bytes;
   echantillons: EchantillonVideo[];
+  /**
+   * REQ-MED-14 — la rotation **à l'affichage**, propagée dans la matrice du `tkhd`.
+   *
+   * Gratuite et sans perte : les pixels ne bougent pas, seul le lecteur tourne l'image.
+   * `largeur`/`hauteur` restent celles des pixels codés — c'est la matrice qui dit au
+   * lecteur d'échanger les deux à l'écran, et `info.w`/`info.h` de l'événement doivent
+   * décrire ce que l'utilisateur verra, pas ce que le codec a encodé.
+   */
+  rotation?: Rotation;
 }
+
+/** Les quatre orientations qu'une caméra écrit. Rien d'autre n'existe dans un `tkhd`. */
+export type Rotation = 0 | 90 | 180 | 270;
 
 const encodeur = new TextEncoder();
 
@@ -66,25 +78,42 @@ const pleine = (drapeaux = 0): number[] => [
   drapeaux & 0xff,
 ];
 
-/** Matrice unité 3×3 en 16.16 — aucune rotation, aucune mise à l'échelle. */
-const MATRICE_UNITE = [
-  ...u32(0x00010000), ...u32(0), ...u32(0),
-  ...u32(0), ...u32(0x00010000), ...u32(0),
+/** 16.16 signé. `u32` fait déjà le complément à deux : `-1 >>> 24` rend bien `0xff`. */
+const f1616 = (valeur: number): number[] => u32(valeur * 0x10000);
+
+/**
+ * REQ-MED-14 — la matrice de transformation du `tkhd`, disposée `{a, b, u, c, d, v, x, y, w}`.
+ *
+ * Seuls les quatre termes de rotation sont posés ; les translations restent nulles, comme
+ * le fait la matrice d'affichage de ffmpeg. Un lecteur qui honore la matrice fait tourner
+ * l'image autour de son centre — c'est ce que produisent les caméras de téléphone.
+ */
+const matrice = (a: number, b: number, c: number, d: number): number[] => [
+  ...f1616(a), ...f1616(b), ...u32(0),
+  ...f1616(c), ...f1616(d), ...u32(0),
   ...u32(0), ...u32(0), ...u32(0x40000000),
 ];
 
+const MATRICES: Record<Rotation, number[]> = {
+  0: matrice(1, 0, 0, 1),
+  90: matrice(0, 1, -1, 0),
+  180: matrice(-1, 0, 0, -1),
+  270: matrice(0, -1, 1, 0),
+};
+
+/** La matrice du film : jamais de rotation ici, elle appartient à la piste. */
+const MATRICE_UNITE = MATRICES[0];
+
 /**
- * Durées par échantillon, dérivées des horodatages.
+ * Durées par échantillon, dérivées des horodatages **de décodage**.
  *
  * Le dernier échantillon n'a pas de suivant qui donnerait sa durée : il reprend celle du
  * précédent. Lui mettre zéro tronquerait la dernière image à la lecture — le défaut se
  * voit sur une vidéo courte, où c'est une part visible du plan.
  */
-function durees(echantillons: EchantillonVideo[]): number[] {
-  const suite = echantillons.map((echantillon, rang) =>
-    rang + 1 < echantillons.length
-      ? Math.max(0, echantillons[rang + 1]!.timestampUs - echantillon.timestampUs)
-      : 0,
+function durees(dts: number[]): number[] {
+  const suite = dts.map((horodatage, rang) =>
+    rang + 1 < dts.length ? Math.max(0, dts[rang + 1]! - horodatage) : 0,
   );
   const dernier = suite.length - 1;
   if (dernier >= 0) suite[dernier] = suite[dernier - 1] ?? TIMESCALE_US / 30;
@@ -115,6 +144,41 @@ function stss(echantillons: EchantillonVideo[]): Bytes[] {
 }
 
 /**
+ * `ctts` — l'écart entre présentation et décodage, échantillon par échantillon.
+ *
+ * **Prérequis des B-frames, et c'est pour ça que la boîte existe.** Un profil High les
+ * autorise ; une image B se décode *après* une image qu'elle précède à l'écran, donc
+ * l'ordre de décodage n'est plus l'ordre de présentation. Sans cette table, un lecteur
+ * affiche les images dans l'ordre où elles sont rangées : la vidéo saute en arrière à
+ * chaque groupe. Le défaut est spectaculaire et silencieux à l'encodage.
+ *
+ * **Version 1, offsets signés.** Un écart négatif est normal — c'est le cas de l'image
+ * qui se décode avant celles qui l'entourent — et la version 0 ne sait pas les écrire.
+ *
+ * Omise quand tout est à zéro : un flux sans B-frames n'a rien à corriger, et une table
+ * de zéros est un octet de plus par échantillon pour rien.
+ */
+function ctts(decalages: number[]): Bytes[] {
+  if (decalages.every((decalage) => decalage === 0)) return [];
+
+  const series: [nombre: number, decalage: number][] = [];
+  for (const decalage of decalages) {
+    const derniere = series.at(-1);
+    if (derniere && derniere[1] === decalage) derniere[0] += 1;
+    else series.push([1, decalage]);
+  }
+
+  return [
+    boite(
+      "ctts",
+      [1, 0, 0, 0], // version 1 : les offsets sont signés
+      u32(series.length),
+      series.flatMap(([nombre, decalage]) => [...u32(nombre), ...u32(decalage)]),
+    ),
+  ];
+}
+
+/**
  * Écrit un MP4 progressif : `ftyp`, `mdat`, `moov`.
  *
  * ponytail: `moov` **après** les données, pas de « faststart ». Le déplacer en tête
@@ -123,12 +187,31 @@ function stss(echantillons: EchantillonVideo[]): Bytes[] {
  * déchiffré en entier avant d'être lu, depuis un blob local : il n'y a rien à progresser.
  * À reprendre le jour où un média se lirait en flux — ce que le chiffrement interdit.
  */
-export function ecrireMp4({ largeur, hauteur, description, echantillons }: Mp4Options): Bytes {
+export function ecrireMp4({
+  largeur,
+  hauteur,
+  description,
+  echantillons,
+  rotation = 0,
+}: Mp4Options): Bytes {
   if (echantillons.length === 0) throw new Error("MP4 sans échantillon : rien à muxer");
   if (description.length === 0) throw new Error("MP4 sans description de codec : illisible");
 
   const tailles = echantillons.map((echantillon) => echantillon.donnees.length);
-  const dureesParEchantillon = durees(echantillons);
+
+  /*
+   * Les échantillons arrivent dans l'ordre **de décodage** — c'est celui où l'encodeur les
+   * rend —, et leur horodatage est celui de **présentation**. Les deux coïncident tant
+   * qu'il n'y a pas d'image B ; dès qu'il y en a, il faut les deux suites.
+   *
+   * Les dates de décodage sont les mêmes valeurs, remises en ordre croissant : une image
+   * décodée en n-ième position est décodée à la n-ième date, quelle que soit celle à
+   * laquelle on l'affichera. C'est ce qui rend `ctts` calculable sans que l'encodeur ait
+   * à rendre une seconde horloge — WebCodecs n'en expose pas.
+   */
+  const presentation = echantillons.map((echantillon) => echantillon.timestampUs);
+  const decodage = [...presentation].sort((a, b) => a - b);
+  const dureesParEchantillon = durees(decodage);
   const dureeTotale = dureesParEchantillon.reduce((somme, duree) => somme + duree, 0);
 
   const ftyp = boite("ftyp", encodeur.encode("isom"), u32(512), encodeur.encode("isomiso2avc1mp41"));
@@ -167,6 +250,7 @@ export function ecrireMp4({ largeur, hauteur, description, echantillons }: Mp4Op
     "stbl",
     boite("stsd", pleine(), u32(1), avc1),
     stts(dureesParEchantillon),
+    ...ctts(presentation.map((date, rang) => date - decodage[rang]!)),
     ...stss(echantillons),
     // Un seul chunk contient tous les échantillons : la table de correspondance tient
     // donc en une entrée, et `stco` en un décalage.
@@ -202,7 +286,7 @@ export function ecrireMp4({ largeur, hauteur, description, echantillons }: Mp4Op
       u16(0), u16(0),
       u16(0), // volume : nul pour une piste vidéo
       u16(0),
-      MATRICE_UNITE,
+      MATRICES[rotation],
       u32(largeur * 0x10000),
       u32(hauteur * 0x10000),
     ),

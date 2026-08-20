@@ -23,16 +23,16 @@ import {
   typingUsers,
   type MentionCandidate,
 } from "@tacita/messaging";
-import { PROFILES, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
+import { saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
 import { useOutbox } from "./OutboxProvider";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { routeAppel, routeInfos } from "../../lib/routes";
+import { TranscodageIndisponible } from "../../lib/media-env";
 import { brancherModeMasque } from "../../lib/mode-masque";
 import { lireFondEcran } from "../../lib/preferences";
-import { videoTranscodable } from "../../lib/transcode-video";
 import { BandeauAppel } from "../appels/BandeauAppel";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { IconeAppel, IconeCamera, IconeVideo } from "../foundation/icons";
@@ -93,13 +93,16 @@ export function Conversation({ roomId }: { roomId: string }) {
   // gestes qui l'accompagnent — déchiffrer, sauvegarder — viennent du même endroit que
   // pour les autres écrans à médias.
   const { env, telecharger, sauvegarder } = useMediaActions(session);
-  const [videoAutorisee, setVideoAutorisee] = useState(false);
-
-  // REQ-MED-04 — `WebCodecs` est large mais pas universel : on **mesure** avant de
-  // proposer la vidéo, plutôt que de l'offrir partout et d'échouer chez certains.
-  useEffect(() => {
-    void videoTranscodable(PROFILES.good.video.height).then(setVideoAutorisee);
-  }, []);
+  /**
+   * REQ-MED-04 — l'échec **dédié** de la compression, distinct de l'absence de bouton.
+   *
+   * La vidéo est proposée partout depuis que le chemin rapide existe (E-18) : une source
+   * déjà conforme se remuxe sans encodeur. Ce qui reste possible, c'est qu'une source
+   * **non** conforme tombe sur un appareil qui ne sait pas réencoder — et ça, il faut le
+   * dire à ce moment-là, avec sa phrase, sinon le bouton promet plus que le pipeline ne
+   * tient (interdit n°13).
+   */
+  const [erreurMedia, setErreurMedia] = useState<string>();
 
   const rafraichir = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -286,11 +289,19 @@ export function Conversation({ roomId }: { roomId: string }) {
   const joindre = async (fichiers: File[]) => {
     if (!session || !outbox) return;
     setEnvoiMedia(true);
+    setErreurMedia(undefined);
     try {
       for (const fichier of fichiers) {
         const contenu = await uploadAttachment(session, env, fichier);
         await outbox.enqueue(roomId, contenu);
       }
+    } catch (cause) {
+      // REQ-MED-10 — le message ne cite jamais le fichier : ni son nom, ni ses octets.
+      setErreurMedia(
+        cause instanceof TranscodageIndisponible
+          ? "Impossible de compresser cette vidéo sur cet appareil."
+          : "L'envoi de cette pièce jointe a échoué.",
+      );
     } finally {
       setEnvoiMedia(false);
     }
@@ -405,7 +416,7 @@ export function Conversation({ roomId }: { roomId: string }) {
             <MediaPicker
               onFichiers={(fichiers) => void joindre(fichiers)}
               enCours={envoiMedia}
-              videoAutorisee={videoAutorisee}
+              erreur={erreurMedia}
             />
           }
           actionsEnvoi={
