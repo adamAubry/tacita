@@ -4,6 +4,7 @@ import type { Session } from "@tacita/client-core";
 import {
   downloadAttachment,
   downloadAttachmentToFile,
+  downloadCiphertext,
   estRendable,
   saveOriginal,
 } from "@tacita/media-pipeline";
@@ -105,6 +106,19 @@ export function useMediaActions(session: Session | null) {
   );
 
   /**
+   * REQ-MED-08 (b) — le **chiffré**, pour la lecture progressive : c'est le lecteur qui
+   * demande les plages, et chacune est vérifiée puis déchiffrée à la demande. Le clair
+   * n'existe donc jamais en entier, ni en mémoire ni ailleurs.
+   */
+  const telechargerChiffre = useCallback(
+    async (url: string) => {
+      if (!session) throw new Error("session absente : aucun média téléchargeable");
+      return downloadCiphertext(session, env, url);
+    },
+    [session, env],
+  );
+
+  /**
    * REQ-MED-05 / REQ-MED-15 — le déchiffrement puis le choix de destination, délégué au
    * pipeline. **Par tranches quand la plateforme le permet** : sur une vidéo de 400 Mo
    * reçue d'un client tiers, le chemin d'un seul bloc fait coexister le chiffré, le clair
@@ -123,5 +137,5 @@ export function useMediaActions(session: Session | null) {
     [session, telecharger, env],
   );
 
-  return { env, avis, telecharger, sauvegarder };
+  return { env, avis, telecharger, telechargerChiffre, sauvegarder };
 }

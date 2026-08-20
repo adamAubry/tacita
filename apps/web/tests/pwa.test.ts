@@ -156,3 +156,57 @@ describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
     }
   });
 });
+
+/**
+ * REQ-MED-08 (b) — **les bornes du service worker sont la phase, pas un détail.**
+ *
+ * Il n'y a qu'un worker par portée : celui qui sert les médias **est** celui du push,
+ * réveillé hors de toute page. La note de conception D-10 prévoyait une table de clés en
+ * mémoire, vide à froid, que le handler `push` ne lit jamais. La forme retenue est plus
+ * forte : il n'y a **pas de table**, parce qu'il n'y a pas de clés — le worker demande les
+ * octets à une fenêtre vivante, qui vérifie et déchiffre.
+ *
+ * Sans ces tests, ces bornes ne seraient qu'un commentaire.
+ */
+describe("REQ-MED-08 (b) — le service worker sert des plages sans jamais détenir de clé", () => {
+  const source = sansCommentaires(sw);
+
+  it("aucune clé, aucun déchiffrement, aucune empreinte dans le worker", () => {
+    for (const interdit of ["crypto.subtle", "decrypt", "importKey", "AES-CTR", "digest"]) {
+      expect(source, interdit).not.toContain(interdit);
+    }
+  });
+
+  it("un worker démarré à froid n'a personne à qui demander, et ne sert rien", () => {
+    // `matchAll` puis « aucune fenêtre ⇒ null ⇒ 404 » : c'est toute la borne. Un push
+    // réveille le worker sans client contrôlé ; la chaîne s'arrête au premier maillon.
+    expect(source).toContain("self.clients.matchAll");
+    expect(source).toMatch(/if \(!fenetre\) return null;/);
+    expect(source).toMatch(/if \(!reponse \|\| reponse\.erreur \|\| !reponse\.octets\)/);
+    expect(source).toContain('status: 404');
+  });
+
+  it("le handler `push` ne touche pas au chemin média", () => {
+    const pousse = source.slice(source.indexOf('addEventListener("push"'));
+    expect(pousse).not.toContain("PREFIXE_MEDIA");
+    expect(pousse).not.toContain("TYPE_PLAGE");
+  });
+
+  it("le clair déchiffré n'entre dans aucun cache", () => {
+    // Interdit n°8. Le chemin média rend avant toute considération de cache, et sa réponse
+    // porte `no-store` pour que le navigateur ne le fasse pas non plus.
+    const debut = source.indexOf("function servirMedia");
+    const media = source.slice(debut, source.indexOf("self.addEventListener", debut));
+    expect(media).not.toContain("caches");
+    expect(media).toContain('"cache-control": "no-store"');
+    // Et la condition de mise en cache, elle, n'a pas bougé : `/_next/static/` seulement.
+    expect(source).toContain('url.pathname.startsWith("/_next/static/")');
+  });
+
+  it("les plages demandées sont bornées, jamais devinées", () => {
+    // Une requête sans en-tête `Range` ne doit pas faire servir un fichier entier par
+    // surprise : le défaut est le premier bloc.
+    expect(source).toContain("plageDemandee");
+    expect(source).toMatch(/\^bytes=/);
+  });
+});

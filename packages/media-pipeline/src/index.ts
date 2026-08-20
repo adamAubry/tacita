@@ -8,6 +8,7 @@ import {
   type CryptoEnvironment,
   type EncryptedFile,
 } from "./attachments";
+import { CHAMP_BLOCS, hachesParBloc } from "./blocs";
 import type { CacheChiffre } from "./cache";
 import {
   detectProfile,
@@ -40,6 +41,8 @@ export { lireWebmOpus } from "./webm";
 export type { WebmOpus } from "./webm";
 export { CODECS_H264, detectProfile, PROFILES, remuxable, THUMBNAIL } from "./profiles";
 export { BUDGET_DEFAUT, ouvrirCacheChiffre } from "./cache";
+export { CHAMP_BLOCS, dechiffrerPlage, hachesParBloc, TAILLE_BLOC } from "./blocs";
+export type { SourceChiffree } from "./blocs";
 export type { CacheChiffre } from "./cache";
 export { estRendable, resoudreType, TAILLE_SNIFF, typeSniffe, TYPES_RENDUS } from "./types-rendus";
 export type { Resolution } from "./types-rendus";
@@ -129,6 +132,15 @@ export type AttachmentContent = {
   info: Record<string, unknown>;
   /** REQ-MED-01 — clés du blob principal. */
   file: EncryptedFile;
+  /**
+   * REQ-MED-08 (b) — les empreintes par bloc du **fichier principal**, dans l'ordre.
+   *
+   * Extension à nous, namespacée, jamais présentée comme du Matrix natif : un client tiers
+   * l'ignore et retombe sur `hashes.sha256`, que nous continuons d'écrire. C'est ce qui
+   * rend la lecture progressive possible sans rien céder de REQ-MED-08 et sans régression
+   * d'interop.
+   */
+  [CHAMP_BLOCS]?: string[];
   "org.matrix.msc1767.audio"?: { duration: number; waveform: number[] };
   "org.matrix.msc3245.voice"?: Record<string, never>;
 };
@@ -179,6 +191,11 @@ async function chiffrerEnAttente(
   const { ciphertext, keys } = await encryptAttachment(new Uint8Array(await blob.arrayBuffer()), env);
   enAttente.push({ chemin: [...chemin, "url"], ciphertext });
   return { ...keys, url: "" };
+}
+
+/** REQ-MED-08 (b) — les empreintes par bloc du chiffré qui vient d'être rangé en attente. */
+async function blocsDe(env: MediaEnvironment, enAttente: Televersement[]): Promise<string[]> {
+  return hachesParBloc(enAttente.at(-1)!.ciphertext, env.subtle);
 }
 
 /**
@@ -297,6 +314,7 @@ async function construireContenu(
           ...(await thumbnailOf(env, raster.blob, enAttente)),
         },
         file: await chiffrerEnAttente(env, raster.blob, ["file"], enAttente),
+        [CHAMP_BLOCS]: await blocsDe(env, enAttente),
       };
     }
 
@@ -317,6 +335,7 @@ async function construireContenu(
           ...(await thumbnailOf(env, await env.extractPoster(video.blob), enAttente)),
         },
         file: await chiffrerEnAttente(env, video.blob, ["file"], enAttente),
+        [CHAMP_BLOCS]: await blocsDe(env, enAttente),
       };
     }
 
@@ -332,6 +351,7 @@ async function construireContenu(
         body,
         info: { mimetype: VOICE_MIME_TYPE, duration: durationMs, size: ogg.size },
         file: await chiffrerEnAttente(env, ogg, ["file"], enAttente),
+        [CHAMP_BLOCS]: await blocsDe(env, enAttente),
         "org.matrix.msc1767.audio": { duration: durationMs, waveform: waveform(samples) },
         "org.matrix.msc3245.voice": {},
       };
@@ -345,6 +365,7 @@ async function construireContenu(
         body,
         info: { mimetype: file.type || "application/octet-stream", size: file.size },
         file: await chiffrerEnAttente(env, file, ["file"], enAttente),
+        [CHAMP_BLOCS]: await blocsDe(env, enAttente),
       };
   }
 }
@@ -440,18 +461,21 @@ export async function downloadAttachment(
   env: MediaEnvironment,
   file: EncryptedFile,
 ): Promise<Bytes> {
-  return decryptAttachment(await chiffreDe(session, env, file.url), file, env.subtle);
+  return decryptAttachment(await downloadCiphertext(session, env, file.url), file, env.subtle);
 }
 
 /**
- * REQ-MED-16 — le chiffré, du cache s'il y est, du réseau sinon — et alors mis en cache.
+ * REQ-MED-16 — le chiffré **tel quel**, du cache s'il y est, du réseau sinon.
+ *
+ * Public depuis REQ-MED-08 (b) : la lecture progressive a besoin du chiffré, pas du clair
+ * — c'est elle qui déchiffre, bloc par bloc, à mesure que le lecteur demande des plages.
  *
  * Le cache est interrogé **avant** le réseau et rempli après, et il ne voit que du
  * chiffré : ce qui en sort repart vers `decryptAttachment` exactement comme ce qui vient
  * du réseau, avec la même vérification d'intégrité (REQ-MED-08). Un cache empoisonné
  * échoue donc au hash, comme un blob corrompu en transit.
  */
-async function chiffreDe(session: Session, env: MediaEnvironment, url: string): Promise<Bytes> {
+export async function downloadCiphertext(session: Session, env: MediaEnvironment, url: string): Promise<Bytes> {
   const enCache = await env.cache?.lire(url).catch(() => undefined);
   if (enCache) return enCache;
 
@@ -485,7 +509,7 @@ export async function downloadAttachmentToFile(
 ): Promise<void> {
   if (!env.ouvrirEcriture) throw new Error("aucun flux d'écriture : téléchargement par tranches impossible");
 
-  const ciphertext = await chiffreDe(session, env, file.url);
+  const ciphertext = await downloadCiphertext(session, env, file.url);
 
   // Le fichier n'est ouvert **qu'après** la première tranche : `decryptAttachmentByChunks`
   // vérifie l'empreinte avant de rendre quoi que ce soit, et un fichier vide créé puis

@@ -1,4 +1,4 @@
-import { SEUILS, type EncryptedFile, type Seuils } from "@tacita/media-pipeline";
+import { CHAMP_BLOCS, SEUILS, type EncryptedFile, type Seuils } from "@tacita/media-pipeline";
 
 /**
  * Ce que le shard lit d'un événement, et **rien de plus**.
@@ -51,6 +51,14 @@ export interface Media {
   largeur?: number;
   hauteur?: number;
   dureeMs?: number;
+  /**
+   * REQ-MED-08 (b) — les empreintes par bloc, quand l'expéditeur en a écrit.
+   *
+   * Absentes d'un média envoyé par un client tiers : le champ est à nous, namespacé, et
+   * son absence fait simplement retomber sur le chemin d'un seul bloc. Aucune régression
+   * d'interop, aucune garantie en moins — c'est la même vérification, en une fois.
+   */
+  blocs?: string[];
   /** REQ-MED-06 — pics MSC1767, entiers 0–1024. */
   ondes?: number[];
 }
@@ -91,6 +99,9 @@ export function mediaDe(evenement: EvenementLu): Media | undefined {
     largeur: typeof info.w === "number" ? info.w : undefined,
     hauteur: typeof info.h === "number" ? info.h : undefined,
     dureeMs: typeof info.duration === "number" ? info.duration : audio?.duration,
+    blocs: Array.isArray(contenu[CHAMP_BLOCS])
+      ? (contenu[CHAMP_BLOCS] as unknown[]).filter((h): h is string => typeof h === "string")
+      : undefined,
     ondes: audio?.waveform,
   };
 }

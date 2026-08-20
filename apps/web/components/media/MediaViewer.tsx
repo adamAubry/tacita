@@ -1,6 +1,11 @@
 "use client";
 
-import { resoudreType, TAILLE_SNIFF, verdictTaille } from "@tacita/media-pipeline";
+import { resoudreType, TAILLE_SNIFF, verdictTaille, type Bytes } from "@tacita/media-pipeline";
+import {
+  inscrireMedia,
+  lectureProgressiveDisponible,
+  retirerMedia,
+} from "../../lib/media-progressif";
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { useGlissement } from "../../lib/gestes";
@@ -20,6 +25,11 @@ export interface MediaViewerProps {
   /** Index d'ouverture. */
   depart: number;
   telecharger: Telecharger;
+  /**
+   * REQ-MED-08 (b) — le chiffré, pour la lecture progressive. Absent ⇒ chemin d'un seul
+   * bloc, inchangé : c'est ce qui garde le viewer testable sans service worker.
+   */
+  telechargerChiffre?: (url: string) => Promise<Uint8Array>;
   onFermer: () => void;
   /** REQ-MED-05 — sauvegarde locale, déléguée au pipeline par le câblage. */
   onSauvegarder: (media: Media) => void;
@@ -63,7 +73,14 @@ type Etat =
  * historique de photos ouvert en plein écran une par une, c'est une seule image en clair
  * en mémoire à la fois.
  */
-export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegarder }: MediaViewerProps) {
+export function MediaViewer({
+  medias,
+  depart,
+  telecharger,
+  telechargerChiffre,
+  onFermer,
+  onSauvegarder,
+}: MediaViewerProps) {
   const [rang, setRang] = useState(depart);
   const [zoom, setZoom] = useState<number>(1);
   const [etat, setEtat] = useState<Etat>({ phase: "chargement" });
@@ -90,6 +107,7 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
   useEffect(() => {
     if (!media) return;
     let objet: string | undefined;
+    let progressif: string | undefined;
     let vivant = true;
     setEtat({ phase: "chargement" });
 
@@ -120,6 +138,35 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
     }
 
     void (async () => {
+      /*
+       * REQ-MED-08 (b) — **la lecture progressive, quand les trois conditions sont là** :
+       * une vidéo, des empreintes par bloc dans l'événement, et un worker qui contrôle la
+       * page. Le lecteur réclame alors des plages, chacune vérifiée puis déchiffrée à la
+       * demande : première image après un bloc au lieu du fichier entier.
+       *
+       * Les trois manquent souvent — un média d'Element n'a pas le champ, un premier
+       * chargement n'a pas encore de worker — et le chemin d'un seul bloc reste dessous,
+       * inchangé. Aucune régression d'interop, aucune garantie en moins.
+       */
+      if (
+        media.msgtype === "m.video" &&
+        media.blocs &&
+        media.blocs.length > 0 &&
+        telechargerChiffre &&
+        lectureProgressiveDisponible() &&
+        declare.rendable
+      ) {
+        const chiffre = await telechargerChiffre(media.fichier.url);
+        if (!vivant) return;
+        if (!navigateurLit(declare.type)) {
+          setEtat({ phase: "refus", motif: "codec" });
+          return;
+        }
+        progressif = inscrireMedia(chiffre as Bytes, media.fichier, media.blocs, declare.type);
+        setEtat({ phase: "pret", url: progressif, type: declare.type });
+        return;
+      }
+
       // Sans type déclaré, le blob descend opaque : on ne lui donne un type qu'une fois
       // ses propres octets reniflés (vieux clients, ponts).
       const blob = await telecharger(media.fichier, declare.rendable ? declare.type : undefined);
@@ -148,11 +195,13 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
 
     return () => {
       vivant = false;
-      // Le blob en clair ne survit pas au média suivant.
+      // Le blob en clair ne survit pas au média suivant. L'inscription non plus : ses
+      // octets chiffrés sont relâchés, et l'URL virtuelle ne sert plus rien.
       if (objet) URL.revokeObjectURL(objet);
+      if (progressif) retirerMedia(progressif);
     };
     // `media` est volontairement absent : `cle` **est** son identité (voir ci-dessus).
-  }, [cle, telecharger, force]);
+  }, [cle, telecharger, telechargerChiffre, force]);
 
   /*
    * `Escape` ferme, comme toute boîte de dialogue modale. Le viewer ne se fermait qu'au

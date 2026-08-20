@@ -153,6 +153,30 @@ export async function decryptAttachment(
  * WebCrypto n'expose aucun hash incrémental. C'est ce que les plafonds de REQ-MED-15
  * bornent, et ce que le hachage par blocs lèvera.
  */
+/**
+ * Déchiffre une tranche de chiffré **prise à un décalage aligné sur 16 octets**.
+ *
+ * Le cœur du déchiffrement par plage, partagé par le téléchargement par tranches
+ * (REQ-MED-15) et la lecture progressive (REQ-MED-08, mécanisme (b)). Il ne vérifie
+ * rien : la vérification appartient à l'appelant, qui sait ce que couvre la tranche.
+ */
+export async function dechiffrerA(
+  tranche: Bytes,
+  keys: FileKeys,
+  subtle: SubtleCrypto,
+  decalage: number,
+): Promise<Bytes> {
+  if (decalage % 16 !== 0) throw new Error("décalage non aligné : le compteur AES serait faux");
+  const key = await subtle.importKey("jwk", keys.key, AES, false, ["decrypt"]);
+  return new Uint8Array(
+    await subtle.decrypt(
+      { name: "AES-CTR", counter: compteurDecale(unbase64(keys.iv), decalage / 16), length: COUNTER_BITS },
+      key,
+      tranche,
+    ),
+  ) as Bytes;
+}
+
 export async function* decryptAttachmentByChunks(
   ciphertext: Bytes,
   keys: FileKeys,

@@ -39,10 +39,79 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/**
+ * REQ-MED-08 (b) — le préfixe des URL virtuelles de lecture progressive.
+ *
+ * **Ce worker ne déchiffre rien et ne détient aucune clé.** Il demande les octets à une
+ * fenêtre vivante, qui vérifie le bloc et le déchiffre. C'est la forme la plus forte des
+ * bornes prévues : le handler `push` ne peut pas lire une table de clés qui n'existe pas,
+ * et un worker réveillé à froid par une notification n'a personne à qui demander — il
+ * répond 404 et ne sert pas un octet.
+ */
+const PREFIXE_MEDIA = "/tacita-media/";
+const TYPE_PLAGE = "tacita-media-plage";
+const DELAI_PLAGE_MS = 10_000;
+
+/** `bytes=0-1048575` → `{ debut, fin }` ; `fin` reste nul quand la requête ne la borne pas. */
+function plageDemandee(entete) {
+  const trouve = /^bytes=(\d+)-(\d*)$/.exec(entete ?? "");
+  if (!trouve) return null;
+  return { debut: Number(trouve[1]), fin: trouve[2] === "" ? null : Number(trouve[2]) };
+}
+
+function demanderPlage(id, plage) {
+  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
+    const fenetre = fenetres[0];
+    if (!fenetre) return null;
+
+    return new Promise((resolve) => {
+      const canal = new MessageChannel();
+      const minuteur = setTimeout(() => resolve(null), DELAI_PLAGE_MS);
+      canal.port1.onmessage = (message) => {
+        clearTimeout(minuteur);
+        resolve(message.data ?? null);
+      };
+      fenetre.postMessage({ type: TYPE_PLAGE, id, debut: plage.debut, fin: plage.fin }, [canal.port2]);
+    });
+  });
+}
+
+function servirMedia(requete, id) {
+  const plage = plageDemandee(requete.headers.get("range")) ?? { debut: 0, fin: null };
+
+  return demanderPlage(id, plage).then((reponse) => {
+    // Aucune fenêtre, aucune inscription, ou une vérification d'intégrité qui a échoué :
+    // rien n'est servi, et surtout jamais un octet non vérifié.
+    if (!reponse || reponse.erreur || !reponse.octets) {
+      return new Response(null, { status: 404, statusText: "media indisponible" });
+    }
+
+    return new Response(reponse.octets, {
+      status: 206,
+      headers: {
+        "content-type": reponse.type,
+        "content-length": String(reponse.octets.byteLength),
+        "content-range": `bytes ${reponse.debut}-${reponse.fin}/${reponse.taille}`,
+        "accept-ranges": "bytes",
+        // Interdit n°8 — ce contenu est déchiffré : il ne va dans aucun cache, ni le nôtre,
+        // ni celui du navigateur.
+        "cache-control": "no-store",
+      },
+    });
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   const requete = event.request;
   const url = new URL(requete.url);
   const memeOrigine = url.origin === self.location.origin;
+
+  // REQ-MED-08 (b) — la lecture progressive, avant toute considération de cache : ce
+  // chemin ne passe **jamais** par `caches`, ni en lecture ni en écriture.
+  if (memeOrigine && url.pathname.startsWith(PREFIXE_MEDIA)) {
+    event.respondWith(servirMedia(requete, url.pathname.slice(PREFIXE_MEDIA.length)));
+    return;
+  }
 
   // Seuls les assets versionnés du build entrent au cache. Le test de REQ-UI-01 relit
   // cette condition : l'élargir est ce qui ferait entrer des données utilisateur.

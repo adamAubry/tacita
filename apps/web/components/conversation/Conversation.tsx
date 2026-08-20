@@ -92,7 +92,7 @@ export function Conversation({ roomId }: { roomId: string }) {
   // lit `navigator.connection`, ni l'un ni l'autre à refaire à chaque rendu. Les deux
   // gestes qui l'accompagnent — déchiffrer, sauvegarder — viennent du même endroit que
   // pour les autres écrans à médias.
-  const { env, avis, telecharger, sauvegarder } = useMediaActions(session);
+  const { env, avis, telecharger, telechargerChiffre, sauvegarder } = useMediaActions(session);
   /**
    * REQ-MED-04 — l'échec **dédié** de la compression, distinct de l'absence de bouton.
    *
@@ -469,6 +469,7 @@ export function Conversation({ roomId }: { roomId: string }) {
           medias={medias}
           depart={viewer}
           telecharger={telecharger}
+          telechargerChiffre={telechargerChiffre}
           onFermer={() => setViewer(undefined)}
           onSauvegarder={sauvegarder}
         />

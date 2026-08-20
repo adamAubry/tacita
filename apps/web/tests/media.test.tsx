@@ -888,3 +888,76 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
     expect(source).toContain('const pivote = rotation === 90 || rotation === 270;');
   });
 });
+
+/**
+ * REQ-MED-08 (b) — **la lecture progressive, côté écran.**
+ *
+ * Ce qui se prouve ici : le chemin ne se prend que lorsque ses trois conditions sont
+ * réunies, et le chemin d'un seul bloc reste dessous, intact. La vérification par bloc
+ * elle-même est prouvée dans le paquet (`blocs.test.ts`, bloc corrompu compris).
+ */
+describe("REQ-MED-08 (b) — le viewer ne lit par plages que quand les trois conditions sont là", () => {
+  const video = (blocs?: string[]) =>
+    mediaDe(
+      evenement({
+        msgtype: "m.video",
+        body: "vacances.mp4",
+        file: FICHIER,
+        info: { mimetype: "video/mp4", size: 1024, thumbnail_file: VIGNETTE },
+        ...(blocs ? { "org.tacita.media.block_sha256": blocs } : {}),
+      }),
+    )!;
+
+  const rendre = (media: Media, chiffre?: (url: string) => Promise<Uint8Array>) =>
+    render(
+      <MediaViewer
+        medias={[media]}
+        depart={0}
+        telecharger={telecharger}
+        telechargerChiffre={chiffre}
+        onFermer={vi.fn()}
+        onSauvegarder={vi.fn()}
+      />,
+    );
+
+  beforeEach(() => {
+    vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("maybe");
+  });
+
+  it("les empreintes par bloc se lisent dans l'événement, sous leur nom à nous", () => {
+    expect(video(["abc", "def"]).blocs).toEqual(["abc", "def"]);
+    // Un média d'un client tiers n'a pas le champ : le chemin legacy s'applique.
+    expect(video().blocs).toBeUndefined();
+  });
+
+  it("sans worker qui contrôle la page, le chemin d'un seul bloc s'applique", async () => {
+    // jsdom n'a pas de `serviceWorker.controller` : c'est exactement le premier
+    // chargement, avant que le worker ne prenne la main.
+    const chiffre = vi.fn(async () => new Uint8Array(8));
+    rendre(video(["abc"]), chiffre);
+
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(FICHIER, "video/mp4"));
+    expect(chiffre).not.toHaveBeenCalled();
+  });
+
+  it("sans empreintes, le chiffré n'est même pas demandé", async () => {
+    const chiffre = vi.fn(async () => new Uint8Array(8));
+    rendre(video(), chiffre);
+
+    await waitFor(() => expect(telecharger).toHaveBeenCalled());
+    expect(chiffre).not.toHaveBeenCalled();
+  });
+
+  it("le câblage relie les trois pièces : chiffré, empreintes, worker", () => {
+    // Trois valeurs posées à trois endroits différents, qu'aucun rendu de jsdom ne peut
+    // relier (règle 7). Le viewer les lit toutes les trois, ou le chemin est mort.
+    const viewer = sansCommentaires(lire("components/media/MediaViewer.tsx"));
+    expect(viewer).toContain("media.blocs");
+    expect(viewer).toContain("lectureProgressiveDisponible()");
+    expect(viewer).toContain("inscrireMedia(chiffre as Bytes, media.fichier, media.blocs, declare.type)");
+    expect(viewer).toContain("retirerMedia(progressif)");
+
+    const cablage = sansCommentaires(lire("components/conversation/Conversation.tsx"));
+    expect(cablage).toContain("telechargerChiffre={telechargerChiffre}");
+  });
+});
