@@ -68,7 +68,10 @@ const u32 = (valeur: number): number[] => [
   valeur & 0xff,
 ];
 
-const u16 = (valeur: number): number[] => [(valeur >>> 8) & 0xff, valeur & 0xff];
+const u16 = (valeur: number): number[] => [
+  (valeur >>> 8) & 0xff,
+  valeur & 0xff,
+];
 
 /** Version 0 + trois octets de drapeaux, en tête de toute « full box ». */
 const pleine = (drapeaux = 0): number[] => [
@@ -89,9 +92,15 @@ const f1616 = (valeur: number): number[] => u32(valeur * 0x10000);
  * l'image autour de son centre — c'est ce que produisent les caméras de téléphone.
  */
 const matrice = (a: number, b: number, c: number, d: number): number[] => [
-  ...f1616(a), ...f1616(b), ...u32(0),
-  ...f1616(c), ...f1616(d), ...u32(0),
-  ...u32(0), ...u32(0), ...u32(0x40000000),
+  ...f1616(a),
+  ...f1616(b),
+  ...u32(0),
+  ...f1616(c),
+  ...f1616(d),
+  ...u32(0),
+  ...u32(0),
+  ...u32(0),
+  ...u32(0x40000000),
 ];
 
 const MATRICES: Record<Rotation, number[]> = {
@@ -138,7 +147,9 @@ function stts(valeurs: number[]): Bytes {
 
 /** `stss` — les images clés, en rangs 1-based. Omise si tout est clé. */
 function stss(echantillons: EchantillonVideo[]): Bytes[] {
-  const cles = echantillons.flatMap((echantillon, rang) => (echantillon.cle ? [rang + 1] : []));
+  const cles = echantillons.flatMap((echantillon, rang) =>
+    echantillon.cle ? [rang + 1] : [],
+  );
   if (cles.length === echantillons.length) return [];
   return [boite("stss", pleine(), u32(cles.length), cles.flatMap(u32))];
 }
@@ -173,19 +184,26 @@ function ctts(decalages: number[]): Bytes[] {
       "ctts",
       [1, 0, 0, 0], // version 1 : les offsets sont signés
       u32(series.length),
-      series.flatMap(([nombre, decalage]) => [...u32(nombre), ...u32(decalage)]),
+      series.flatMap(([nombre, decalage]) => [
+        ...u32(nombre),
+        ...u32(decalage),
+      ]),
     ),
   ];
 }
 
 /**
- * Écrit un MP4 progressif : `ftyp`, `mdat`, `moov`.
+ * Écrit un MP4 **faststart** : `ftyp`, `moov`, `mdat`.
  *
- * ponytail: `moov` **après** les données, pas de « faststart ». Le déplacer en tête
- * demanderait de recalculer tous les décalages de chunk une fois sa taille connue, pour un
- * gain qui n'existe qu'en lecture progressive depuis un serveur. Ici le fichier est
- * déchiffré en entier avant d'être lu, depuis un blob local : il n'y a rien à progresser.
- * À reprendre le jour où un média se lirait en flux — ce que le chiffrement interdit.
+ * *(Ordre inversé le 20/08/2026. La version précédente écrivait `moov` en dernier, avec ce
+ * motif : « le déplacer en tête demanderait de recalculer tous les décalages de chunk une
+ * fois sa taille connue, pour un gain qui n'existe qu'en lecture progressive ». Les deux
+ * moitiés étaient fausses. Le recalcul tient en **une passe de plus** : la taille d'un
+ * `stco` ne dépend pas de la valeur qu'il contient, donc construire `moov` avec des
+ * décalages nuls donne exactement sa longueur définitive, et la seconde construction pose
+ * les vrais. Quant au gain, il conditionne la lecture progressive de la phase 6 — sans
+ * `moov` en tête, un lecteur doit lire la fin du fichier avant la première image — et il
+ * vaut déjà pour un fichier exporté vers un autre outil.)*
  */
 export function ecrireMp4({
   largeur,
@@ -194,8 +212,10 @@ export function ecrireMp4({
   echantillons,
   rotation = 0,
 }: Mp4Options): Bytes {
-  if (echantillons.length === 0) throw new Error("MP4 sans échantillon : rien à muxer");
-  if (description.length === 0) throw new Error("MP4 sans description de codec : illisible");
+  if (echantillons.length === 0)
+    throw new Error("MP4 sans échantillon : rien à muxer");
+  if (description.length === 0)
+    throw new Error("MP4 sans description de codec : illisible");
 
   const tailles = echantillons.map((echantillon) => echantillon.donnees.length);
 
@@ -209,14 +229,26 @@ export function ecrireMp4({
    * laquelle on l'affichera. C'est ce qui rend `ctts` calculable sans que l'encodeur ait
    * à rendre une seconde horloge — WebCodecs n'en expose pas.
    */
-  const presentation = echantillons.map((echantillon) => echantillon.timestampUs);
+  const presentation = echantillons.map(
+    (echantillon) => echantillon.timestampUs,
+  );
   const decodage = [...presentation].sort((a, b) => a - b);
   const dureesParEchantillon = durees(decodage);
-  const dureeTotale = dureesParEchantillon.reduce((somme, duree) => somme + duree, 0);
+  const dureeTotale = dureesParEchantillon.reduce(
+    (somme, duree) => somme + duree,
+    0,
+  );
 
-  const ftyp = boite("ftyp", encodeur.encode("isom"), u32(512), encodeur.encode("isomiso2avc1mp41"));
+  const ftyp = boite(
+    "ftyp",
+    encodeur.encode("isom"),
+    u32(512),
+    encodeur.encode("isomiso2avc1mp41"),
+  );
 
-  const donnees = new Uint8Array(tailles.reduce((somme, taille) => somme + taille, 0));
+  const donnees = new Uint8Array(
+    tailles.reduce((somme, taille) => somme + taille, 0),
+  );
   let position = 0;
   for (const echantillon of echantillons) {
     donnees.set(echantillon.donnees, position);
@@ -224,16 +256,16 @@ export function ecrireMp4({
   }
   const mdat = boite("mdat", donnees);
 
-  // Le décalage du premier chunk est connu d'avance parce que `mdat` précède `moov` :
-  // c'est précisément ce que le choix « pas de faststart » achète.
-  const decalageChunk = ftyp.length + 8;
-
   const avcC = boite("avcC", description);
   const avc1 = boite(
     "avc1",
     [0, 0, 0, 0, 0, 0], // réservé
     u16(1), // index de référence de données
-    u16(0), u16(0), u32(0), u32(0), u32(0), // pré-défini / réservé
+    u16(0),
+    u16(0),
+    u32(0),
+    u32(0),
+    u32(0), // pré-défini / réservé
     u16(largeur),
     u16(hauteur),
     u32(0x00480000), // 72 dpi horizontaux
@@ -246,76 +278,121 @@ export function ecrireMp4({
     avcC,
   );
 
-  const stbl = boite(
-    "stbl",
-    boite("stsd", pleine(), u32(1), avc1),
-    stts(dureesParEchantillon),
-    ...ctts(presentation.map((date, rang) => date - decodage[rang]!)),
-    ...stss(echantillons),
-    // Un seul chunk contient tous les échantillons : la table de correspondance tient
-    // donc en une entrée, et `stco` en un décalage.
-    boite("stsc", pleine(), u32(1), u32(1), u32(echantillons.length), u32(1)),
-    boite("stsz", pleine(), u32(0), u32(tailles.length), tailles.flatMap(u32)),
-    boite("stco", pleine(), u32(1), u32(decalageChunk)),
-  );
+  const construireMoov = (decalageChunk: number): Bytes => {
+    const stbl = boite(
+      "stbl",
+      boite("stsd", pleine(), u32(1), avc1),
+      stts(dureesParEchantillon),
+      ...ctts(presentation.map((date, rang) => date - decodage[rang]!)),
+      ...stss(echantillons),
+      // Un seul chunk contient tous les échantillons : la table de correspondance tient
+      // donc en une entrée, et `stco` en un décalage.
+      boite("stsc", pleine(), u32(1), u32(1), u32(echantillons.length), u32(1)),
+      boite(
+        "stsz",
+        pleine(),
+        u32(0),
+        u32(tailles.length),
+        tailles.flatMap(u32),
+      ),
+      boite("stco", pleine(), u32(1), u32(decalageChunk)),
+    );
 
-  const minf = boite(
-    "minf",
-    boite("vmhd", pleine(1), u16(0), u16(0), u16(0), u16(0)),
-    boite("dinf", boite("dref", pleine(), u32(1), boite("url ", pleine(1)))),
-    stbl,
-  );
+    const minf = boite(
+      "minf",
+      boite("vmhd", pleine(1), u16(0), u16(0), u16(0), u16(0)),
+      boite("dinf", boite("dref", pleine(), u32(1), boite("url ", pleine(1)))),
+      stbl,
+    );
 
-  const mdia = boite(
-    "mdia",
-    boite("mdhd", pleine(), u32(0), u32(0), u32(TIMESCALE_US), u32(dureeTotale), u16(0x55c4), u16(0)),
-    boite("hdlr", pleine(), u32(0), encodeur.encode("vide"), u32(0), u32(0), u32(0), encodeur.encode("VideoHandler\0")),
-    minf,
-  );
+    const mdia = boite(
+      "mdia",
+      boite(
+        "mdhd",
+        pleine(),
+        u32(0),
+        u32(0),
+        u32(TIMESCALE_US),
+        u32(dureeTotale),
+        u16(0x55c4),
+        u16(0),
+      ),
+      boite(
+        "hdlr",
+        pleine(),
+        u32(0),
+        encodeur.encode("vide"),
+        u32(0),
+        u32(0),
+        u32(0),
+        encodeur.encode("VideoHandler\0"),
+      ),
+      minf,
+    );
 
-  const trak = boite(
-    "trak",
-    boite(
-      "tkhd",
-      pleine(3), // activée, et présente dans le film
-      u32(0), u32(0),
-      u32(1), // identifiant de piste
-      u32(0),
-      u32(dureeTotale),
-      u32(0), u32(0),
-      u16(0), u16(0),
-      u16(0), // volume : nul pour une piste vidéo
-      u16(0),
-      MATRICES[rotation],
-      u32(largeur * 0x10000),
-      u32(hauteur * 0x10000),
-    ),
-    mdia,
-  );
+    const trak = boite(
+      "trak",
+      boite(
+        "tkhd",
+        pleine(3), // activée, et présente dans le film
+        u32(0),
+        u32(0),
+        u32(1), // identifiant de piste
+        u32(0),
+        u32(dureeTotale),
+        u32(0),
+        u32(0),
+        u16(0),
+        u16(0),
+        u16(0), // volume : nul pour une piste vidéo
+        u16(0),
+        MATRICES[rotation],
+        u32(largeur * 0x10000),
+        u32(hauteur * 0x10000),
+      ),
+      mdia,
+    );
 
-  const moov = boite(
-    "moov",
-    boite(
-      "mvhd",
-      pleine(),
-      u32(0), u32(0),
-      u32(TIMESCALE_US),
-      u32(dureeTotale),
-      u32(0x00010000), // vitesse normale
-      u16(0x0100), // volume plein
-      u16(0),
-      u32(0), u32(0),
-      MATRICE_UNITE,
-      u32(0), u32(0), u32(0), u32(0), u32(0), u32(0),
-      u32(2), // prochain identifiant de piste
-    ),
-    trak,
-  );
+    const moov = boite(
+      "moov",
+      boite(
+        "mvhd",
+        pleine(),
+        u32(0),
+        u32(0),
+        u32(TIMESCALE_US),
+        u32(dureeTotale),
+        u32(0x00010000), // vitesse normale
+        u16(0x0100), // volume plein
+        u16(0),
+        u32(0),
+        u32(0),
+        MATRICE_UNITE,
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(0),
+        u32(2), // prochain identifiant de piste
+      ),
+      trak,
+    );
 
-  const total = ftyp.length + mdat.length + moov.length;
-  const fichier = new Uint8Array(total);
+    return moov;
+  };
+
+  /*
+   * Deux passes, et c'est tout ce que coûte le faststart : la première apprend la
+   * **longueur** de `moov` — qui ne dépend pas des décalages qu'il contient, un `stco`
+   * occupe quatre octets quelle que soit sa valeur —, la seconde y écrit le vrai décalage
+   * du premier chunk, maintenant connu.
+   */
+  const moov = construireMoov(ftyp.length + construireMoov(0).length + 8);
+
+  const fichier = new Uint8Array(ftyp.length + moov.length + mdat.length);
   fichier.set(ftyp, 0);
-  fichier.set(mdat, ftyp.length);
-  fichier.set(moov, ftyp.length + mdat.length);
+  fichier.set(moov, ftyp.length);
+  fichier.set(mdat, ftyp.length + moov.length);
   return fichier;
 }

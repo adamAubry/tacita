@@ -78,8 +78,10 @@ describe("REQ-MED-04 — muxeur MP4 : les échantillons encodés deviennent un f
   const fichier = ecrireMp4({ largeur: 640, hauteur: 480, description: DESCRIPTION, echantillons });
   const boites = lireBoites(fichier);
 
-  it("le fichier s'ouvre sur ftyp et ne contient que ftyp, mdat et moov", () => {
-    expect(boites.map((boite) => boite.type)).toEqual(["ftyp", "mdat", "moov"]);
+  it("le fichier s'ouvre sur ftyp, puis moov, puis mdat — et rien d'autre", () => {
+    // `moov` **avant** les données depuis le 20/08/2026 : c'est ce qui permet à un lecteur
+    // de démarrer sans lire la fin du fichier (prérequis de la lecture progressive).
+    expect(boites.map((boite) => boite.type)).toEqual(["ftyp", "moov", "mdat"]);
     expect(String.fromCharCode(...boites[0]!.contenu.subarray(0, 4))).toBe("isom");
   });
 

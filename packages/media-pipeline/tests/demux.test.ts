@@ -120,3 +120,44 @@ describe("REQ-MED-04 — `ctts` : l'ordre de présentation survit aux images B",
     );
   });
 });
+
+describe("REQ-MED-04 — faststart : `moov` avant `mdat`", () => {
+  const positionDe = (fichier: Bytes, type: string): number =>
+    new TextDecoder("latin1").decode(fichier).indexOf(type);
+
+  it("les boîtes sortent dans l'ordre ftyp, moov, mdat", () => {
+    const fichier = ecrireMp4({
+      largeur: 640,
+      hauteur: 360,
+      description: DESCRIPTION,
+      echantillons: echantillons(12),
+    });
+
+    const ftyp = positionDe(fichier, "ftyp");
+    const moov = positionDe(fichier, "moov");
+    const mdat = positionDe(fichier, "mdat");
+    expect(ftyp).toBeGreaterThanOrEqual(0);
+    expect(moov).toBeGreaterThan(ftyp);
+    expect(mdat).toBeGreaterThan(moov);
+  });
+
+  /**
+   * Le vrai risque du faststart n'est pas l'ordre, c'est le **décalage** : `stco` pointe
+   * vers `mdat`, qui a bougé. Un décalage faux ne casse pas la lecture des boîtes — il
+   * fait lire des octets arbitraires comme des échantillons, et mp4box les rendrait
+   * différents de ceux écrits.
+   */
+  it("les échantillons se relisent au bon endroit après le déplacement de `moov`", async () => {
+    const origine = echantillons(12);
+    const source = await lireMp4(
+      ecrireMp4({ largeur: 640, hauteur: 360, description: DESCRIPTION, echantillons: origine }),
+    );
+
+    expect(source.echantillons).toHaveLength(12);
+    for (const rang of [0, 5, 11]) {
+      expect([...source.echantillons[rang]!.donnees], `échantillon ${rang}`).toEqual([
+        ...origine[rang]!.donnees,
+      ]);
+    }
+  });
+});
