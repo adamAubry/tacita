@@ -69,8 +69,11 @@ export interface Raster {
 export interface MediaEnvironment extends CryptoEnvironment {
   /** Canvas/OffscreenCanvas. Sert aussi aux vignettes : même code, cibles différentes. */
   resizeImage(blob: Blob, targets: ImageTargets): Promise<Raster>;
-  /** WebCodecs, repli ffmpeg.wasm. */
-  transcodeVideo(blob: Blob, targets: VideoTargets): Promise<Raster & { durationMs: number }>;
+  /** WebCodecs, dans un Worker. `sansSon` remonte le cas de REQ-MED-13. */
+  transcodeVideo(
+    blob: Blob,
+    targets: VideoTargets,
+  ): Promise<Raster & { durationMs: number; sansSon?: boolean }>;
   /** Une image extraite de la vidéo, source de la vignette (REQ-MED-03). */
   extractPoster(blob: Blob): Promise<Blob>;
   /** REQ-MED-07 — encodeur Opus WASM. */
@@ -91,6 +94,14 @@ export interface MediaEnvironment extends CryptoEnvironment {
   saveViaDownload(blob: Blob, filename: string): Promise<void>;
   /** D-04 — `navigator.connection`, absente sur Safari. */
   connection?: NetworkInformation;
+  /**
+   * REQ-MED-13 — ce que le pipeline a dû abandonner en route, et que l'UI doit dire.
+   *
+   * Un rappel plutôt qu'une valeur de retour : `uploadAttachment` rend un contenu
+   * d'événement, et une vidéo partie sans son n'a rien à y écrire — c'est une information
+   * pour **l'expéditeur**, pas pour le destinataire ni pour le serveur.
+   */
+  signaler?(avis: "video-sans-son"): void;
 }
 
 /**
@@ -217,6 +228,9 @@ export async function uploadAttachment(
 
     case "video": {
       const video = await env.transcodeVideo(file, targets.video);
+      // REQ-MED-13 — la vidéo part quand même, et l'UI le dit. Ne pas l'envoyer serait
+      // pire ; l'envoyer en silence serait malhonnête (interdit n°13).
+      if (video.sansSon) env.signaler?.("video-sans-son");
       return {
         msgtype: "m.video",
         body,

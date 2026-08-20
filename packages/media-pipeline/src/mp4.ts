@@ -1,16 +1,17 @@
 import type { Bytes } from "./attachments";
 
 /**
- * Muxeur MP4 (ISO BMFF) pour une piste vidéo unique — **octets → octets, aucun DOM**
- * (spec 08, § Méthode, E-10).
+ * Muxeur MP4 (ISO BMFF) — **octets → octets, aucun DOM** (spec 08, § Méthode, E-10).
  *
- * Il n'encode rien : il reçoit des échantillons déjà encodés par `WebCodecs` côté shard,
- * et les range dans les boîtes qu'un lecteur attend. C'est le pendant vidéo du muxeur Ogg.
+ * Il n'encode rien : il reçoit des échantillons déjà encodés — par `WebCodecs` pour la
+ * vidéo, tels quels depuis la source pour l'audio — et les range dans les boîtes qu'un
+ * lecteur attend. C'est le pendant vidéo du muxeur Ogg.
  *
- * **Une piste, pas de son.** REQ-MED-04 compresse une vidéo pour l'envoi ; l'audio d'une
- * vidéo de téléphone n'est pas dans le périmètre de D-04, et une seconde piste doublerait
- * les tables sans qu'aucune exigence ne la demande. À ajouter le jour où une REQ la
- * nomme, pas avant.
+ * **Deux pistes depuis le 20/08/2026 (REQ-MED-13).** Le commentaire qui vivait ici disait
+ * « une piste, pas de son : l'audio d'une vidéo de téléphone n'est pas dans le périmètre
+ * de D-04, et aucune exigence ne la demande ». C'était vrai de la lettre des specs et faux
+ * du produit : sur une messagerie, une vidéo muette est perçue comme un bug. La REQ existe
+ * maintenant, et la piste avec elle.
  */
 
 /** Microsecondes : c'est l'unité de `WebCodecs`, et l'adopter supprime tout arrondi. */
@@ -23,6 +24,36 @@ export interface EchantillonVideo {
   timestampUs: number;
   /** Image clé : elle seule permet de démarrer le décodage. */
   cle: boolean;
+}
+
+/**
+ * Un échantillon audio, **recopié tel quel** depuis la source.
+ *
+ * Sa durée est celle que la source déclare, dans l'échelle de temps de la source : la
+ * recopier plutôt que la recalculer supprime toute dérive — une trame AAC dure 1024
+ * échantillons, ce qui ne tombe juste dans aucune échelle en microsecondes.
+ */
+export interface EchantillonAudio {
+  donnees: Bytes;
+  /** Durée dans le `timescale` de la piste audio. */
+  duree: number;
+}
+
+/** REQ-MED-13 — la piste audio, telle que le muxeur la reçoit : déjà encodée, jamais convertie. */
+export interface PisteAudio {
+  /**
+   * La boîte `esds` de la source, **recopiée octet pour octet**, en-tête compris.
+   *
+   * Elle porte l'`AudioSpecificConfig` — profil, fréquence, canaux —, et la réécrire
+   * demanderait de la parser puis de la reconstruire, deux occasions de se tromper sur
+   * une structure qu'on ne fait que transporter.
+   */
+  esds: Bytes;
+  /** Échelle de temps de la piste, celle de la source : conservée, jamais convertie. */
+  timescale: number;
+  frequence: number;
+  canaux: number;
+  echantillons: EchantillonAudio[];
 }
 
 export interface Mp4Options {
@@ -44,6 +75,13 @@ export interface Mp4Options {
    * décrire ce que l'utilisateur verra, pas ce que le codec a encodé.
    */
   rotation?: Rotation;
+  /**
+   * REQ-MED-13 — la piste audio, quand la source en a une **et** qu'elle est transportable.
+   *
+   * Absente ⇒ fichier **mono-piste**, jamais une piste vide : un `trak` sans échantillon
+   * fait échouer certains lecteurs et n'apporte rien aux autres.
+   */
+  audio?: PisteAudio;
 }
 
 /** Les quatre orientations qu'une caméra écrit. Rien d'autre n'existe dans un `tkhd`. */
@@ -192,6 +230,9 @@ function ctts(decalages: number[]): Bytes[] {
   ];
 }
 
+/** Le même en-tête pour tous les fichiers : sa longueur entre dans le calcul des décalages. */
+const ftyp = boite("ftyp", encodeur.encode("isom"), u32(512), encodeur.encode("isomiso2avc1mp41"));
+
 /**
  * Écrit un MP4 **faststart** : `ftyp`, `moov`, `mdat`.
  *
@@ -211,13 +252,12 @@ export function ecrireMp4({
   description,
   echantillons,
   rotation = 0,
+  audio,
 }: Mp4Options): Bytes {
-  if (echantillons.length === 0)
-    throw new Error("MP4 sans échantillon : rien à muxer");
-  if (description.length === 0)
-    throw new Error("MP4 sans description de codec : illisible");
+  if (echantillons.length === 0) throw new Error("MP4 sans échantillon : rien à muxer");
+  if (description.length === 0) throw new Error("MP4 sans description de codec : illisible");
 
-  const tailles = echantillons.map((echantillon) => echantillon.donnees.length);
+  const taillesVideo = echantillons.map((echantillon) => echantillon.donnees.length);
 
   /*
    * Les échantillons arrivent dans l'ordre **de décodage** — c'est celui où l'encodeur les
@@ -229,30 +269,103 @@ export function ecrireMp4({
    * laquelle on l'affichera. C'est ce qui rend `ctts` calculable sans que l'encodeur ait
    * à rendre une seconde horloge — WebCodecs n'en expose pas.
    */
-  const presentation = echantillons.map(
-    (echantillon) => echantillon.timestampUs,
-  );
+  const presentation = echantillons.map((echantillon) => echantillon.timestampUs);
   const decodage = [...presentation].sort((a, b) => a - b);
-  const dureesParEchantillon = durees(decodage);
-  const dureeTotale = dureesParEchantillon.reduce(
-    (somme, duree) => somme + duree,
-    0,
+  const dureesVideo = durees(decodage);
+  const dureeVideo = dureesVideo.reduce((somme, duree) => somme + duree, 0);
+
+  const dureesAudio = audio?.echantillons.map((echantillon) => echantillon.duree) ?? [];
+  const dureeAudio = dureesAudio.reduce((somme, duree) => somme + duree, 0);
+  /** La durée du film est celle de la plus longue piste, exprimée en microsecondes. */
+  const dureeFilm = Math.max(
+    dureeVideo,
+    audio ? Math.round((dureeAudio / audio.timescale) * TIMESCALE_US) : 0,
   );
 
-  const ftyp = boite(
-    "ftyp",
-    encodeur.encode("isom"),
-    u32(512),
-    encodeur.encode("isomiso2avc1mp41"),
-  );
+  /*
+   * REQ-MED-13 — **l'entrelacement**, et pourquoi il n'est pas cosmétique.
+   *
+   * Deux pistes rangées d'un bloc obligent un lecteur à sauter d'un bout à l'autre du
+   * fichier pour tenir une seconde de son en face d'une seconde d'image. Sur un blob
+   * local c'est invisible ; sur une lecture par plages — ce que prépare le hachage par
+   * blocs —, chaque saut est une requête. Les groupes d'une seconde sont le compromis
+   * habituel : assez gros pour que les tables restent courtes, assez fins pour qu'un
+   * lecteur n'ait jamais plus d'une seconde d'avance à charger.
+   */
+  const GROUPE_US = TIMESCALE_US;
+  const finVideo = (rang: number): number => decodage[rang] ?? dureeVideo;
+  const morceaux: { piste: "v" | "a"; premier: number; nombre: number }[] = [];
 
-  const donnees = new Uint8Array(
-    tailles.reduce((somme, taille) => somme + taille, 0),
-  );
+  let rangVideo = 0;
+  let rangAudio = 0;
+  let tempsAudio = 0;
+  for (let groupe = 0; rangVideo < echantillons.length || rangAudio < dureesAudio.length; groupe++) {
+    const limite = (groupe + 1) * GROUPE_US;
+    const avantVideo = rangVideo;
+    const avantAudio = rangAudio;
+
+    let finV = rangVideo;
+    while (finV < echantillons.length && finVideo(finV) < limite) finV += 1;
+    if (finV > rangVideo) morceaux.push({ piste: "v", premier: rangVideo, nombre: finV - rangVideo });
+    rangVideo = finV;
+
+    let finA = rangAudio;
+    while (
+      finA < dureesAudio.length &&
+      (tempsAudio / (audio?.timescale ?? 1)) * TIMESCALE_US < limite
+    ) {
+      tempsAudio += dureesAudio[finA] ?? 0;
+      finA += 1;
+    }
+    if (finA > rangAudio) morceaux.push({ piste: "a", premier: rangAudio, nombre: finA - rangAudio });
+    rangAudio = finA;
+
+    /*
+     * Garde-fou contre une boucle infinie : des horodatages qui n'avancent pas — tous nuls,
+     * ou tous au-delà de la fin — laisseraient les deux curseurs sur place indéfiniment.
+     * La comparaison porte sur l'**avant**, pas sur les curseurs qu'on vient de déplacer :
+     * écrite dans l'autre sens, la garde était vraie à tous les tours et coupait le fichier
+     * à sa première seconde. C'est le genre de faute que seul un cas à plusieurs groupes
+     * révèle, et le test à trois secondes est là pour ça.
+     */
+    if (rangVideo === avantVideo && rangAudio === avantAudio) {
+      if (rangVideo < echantillons.length) {
+        morceaux.push({ piste: "v", premier: rangVideo, nombre: echantillons.length - rangVideo });
+        rangVideo = echantillons.length;
+      }
+      if (rangAudio < dureesAudio.length) {
+        morceaux.push({ piste: "a", premier: rangAudio, nombre: dureesAudio.length - rangAudio });
+        rangAudio = dureesAudio.length;
+      }
+      break;
+    }
+  }
+
+  /** Les octets de `mdat`, dans l'ordre des morceaux, et les décalages relatifs de chacun. */
+  const octetsAudio = audio?.echantillons.map((echantillon) => echantillon.donnees) ?? [];
+  const taillesAudio = octetsAudio.map((donnees) => donnees.length);
+
+  const decalages: { v: number[]; a: number[] } = { v: [], a: [] };
+  const tailleParMorceau: { v: number[]; a: number[] } = { v: [], a: [] };
+  const paquets: Bytes[] = [];
+  let curseur = 0;
+
+  for (const morceau of morceaux) {
+    decalages[morceau.piste].push(curseur);
+    tailleParMorceau[morceau.piste].push(morceau.nombre);
+    const source = morceau.piste === "v" ? echantillons.map((e) => e.donnees) : octetsAudio;
+    for (let rang = morceau.premier; rang < morceau.premier + morceau.nombre; rang++) {
+      const donnees = source[rang]!;
+      paquets.push(donnees);
+      curseur += donnees.length;
+    }
+  }
+
+  const donnees = new Uint8Array(curseur);
   let position = 0;
-  for (const echantillon of echantillons) {
-    donnees.set(echantillon.donnees, position);
-    position += echantillon.donnees.length;
+  for (const paquet of paquets) {
+    donnees.set(paquet, position);
+    position += paquet.length;
   }
   const mdat = boite("mdat", donnees);
 
@@ -261,11 +374,7 @@ export function ecrireMp4({
     "avc1",
     [0, 0, 0, 0, 0, 0], // réservé
     u16(1), // index de référence de données
-    u16(0),
-    u16(0),
-    u32(0),
-    u32(0),
-    u32(0), // pré-défini / réservé
+    u16(0), u16(0), u32(0), u32(0), u32(0), // pré-défini / réservé
     u16(largeur),
     u16(hauteur),
     u32(0x00480000), // 72 dpi horizontaux
@@ -278,115 +387,155 @@ export function ecrireMp4({
     avcC,
   );
 
-  const construireMoov = (decalageChunk: number): Bytes => {
-    const stbl = boite(
+  /** `mp4a` — l'entrée de description de la piste audio, avec l'`esds` de la source. */
+  const mp4a = audio
+    ? boite(
+        "mp4a",
+        [0, 0, 0, 0, 0, 0],
+        u16(1), // index de référence de données
+        u32(0), u32(0), // version, révision, fournisseur
+        u16(audio.canaux),
+        u16(16), // taille d'échantillon, valeur conventionnelle pour un flux compressé
+        u16(0), u16(0), // pré-défini, réservé
+        u32(audio.frequence * 0x10000), // 16.16
+        audio.esds,
+      )
+    : undefined;
+
+  /** `stsc` — combien d'échantillons par morceau, compressé en séries. */
+  const stsc = (nombres: number[]): Bytes => {
+    const series: [premier: number, nombre: number][] = [];
+    nombres.forEach((nombre, rang) => {
+      const derniere = series.at(-1);
+      if (derniere && derniere[1] === nombre) return;
+      series.push([rang + 1, nombre]);
+    });
+    return boite(
+      "stsc",
+      pleine(),
+      u32(series.length),
+      series.flatMap(([premier, nombre]) => [...u32(premier), ...u32(nombre), ...u32(1)]),
+    );
+  };
+
+  const stco = (offsets: number[], base: number): Bytes =>
+    boite("stco", pleine(), u32(offsets.length), offsets.flatMap((offset) => u32(offset + base)));
+
+  const construireMoov = (base: number): Bytes => {
+    const stblVideo = boite(
       "stbl",
       boite("stsd", pleine(), u32(1), avc1),
-      stts(dureesParEchantillon),
+      stts(dureesVideo),
       ...ctts(presentation.map((date, rang) => date - decodage[rang]!)),
       ...stss(echantillons),
-      // Un seul chunk contient tous les échantillons : la table de correspondance tient
-      // donc en une entrée, et `stco` en un décalage.
-      boite("stsc", pleine(), u32(1), u32(1), u32(echantillons.length), u32(1)),
-      boite(
-        "stsz",
-        pleine(),
-        u32(0),
-        u32(tailles.length),
-        tailles.flatMap(u32),
-      ),
-      boite("stco", pleine(), u32(1), u32(decalageChunk)),
+      stsc(tailleParMorceau.v),
+      boite("stsz", pleine(), u32(0), u32(taillesVideo.length), taillesVideo.flatMap(u32)),
+      stco(decalages.v, base),
     );
 
-    const minf = boite(
-      "minf",
-      boite("vmhd", pleine(1), u16(0), u16(0), u16(0), u16(0)),
-      boite("dinf", boite("dref", pleine(), u32(1), boite("url ", pleine(1)))),
-      stbl,
-    );
-
-    const mdia = boite(
-      "mdia",
-      boite(
-        "mdhd",
-        pleine(),
-        u32(0),
-        u32(0),
-        u32(TIMESCALE_US),
-        u32(dureeTotale),
-        u16(0x55c4),
-        u16(0),
-      ),
-      boite(
-        "hdlr",
-        pleine(),
-        u32(0),
-        encodeur.encode("vide"),
-        u32(0),
-        u32(0),
-        u32(0),
-        encodeur.encode("VideoHandler\0"),
-      ),
-      minf,
-    );
-
-    const trak = boite(
+    const trakVideo = boite(
       "trak",
       boite(
         "tkhd",
         pleine(3), // activée, et présente dans le film
-        u32(0),
-        u32(0),
+        u32(0), u32(0),
         u32(1), // identifiant de piste
         u32(0),
-        u32(dureeTotale),
-        u32(0),
-        u32(0),
-        u16(0),
-        u16(0),
+        u32(dureeVideo),
+        u32(0), u32(0),
+        u16(0), u16(0),
         u16(0), // volume : nul pour une piste vidéo
         u16(0),
         MATRICES[rotation],
         u32(largeur * 0x10000),
         u32(hauteur * 0x10000),
       ),
-      mdia,
+      boite(
+        "mdia",
+        boite("mdhd", pleine(), u32(0), u32(0), u32(TIMESCALE_US), u32(dureeVideo), u16(0x55c4), u16(0)),
+        boite("hdlr", pleine(), u32(0), encodeur.encode("vide"), u32(0), u32(0), u32(0), encodeur.encode("VideoHandler\0")),
+        boite(
+          "minf",
+          boite("vmhd", pleine(1), u16(0), u16(0), u16(0), u16(0)),
+          boite("dinf", boite("dref", pleine(), u32(1), boite("url ", pleine(1)))),
+          stblVideo,
+        ),
+      ),
     );
 
-    const moov = boite(
+    const trakAudio =
+      audio && mp4a
+        ? [
+            boite(
+              "trak",
+              boite(
+                "tkhd",
+                pleine(3),
+                u32(0), u32(0),
+                u32(2), // seconde piste
+                u32(0),
+                u32(Math.round((dureeAudio / audio.timescale) * TIMESCALE_US)),
+                u32(0), u32(0),
+                u16(0), u16(0),
+                u16(0x0100), // volume plein : c'est une piste sonore
+                u16(0),
+                MATRICES[0], // une piste audio ne tourne pas
+                u32(0), // ni largeur, ni hauteur
+                u32(0),
+              ),
+              boite(
+                "mdia",
+                // **L'échelle de temps de la source**, conservée telle quelle : une trame
+                // AAC dure 1024 échantillons, ce qui ne tombe juste dans aucune échelle en
+                // microsecondes. Convertir ici, c'est arrondir à chaque trame, et une
+                // dérive de quelques millisecondes en fin de fichier.
+                boite("mdhd", pleine(), u32(0), u32(0), u32(audio.timescale), u32(dureeAudio), u16(0x55c4), u16(0)),
+                boite("hdlr", pleine(), u32(0), encodeur.encode("soun"), u32(0), u32(0), u32(0), encodeur.encode("SoundHandler\0")),
+                boite(
+                  "minf",
+                  boite("smhd", pleine(), u16(0), u16(0)),
+                  boite("dinf", boite("dref", pleine(), u32(1), boite("url ", pleine(1)))),
+                  boite(
+                    "stbl",
+                    boite("stsd", pleine(), u32(1), mp4a),
+                    stts(dureesAudio),
+                    // Aucune `stss` : toute trame AAC est un point d'entrée.
+                    stsc(tailleParMorceau.a),
+                    boite("stsz", pleine(), u32(0), u32(taillesAudio.length), taillesAudio.flatMap(u32)),
+                    stco(decalages.a, base),
+                  ),
+                ),
+              ),
+            ),
+          ]
+        : [];
+
+    return boite(
       "moov",
       boite(
         "mvhd",
         pleine(),
-        u32(0),
-        u32(0),
+        u32(0), u32(0),
         u32(TIMESCALE_US),
-        u32(dureeTotale),
+        u32(dureeFilm),
         u32(0x00010000), // vitesse normale
         u16(0x0100), // volume plein
         u16(0),
-        u32(0),
-        u32(0),
+        u32(0), u32(0),
         MATRICE_UNITE,
-        u32(0),
-        u32(0),
-        u32(0),
-        u32(0),
-        u32(0),
-        u32(0),
-        u32(2), // prochain identifiant de piste
+        u32(0), u32(0), u32(0), u32(0), u32(0), u32(0),
+        u32(trakAudio.length > 0 ? 3 : 2), // prochain identifiant de piste
       ),
-      trak,
+      trakVideo,
+      ...trakAudio,
     );
-
-    return moov;
   };
 
   /*
    * Deux passes, et c'est tout ce que coûte le faststart : la première apprend la
    * **longueur** de `moov` — qui ne dépend pas des décalages qu'il contient, un `stco`
-   * occupe quatre octets quelle que soit sa valeur —, la seconde y écrit le vrai décalage
-   * du premier chunk, maintenant connu.
+   * occupe quatre octets quelle que soit sa valeur —, la seconde y écrit les vrais
+   * décalages, maintenant connus.
    */
   const moov = construireMoov(ftyp.length + construireMoov(0).length + 8);
 

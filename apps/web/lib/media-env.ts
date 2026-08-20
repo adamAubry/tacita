@@ -75,8 +75,10 @@ async function dessiner(source: ImageBitmap, maxEdge: number, mimeType: string, 
  * bloque le thread principal une demi-seconde, et cet objet est transférable dans un
  * worker le jour où on l'y déplace (contrainte spec 08).
  */
-export function environnementMedia(): MediaEnvironment {
+export function environnementMedia(options: { signaler?: MediaEnvironment["signaler"] } = {}): MediaEnvironment {
   return {
+    /** REQ-MED-13 — le canal par lequel le pipeline dit ce qu'il a dû abandonner. */
+    signaler: options.signaler,
     subtle: globalThis.crypto.subtle,
     getRandomValues: (bytes) => {
       globalThis.crypto.getRandomValues(bytes);
@@ -137,7 +139,14 @@ export function environnementMedia(): MediaEnvironment {
         const worker = new Worker(new URL("./transcode-worker.ts", import.meta.url));
         worker.onmessage = ({ data }: MessageEvent<ReponseTranscodage>) => {
           worker.terminate();
-          if (data.ok) resoudre({ blob: data.blob, width: data.width, height: data.height, durationMs: data.durationMs });
+          if (data.ok)
+            resoudre({
+              blob: data.blob,
+              width: data.width,
+              height: data.height,
+              durationMs: data.durationMs,
+              sansSon: data.sansSon,
+            });
           else rejeter(new TranscodageIndisponible("video", data.message));
         };
         worker.onerror = () => {

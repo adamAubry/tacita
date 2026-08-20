@@ -92,7 +92,7 @@ export function Conversation({ roomId }: { roomId: string }) {
   // lit `navigator.connection`, ni l'un ni l'autre à refaire à chaque rendu. Les deux
   // gestes qui l'accompagnent — déchiffrer, sauvegarder — viennent du même endroit que
   // pour les autres écrans à médias.
-  const { env, telecharger, sauvegarder } = useMediaActions(session);
+  const { env, avis, telecharger, sauvegarder } = useMediaActions(session);
   /**
    * REQ-MED-04 — l'échec **dédié** de la compression, distinct de l'absence de bouton.
    *
@@ -290,10 +290,16 @@ export function Conversation({ roomId }: { roomId: string }) {
     if (!session || !outbox) return;
     setEnvoiMedia(true);
     setErreurMedia(undefined);
+    avis.current = undefined;
     try {
       for (const fichier of fichiers) {
         const contenu = await uploadAttachment(session, env, fichier);
         await outbox.enqueue(roomId, contenu);
+      }
+      // REQ-MED-13 — la vidéo est partie ; ce qu'elle a laissé en route se dit maintenant,
+      // à l'expéditeur et à lui seul.
+      if (avis.current === "video-sans-son") {
+        setErreurMedia("Cette vidéo est partie sans le son : son format audio ne peut pas être transporté.");
       }
     } catch (cause) {
       // REQ-MED-10 — le message ne cite jamais le fichier : ni son nom, ni ses octets.

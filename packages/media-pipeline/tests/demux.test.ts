@@ -38,7 +38,8 @@ describe("REQ-MED-04 — démuxage : ce qu'une bibliothèque indépendante lit d
     expect(source.echantillons).toHaveLength(30);
     expect(source.dureeMs).toBe(1000);
     expect(source.pistes).toBe(1);
-    expect(source.audio).toBe(false);
+    expect(source.audio).toBeUndefined();
+    expect(source.audioAbandonne).toBe(false);
     // Le débit est **mesuré** sur les échantillons, pas lu dans un en-tête : 30 × 24 o
     // sur une seconde.
     expect(source.debitBps).toBe(30 * 24 * 8);
@@ -159,5 +160,124 @@ describe("REQ-MED-04 — faststart : `moov` avant `mdat`", () => {
         ...origine[rang]!.donnees,
       ]);
     }
+  });
+});
+
+/**
+ * REQ-MED-13 — **la seconde piste, de bout en bout.**
+ *
+ * L'`esds` est fabriqué ici à la main parce qu'aucun encodeur n'existe dans Node : ce que
+ * le test prouve, c'est que le muxeur écrit une piste sonore qu'une implémentation
+ * indépendante retrouve, avec ses échantillons intacts, ses durées exactes et ses deux
+ * pistes entrelacées. Ce qu'il ne prouve pas — qu'un lecteur réel rende le son — se mesure
+ * au navigateur et se consigne avec sa date.
+ */
+describe("REQ-MED-13 — piste audio : recopiée, entrelacée, relue", () => {
+  /** Un `esds` minimal mais conforme : ES → DecoderConfig → AudioSpecificConfig AAC-LC. */
+  const ESDS = new Uint8Array([
+    0, 0, 0, 0x27, ...[..."esds"].map((c) => c.charCodeAt(0)),
+    0, 0, 0, 0, // version + drapeaux
+    0x03, 0x19, 0x00, 0x02, 0x00, // ES_Descriptor
+    0x04, 0x11, 0x40, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xf4, 0x00, 0x00, 0x01, 0xf4, 0x00,
+    0x05, 0x02, 0x12, 0x10, // DecoderSpecificInfo : AAC-LC, 44,1 kHz, stéréo
+    0x06, 0x01, 0x02,
+  ]) as Bytes;
+
+  const TRAME = 1024;
+  const audio = (nombre: number) => ({
+    esds: ESDS,
+    timescale: 44_100,
+    frequence: 44_100,
+    canaux: 2,
+    echantillons: Array.from({ length: nombre }, (_u, rang) => ({
+      donnees: new Uint8Array([0x21, rang & 0xff, 0x00, 0x00, 0x00, 0x00]) as Bytes,
+      duree: TRAME,
+    })),
+  });
+
+  it("la piste sonore ressort avec ses échantillons, ses durées et son format", async () => {
+    // 30 images à 33 ms et 43 trames AAC : environ une seconde de chaque.
+    const fichier = ecrireMp4({
+      largeur: 640,
+      hauteur: 360,
+      description: DESCRIPTION,
+      echantillons: echantillons(30),
+      audio: audio(43),
+    });
+    const source = await lireMp4(fichier);
+
+    expect(source.pistes).toBe(2);
+    expect(source.audio).toBeDefined();
+    expect(source.audio!.canaux).toBe(2);
+    expect(source.audio!.frequence).toBe(44_100);
+    expect(source.audio!.timescale).toBe(44_100);
+    expect(source.audio!.echantillons).toHaveLength(43);
+    // Les durées sont **recopiées**, pas recalculées : 1024 échantillons par trame, à
+    // l'unité près, donc aucune dérive au bout de cinq minutes comme au bout d'une.
+    expect(source.audio!.echantillons.every((e) => e.duree === TRAME)).toBe(true);
+    expect([...source.audio!.echantillons[7]!.donnees]).toEqual([0x21, 7, 0, 0, 0, 0]);
+    // La vidéo n'a pas bougé pour autant.
+    expect(source.echantillons).toHaveLength(30);
+  });
+
+  it("l'aller-retour complet conserve les deux pistes", async () => {
+    const premier = ecrireMp4({
+      largeur: 320,
+      hauteur: 240,
+      description: DESCRIPTION,
+      echantillons: echantillons(10),
+      audio: audio(14),
+    });
+    const relu = await lireMp4(premier);
+    // On remuxe ce qu'on vient de lire — c'est exactement ce que fait le chemin rapide.
+    const second = await lireMp4(
+      ecrireMp4({
+        largeur: relu.largeur,
+        hauteur: relu.hauteur,
+        description: relu.description,
+        echantillons: relu.echantillons,
+        audio: relu.audio,
+      }),
+    );
+
+    expect(second.audio!.echantillons).toHaveLength(14);
+    expect(second.echantillons).toHaveLength(10);
+    expect([...second.audio!.echantillons[3]!.donnees]).toEqual([0x21, 3, 0, 0, 0, 0]);
+  });
+
+  it("les deux pistes sont entrelacées, pas rangées bout à bout", async () => {
+    // Trois secondes de chaque : sans entrelacement, la table de la vidéo aurait un seul
+    // morceau, et celle de l'audio un seul aussi.
+    const fichier = ecrireMp4({
+      largeur: 320,
+      hauteur: 240,
+      description: DESCRIPTION,
+      echantillons: echantillons(90),
+      audio: audio(129),
+    });
+
+    // `stsc` compresse les séries : plusieurs morceaux par piste s'y voient à ce que la
+    // table décrive plus d'un premier morceau, ou à ce que `stco` porte plusieurs adresses.
+    const texte = new TextDecoder("latin1").decode(fichier);
+    const stco = texte.indexOf("stco");
+    const nombreDeMorceaux = new DataView(fichier.buffer, fichier.byteOffset).getUint32(stco + 8);
+    expect(nombreDeMorceaux).toBeGreaterThan(1);
+
+    // Et la relecture reste juste, ce qui est le vrai risque d'un `stco` à plusieurs entrées.
+    const source = await lireMp4(fichier);
+    expect(source.echantillons).toHaveLength(90);
+    expect(source.audio!.echantillons).toHaveLength(129);
+    expect([...source.echantillons[64]!.donnees]).toEqual([...echantillons(90)[64]!.donnees]);
+  });
+
+  it("sans son, le fichier reste mono-piste — jamais une piste vide", () => {
+    const fichier = ecrireMp4({
+      largeur: 320,
+      hauteur: 240,
+      description: DESCRIPTION,
+      echantillons: echantillons(4),
+    });
+    expect(new TextDecoder("latin1").decode(fichier)).not.toContain("mp4a");
+    expect(new TextDecoder("latin1").decode(fichier)).not.toContain("soun");
   });
 });

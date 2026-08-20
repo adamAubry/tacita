@@ -9,7 +9,7 @@ import {
 } from "mp4box";
 
 import type { Bytes } from "./attachments";
-import type { EchantillonVideo, Rotation } from "./mp4";
+import type { EchantillonVideo, PisteAudio, Rotation } from "./mp4";
 
 /**
  * REQ-MED-04 / E-17 — **le démuxage d'un fichier entrant, par bibliothèque.**
@@ -51,8 +51,17 @@ export interface SourceVideo {
   echantillons: EchantillonVideo[];
   /** Nombre total de pistes de la source, vidéo comprise. */
   pistes: number;
-  /** La source porte-t-elle du son ? Tant que le muxeur n'écrit qu'une piste, il se perd. */
-  audio: boolean;
+  /**
+   * REQ-MED-13 — la piste audio **transportable**, quand il y en a une.
+   *
+   * Absente quand la source n'a pas de son, ou quand son codec n'est pas de l'AAC : ce
+   * muxeur recopie une piste, il n'en convertit aucune. Le second cas est signalé par
+   * `audioAbandonne`, parce que « pas de son » et « du son qu'on n'a pas su emporter » ne
+   * demandent pas la même phrase à l'écran.
+   */
+  audio?: PisteAudio;
+  /** La source avait du son, et il ne part pas : l'UI doit le dire (REQ-MED-13). */
+  audioAbandonne: boolean;
 }
 
 const signe = (valeur: number): number => (valeur > 0x7fffffff ? valeur - 0x100000000 : valeur);
@@ -77,8 +86,8 @@ export function rotationDeMatrice(matrice: Matrix | undefined): Rotation {
   return 0;
 }
 
-/** L'`avcC` de la piste, sorti tel quel de sa boîte — huit octets d'en-tête retirés. */
-function descriptionDe(fichier: ISOFile, pisteId: number): Bytes {
+/** La boîte de configuration d'une piste, écrite telle quelle par mp4box. */
+function boiteDe(fichier: ISOFile, pisteId: number, noms: string[], entete: boolean): Bytes {
   const piste = fichier.getTrackById(pisteId);
   /*
    * La boîte de configuration porte un nom par codec — `avcC`, `hvcC`, `vpcC`, `av1C` —
@@ -93,13 +102,15 @@ function descriptionDe(fichier: ISOFile, pisteId: number): Bytes {
   >[];
 
   for (const entree of entrees) {
-    const config = entree.avcC ?? entree.hvcC ?? entree.vpcC ?? entree.av1C;
+    const config = noms.map((nom) => entree[nom]).find(Boolean);
     if (!config) continue;
     const flux = new DataStream(undefined, 0, Endianness.BIG_ENDIAN);
     config.write(flux);
-    return new Uint8Array(flux.buffer.slice(8)) as Bytes;
+    // La vidéo veut le **contenu** de `avcC` (le muxeur réécrit la boîte) ; l'audio veut
+    // la boîte `esds` **entière**, en-tête compris, parce qu'elle est recopiée telle quelle.
+    return new Uint8Array(entete ? flux.buffer : flux.buffer.slice(8)) as Bytes;
   }
-  throw new Error("piste vidéo sans description de codec : source illisible");
+  throw new Error(`piste sans description de codec (${noms.join(", ")}) : source illisible`);
 }
 
 /**
@@ -124,21 +135,36 @@ export async function lireMp4(octets: Bytes): Promise<SourceVideo> {
         return;
       }
 
+      // REQ-MED-13 — la piste audio n'est reprise que si elle est **de l'AAC** : le
+      // muxeur recopie une piste, il n'en convertit aucune (voir `SourceVideo.audio`).
+      const pisteAudio = info.audioTracks?.[0];
+      const audioReprise = pisteAudio?.codec.startsWith("mp4a") === true;
+
       const echantillons: EchantillonVideo[] = [];
-      fichier.onSamples = (_id, _user, lot: Sample[]) => {
+      const echantillonsAudio: PisteAudio["echantillons"] = [];
+      fichier.onSamples = (id, _user, lot: Sample[]) => {
         for (const brut of lot) {
           if (!brut.data) continue;
-          echantillons.push({
-            donnees: new Uint8Array(brut.data) as Bytes,
-            // `cts` est la date de **présentation** : c'est ce que le muxeur attend, et
-            // ce dont il redérive l'ordre de décodage.
-            timestampUs: Math.round((brut.cts / brut.timescale) * 1_000_000),
-            cle: brut.is_sync,
-          });
+          if (id === piste.id) {
+            echantillons.push({
+              donnees: new Uint8Array(brut.data) as Bytes,
+              // `cts` est la date de **présentation** : c'est ce que le muxeur attend, et
+              // ce dont il redérive l'ordre de décodage.
+              timestampUs: Math.round((brut.cts / brut.timescale) * 1_000_000),
+              cle: brut.is_sync,
+            });
+          } else {
+            // La durée **déclarée**, dans l'échelle de la source : la recalculer
+            // introduirait la dérive que conserver l'échelle supprime.
+            echantillonsAudio.push({ donnees: new Uint8Array(brut.data) as Bytes, duree: brut.duration });
+          }
         }
       };
 
       fichier.setExtractionOptions(piste.id, null, { nbSamples: Number.MAX_SAFE_INTEGER });
+      if (pisteAudio && audioReprise) {
+        fichier.setExtractionOptions(pisteAudio.id, null, { nbSamples: Number.MAX_SAFE_INTEGER });
+      }
       fichier.start();
       fichier.flush();
 
@@ -154,10 +180,20 @@ export async function lireMp4(octets: Bytes): Promise<SourceVideo> {
         // Le débit **mesuré**, pas celui que le conteneur annonce : un champ d'en-tête se
         // recopie d'un transcodage à l'autre et ne décrit plus rien.
         debitBps: dureeMs > 0 ? Math.round((octetsUtiles * 8) / (dureeMs / 1000)) : 0,
-        description: descriptionDe(fichier, piste.id),
+        description: boiteDe(fichier, piste.id, ["avcC", "hvcC", "vpcC", "av1C"], false),
         echantillons,
         pistes: info.tracks?.length ?? 1,
-        audio: (info.audioTracks?.length ?? 0) > 0,
+        audio:
+          pisteAudio && audioReprise && echantillonsAudio.length > 0
+            ? {
+                esds: boiteDe(fichier, pisteAudio.id, ["esds"], true),
+                timescale: pisteAudio.timescale,
+                frequence: pisteAudio.audio?.sample_rate ?? pisteAudio.timescale,
+                canaux: pisteAudio.audio?.channel_count ?? 2,
+                echantillons: echantillonsAudio,
+              }
+            : undefined,
+        audioAbandonne: pisteAudio !== undefined && !audioReprise,
       });
     };
 

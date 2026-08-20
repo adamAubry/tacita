@@ -7,7 +7,9 @@ import {
   estRendable,
   saveOriginal,
 } from "@tacita/media-pipeline";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
+
+import type { MediaEnvironment } from "@tacita/media-pipeline";
 
 import { environnementMedia } from "../../lib/media-env";
 import type { Media, Telecharger } from "./media";
@@ -29,7 +31,18 @@ import type { Media, Telecharger } from "./media";
  * ouvrirait un second `AudioContext` pour le même écran.
  */
 export function useMediaActions(session: Session | null) {
-  const env = useMemo(() => environnementMedia(), []);
+  /**
+   * REQ-MED-13 — la dernière chose que le pipeline a dû abandonner, déposée ici.
+   *
+   * Une boîte plutôt qu'un état React : l'avis se lit **juste après** l'appel qui l'a
+   * produit, dans la même fonction, et n'a aucune raison de provoquer un rendu par
+   * lui-même. C'est l'appelant qui décide s'il en fait un message.
+   */
+  const avis = useRef<Parameters<NonNullable<MediaEnvironment["signaler"]>>[0] | undefined>(undefined);
+  const env = useMemo(
+    () => environnementMedia({ signaler: (recu) => { avis.current = recu; } }),
+    [],
+  );
 
   const telecharger = useCallback<Telecharger>(
     async (fichier, mimeType) => {
@@ -72,5 +85,5 @@ export function useMediaActions(session: Session | null) {
     [session, telecharger, env],
   );
 
-  return { env, telecharger, sauvegarder };
+  return { env, avis, telecharger, sauvegarder };
 }

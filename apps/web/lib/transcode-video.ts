@@ -100,7 +100,7 @@ async function attendre(pleine: () => boolean): Promise<void> {
  * REQ-MED-04 / E-18 — **le chemin rapide** : une source déjà conforme change de
  * conteneur, pas de pixels. Zéro attente, zéro génération de perte.
  */
-function remuxer(source: SourceVideo): Raster & { durationMs: number } {
+function remuxer(source: SourceVideo): Sortie {
   return {
     blob: enMp4(
       ecrireMp4({
@@ -109,9 +109,13 @@ function remuxer(source: SourceVideo): Raster & { durationMs: number } {
         description: source.description,
         echantillons: source.echantillons,
         rotation: source.rotation,
+        // REQ-MED-13 — la piste sonore suit **sans être touchée**, ce qui est tout
+        // l'intérêt : sur ce chemin, rien n'est réencodé, ni l'image ni le son.
+        audio: source.audio,
       }),
     ),
     ...calibre(source.largeur, source.hauteur, source.rotation, source.dureeMs),
+    sansSon: source.audioAbandonne,
   };
 }
 
@@ -128,10 +132,9 @@ function echantillonDe(morceau: EncodedVideoChunk): EchantillonVideo {
  * Lève quand ce navigateur ne sait pas encoder : c'est le message d'échec dédié de l'UI
  * qui prend le relais (REQ-MED-04), jamais un fichier approximatif.
  */
-export async function transcoderVideo(
-  blob: Blob,
-  cibles: VideoTargets,
-): Promise<Raster & { durationMs: number }> {
+type Sortie = Raster & { durationMs: number; sansSon: boolean };
+
+export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise<Sortie> {
   const source = await lireMp4(new Uint8Array(await blob.arrayBuffer()) as Bytes);
 
   if (remuxable(source, cibles)) return remuxer(source);
@@ -235,8 +238,19 @@ export async function transcoderVideo(
 
   return {
     blob: enMp4(
-      ecrireMp4({ largeur, hauteur, description, echantillons, rotation: source.rotation }),
+      ecrireMp4({
+        largeur,
+        hauteur,
+        description,
+        echantillons,
+        rotation: source.rotation,
+        // Le son n'est **jamais** réencodé, même quand l'image l'est : une piste AAC-LC
+        // est déjà au format de sortie, et la repasser dans un encodeur ne ferait que lui
+        // coûter une génération.
+        audio: source.audio,
+      }),
     ),
     ...calibre(largeur, hauteur, source.rotation, source.dureeMs),
+    sansSon: source.audioAbandonne,
   };
 }
