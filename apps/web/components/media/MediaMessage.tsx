@@ -114,7 +114,9 @@ export function MediaMessage({
 }: MediaMessageProps) {
   // La vignette d'abord : c'est elle qui est petite. Le média entier n'est déchiffré
   // qu'à l'ouverture du viewer.
-  const visuel = useBlob(media.vignette ?? undefined, telecharger, "image/jpeg");
+  // Le type vient de `thumbnail_info` : la vignette est en WebP depuis qu'elle a doublé
+  // de côté, et en JPEG là où l'expéditeur ne savait pas l'encoder (REQ-MED-03).
+  const visuel = useBlob(media.vignette ?? undefined, telecharger, media.vignetteMime ?? "image/jpeg");
   // Le type du blob vient de l'événement : un `<audio>` dont la source est un blob
   // `application/octet-stream` ne sait pas ce qu'il lit (voir `Media.mime`).
   const audio = useBlob(

@@ -21,6 +21,14 @@ export interface Media {
   fichier: EncryptedFile;
   /** Vignette chiffrée à part, avec sa propre clé. Absente sur audio et fichier. */
   vignette?: EncryptedFile;
+  /**
+   * Le type de la vignette, tel que `thumbnail_info` le déclare.
+   *
+   * Il n'a pas toujours été le même que celui du média : la vignette est en WebP depuis
+   * qu'elle a doublé de côté, et en JPEG là où le navigateur de l'expéditeur ne savait pas
+   * l'encoder. Le coder en dur ferait rendre un WebP sous une étiquette JPEG.
+   */
+  vignetteMime?: string;
   taille?: number;
   /**
    * `info.mimetype`, tel que le pipeline l'écrit (REQ-MED-02).
@@ -74,6 +82,10 @@ export function mediaDe(evenement: EvenementLu): Media | undefined {
     nom: typeof contenu.body === "string" ? contenu.body : "",
     fichier,
     vignette: info.thumbnail_file as EncryptedFile | undefined,
+    vignetteMime:
+      typeof (info.thumbnail_info as Record<string, unknown> | undefined)?.mimetype === "string"
+        ? ((info.thumbnail_info as Record<string, string>).mimetype)
+        : undefined,
     taille: typeof info.size === "number" ? info.size : undefined,
     mime: typeof info.mimetype === "string" ? info.mimetype : undefined,
     largeur: typeof info.w === "number" ? info.w : undefined,

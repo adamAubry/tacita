@@ -28,8 +28,20 @@ export const PROFILES: Record<NetworkProfile, { image: ImageTargets; video: Vide
   },
 };
 
-/** Vignette : indépendante du profil réseau, elle est déjà minuscule. */
-export const THUMBNAIL: ImageTargets = { maxEdge: 320, quality: 0.7, mimeType: "image/jpeg" };
+/**
+ * Vignette : indépendante du profil réseau, elle est déjà minuscule.
+ *
+ * **512 px et WebP depuis le 20/08/2026.** 320 px était sous-dimensionné : une vignette
+ * qui occupe 220 px CSS sur un écran à trois pixels physiques par point en demande 660 —
+ * elle était floue sur tout téléphone récent. Le WebP à 0,75 reprend largement le poids
+ * que la résolution ajoute, et reste sous celui du JPEG à 320.
+ *
+ * Le repli JPEG n'est pas une préférence, c'est une nécessité **vérifiée** : un canvas à
+ * qui l'on demande un type qu'il ne sait pas encoder rend du PNG **sans le dire**, et un
+ * PNG de photo pèse plusieurs fois le JPEG qu'il remplace. C'est `resizeImage` qui doit
+ * relire le type obtenu, pas le supposer.
+ */
+export const THUMBNAIL: ImageTargets = { maxEdge: 512, quality: 0.75, mimeType: "image/webp" };
 
 export interface NetworkInformation {
   effectiveType?: string;

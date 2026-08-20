@@ -64,7 +64,17 @@ async function dessiner(source: ImageBitmap, maxEdge: number, mimeType: string, 
 
   contexte.drawImage(source, 0, 0, width, height);
   source.close();
-  return { blob: await canvas.convertToBlob({ type: mimeType, quality }), width, height };
+
+  const blob = await canvas.convertToBlob({ type: mimeType, quality });
+  /*
+   * **Le repli se vérifie, il ne se suppose pas.** Un canvas à qui l'on demande un type
+   * qu'il ne sait pas encoder ne lève pas : il rend du **PNG**, silencieusement, et un PNG
+   * de photo pèse plusieurs fois le JPEG qu'il devait remplacer. La vignette WebP de
+   * `THUMBNAIL` deviendrait donc plus lourde là où elle n'est pas supportée — l'inverse
+   * exact de ce qu'on cherchait.
+   */
+  if (blob.type === mimeType || mimeType === "image/jpeg") return { blob, width, height };
+  return { blob: await canvas.convertToBlob({ type: "image/jpeg", quality }), width, height };
 }
 
 /**

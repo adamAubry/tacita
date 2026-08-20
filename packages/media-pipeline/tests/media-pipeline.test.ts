@@ -13,6 +13,7 @@ import {
   MediaIntegrityError,
   PROFILES,
   saveOriginal,
+  THUMBNAIL,
   uploadAttachment,
   uploadPublicProfileImage,
   waveform,
@@ -178,6 +179,37 @@ describe("REQ-MED-03 — vignettes générées côté client, chiffrées sépar�
     expect(thumbnail.iv).not.toBe(content.file.iv);
     // `/thumbnail` côté serveur est exclu : il ne sait pas déchiffrer le blob.
     expect(fake.client.mxcUrlToHttp).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **Le type déclaré est celui qu'on a obtenu, pas celui qu'on visait.**
+   *
+   * Un canvas à qui l'on demande un format qu'il ne sait pas encoder rend du PNG sans
+   * lever : la cible est WebP depuis que la vignette a doublé de côté, et là où elle
+   * n'est pas supportée le shard retombe sur du JPEG. Écrire `THUMBNAIL.mimeType` dans
+   * l'événement ferait mentir celui-ci sur ses propres octets, et le destinataire
+   * construirait un Blob d'un type qui n'est pas le sien.
+   */
+  it("`thumbnail_info` déclare le type réellement produit", async () => {
+    const repli = fakeEnv({
+      resizeImage: vi.fn(async () => ({
+        blob: new Blob(["vignette"], { type: "image/jpeg" }),
+        width: 512,
+        height: 256,
+      })),
+    }) as unknown as MediaEnvironment;
+
+    const content = await uploadAttachment(
+      session,
+      repli,
+      new File([bytes("jpeg")], "chat.jpg", { type: "image/jpeg" }),
+    );
+    expect(THUMBNAIL.mimeType).toBe("image/webp");
+    expect((content.info.thumbnail_info as Record<string, unknown>).mimetype).toBe("image/jpeg");
+  });
+
+  it("la vignette vise 512 px de côté long — 320 était flou sur tout écran dense", () => {
+    expect(THUMBNAIL.maxEdge).toBe(512);
   });
 
   it("dérive la vignette d'une image extraite de la vidéo", async () => {

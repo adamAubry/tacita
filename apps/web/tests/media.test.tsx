@@ -83,6 +83,39 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
     expect(screen.getByAltText("plage.jpg").getAttribute("src")).toMatch(/^blob:/);
   });
 
+  it("la vignette est déchiffrée sous le type que l'événement lui donne", async () => {
+    // Elle est en WebP depuis qu'elle a doublé de côté, et en JPEG là où l'expéditeur ne
+    // savait pas l'encoder : le type se lit dans `thumbnail_info`, il ne se devine pas.
+    const webp = mediaDe(
+      evenement({
+        msgtype: "m.image",
+        body: "plage.jpg",
+        file: FICHIER,
+        info: {
+          mimetype: "image/jpeg",
+          thumbnail_file: VIGNETTE,
+          thumbnail_info: { mimetype: "image/webp", w: 512, h: 288 },
+        },
+      }),
+    )!;
+    expect(webp.vignetteMime).toBe("image/webp");
+
+    render(<MediaMessage media={webp} telecharger={telecharger} />);
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(VIGNETTE, "image/webp"));
+  });
+
+  /**
+   * Le repli de format ne se suppose pas : un canvas à qui l'on demande un type qu'il ne
+   * sait pas encoder rend du **PNG** en silence, et un PNG de photo pèse plusieurs fois le
+   * JPEG qu'il remplace — la vignette deviendrait plus lourde là où elle devait s'alléger.
+   * jsdom n'a pas d'`OffscreenCanvas` : c'est la source qui est lue (règle 7).
+   */
+  it("le repli de format de la vignette relit le type obtenu", () => {
+    const source = sansCommentaires(lire("lib/media-env.ts"));
+    expect(source).toContain("blob.type === mimeType");
+    expect(source).toContain('convertToBlob({ type: "image/jpeg", quality })');
+  });
+
   it("en attente du déchiffrement, un skeleton — pas un trou qui déplace la timeline", () => {
     // Une promesse qui ne se résout jamais : le déchiffrement est « en cours », et c'est
     // exactement l'état que le skeleton doit rendre.

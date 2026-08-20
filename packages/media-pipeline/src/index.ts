@@ -158,7 +158,10 @@ async function thumbnailOf(
   return {
     thumbnail_file: await encryptAndUpload(session, env, raster.blob),
     thumbnail_info: {
-      mimetype: THUMBNAIL.mimeType,
+      // **Le type obtenu, pas le type demandé.** Un canvas qui ne sait pas encoder le
+      // format demandé rend du PNG en silence ; écrire ici la cible ferait mentir
+      // l'événement sur ses propres octets, et le destinataire lirait un type faux.
+      mimetype: raster.blob.type || THUMBNAIL.mimeType,
       w: raster.width,
       h: raster.height,
       size: raster.blob.size,
