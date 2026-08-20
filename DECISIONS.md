@@ -128,7 +128,7 @@ Si la file reprend un téléversement après redémarrage, le chiffré doit êtr
 
 **Ce qui déplacerait la conclusion** est nommé par D-06 et reste post-V1 : une clé de pickle sur le store crypto **plus** un écran de déverrouillage à chaque ouverture. Le jour où cette décision sera prise, le store de la file et le cache de ciphertext (REQ-MED-16) devront entrer dans le même périmètre — sans quoi on chiffrerait la serrure en laissant la porte.
 
-## D-11 — Padding de taille des blobs médias
+## D-11 — Padding de taille des blobs médias (E-24)
 > **OUVERTE — NON TRANCHÉE au 20/08/2026.** Aucune implémentation ne peut s'en réclamer. Cette entrée existe pour que la question ne se reperde pas, pas pour autoriser quoi que ce soit.
 
 **Le fait.** AES-CTR ne pade pas : la taille du chiffré est celle du clair à l'octet près. À débit quasi constant, taille ÷ débit ≈ durée. On cache donc la durée dans l'événement chiffré et on la redonne par canal latéral.
