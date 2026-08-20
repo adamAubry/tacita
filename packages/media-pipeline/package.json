@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@tacita/outbox": "workspace:*",
-    "@types/node": "^22.10.7"
+    "@types/node": "^22.10.7",
+    "fake-indexeddb": "^6.2.5"
   }
 }

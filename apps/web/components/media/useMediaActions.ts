@@ -7,9 +7,9 @@ import {
   estRendable,
   saveOriginal,
 } from "@tacita/media-pipeline";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import type { MediaEnvironment } from "@tacita/media-pipeline";
+import { ouvrirCacheChiffre, type CacheChiffre, type MediaEnvironment } from "@tacita/media-pipeline";
 
 import { environnementMedia } from "../../lib/media-env";
 import type { Media, Telecharger } from "./media";
@@ -43,6 +43,44 @@ export function useMediaActions(session: Session | null) {
     () => environnementMedia({ signaler: (recu) => { avis.current = recu; } }),
     [],
   );
+
+  /**
+   * REQ-MED-16 — le cache de chiffré, ouvert une fois et **inscrit au registre de wipe**.
+   *
+   * L'inscription est la moitié qui compte : sans elle, un demi-gigaoctet de chiffré
+   * survivrait à la déconnexion. Inerte sans les clés Megolm, donc pas une fuite de
+   * contenu — mais une trace de qui a échangé quoi et quand, sur une machine partagée.
+   *
+   * Le cache est posé sur l'environnement **après** son ouverture : `MediaEnvironment.cache`
+   * est optionnel, et son absence rend simplement chaque téléchargement au réseau, ce qui
+   * était le comportement d'avant. Rien n'attend son arrivée.
+   */
+  useEffect(() => {
+    if (!session) return;
+    let vivant = true;
+    let ouvert: CacheChiffre | undefined;
+
+    void ouvrirCacheChiffre(globalThis.indexedDB)
+      .then((cache) => {
+        if (!vivant) {
+          cache.fermer();
+          return;
+        }
+        ouvert = cache;
+        env.cache = cache;
+        session.registerWipe("media-cache", () => cache.vider());
+      })
+      .catch(() => {
+        // Un cache qui ne s'ouvre pas — quota, mode privé — n'est pas une panne : on
+        // retombe sur le réseau, silencieusement et sans dégrader une garantie.
+      });
+
+    return () => {
+      vivant = false;
+      env.cache = undefined;
+      ouvert?.fermer();
+    };
+  }, [session, env]);
 
   const telecharger = useCallback<Telecharger>(
     async (fichier, mimeType) => {

@@ -191,6 +191,9 @@ importers:
       '@types/node':
         specifier: ^22.10.7
         version: 22.20.1
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
 
   packages/messaging:
     dependencies:

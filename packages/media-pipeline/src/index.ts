@@ -8,6 +8,7 @@ import {
   type CryptoEnvironment,
   type EncryptedFile,
 } from "./attachments";
+import type { CacheChiffre } from "./cache";
 import {
   detectProfile,
   PROFILES,
@@ -38,6 +39,8 @@ export { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
 export { lireWebmOpus } from "./webm";
 export type { WebmOpus } from "./webm";
 export { CODECS_H264, detectProfile, PROFILES, remuxable, THUMBNAIL } from "./profiles";
+export { BUDGET_DEFAUT, ouvrirCacheChiffre } from "./cache";
+export type { CacheChiffre } from "./cache";
 export { estRendable, resoudreType, TAILLE_SNIFF, typeSniffe, TYPES_RENDUS } from "./types-rendus";
 export type { Resolution } from "./types-rendus";
 export type { ImageTargets, NetworkProfile, VideoTargets } from "./profiles";
@@ -94,6 +97,13 @@ export interface MediaEnvironment extends CryptoEnvironment {
   saveViaDownload(blob: Blob, filename: string): Promise<void>;
   /** D-04 — `navigator.connection`, absente sur Safari. */
   connection?: NetworkInformation;
+  /**
+   * REQ-MED-16 — le cache de chiffré, quand le câblage en fournit un.
+   *
+   * Optionnel, et sans repli à écrire : son absence rend simplement chaque téléchargement
+   * au réseau, ce qui était le comportement d'avant.
+   */
+  cache?: CacheChiffre;
   /**
    * REQ-MED-13 — ce que le pipeline a dû abandonner en route, et que l'UI doit dire.
    *
@@ -341,8 +351,26 @@ export async function downloadAttachment(
   env: MediaEnvironment,
   file: EncryptedFile,
 ): Promise<Bytes> {
-  const response = await recupererMedia(session, file.url);
-  return decryptAttachment(new Uint8Array(await response.arrayBuffer()), file, env.subtle);
+  return decryptAttachment(await chiffreDe(session, env, file.url), file, env.subtle);
+}
+
+/**
+ * REQ-MED-16 — le chiffré, du cache s'il y est, du réseau sinon — et alors mis en cache.
+ *
+ * Le cache est interrogé **avant** le réseau et rempli après, et il ne voit que du
+ * chiffré : ce qui en sort repart vers `decryptAttachment` exactement comme ce qui vient
+ * du réseau, avec la même vérification d'intégrité (REQ-MED-08). Un cache empoisonné
+ * échoue donc au hash, comme un blob corrompu en transit.
+ */
+async function chiffreDe(session: Session, env: MediaEnvironment, url: string): Promise<Bytes> {
+  const enCache = await env.cache?.lire(url).catch(() => undefined);
+  if (enCache) return enCache;
+
+  const octets = new Uint8Array(await (await recupererMedia(session, url)).arrayBuffer()) as Bytes;
+  // L'écriture n'est pas attendue : un cache indisponible ou plein ne doit pas retarder
+  // l'affichage, et encore moins le faire échouer.
+  void env.cache?.ecrire(url, octets).catch(() => {});
+  return octets;
 }
 
 /**
@@ -368,8 +396,7 @@ export async function downloadAttachmentToFile(
 ): Promise<void> {
   if (!env.ouvrirEcriture) throw new Error("aucun flux d'écriture : téléchargement par tranches impossible");
 
-  const response = await recupererMedia(session, file.url);
-  const ciphertext = new Uint8Array(await response.arrayBuffer()) as Bytes;
+  const ciphertext = await chiffreDe(session, env, file.url);
 
   // Le fichier n'est ouvert **qu'après** la première tranche : `decryptAttachmentByChunks`
   // vérifie l'empreinte avant de rendre quoi que ce soit, et un fichier vide créé puis
