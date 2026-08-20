@@ -2,6 +2,7 @@ import type { Session } from "@tacita/client-core";
 
 import {
   decryptAttachment,
+  decryptAttachmentByChunks,
   encryptAttachment,
   type Bytes,
   type CryptoEnvironment,
@@ -18,7 +19,15 @@ import {
 
 import { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
 
-export { decryptAttachment, encryptAttachment, MediaIntegrityError } from "./attachments";
+export {
+  decryptAttachment,
+  decryptAttachmentByChunks,
+  encryptAttachment,
+  MediaIntegrityError,
+  TAILLE_TRANCHE,
+} from "./attachments";
+export { SEUILS, verdictTaille } from "./plafonds";
+export type { Seuils, Verdict } from "./plafonds";
 export type { Bytes, EncryptedFile, FileKeys } from "./attachments";
 export { ecrireMp4, TIMESCALE_US } from "./mp4";
 export type { EchantillonVideo, Mp4Options } from "./mp4";
@@ -37,6 +46,12 @@ const WAVEFORM_SCALE = 1024;
 
 /** D-03 — format de sortie unique des vocaux. Tout le reste passe par le transcodeur. */
 export const VOICE_MIME_TYPE = "audio/ogg";
+
+/** Ce qu'un flux d'écriture doit savoir faire, et rien de plus. */
+export interface Ecrivain {
+  write(donnees: Blob | Uint8Array): Promise<void>;
+  close(): Promise<void>;
+}
 
 export interface Raster {
   blob: Blob;
@@ -62,6 +77,14 @@ export interface MediaEnvironment extends CryptoEnvironment {
   decodeAudio(blob: Blob): Promise<{ samples: Float32Array; durationMs: number }>;
   /** REQ-MED-05 — File System Access API, absente de Firefox et Safari. */
   saveViaFilePicker?(blob: Blob, filename: string): Promise<void>;
+  /**
+   * REQ-MED-15 — le **flux** d'écriture de la même API, quand elle est là.
+   *
+   * `saveViaFilePicker` prend un Blob, donc le fichier entier en clair et en mémoire :
+   * c'est précisément ce qu'on veut éviter sur 400 Mo. Celui-ci rend de quoi écrire
+   * tranche par tranche. Absent ⇒ chemin tout-ou-rien, borné par `SEUILS.dur`.
+   */
+  ouvrirEcriture?(filename: string): Promise<Ecrivain>;
   /** REQ-MED-05 — repli : téléchargement classique. */
   saveViaDownload(blob: Blob, filename: string): Promise<void>;
   /** D-04 — `navigator.connection`, absente sur Safari. */
@@ -301,6 +324,46 @@ export async function downloadAttachment(
 ): Promise<Bytes> {
   const response = await recupererMedia(session, file.url);
   return decryptAttachment(new Uint8Array(await response.arrayBuffer()), file, env.subtle);
+}
+
+/**
+ * REQ-MED-15 — **le téléchargement d'un média, sans jamais tenir son clair en entier.**
+ *
+ * Le chiffré descend et se vérifie d'un bloc (REQ-MED-08, mécanisme (a) : rien n'est
+ * déchiffré avant que l'empreinte du tout soit bonne), puis le clair sort par tranches,
+ * chacune écrite et relâchée. Le pic passe d'environ trois fois la taille du fichier à
+ * « le chiffré, plus une tranche ».
+ *
+ * **Le clair va directement à la destination choisie par l'utilisateur** : aucun staging
+ * OPFS, aucun fichier temporaire dans notre origine. Et rien n'est écrit avant la
+ * vérification — un chiffré corrompu lève avant le premier `write`.
+ *
+ * Lève si l'environnement n'expose pas de flux : c'est à l'appelant de le savoir avant
+ * (`verdictTaille` prend `flux` en entrée), pas de le découvrir ici.
+ */
+export async function downloadAttachmentToFile(
+  session: Session,
+  env: MediaEnvironment,
+  file: EncryptedFile,
+  filename: string,
+): Promise<void> {
+  if (!env.ouvrirEcriture) throw new Error("aucun flux d'écriture : téléchargement par tranches impossible");
+
+  const response = await recupererMedia(session, file.url);
+  const ciphertext = new Uint8Array(await response.arrayBuffer()) as Bytes;
+
+  // Le fichier n'est ouvert **qu'après** la première tranche : `decryptAttachmentByChunks`
+  // vérifie l'empreinte avant de rendre quoi que ce soit, et un fichier vide créé puis
+  // abandonné sur une erreur d'intégrité serait un déchet visible pour l'utilisateur.
+  let ecrivain: Ecrivain | undefined;
+  try {
+    for await (const tranche of decryptAttachmentByChunks(ciphertext, file, env.subtle)) {
+      ecrivain ??= await env.ouvrirEcriture(filename);
+      await ecrivain.write(tranche);
+    }
+  } finally {
+    await ecrivain?.close();
+  }
 }
 
 /**

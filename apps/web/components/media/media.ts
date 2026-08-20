@@ -1,4 +1,4 @@
-import type { EncryptedFile } from "@tacita/media-pipeline";
+import { SEUILS, type EncryptedFile, type Seuils } from "@tacita/media-pipeline";
 
 /**
  * Ce que le shard lit d'un événement, et **rien de plus**.
@@ -81,6 +81,31 @@ export function mediaDe(evenement: EvenementLu): Media | undefined {
     dureeMs: typeof info.duration === "number" ? info.duration : audio?.duration,
     ondes: audio?.waveform,
   };
+}
+
+/**
+ * REQ-MED-15 — le téléchargement par tranches existe-t-il sur ce navigateur ?
+ *
+ * `showSaveFilePicker` est absent de Firefox et de Safari. Sans lui, le clair doit tenir
+ * en mémoire d'un bloc, et c'est le seul cas où le plafond dur s'applique.
+ */
+export function fluxFichierDisponible(): boolean {
+  return typeof (globalThis as { showSaveFilePicker?: unknown }).showSaveFilePicker === "function";
+}
+
+/**
+ * REQ-MED-15 — les plafonds de **cet** appareil.
+ *
+ * `deviceMemory` est la seule mesure directe, et elle n'existe que sur les navigateurs
+ * Chromium. À défaut, `pointer: coarse` : un pointeur grossier est un doigt, donc un
+ * téléphone ou une tablette, donc l'appareil où l'onglet meurt sans avertissement. À
+ * défaut des deux, le profil de bureau — on ne dégrade pas ce qu'on ne sait pas mesurer,
+ * même jurisprudence que le profil réseau de D-04.
+ */
+export function seuilsAppareil(): Seuils {
+  const memoire = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  if (memoire !== undefined) return memoire <= 4 ? SEUILS.mobile : SEUILS.bureau;
+  return globalThis.matchMedia?.("(pointer: coarse)").matches ? SEUILS.mobile : SEUILS.bureau;
 }
 
 /**

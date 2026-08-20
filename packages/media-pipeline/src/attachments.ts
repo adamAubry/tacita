@@ -92,6 +92,32 @@ export async function encryptAttachment(
   };
 }
 
+/**
+ * REQ-MED-15 — la tranche de déchiffrement. 1 MiB : assez grand pour que le coût par
+ * appel soit négligeable, assez petit pour que le pic mémoire du clair le soit aussi.
+ */
+export const TAILLE_TRANCHE = 1024 * 1024;
+
+/**
+ * Le compteur AES-CTR **décalé de `blocs` blocs de 16 octets**.
+ *
+ * C'est toute la raison pour laquelle un déchiffrement par tranches est possible :
+ * contrairement au hash, qui exige le fichier entier (`crypto.subtle.digest` est
+ * one-shot), CTR n'est pas chaîné — chaque bloc se déchiffre à partir de son seul
+ * compteur, donc depuis n'importe quel décalage multiple de 16.
+ *
+ * Seuls les 64 bits de poids faible comptent (`COUNTER_BITS`), et ils vivent dans les
+ * huit derniers octets : le préfixe aléatoire ne bouge pas.
+ */
+function compteurDecale(iv: Bytes, blocs: number): Bytes {
+  const decale = new Uint8Array(iv) as Bytes;
+  const vue = new DataView(decale.buffer, decale.byteOffset, decale.byteLength);
+  // `BigInt` et pas une addition en nombre flottant : au-delà de 2^53 blocs l'arithmétique
+  // ordinaire arrondit en silence, et un compteur faux déchiffre du bruit sans lever.
+  vue.setBigUint64(8, BigInt.asUintN(64, vue.getBigUint64(8) + BigInt(blocs)));
+  return decale;
+}
+
 /** REQ-MED-08 — l'empreinte est vérifiée *avant* de déchiffrer, pas après. */
 export async function decryptAttachment(
   ciphertext: Bytes,
@@ -110,4 +136,46 @@ export async function decryptAttachment(
       ciphertext,
     ),
   );
+}
+
+/**
+ * REQ-MED-15 — **vérification globale une fois, puis déchiffrement par tranches.**
+ *
+ * Conforme à REQ-MED-08 à la lettre, et par le mécanisme (a) qu'elle nomme : l'empreinte
+ * du chiffré **entier** est vérifiée avant qu'un seul octet ne soit déchiffré. Ce que la
+ * découpe change, ce n'est pas la vérification — c'est le clair, qui n'existe plus jamais
+ * en entier : une tranche vit le temps d'être écrite, puis disparaît.
+ *
+ * Sur une vidéo de 400 Mo reçue d'un client tiers, le pic passe d'environ trois fois la
+ * taille du fichier — chiffré, clair, Blob — à « le chiffré, plus une tranche ».
+ *
+ * Le chiffré, lui, reste entier en mémoire, et il n'y a pas d'échappatoire en phase 2 :
+ * WebCrypto n'expose aucun hash incrémental. C'est ce que les plafonds de REQ-MED-15
+ * bornent, et ce que le hachage par blocs lèvera.
+ */
+export async function* decryptAttachmentByChunks(
+  ciphertext: Bytes,
+  keys: FileKeys,
+  subtle: SubtleCrypto,
+  taille = TAILLE_TRANCHE,
+): AsyncGenerator<Bytes> {
+  if ((await sha256(subtle, ciphertext)) !== unpadded(keys.hashes.sha256 ?? "")) {
+    throw new MediaIntegrityError();
+  }
+
+  const key = await subtle.importKey("jwk", keys.key, AES, false, ["decrypt"]);
+  const iv = unbase64(keys.iv);
+  // Une tranche entamant un bloc AES à moitié décalerait le compteur d'un cran : la
+  // découpe se fait sur des multiples de 16 octets, et la dernière prend ce qui reste.
+  const pas = Math.max(16, Math.floor(taille / 16) * 16);
+
+  for (let debut = 0; debut < ciphertext.length; debut += pas) {
+    yield new Uint8Array(
+      await subtle.decrypt(
+        { name: "AES-CTR", counter: compteurDecale(iv, debut / 16), length: COUNTER_BITS },
+        key,
+        ciphertext.subarray(debut, debut + pas),
+      ),
+    ) as Bytes;
+  }
 }

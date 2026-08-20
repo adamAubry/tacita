@@ -1,11 +1,18 @@
 "use client";
 
-import { resoudreType, TAILLE_SNIFF } from "@tacita/media-pipeline";
+import { resoudreType, TAILLE_SNIFF, verdictTaille } from "@tacita/media-pipeline";
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { useGlissement } from "../../lib/gestes";
 import { Button, Text } from "../foundation/primitives";
-import { navigateurLit, type Media, type Telecharger } from "./media";
+import {
+  fluxFichierDisponible,
+  navigateurLit,
+  seuilsAppareil,
+  tailleLisible,
+  type Media,
+  type Telecharger,
+} from "./media";
 
 export interface MediaViewerProps {
   /** Les médias du salon, dans l'ordre de la timeline : la navigation les suit. */
@@ -33,6 +40,11 @@ const REFUS = {
   "hors-liste": "Tacita n'affiche pas ce format de fichier.",
   inconnu: "Le format de ce fichier n'a pas pu être identifié.",
   codec: "Ce navigateur ne sait pas lire cette vidéo.",
+  // REQ-MED-15 — les deux plafonds. Le premier est un inconfort qu'on laisse forcer, le
+  // second un onglet qui meurt : deux phrases, parce que ce ne sont pas deux degrés du
+  // même problème.
+  lourd: "Ce fichier est trop lourd pour être lu dans l'application.",
+  "trop-lourd": "Ce fichier est trop lourd pour cet appareil.",
 } as const;
 
 type Refus = keyof typeof REFUS;
@@ -55,6 +67,10 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
   const [rang, setRang] = useState(depart);
   const [zoom, setZoom] = useState<number>(1);
   const [etat, setEtat] = useState<Etat>({ phase: "chargement" });
+  /** REQ-MED-15 — « ouvrir quand même », et **sur ce média-là** : le forçage ne se
+   *  transporte pas au suivant, qui n'a aucune raison d'hériter d'un choix qui ne le
+   *  concernait pas. */
+  const [forceSur, setForceSur] = useState<string>();
 
   const media = medias[rang];
 
@@ -69,12 +85,26 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
    * 2 secondes » des retours d'usage.
    */
   const cle = media?.fichier.url;
+  const force = forceSur !== undefined && forceSur === cle;
 
   useEffect(() => {
     if (!media) return;
     let objet: string | undefined;
     let vivant = true;
     setEtat({ phase: "chargement" });
+
+    /*
+     * REQ-MED-15 — la taille décide avant tout le reste, et sans réseau : `info.size` est
+     * dans l'événement. Au-delà du premier plafond il n'y a pas de lecteur ; au-delà du
+     * second, et seulement faute de flux d'écriture, il n'y a rien du tout à proposer.
+     */
+    const flux = fluxFichierDisponible();
+    const bornes = { flux, seuils: seuilsAppareil() };
+    const verdict = force ? "inline" : verdictTaille(media.taille, bornes);
+    if (verdict !== "inline") {
+      setEtat({ phase: "refus", motif: verdict === "refus" ? "trop-lourd" : "lourd" });
+      return;
+    }
 
     /*
      * REQ-MED-12 — la résolution du type précède le téléchargement, et peut le rendre
@@ -122,7 +152,7 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
       if (objet) URL.revokeObjectURL(objet);
     };
     // `media` est volontairement absent : `cle` **est** son identité (voir ci-dessus).
-  }, [cle, telecharger]);
+  }, [cle, telecharger, force]);
 
   /*
    * `Escape` ferme, comme toute boîte de dialogue modale. Le viewer ne se fermait qu'au
@@ -210,9 +240,24 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
           <div style={{ display: "grid", gap: "var(--spacing-3)", justifyItems: "center", padding: "var(--spacing-4)" }}>
             <Text type="body">{REFUS[etat.motif]}</Text>
             <Text type="supporting" color="secondary">
-              Vous pouvez le télécharger pour l'ouvrir avec une autre application.
+              {etat.motif === "trop-lourd"
+                ? "Ouvrez-le sur un appareil disposant de plus de mémoire."
+                : "Vous pouvez le télécharger pour l'ouvrir avec une autre application."}
             </Text>
-            <Button label="Télécharger" variant="secondary" onClick={() => onSauvegarder(media)} />
+            {/* REQ-MED-15 — le poids est dans le libellé : « télécharger 412 Mo » et
+                « télécharger » ne demandent pas la même décision, surtout en mobilité. */}
+            {etat.motif !== "trop-lourd" && (
+              <Button
+                label={media.taille === undefined ? "Télécharger" : `Télécharger (${tailleLisible(media.taille)})`}
+                variant="secondary"
+                onClick={() => onSauvegarder(media)}
+              />
+            )}
+            {/* Passer outre reste possible tant que le clair tient en mémoire — et
+                l'avertissement est la phrase au-dessus, pas une modale de plus. */}
+            {etat.motif === "lourd" && (
+              <Button label="Ouvrir quand même" variant="ghost" onClick={() => setForceSur(cle)} />
+            )}
           </div>
         ) : etat.phase === "pret" ? (
           media.msgtype === "m.video" ? (

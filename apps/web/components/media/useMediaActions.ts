@@ -1,7 +1,12 @@
 "use client";
 
 import type { Session } from "@tacita/client-core";
-import { downloadAttachment, estRendable, saveOriginal } from "@tacita/media-pipeline";
+import {
+  downloadAttachment,
+  downloadAttachmentToFile,
+  estRendable,
+  saveOriginal,
+} from "@tacita/media-pipeline";
 import { useCallback, useMemo } from "react";
 
 import { environnementMedia } from "../../lib/media-env";
@@ -48,14 +53,23 @@ export function useMediaActions(session: Session | null) {
     [session, env],
   );
 
-  /** REQ-MED-05 — le déchiffrement puis le choix de destination, délégué au pipeline. */
+  /**
+   * REQ-MED-05 / REQ-MED-15 — le déchiffrement puis le choix de destination, délégué au
+   * pipeline. **Par tranches quand la plateforme le permet** : sur une vidéo de 400 Mo
+   * reçue d'un client tiers, le chemin d'un seul bloc fait coexister le chiffré, le clair
+   * et le Blob — trois fois la taille du fichier, et l'onglet meurt sur mobile.
+   *
+   * Le repli n'est pas une dégradation silencieuse : c'est `verdictTaille` qui a déjà
+   * refusé, en amont, ce que ce repli ne saurait pas porter.
+   */
   const sauvegarder = useCallback(
     (media: Media) => {
-      void telecharger(media.fichier, media.mime).then((blob) =>
-        saveOriginal(env, blob, media.nom),
-      );
+      if (!session) return;
+      void (env.ouvrirEcriture
+        ? downloadAttachmentToFile(session, env, media.fichier, media.nom)
+        : telecharger(media.fichier, media.mime).then((blob) => saveOriginal(env, blob, media.nom)));
     },
-    [telecharger, env],
+    [session, telecharger, env],
   );
 
   return { env, telecharger, sauvegarder };

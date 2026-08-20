@@ -45,7 +45,7 @@ export class TranscodageIndisponible extends Error {
 const choisirFichier = (
   globalThis as unknown as {
     showSaveFilePicker?: (options: { suggestedName: string }) => Promise<{
-      createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>;
+      createWritable(): Promise<{ write(data: Blob | Uint8Array): Promise<void>; close(): Promise<void> }>;
     }>;
   }
 ).showSaveFilePicker;
@@ -142,6 +142,23 @@ export function environnementMedia(): MediaEnvironment {
           const flux = await (await choisirFichier({ suggestedName: filename })).createWritable();
           await flux.write(blob);
           await flux.close();
+        }
+      : undefined,
+
+    /**
+     * REQ-MED-15 — le **flux** de la même API, pour écrire un gros média tranche par
+     * tranche. Même absence que `saveViaFilePicker` sur Firefox et Safari : le pipeline
+     * retombe alors sur le chemin tout-ou-rien, borné par `SEUILS.dur`.
+     */
+    ouvrirEcriture: choisirFichier
+      ? async (filename) => {
+          const flux = await (await choisirFichier({ suggestedName: filename })).createWritable();
+          return {
+            // `write` du FileSystemWritableFileStream accepte les deux ; le type du
+            // paquet ne promet que ce que les deux appelants passent réellement.
+            write: (donnees) => flux.write(donnees as Blob),
+            close: () => flux.close(),
+          };
         }
       : undefined,
 

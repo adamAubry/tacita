@@ -711,3 +711,91 @@ describe("REQ-MED-12 — le viewer refuse de rendre ce qui n'est pas dans la lis
     expect(source).toContain("estRendable(mimeType) ? mimeType : \"application/octet-stream\"");
   });
 });
+
+/**
+ * REQ-MED-15 — **les plafonds, côté écran.**
+ *
+ * La décision est prouvée pure dans le paquet (table de vérité, et le déchiffrement par
+ * tranches avec elle). Ce qui se prouve ici, c'est qu'aucun octet ne descend quand la
+ * taille l'interdit — la garde ne sert à rien si l'écran la contourne.
+ */
+describe("REQ-MED-15 — au-delà du plafond, pas de lecteur", () => {
+  const lourd = (octets: number) =>
+    mediaDe(
+      evenement({
+        msgtype: "m.video",
+        body: "vacances.mp4",
+        file: FICHIER,
+        info: { mimetype: "video/mp4", size: octets, thumbnail_file: VIGNETTE },
+      }),
+    )!;
+
+  const ouvrir = (media: Media) => {
+    const onSauvegarder = vi.fn();
+    render(
+      <MediaViewer
+        medias={[media]}
+        depart={0}
+        telecharger={telecharger}
+        onFermer={vi.fn()}
+        onSauvegarder={onSauvegarder}
+      />,
+    );
+    return onSauvegarder;
+  };
+
+  // jsdom n'expose ni `deviceMemory` ni `showSaveFilePicker` : c'est le profil de bureau
+  // sans flux d'écriture, donc les deux plafonds s'appliquent — le cas le plus strict.
+  it("au-delà du premier plafond : pas de lecteur, un poids affiché, et rien n'est descendu", async () => {
+    const onSauvegarder = ouvrir(lourd(120 * 1024 * 1024));
+
+    await waitFor(() => expect(screen.getByText(/trop lourd pour être lu/)).toBeTruthy());
+    expect(telecharger).not.toHaveBeenCalled();
+    expect(document.querySelector("video")).toBeNull();
+
+    // Le poids est dans le libellé : « télécharger 120 Mo » et « télécharger » ne
+    // demandent pas la même décision, surtout en mobilité.
+    fireEvent.click(screen.getByRole("button", { name: `Télécharger (${tailleLisible(120 * 1024 * 1024)})` }));
+    expect(onSauvegarder).toHaveBeenCalledTimes(1);
+  });
+
+  it("« ouvrir quand même » existe sous le plafond dur, et lance le déchiffrement", async () => {
+    ouvrir(lourd(120 * 1024 * 1024));
+    await waitFor(() => expect(screen.getByText(/trop lourd pour être lu/)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Ouvrir quand même" }));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(FICHIER, "video/mp4"));
+  });
+
+  it("au-delà du plafond dur sans flux, plus rien n'est proposé — et on dit pourquoi", async () => {
+    ouvrir(lourd(500 * 1024 * 1024));
+
+    await waitFor(() => expect(screen.getByText(/trop lourd pour cet appareil/)).toBeTruthy());
+    expect(screen.getByText(/plus de mémoire/)).toBeTruthy();
+    // Ni lecteur, ni téléchargement : le clair ne tiendrait pas en mémoire, et le
+    // proposer serait promettre ce que l'appareil ne peut pas tenir.
+    expect(screen.queryByRole("button", { name: /Télécharger/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ouvrir quand même" })).toBeNull();
+    expect(telecharger).not.toHaveBeenCalled();
+  });
+
+  it("sous le plafond, rien ne change : le média s'ouvre comme avant", async () => {
+    const canPlayType = vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("maybe");
+    ouvrir(lourd(2 * 1024 * 1024));
+
+    await waitFor(() => expect(document.querySelector("video")).toBeTruthy());
+    canPlayType.mockRestore();
+  });
+
+  /**
+   * Le chemin d'écriture, qui ne se rend pas : `sauvegarder` doit passer par le
+   * téléchargement **par tranches** quand la plateforme l'expose, sinon le plafond dur ne
+   * protège rien — c'est le repli d'un seul bloc qu'il borne (règle 7).
+   */
+  it("la sauvegarde emprunte le flux quand il existe, le bloc unique sinon", () => {
+    const source = lire("components/media/useMediaActions.ts");
+    expect(source).toContain("env.ouvrirEcriture");
+    expect(source).toContain("downloadAttachmentToFile(session, env, media.fichier, media.nom)");
+    expect(source).toContain("saveOriginal(env, blob, media.nom)");
+  });
+});
