@@ -27,6 +27,8 @@ export { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
 export { lireWebmOpus } from "./webm";
 export type { WebmOpus } from "./webm";
 export { detectProfile, PROFILES, THUMBNAIL } from "./profiles";
+export { estRendable, resoudreType, TAILLE_SNIFF, typeSniffe, TYPES_RENDUS } from "./types-rendus";
+export type { Resolution } from "./types-rendus";
 export type { ImageTargets, NetworkProfile, VideoTargets } from "./profiles";
 
 /** Forme d'onde MSC1767 : entiers 0–1024. */

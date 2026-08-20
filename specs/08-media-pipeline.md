@@ -27,6 +27,9 @@
   |---|---|
   | Vidéo | `video/mp4`, `video/quicktime`, `video/webm`, `video/x-matroska` |
   | Image | `image/jpeg`, `image/png`, `image/webp`, `image/gif`, `image/avif` |
+  | Audio | `audio/ogg`, `audio/mpeg`, `audio/mp4`, `audio/webm`, `audio/wav` |
+
+  *(**Ligne audio ajoutée le 20/08/2026, à l'implémentation.** La REQ était écrite pour deux chemins ; le shard en rend **trois** — `m.audio` passe par la même fonction de téléchargement et le même `URL.createObjectURL` que les deux autres, avec le même `info.mimetype` fourni par l'expéditeur. Laisser l'audio hors de la liste aurait laissé le trou ouvert sur le tiers du problème, et la garde est unique : elle vit à l'endroit par où passent les trois. `audio/ogg` est notre format de sortie unique (D-03) ; les quatre autres sont ce qu'un client tiers ou un pont peut envoyer.)*
 
   Trois précisions font la REQ :
   - **`application/octet-stream` n'est pas un type rendable.** C'est le repli actuel du chemin de lecture, et il échoue en silence : un Blob de ce type dans un `<video>` ne joue pas et ne dit pas pourquoi. L'échec de résolution est un **état explicite**, jamais un repli.

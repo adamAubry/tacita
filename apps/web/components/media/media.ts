@@ -83,6 +83,23 @@ export function mediaDe(evenement: EvenementLu): Media | undefined {
   };
 }
 
+/**
+ * REQ-MED-12 — **ce navigateur-ci sait-il décoder ce type ?**
+ *
+ * La liste close (paquet, `resoudreType`) dit ce que Tacita accepte de rendre ; elle ne
+ * dit pas ce que la plateforme sait lire. Le HEVC d'iOS se lit sur Safari et pas partout
+ * sur Chrome de bureau : sans ce contrôle, l'utilisateur reçoit un rectangle noir et en
+ * conclut que l'application est cassée.
+ *
+ * Une chaîne vide est le « non » de `canPlayType` ; `maybe` et `probably` sont deux oui.
+ * En rendu serveur il n'y a rien à mesurer, et refuser par défaut afficherait le message
+ * d'échec sur le premier rendu de chaque vidéo.
+ */
+export function navigateurLit(type: string): boolean {
+  if (typeof document === "undefined") return true;
+  return document.createElement("video").canPlayType(type) !== "";
+}
+
 /** Déchiffre une pièce jointe et rend un blob affichable. Injecté : les composants ne
  *  connaissent ni la session, ni le pipeline — ils sont testables sans les deux. */
 export type Telecharger = (fichier: EncryptedFile, mimeType?: string) => Promise<Blob>;

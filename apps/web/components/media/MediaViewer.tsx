@@ -1,10 +1,11 @@
 "use client";
 
+import { resoudreType, TAILLE_SNIFF } from "@tacita/media-pipeline";
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { useGlissement } from "../../lib/gestes";
 import { Button, Text } from "../foundation/primitives";
-import type { Media, Telecharger } from "./media";
+import { navigateurLit, type Media, type Telecharger } from "./media";
 
 export interface MediaViewerProps {
   /** Les médias du salon, dans l'ordre de la timeline : la navigation les suit. */
@@ -20,6 +21,29 @@ export interface MediaViewerProps {
 const ZOOM_MAX = 3;
 
 /**
+ * REQ-MED-12 — les trois façons dont un média peut ne pas s'afficher, et ce qu'on en dit.
+ *
+ * Un seul écran pour les trois, mais **trois phrases distinctes** : « on ne rend pas ce
+ * format », « on n'a pas su l'identifier » et « ce navigateur-ci ne sait pas le lire » ne
+ * demandent pas la même chose à celui qui lit. La troisième est rattrapable en changeant
+ * d'appareil, les deux autres non — les confondre enverrait quelqu'un essayer un autre
+ * navigateur pour rien.
+ */
+const REFUS = {
+  "hors-liste": "Tacita n'affiche pas ce format de fichier.",
+  inconnu: "Le format de ce fichier n'a pas pu être identifié.",
+  codec: "Ce navigateur ne sait pas lire cette vidéo.",
+} as const;
+
+type Refus = keyof typeof REFUS;
+
+/** Ce que le viewer a sous la main pour le média courant. Un état, pas deux booléens. */
+type Etat =
+  | { phase: "chargement" }
+  | { phase: "pret"; url: string; type: string }
+  | { phase: "refus"; motif: Refus };
+
+/**
  * REQ-UIX-16 — viewer plein écran : zoom, navigation entre les médias du salon,
  * sauvegarde, fermeture par geste vers le bas.
  *
@@ -30,7 +54,7 @@ const ZOOM_MAX = 3;
 export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegarder }: MediaViewerProps) {
   const [rang, setRang] = useState(depart);
   const [zoom, setZoom] = useState<number>(1);
-  const [url, setUrl] = useState<string>();
+  const [etat, setEtat] = useState<Etat>({ phase: "chargement" });
 
   const media = medias[rang];
 
@@ -50,20 +74,52 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
     if (!media) return;
     let objet: string | undefined;
     let vivant = true;
+    setEtat({ phase: "chargement" });
 
-    // Le type vient de l'événement : sans lui, le blob est `application/octet-stream` et
-    // le lecteur ne sait pas quel conteneur il ouvre (voir `Media.mime`).
-    void telecharger(media.fichier, media.mime).then((blob) => {
+    /*
+     * REQ-MED-12 — la résolution du type précède le téléchargement, et peut le rendre
+     * inutile. `info.mimetype` est protégé par Megolm : non falsifiable par le serveur,
+     * **parfaitement falsifiable par l'expéditeur**. Un type hors liste close est donc
+     * refusé ici, avant qu'un seul octet ne descende — le fichier reste téléchargeable,
+     * c'est de le **rendre** qu'on refuse.
+     */
+    const declare = resoudreType(media.mime);
+    if (!declare.rendable && declare.motif !== "octets-requis") {
+      setEtat({ phase: "refus", motif: declare.motif });
+      return;
+    }
+
+    void (async () => {
+      // Sans type déclaré, le blob descend opaque : on ne lui donne un type qu'une fois
+      // ses propres octets reniflés (vieux clients, ponts).
+      const blob = await telecharger(media.fichier, declare.rendable ? declare.type : undefined);
       if (!vivant) return;
-      objet = URL.createObjectURL(blob);
-      setUrl(objet);
-    });
+
+      const resolu = declare.rendable
+        ? declare
+        : resoudreType(undefined, new Uint8Array(await blob.slice(0, TAILLE_SNIFF).arrayBuffer()));
+      if (!vivant) return;
+
+      if (!resolu.rendable) {
+        // `octets-requis` ne peut plus se produire ici : les octets, on les a.
+        setEtat({ phase: "refus", motif: resolu.motif === "hors-liste" ? "hors-liste" : "inconnu" });
+        return;
+      }
+      if (media.msgtype === "m.video" && !navigateurLit(resolu.type)) {
+        setEtat({ phase: "refus", motif: "codec" });
+        return;
+      }
+
+      objet = URL.createObjectURL(
+        blob.type === resolu.type ? blob : new Blob([blob], { type: resolu.type }),
+      );
+      setEtat({ phase: "pret", url: objet, type: resolu.type });
+    })();
 
     return () => {
       vivant = false;
       // Le blob en clair ne survit pas au média suivant.
       if (objet) URL.revokeObjectURL(objet);
-      setUrl(undefined);
     };
     // `media` est volontairement absent : `cle` **est** son identité (voir ci-dessus).
   }, [cle, telecharger]);
@@ -148,11 +204,21 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
       </div>
 
       <div style={{ display: "grid", placeItems: "center", overflow: "auto" }}>
-        {url ? (
+        {etat.phase === "refus" ? (
+          /* REQ-MED-12 — un état explicite, jamais un lecteur muet ou un rectangle noir :
+             ce qui n'est pas rendable se dit, et propose la seule action qui reste. */
+          <div style={{ display: "grid", gap: "var(--spacing-3)", justifyItems: "center", padding: "var(--spacing-4)" }}>
+            <Text type="body">{REFUS[etat.motif]}</Text>
+            <Text type="supporting" color="secondary">
+              Vous pouvez le télécharger pour l'ouvrir avec une autre application.
+            </Text>
+            <Button label="Télécharger" variant="secondary" onClick={() => onSauvegarder(media)} />
+          </div>
+        ) : etat.phase === "pret" ? (
           media.msgtype === "m.video" ? (
             // Pas de piste de sous-titres : une vidéo envoyée par un correspondant n'en
             // porte pas, et en inventer une serait pire que son absence.
-            <video src={url} controls style={{ maxWidth: "100%", maxHeight: "100%" }} />
+            <video src={etat.url} controls style={{ maxWidth: "100%", maxHeight: "100%" }} />
           ) : (
             // WCAG 2.1.1 — le zoom est porté par un `<button>` et non par l'image :
             // une `<img onClick>` n'est ni focusable ni actionnable au clavier, et le
@@ -175,7 +241,7 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
               }}
             >
               <img
-                src={url}
+                src={etat.url}
                 alt={media.nom}
                 style={{
                   transform: `scale(${zoom})`,

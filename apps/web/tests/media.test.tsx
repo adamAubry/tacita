@@ -2,6 +2,7 @@ import type { EncryptedFile } from "@tacita/media-pipeline";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { lire } from "./sources";
 import { ConversationCollections } from "../components/media/ConversationCollections";
 import { MediaMessage } from "../components/media/MediaMessage";
 import { MediaPicker } from "../components/media/MediaPicker";
@@ -45,7 +46,10 @@ const image = (id = "$img") =>
       msgtype: "m.image",
       body: "plage.jpg",
       file: FICHIER,
-      info: { size: 2048, thumbnail_file: VIGNETTE },
+      // `info.mimetype` est ce que le pipeline écrit (REQ-MED-02/04), et ce dont la
+      // résolution de type part (REQ-MED-12). Une fixture qui l'omettait décrivait un
+      // événement que ce dépôt ne produit pas.
+      info: { size: 2048, mimetype: "image/jpeg", thumbnail_file: VIGNETTE },
     },
     id,
   );
@@ -421,7 +425,7 @@ describe("REQ-UIX-16 — viewer plein écran : navigation, sauvegarde, fermeture
 
   it("le média entier n'est déchiffré qu'ici, pas dans la timeline", async () => {
     rendre();
-    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(medias[0]!.fichier, undefined));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(medias[0]!.fichier, "image/jpeg"));
   });
 
   it("sauvegarde le média affiché", () => {
@@ -610,5 +614,100 @@ describe("REQ-UIX-17 / REQ-UIX-18 — galeries partagées : quatre onglets, pér
     for (const libelle of ["Médias", "Épinglés", "Liens", "Fichiers"]) {
       expect(section.getByText(libelle)).toBeTruthy();
     }
+  });
+});
+
+/**
+ * REQ-MED-12 — **la liste close, côté écran.**
+ *
+ * La résolution elle-même est prouvée dans le paquet (`types-rendus.test.ts`, entrées
+ * hostiles comprises). Ce qui se prouve ici, c'est ce que le viewer en fait : rien de
+ * hors liste ne descend, rien de non identifié ne s'affiche, et aucun lecteur vide.
+ */
+describe("REQ-MED-12 — le viewer refuse de rendre ce qui n'est pas dans la liste close", () => {
+  const mediaDeType = (mimetype: string | undefined, msgtype = "m.image") =>
+    mediaDe(
+      evenement({
+        msgtype,
+        body: "piece-jointe",
+        file: FICHIER,
+        info: { ...(mimetype === undefined ? {} : { mimetype }), thumbnail_file: VIGNETTE },
+      }),
+    )!;
+
+  const ouvrir = (media: Media, telechargement = telecharger) => {
+    const onSauvegarder = vi.fn();
+    render(
+      <MediaViewer
+        medias={[media]}
+        depart={0}
+        telecharger={telechargement}
+        onFermer={vi.fn()}
+        onSauvegarder={onSauvegarder}
+      />,
+    );
+    return onSauvegarder;
+  };
+
+  it("un type déclaré hostile n'est ni rendu ni même téléchargé", async () => {
+    const onSauvegarder = ouvrir(mediaDeType("image/svg+xml"));
+
+    await waitFor(() => expect(screen.getByText(/n'affiche pas ce format/)).toBeTruthy());
+    expect(screen.queryByAltText("piece-jointe")).toBeNull();
+    // Le refus tombe **avant** le réseau : rien n'est descendu, rien n'a été déchiffré.
+    expect(telecharger).not.toHaveBeenCalled();
+
+    // Le fichier reste récupérable — ce qui est refusé, c'est de le rendre.
+    fireEvent.click(screen.getByRole("button", { name: "Télécharger" }));
+    expect(onSauvegarder).toHaveBeenCalledTimes(1);
+  });
+
+  it("sans type déclaré, les octets du clair tranchent", async () => {
+    // Un JPEG véritable : la signature est dans les octets, pas dans l'événement.
+    const jpeg = vi.fn(async () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...Array<number>(16).fill(0)])]));
+    ouvrir(mediaDeType(undefined), jpeg);
+
+    await waitFor(() => expect(screen.getByAltText("piece-jointe")).toBeTruthy());
+    // Descendu sans type — c'est le reniflement qui le lui donne ensuite.
+    expect(jpeg).toHaveBeenCalledWith(FICHIER, undefined);
+  });
+
+  it("des octets qu'on ne sait pas identifier donnent un état explicite, jamais un lecteur muet", async () => {
+    const bruit = vi.fn(async () => new Blob([new Uint8Array(Array<number>(32).fill(7))]));
+    ouvrir(mediaDeType(undefined), bruit);
+
+    await waitFor(() => expect(screen.getByText(/n'a pas pu être identifié/)).toBeTruthy());
+    expect(screen.queryByAltText("piece-jointe")).toBeNull();
+  });
+
+  it("un codec que ce navigateur ne lit pas se dit, au lieu d'un rectangle noir", async () => {
+    // jsdom rend `""` pour tout : c'est exactement le « non » de `canPlayType`, et c'est
+    // le cas du HEVC d'iOS sur Chrome de bureau.
+    ouvrir(mediaDeType("video/mp4", "m.video"));
+
+    await waitFor(() => expect(screen.getByText(/ne sait pas lire cette vidéo/)).toBeTruthy());
+    expect(document.querySelector("video")).toBeNull();
+  });
+
+  it("un codec lisible rend le lecteur", async () => {
+    const canPlayType = vi
+      .spyOn(HTMLMediaElement.prototype, "canPlayType")
+      .mockReturnValue("maybe");
+    ouvrir(mediaDeType("video/mp4", "m.video"));
+
+    await waitFor(() => expect(document.querySelector("video")).toBeTruthy());
+    expect(canPlayType).toHaveBeenCalledWith("video/mp4");
+    canPlayType.mockRestore();
+  });
+
+  /**
+   * Le verrou de dernier recours, celui qui tient les appelants qu'on n'a pas encore
+   * écrits : le Blob se fabrique à un seul endroit, et ce type-là ne s'y invente pas.
+   * jsdom ne fait pas descendre de session — c'est la source qui est lue, comme partout
+   * ailleurs où la valeur compte plus que le rendu (règle 7).
+   */
+  it("le type d'un Blob ne peut pas sortir de la liste close, quel que soit l'appelant", () => {
+    const source = lire("components/media/useMediaActions.ts");
+    expect(source).toContain("estRendable(mimeType) ? mimeType : \"application/octet-stream\"");
   });
 });

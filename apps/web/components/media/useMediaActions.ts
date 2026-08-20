@@ -1,7 +1,7 @@
 "use client";
 
 import type { Session } from "@tacita/client-core";
-import { downloadAttachment, saveOriginal } from "@tacita/media-pipeline";
+import { downloadAttachment, estRendable, saveOriginal } from "@tacita/media-pipeline";
 import { useCallback, useMemo } from "react";
 
 import { environnementMedia } from "../../lib/media-env";
@@ -30,9 +30,20 @@ export function useMediaActions(session: Session | null) {
     async (fichier, mimeType) => {
       if (!session) throw new Error("session absente : aucun média déchiffrable");
       const octets = await downloadAttachment(session, env, fichier);
-      // Le type est celui que l'UI attend pour l'affichage, pas celui du blob chiffré :
-      // le pipeline rend des octets nus, sans en-tête de contenu.
-      return new Blob([octets as BlobPart], { type: mimeType ?? "application/octet-stream" });
+      /*
+       * Le type est celui que l'UI attend pour l'affichage, pas celui du blob chiffré :
+       * le pipeline rend des octets nus, sans en-tête de contenu.
+       *
+       * REQ-MED-12 — **et c'est le dernier verrou avant `URL.createObjectURL`.** Un type
+       * hors liste close ne devient jamais le type d'un Blob, quel que soit l'appelant :
+       * la garde est ici, à l'endroit unique par où passent la timeline, la galerie et le
+       * viewer, et non dans chacun des trois. Un appelant qui demanderait `text/html`
+       * obtient des octets opaques — donc rien de rendable, ce qui est exactement le
+       * verdict de la REQ.
+       */
+      return new Blob([octets as BlobPart], {
+        type: estRendable(mimeType) ? mimeType : "application/octet-stream",
+      });
     },
     [session, env],
   );
