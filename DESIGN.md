@@ -34,7 +34,11 @@ Neutres à très léger sous-ton vert (invisible consciemment, cohérent avec l'
 | `warning` | #9A6A00 | #D9A441 | avertissements (limites connues) |
 | `highlight` | #155E4D à 14 %, texte `text` | #4FBD96 à 22 %, texte `text` | occurrences de recherche, `@me` |
 | `scrim` | #FFFFFF à 70 % | #131514 à 60 % | voile de lisibilité sur fond d'écran personnalisé |
+| `viewer` | #131514 | #131514 | fond du visionneur plein écran — **le même dans les deux thèmes** |
+| `on-viewer` | #E9ECEA | #E9ECEA | encre et commandes posées sur `viewer` (muet : #9AA39F) |
 | `glass` | #F6F7F6 à 65 % | #131514 à 65 % | **bouton de retour du profil, et lui seul** — teinte **et** `blur(12px)`, indissociables |
+
+`viewer` et `on-viewer` sont le couple du thème sombre **figé** : une photo se regarde sur un fond neutre sombre, que l'app soit en clair ou en sombre. Ils existent parce que le fond inversé d'Astryx suit le thème *et* vaut exactement `text` : les commandes du visionneur y étaient de la couleur de leur propre fond, donc invisibles — c'est le seul endroit de l'app où l'encre du thème ne s'applique pas.
 
 `glass` est un couple, pas une couleur : la teinte seule laisse passer les hautes fréquences d'une photo derrière du texte. Un navigateur sans `backdrop-filter` garde les 65 % d'opacité — l'effet dégrade, la lisibilité non. Règles : l'accent occupe moins de 5 % de tout écran courant — s'il devient ambiant, c'est un bug de design ; `danger` jamais pour de l'emphase non destructive ; badges de non-lus en `text` sur `accent-soft` (pas de pastille rouge, cf. PRODUCT.md) ; contraste AA vérifié pour chaque paire ; aucune autre couleur n'existe.
 

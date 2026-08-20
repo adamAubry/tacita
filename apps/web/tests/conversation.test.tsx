@@ -15,6 +15,7 @@ import {
   texteAffiche,
   type MessageAffiche,
 } from "../components/conversation/message";
+import { mediaDe } from "../components/media/media";
 import { SEUIL_GLISSEMENT, ZONE_MORTE_BORD } from "../lib/gestes";
 import { lire } from "./sources";
 
@@ -547,5 +548,55 @@ describe("REQ-UIX-15 — la barre d'écriture : une seule rangée, et le bas de 
     // colonne s'allonge, la page entière défile, et la barre repart sous le dernier
     // message — exactement le défaut qu'on corrige, avec l'`overflow` en place.
     expect(timeline).toContain("minHeight: 0");
+  });
+});
+
+/**
+ * REQ-MED-05 — **la sortie d'un fichier reçu, de bout en bout.**
+ *
+ * Le viewer plein écran ne s'ouvre que sur une image ou une vidéo : un PDF, un ZIP ou un
+ * document restait une tuile sans aucune façon d'en écrire les octets sur l'appareil.
+ * Signalé tel quel par les utilisateurs.
+ *
+ * La chaîne est faite de props **optionnelles** — `Conversation` → `Timeline` →
+ * `MessageObject` → `MediaMessage` : en oublier une compile, et le bouton disparaît en
+ * silence. D'où le rendu jusqu'à la timeline, et la source pour le maillon du dessus.
+ */
+describe("REQ-MED-05 — un fichier reçu se télécharge sur l'appareil", () => {
+  const fichier = mediaDe({
+    getId: () => "$fic",
+    getContent: () => ({
+      msgtype: "m.file",
+      body: "contrat.pdf",
+      file: { url: "mxc://tacita.test/abc", key: {}, iv: "iv", hashes: {}, v: "v2" },
+      info: { size: 1536, mimetype: "application/pdf" },
+    }),
+  })!;
+
+  it("la timeline câble le téléchargement jusqu'à la tuile du fichier", () => {
+    const onSauvegarderMedia = vi.fn();
+    render(
+      <Timeline
+        messages={[message({ media: fichier })]}
+        onRepondre={vi.fn()}
+        onHold={vi.fn()}
+        onReagir={vi.fn()}
+        onRenvoyer={vi.fn()}
+        onAbandonner={vi.fn()}
+        telecharger={vi.fn()}
+        onSauvegarderMedia={onSauvegarderMedia}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Télécharger" }));
+    expect(onSauvegarderMedia).toHaveBeenCalledWith(fichier);
+  });
+
+  it("le câblage de l'écran fournit le geste, et le pipeline en est le propriétaire", () => {
+    const ecran = lire("components/conversation/Conversation.tsx");
+    expect(ecran).toContain("onSauvegarderMedia={sauvegarder}");
+    // `saveOriginal` (spec 08) et pas un `<a download>` maison : le choix de destination
+    // appartient au pipeline, qui sait ce que le navigateur supporte.
+    expect(lire("components/media/useMediaActions.ts")).toContain("saveOriginal(env, blob, media.nom)");
   });
 });

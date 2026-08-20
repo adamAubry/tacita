@@ -3,7 +3,7 @@
 import type { EncryptedFile } from "@tacita/media-pipeline";
 import { useEffect, useState } from "react";
 
-import { Skeleton, Text } from "../foundation/primitives";
+import { Button, Skeleton, Text } from "../foundation/primitives";
 import { VoicePlayer } from "./VoicePlayer";
 import { dureeLisible, tailleLisible, type Media, type Telecharger } from "./media";
 
@@ -17,6 +17,27 @@ import { dureeLisible, tailleLisible, type Media, type Telecharger } from "./med
 function useBlob(fichier: EncryptedFile | undefined, telecharger: Telecharger, mimeType?: string) {
   const [url, setUrl] = useState<string>();
   const [erreur, setErreur] = useState(false);
+
+  /*
+   * **La dépendance est l'URL du blob, pas l'objet qui la porte.**
+   *
+   * `mediaDe()` reconstruit un objet `Media` — et donc un `EncryptedFile` — à chaque appel,
+   * et ses appelants l'appellent à chaque rendu : le mémo de `Conversation` se recalcule à
+   * chaque tour de `/sync`, la galerie appelle `mediaDe` directement dans son rendu. Le
+   * contenu est identique, l'identité non ; un effet qui dépend de l'objet se relançait
+   * donc à chaque événement de la conversation — frappe, accusé, déchiffrement d'un
+   * message voisin.
+   *
+   * Ce que ça coûtait : chaque vignette de la timeline re-téléchargée et re-déchiffrée en
+   * boucle, et surtout, dans le viewer, la vidéo entière re-déchiffrée pendant qu'on la
+   * regarde — sa source changeait sous elle et la lecture repartait de zéro. C'est le
+   * « on déchiffre 2 secondes par 2 secondes » des retours d'usage : le chiffrement n'y
+   * était pour rien, la boucle de rendu pour tout.
+   *
+   * Un `mxc://` désigne un blob immuable : deux `EncryptedFile` de même URL portent les
+   * mêmes octets et les mêmes clés. C'est l'identité qui compte ici, et la seule stable.
+   */
+  const cle = fichier?.url;
 
   useEffect(() => {
     if (!fichier) return;
@@ -35,7 +56,8 @@ function useBlob(fichier: EncryptedFile | undefined, telecharger: Telecharger, m
       vivant = false;
       if (objet) URL.revokeObjectURL(objet);
     };
-  }, [fichier, telecharger, mimeType]);
+    // `fichier` est volontairement absent : `cle` **est** son identité (voir ci-dessus).
+  }, [cle, telecharger, mimeType]);
 
   return { url, erreur };
 }
@@ -52,6 +74,15 @@ export interface MediaMessageProps {
   telecharger: Telecharger;
   /** Ouvre le viewer plein écran (REQ-UIX-16). Absent sur audio et fichier. */
   onOuvrir?: () => void;
+  /**
+   * REQ-MED-05 — sauvegarde sur l'appareil, déléguée au pipeline par le câblage.
+   *
+   * Elle n'existait **que** dans le viewer plein écran, qui ne s'ouvre que sur une image
+   * ou une vidéo : un PDF, un ZIP ou un document reçu s'affichait en tuile, sans une
+   * seule façon d'en sortir les octets. Le fichier était là, déchiffrable, et
+   * inatteignable — signalé tel quel par les utilisateurs.
+   */
+  onSauvegarder?: () => void;
   /**
    * REQ-UIX-17 — la tuile **remplit sa cellule, en carré**, pour la grille de la galerie.
    *
@@ -74,11 +105,23 @@ export interface MediaMessageProps {
  * Un média qu'on n'a pas encore déchiffré rend un Skeleton **de la même géométrie**, pour
  * que l'arrivée de l'image ne déplace pas la timeline (DESIGN.md).
  */
-export function MediaMessage({ media, telecharger, onOuvrir, carre = false }: MediaMessageProps) {
+export function MediaMessage({
+  media,
+  telecharger,
+  onOuvrir,
+  onSauvegarder,
+  carre = false,
+}: MediaMessageProps) {
   // La vignette d'abord : c'est elle qui est petite. Le média entier n'est déchiffré
   // qu'à l'ouverture du viewer.
   const visuel = useBlob(media.vignette ?? undefined, telecharger, "image/jpeg");
-  const audio = useBlob(media.msgtype === "m.audio" ? media.fichier : undefined, telecharger);
+  // Le type du blob vient de l'événement : un `<audio>` dont la source est un blob
+  // `application/octet-stream` ne sait pas ce qu'il lit (voir `Media.mime`).
+  const audio = useBlob(
+    media.msgtype === "m.audio" ? media.fichier : undefined,
+    telecharger,
+    media.mime,
+  );
 
   if (media.msgtype === "m.audio") {
     return (
@@ -111,6 +154,13 @@ export function MediaMessage({ media, telecharger, onOuvrir, carre = false }: Me
             {media.taille === undefined ? "Fichier" : tailleLisible(media.taille)}
           </Text>
         </div>
+
+        {/* Le nom du fichier porte le bouton, et pas l'inverse : la tuile entière n'est
+            pas cliquable parce qu'un téléchargement n'est pas une navigation — il écrit
+            sur l'appareil, et ça se demande explicitement. */}
+        {onSauvegarder && (
+          <Button label="Télécharger" variant="secondary" onClick={onSauvegarder} />
+        )}
       </div>
     );
   }

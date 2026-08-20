@@ -141,6 +141,27 @@ describe("REQ-UI-03 — le thème porte les valeurs de DESIGN.md, et rien d'autr
         expect(ratio, `${texte} sur ${fond} en ${mode}`).toBeGreaterThanOrEqual(4.5);
       }
     }
+
+    /*
+     * Le couple du visionneur (DESIGN.md § Colors, `viewer` / `on-viewer`) ne vient pas de
+     * la palette : il est **figé** dans la feuille de tokens, parce qu'il ne suit pas le
+     * thème — une photo se regarde sur un fond sombre dans les deux modes.
+     *
+     * C'est la paire qui manquait, et qui était en défaut de la pire façon : le fond
+     * valait `--color-background-inverted`, c'est-à-dire exactement `text`, la couleur que
+     * les boutons d'Astryx posent dessus. Rapport de contraste **1:1** — les commandes du
+     * viewer, « Fermer » comprise, étaient invisibles dans les deux thèmes.
+     */
+    const feuille = sansCommentaires(lire("components/foundation/tokens.css"));
+    const token = (nom: string) => {
+      const trouve = feuille.match(new RegExp(`${nom}:\\s*(#[0-9a-f]{6})`));
+      expect(trouve, `${nom} absent de tokens.css`).not.toBeNull();
+      return trouve![1]!;
+    };
+    for (const encre of ["--tacita-sur-viewer", "--tacita-sur-viewer-muet"]) {
+      const ratio = contraste(token(encre), token("--tacita-viewer"));
+      expect(ratio, `${encre} sur --tacita-viewer`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("la pile de polices est celle de DESIGN.md, sans webfont", () => {

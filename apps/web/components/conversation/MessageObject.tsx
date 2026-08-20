@@ -8,7 +8,7 @@ import { heure } from "../../lib/dates";
 import { useGlissement } from "../../lib/gestes";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { MediaMessage } from "../media/MediaMessage";
-import type { Telecharger } from "../media/media";
+import type { Media, Telecharger } from "../media/media";
 import { Button, Text, ToggleButton } from "../foundation/primitives";
 import { texteAffiche, type MessageAffiche } from "./message";
 
@@ -30,6 +30,9 @@ export interface MessageObjectProps {
   /** REQ-UI-14 — déchiffrement d'une pièce jointe, injecté par le câblage (M-E). */
   telecharger?: Telecharger;
   onOuvrirMedia?: () => void;
+  /** REQ-MED-05 — écrire la pièce jointe sur l'appareil. Rendu sur les fichiers, qui
+   *  n'ouvrent pas de viewer et n'avaient donc aucune sortie. */
+  onSauvegarderMedia?: (media: Media) => void;
 }
 
 /** `sending` n'y figure pas : ce statut ne rend aucune coche, il rend `null`. */
@@ -125,7 +128,12 @@ export function MessageObject({
   onAbandonner,
   telecharger,
   onOuvrirMedia,
+  onSauvegarderMedia,
 }: MessageObjectProps) {
+  // Lié une fois : `message.media` est optionnel, et le rebrancher dans chaque garde
+  // redemanderait un `!` au compilateur à chaque usage.
+  const media = message.media;
+
   const geste = useGlissement({
     onGauche: onRepondre,
     onDroite: onRevelerHeures,
@@ -171,8 +179,13 @@ export function MessageObject({
 
         {/* REQ-UI-14 — une pièce jointe remplace le corps de texte : le `body` d'un
             média est son nom de fichier, que la tuile porte déjà. */}
-        {message.media && telecharger && (
-          <MediaMessage media={message.media} telecharger={telecharger} onOuvrir={onOuvrirMedia} />
+        {media && telecharger && (
+          <MediaMessage
+            media={media}
+            telecharger={telecharger}
+            onOuvrir={onOuvrirMedia}
+            onSauvegarder={onSauvegarderMedia ? () => onSauvegarderMedia(media) : undefined}
+          />
         )}
 
         <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--spacing-2)" }}>

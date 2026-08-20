@@ -146,6 +146,56 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
     await waitFor(() => expect(screen.getByText(/n'a pas pu être déchiffré/)).toBeTruthy());
   });
 
+  /**
+   * **Le déchiffrement suit le blob, pas l'objet qui le décrit.**
+   *
+   * `mediaDe()` reconstruit un `Media` à chaque appel, et ses appelants l'appellent à
+   * chaque rendu — le mémo de `Conversation` se recalcule à chaque tour de `/sync`, la
+   * galerie appelle `mediaDe` dans son rendu. Tant que l'effet dépendait de l'objet, un
+   * simple accusé de lecture relançait le téléchargement et le déchiffrement de chaque
+   * vignette de la timeline.
+   */
+  it("un rendu de plus sur un média équivalent ne re-déchiffre rien", async () => {
+    const { rerender } = render(<MediaMessage media={mediaDe(image())!} telecharger={telecharger} />);
+    await waitFor(() => expect(screen.getByAltText("plage.jpg")).toBeTruthy());
+    expect(telecharger).toHaveBeenCalledTimes(1);
+
+    // Le même événement, relu : même contenu, même URL `mxc://`, objet différent.
+    rerender(<MediaMessage media={mediaDe(image())!} telecharger={telecharger} />);
+    rerender(<MediaMessage media={mediaDe(image())!} telecharger={telecharger} />);
+    expect(telecharger).toHaveBeenCalledTimes(1);
+
+    // Un autre blob, lui, se déchiffre : la mémoïsation ne fige pas le composant.
+    const autre = mediaDe(
+      evenement({
+        msgtype: "m.image",
+        body: "montagne.jpg",
+        file: FICHIER,
+        info: { thumbnail_file: { ...VIGNETTE, url: "mxc://tacita.test/vignette-2" } },
+      }),
+    )!;
+    rerender(<MediaMessage media={autre} telecharger={telecharger} />);
+    await waitFor(() => expect(telecharger).toHaveBeenCalledTimes(2));
+  });
+
+  /**
+   * REQ-MED-05 — un fichier qui n'est ni photo ni vidéo n'ouvre aucun viewer : sans ce
+   * bouton, ses octets étaient déchiffrables et pourtant inatteignables. Signalé tel quel
+   * par les utilisateurs.
+   */
+  it("un fichier porte une sortie : le téléchargement sur l'appareil", () => {
+    const fichier = mediaDe(
+      evenement({ msgtype: "m.file", body: "contrat.pdf", file: FICHIER, info: { size: 1536 } }),
+    )!;
+    const onSauvegarder = vi.fn();
+    render(<MediaMessage media={fichier} telecharger={telecharger} onSauvegarder={onSauvegarder} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Télécharger" }));
+    expect(onSauvegarder).toHaveBeenCalledTimes(1);
+    // Le clic ne déchiffre pas ici : c'est le câblage qui possède le pipeline (M-E).
+    expect(telecharger).not.toHaveBeenCalled();
+  });
+
   it("un fichier rend son nom et sa taille, jamais une vignette", () => {
     const fichier = mediaDe(
       evenement({ msgtype: "m.file", body: "contrat.pdf", file: FICHIER, info: { size: 1536 } }),
@@ -371,13 +421,99 @@ describe("REQ-UIX-16 — viewer plein écran : navigation, sauvegarde, fermeture
 
   it("le média entier n'est déchiffré qu'ici, pas dans la timeline", async () => {
     rendre();
-    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(medias[0]!.fichier));
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(medias[0]!.fichier, undefined));
   });
 
   it("sauvegarde le média affiché", () => {
     const { onSauvegarder } = rendre();
     fireEvent.click(screen.getByRole("button", { name: "Sauvegarder" }));
     expect(onSauvegarder).toHaveBeenCalledWith(medias[0]);
+  });
+
+  /**
+   * **Les commandes du viewer n'étaient pas absentes : elles étaient invisibles.**
+   *
+   * Le fond venait de `--color-background-inverted` d'Astryx, qui vaut exactement `text` —
+   * la couleur d'encre que ses boutons ghost posent dessus. « Fermer » répondait au clic
+   * et ne se voyait pas ; les retours d'usage disaient « on ne peut pas fermer une photo ».
+   *
+   * jsdom ne calcule aucune couleur : ce test lit la **déclaration**, pas le rendu. Il ne
+   * prouve pas le contraste (c'est `theme.test.ts` qui tient la paire de DESIGN.md) ; il
+   * empêche la ligne qui le porte de disparaître sans que personne ne le voie.
+   */
+  it("le viewer pose son fond et son encre, au lieu d'hériter de ceux du thème", () => {
+    rendre();
+    const style = screen.getByRole("dialog").getAttribute("style") ?? "";
+
+    expect(style).toContain("var(--tacita-viewer)");
+    // Le fond inversé d'Astryx suit le thème *et* vaut l'encre : les deux raisons pour
+    // lesquelles il n'a rien à faire ici.
+    expect(style).not.toContain("--color-background-inverted");
+    // L'encre est remappée dans la portée du viewer, ce qui couvre tous ses enfants
+    // Astryx — y compris ceux qu'on y ajoutera.
+    for (const token of ["--color-text-primary", "--color-icon-primary", "--color-text-disabled"]) {
+      expect(style, token).toContain(`${token}: var(--tacita-sur-viewer`);
+    }
+  });
+
+  /**
+   * Le pendant de « un rendu de plus ne re-déchiffre rien » (REQ-UI-14), là où il coûtait
+   * le plus cher : `Conversation` reconstruit ses `Media` à chaque tour de `/sync`, et la
+   * vidéo ouverte était re-téléchargée et re-déchiffrée **pendant sa lecture**, qui
+   * repartait de zéro à chaque fois. C'est le « on déchiffre 2 secondes par 2 secondes »
+   * des retours d'usage.
+   */
+  it("un rafraîchissement de la conversation ne re-déchiffre pas le média ouvert", async () => {
+    const { rerender } = render(
+      <MediaViewer
+        medias={medias}
+        depart={0}
+        telecharger={telecharger}
+        onFermer={vi.fn()}
+        onSauvegarder={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(telecharger).toHaveBeenCalledTimes(1));
+
+    // Les mêmes médias, relus de leurs événements : même contenu, autres objets.
+    rerender(
+      <MediaViewer
+        medias={[mediaDe(image("$a"))!, { ...mediaDe(image("$b"))!, nom: "montagne.jpg" }]}
+        depart={0}
+        telecharger={telecharger}
+        onFermer={vi.fn()}
+        onSauvegarder={vi.fn()}
+      />,
+    );
+    expect(telecharger).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Un blob `application/octet-stream` ne dit pas au lecteur quel conteneur il ouvre :
+   * `downloadAttachment` rend des octets nus, et le type du blob est le seul indice qui
+   * reste. Le pipeline écrit `info.mimetype` — il suffisait de le lire.
+   */
+  it("le blob de la vidéo part avec le type déclaré dans l'événement", async () => {
+    const video = mediaDe(
+      evenement({
+        msgtype: "m.video",
+        body: "sortie.mp4",
+        file: FICHIER,
+        info: { mimetype: "video/mp4", thumbnail_file: VIGNETTE, duration: 4000 },
+      }),
+    )!;
+    expect(video.mime).toBe("video/mp4");
+
+    render(
+      <MediaViewer
+        medias={[video]}
+        depart={0}
+        telecharger={telecharger}
+        onFermer={vi.fn()}
+        onSauvegarder={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(telecharger).toHaveBeenCalledWith(video.fichier, "video/mp4"));
   });
 
   it("un glissement vers le bas ferme", () => {

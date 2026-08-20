@@ -11,12 +11,10 @@ import {
   roomNotificationLevel,
   type RoomNotificationLevel,
 } from "@tacita/messaging";
-import { downloadAttachment } from "@tacita/media-pipeline";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { contactsDeLaSession } from "../../lib/contacts";
-import { environnementMedia } from "../../lib/media-env";
 import { NewConversationSheet } from "../accueil/NewConversationSheet";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { LayoutHeader } from "../foundation/LayoutHeader";
@@ -30,6 +28,7 @@ import {
 import { Sheet } from "../foundation/Sheet";
 import { Button, Text, TextInput } from "../foundation/primitives";
 import { ConversationCollections } from "../media/ConversationCollections";
+import { useMediaActions } from "../media/useMediaActions";
 import { useSession } from "../onboarding/SessionProvider";
 import { InfoButtons } from "./InfoButtons";
 import { LienInvitation } from "./LienInvitation";
@@ -82,15 +81,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
     if (session) setNiveau(roomNotificationLevel(session, roomId));
   }, [session, roomId]);
 
-  const env = useMemo(() => environnementMedia(), []);
-  const telecharger = useCallback(
-    async (fichier: Parameters<typeof downloadAttachment>[2], mimeType?: string) => {
-      if (!session) throw new Error("session absente : aucun média déchiffrable");
-      const octets = await downloadAttachment(session, env, fichier);
-      return new Blob([octets as BlobPart], { type: mimeType ?? "application/octet-stream" });
-    },
-    [session, env],
-  );
+  const { telecharger, sauvegarder } = useMediaActions(session);
 
   const direct = salon?.direct ?? false;
   const nom = salon?.name ?? "Conversation";
@@ -176,6 +167,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
           evenements={session ? listerMessages(session, roomId) : []}
           epingles={session ? getPinnedEvents(session, roomId) : []}
           telecharger={telecharger}
+          onSauvegarder={sauvegarder}
         />
       </div>
 

@@ -23,6 +23,17 @@ export interface Media {
   vignette?: EncryptedFile;
   taille?: number;
   /**
+   * `info.mimetype`, tel que le pipeline l'écrit (REQ-MED-02).
+   *
+   * Il n'est pas décoratif : `downloadAttachment` rend des **octets nus**, et le blob
+   * qu'on en fabrique n'a que le type qu'on lui donne. Un `<video>` ou un `<audio>` dont
+   * la source est un blob `application/octet-stream` n'a aucun moyen de savoir ce qu'il
+   * lit — le média est celui d'un conteneur inconnu, et le lecteur refuse ou devine.
+   * Absent d'un événement d'un client qui ne le renseigne pas : le repli est alors le
+   * type opaque, comme avant.
+   */
+  mime?: string;
+  /**
    * Dimensions de l'original, telles que le pipeline les écrit dans `info.w`/`info.h`
    * (REQ-MED-03). Elles servent à **réserver la boîte** de la vignette avant de l'avoir
    * déchiffrée : sans elles, la tuile n'a pas de hauteur connue et la timeline saute au
@@ -64,6 +75,7 @@ export function mediaDe(evenement: EvenementLu): Media | undefined {
     fichier,
     vignette: info.thumbnail_file as EncryptedFile | undefined,
     taille: typeof info.size === "number" ? info.size : undefined,
+    mime: typeof info.mimetype === "string" ? info.mimetype : undefined,
     largeur: typeof info.w === "number" ? info.w : undefined,
     hauteur: typeof info.h === "number" ? info.h : undefined,
     dureeMs: typeof info.duration === "number" ? info.duration : audio?.duration,

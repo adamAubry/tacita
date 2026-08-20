@@ -7,7 +7,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Skeleton } from "../foundation/primitives";
 import { DateSeparator } from "./DateSeparator";
 import { MessageObject } from "./MessageObject";
-import type { Telecharger } from "../media/media";
+import type { Media, Telecharger } from "../media/media";
 import { nouveauJour, shouldShowHeader, type MessageAffiche } from "./message";
 
 export interface TimelineProps {
@@ -32,6 +32,8 @@ export interface TimelineProps {
   /** REQ-UI-14 — déchiffrement des pièces jointes (M-E), et ouverture du viewer. */
   telecharger?: Telecharger;
   onOuvrirMedia?: (message: MessageAffiche) => void;
+  /** REQ-MED-05 — sauvegarde d'une pièce jointe sur l'appareil (M-E). */
+  onSauvegarderMedia?: (media: Media) => void;
   /**
    * REQ-UIX-20 (M-F) — l'identifiant du message sur lequel se positionner, tel qu'un
    * résultat de recherche l'a passé dans l'URL.
@@ -74,6 +76,7 @@ export function Timeline({
   onAbandonner,
   telecharger,
   onOuvrirMedia,
+  onSauvegarderMedia,
   ancre,
   fondEcran,
 }: TimelineProps) {
@@ -164,6 +167,7 @@ export function Timeline({
               onAbandonner={message.envoi === "failed" ? () => onAbandonner(message) : undefined}
               telecharger={telecharger}
               onOuvrirMedia={onOuvrirMedia ? () => onOuvrirMedia(message) : undefined}
+              onSauvegarderMedia={onSauvegarderMedia}
             />
           </Fragment>
         );

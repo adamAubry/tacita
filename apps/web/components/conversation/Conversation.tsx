@@ -23,14 +23,13 @@ import {
   typingUsers,
   type MentionCandidate,
 } from "@tacita/messaging";
-import { downloadAttachment, PROFILES, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
+import { PROFILES, saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
 import { useOutbox } from "./OutboxProvider";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { routeAppel, routeInfos } from "../../lib/routes";
-import { environnementMedia } from "../../lib/media-env";
 import { brancherModeMasque } from "../../lib/mode-masque";
 import { lireFondEcran } from "../../lib/preferences";
 import { videoTranscodable } from "../../lib/transcode-video";
@@ -42,6 +41,7 @@ import { MediaPicker } from "../media/MediaPicker";
 import { MediaViewer } from "../media/MediaViewer";
 import { PhotoCapture } from "../media/PhotoCapture";
 import { mediaDe, type Media } from "../media/media";
+import { useMediaActions } from "../media/useMediaActions";
 import { useSession } from "../onboarding/SessionProvider";
 import { Composer } from "./Composer";
 import { ConversationStarter } from "./ConversationStarter";
@@ -89,8 +89,10 @@ export function Conversation({ roomId }: { roomId: string }) {
   const [viewer, setViewer] = useState<number | undefined>();
 
   // L'environnement média (spec 08) est créé une fois : il ouvre un `AudioContext` et
-  // lit `navigator.connection`, ni l'un ni l'autre à refaire à chaque rendu.
-  const env = useMemo(() => environnementMedia(), []);
+  // lit `navigator.connection`, ni l'un ni l'autre à refaire à chaque rendu. Les deux
+  // gestes qui l'accompagnent — déchiffrer, sauvegarder — viennent du même endroit que
+  // pour les autres écrans à médias.
+  const { env, telecharger, sauvegarder } = useMediaActions(session);
   const [videoAutorisee, setVideoAutorisee] = useState(false);
 
   // REQ-MED-04 — `WebCodecs` est large mais pas universel : on **mesure** avant de
@@ -301,17 +303,6 @@ export function Conversation({ roomId }: { roomId: string }) {
       : [],
   );
 
-  const telecharger = useCallback(
-    async (fichier: Parameters<typeof downloadAttachment>[2], mimeType?: string) => {
-      if (!session) throw new Error("session absente : aucun média déchiffrable");
-      const octets = await downloadAttachment(session, env, fichier);
-      // Le type est celui que l'UI attend pour l'affichage, pas celui du blob chiffré :
-      // le pipeline rend des octets nus, sans en-tête de contenu.
-      return new Blob([octets as BlobPart], { type: mimeType ?? "application/octet-stream" });
-    },
-    [session, env],
-  );
-
   return (
     <>
       {/* La colonne de l'écran, et la seule raison pour laquelle la barre d'écriture est
@@ -386,6 +377,7 @@ export function Conversation({ roomId }: { roomId: string }) {
           onRenvoyer={(message) => void outbox?.retry(message.cle)}
           onAbandonner={(message) => void outbox?.remove(message.cle)}
           telecharger={telecharger}
+          onSauvegarderMedia={sauvegarder}
           onOuvrirMedia={(message) => {
             const rang = medias.findIndex((media) => media === message.media);
             if (rang >= 0) setViewer(rang);
@@ -443,9 +435,7 @@ export function Conversation({ roomId }: { roomId: string }) {
           depart={viewer}
           telecharger={telecharger}
           onFermer={() => setViewer(undefined)}
-          onSauvegarder={(media) => {
-            void telecharger(media.fichier).then((blob) => saveOriginal(env, blob, media.nom));
-          }}
+          onSauvegarder={sauvegarder}
         />
       )}
 

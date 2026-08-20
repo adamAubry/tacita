@@ -59,6 +59,22 @@
   --tacita-ombre-avatar: 0 0 24px
     light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
 
+  /* Le visionneur plein écran (DESIGN.md § Colors, 20/08/2026). **Aucun `light-dark()` :
+     les deux valeurs sont celles du thème sombre, dans les deux thèmes.** Une photo se
+     regarde sur un fond neutre sombre — c'était déjà l'intention écrite dans
+     `MediaViewer`, mais elle passait par `--color-background-inverted` d'Astryx, qui
+     *suit* le thème : en sombre, le viewer sortait sur fond blanc.
+
+     Et surtout, ce token vaut exactement l'encre du thème (`text`) : le fond du viewer et
+     la couleur des boutons Astryx posés dessus étaient la **même valeur**, dans les deux
+     thèmes. Les commandes « Fermer », « Sauvegarder », « Précédent », « Suivant » étaient
+     donc invisibles — signalé par les utilisateurs comme « on ne peut pas fermer une
+     photo ». jsdom ne calcule aucune couleur : le défaut ne pouvait venir que d'un
+     rapport d'usage ou d'un test de contraste sur la palette (`theme.test.ts`). */
+  --tacita-viewer: #131514;
+  --tacita-sur-viewer: #e9ecea;
+  --tacita-sur-viewer-muet: #9aa39f;
+
   /* DESIGN.md : avatars en **carré arrondi (rayon 25 %)**, signature délibérée face aux
      cercles de toutes les messageries. Astryx n'a pas de token d'avatar — ses avatars
      lisent `--radius-full`. C'est `ConversationAvatar` qui redéfinit ce token dans sa

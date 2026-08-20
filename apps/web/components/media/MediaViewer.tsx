@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 import { useGlissement } from "../../lib/gestes";
 import { Button, Text } from "../foundation/primitives";
@@ -34,12 +34,26 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
 
   const media = medias[rang];
 
+  /*
+   * **L'URL du blob, pas l'objet `Media`** — même raison que dans `useBlob` (voir le long
+   * commentaire de `MediaMessage`), et c'est ici qu'elle coûtait le plus cher.
+   *
+   * `Conversation` reconstruit ses `Media` à chaque tour de `/sync` : tant que l'effet
+   * dépendait de l'objet, une vidéo ouverte était **re-téléchargée et re-déchiffrée
+   * pendant sa lecture**, toutes les quelques secondes, et le `<video>` repartait de zéro
+   * à chaque fois puisque sa source changeait. C'est le « on déchiffre 2 secondes par
+   * 2 secondes » des retours d'usage.
+   */
+  const cle = media?.fichier.url;
+
   useEffect(() => {
     if (!media) return;
     let objet: string | undefined;
     let vivant = true;
 
-    void telecharger(media.fichier).then((blob) => {
+    // Le type vient de l'événement : sans lui, le blob est `application/octet-stream` et
+    // le lecteur ne sait pas quel conteneur il ouvre (voir `Media.mime`).
+    void telecharger(media.fichier, media.mime).then((blob) => {
       if (!vivant) return;
       objet = URL.createObjectURL(blob);
       setUrl(objet);
@@ -51,7 +65,8 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
       if (objet) URL.revokeObjectURL(objet);
       setUrl(undefined);
     };
-  }, [media, telecharger]);
+    // `media` est volontairement absent : `cle` **est** son identité (voir ci-dessus).
+  }, [cle, telecharger]);
 
   /*
    * `Escape` ferme, comme toute boîte de dialogue modale. Le viewer ne se fermait qu'au
@@ -92,17 +107,40 @@ export function MediaViewer({ medias, depart, telecharger, onFermer, onSauvegard
         horizontal.onPointerUp(evenement);
       }}
       onPointerCancel={horizontal.onPointerCancel}
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "grid",
-        gridTemplateRows: "auto 1fr auto",
-        // Le viewer est le seul endroit sombre de l'app en thème clair : une photo se
-        // regarde sur un fond neutre, pas sur du blanc.
-        background: "var(--color-background-inverted)",
-        touchAction: "none",
-        zIndex: 10,
-      }}
+      style={
+        {
+          position: "fixed",
+          inset: 0,
+          display: "grid",
+          gridTemplateRows: "auto 1fr auto",
+          /*
+           * Le viewer est le seul endroit sombre de l'app, dans les deux thèmes : une
+           * photo se regarde sur un fond neutre, pas sur du blanc (DESIGN.md § Colors,
+           * `viewer`).
+           *
+           * Ce fond était `--color-background-inverted`, le fond inversé d'Astryx — qui
+           * **suit le thème** (donc blanc en sombre) et vaut exactement `text`, la couleur
+           * d'encre que les boutons ghost d'Astryx posent dessus. Les quatre commandes du
+           * viewer étaient de la couleur de leur propre fond : « Fermer » existait,
+           * répondait au clic, et ne se voyait pas — d'où « on ne peut pas fermer une
+           * photo » dans les retours d'usage.
+           *
+           * Les tokens d'encre sont donc redéfinis **dans la portée du viewer** : ses
+           * enfants sont des composants Astryx, qui lisent ces variables et rien d'autre.
+           * Les remapper ici les couvre tous, y compris ceux qu'on y ajoutera ; les
+           * habiller un par un laisserait le prochain naître invisible.
+           */
+          background: "var(--tacita-viewer)",
+          "--color-text-primary": "var(--tacita-sur-viewer)",
+          "--color-icon-primary": "var(--tacita-sur-viewer)",
+          "--color-text-secondary": "var(--tacita-sur-viewer-muet)",
+          "--color-icon-secondary": "var(--tacita-sur-viewer-muet)",
+          "--color-text-disabled": "var(--tacita-sur-viewer-muet)",
+          "--color-icon-disabled": "var(--tacita-sur-viewer-muet)",
+          touchAction: "none",
+          zIndex: 10,
+        } as CSSProperties
+      }
     >
       <div style={{ display: "flex", justifyContent: "space-between", padding: "var(--spacing-2)" }}>
         <Button label="Fermer" variant="ghost" onClick={onFermer} />

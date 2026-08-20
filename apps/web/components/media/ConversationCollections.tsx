@@ -11,6 +11,7 @@ import {
   mediaDe,
   repartir,
   type EvenementLu,
+  type Media,
   type Onglet,
   type Telecharger,
 } from "./media";
@@ -51,6 +52,8 @@ export interface ConversationCollectionsProps {
   epingles: string[];
   telecharger: Telecharger;
   onOuvrirMedia?: (rang: number) => void;
+  /** REQ-MED-05 — écrire un fichier sur l'appareil, depuis l'onglet Fichiers. */
+  onSauvegarder?: (media: Media) => void;
 }
 
 /**
@@ -67,6 +70,7 @@ export function ConversationCollections({
   epingles,
   telecharger,
   onOuvrirMedia,
+  onSauvegarder,
 }: ConversationCollectionsProps) {
   const [onglet, setOnglet] = useState<Onglet>("medias");
   const contenus = repartir(evenements, epingles);
@@ -120,6 +124,7 @@ export function ConversationCollections({
                     telecharger={telecharger}
                     carre={onglet === "medias"}
                     onOuvrir={onglet === "medias" ? () => onOuvrirMedia?.(rang) : undefined}
+                    onSauvegarder={onSauvegarder ? () => onSauvegarder(media) : undefined}
                   />
                 ) : (
                   <Text type="body" maxLines={2}>

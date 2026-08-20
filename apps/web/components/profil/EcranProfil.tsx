@@ -8,15 +8,15 @@ import {
   updateProfile,
   type Profile,
 } from "@tacita/messaging";
-import { downloadAttachment, uploadPublicProfileImage } from "@tacita/media-pipeline";
+import { uploadPublicProfileImage } from "@tacita/media-pipeline";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { routeAppel, routeConversation } from "../../lib/routes";
 import { contactsDeLaSession } from "../../lib/contacts";
-import { environnementMedia } from "../../lib/media-env";
 import { enregistrerWipeNotes } from "../../lib/notes";
 import { ConversationCollections } from "../media/ConversationCollections";
+import { useMediaActions } from "../media/useMediaActions";
 import { Placeholder } from "../foundation/Placeholder";
 import { LogoutButton } from "../onboarding/LogoutButton";
 import { useSession } from "../onboarding/SessionProvider";
@@ -50,7 +50,7 @@ export function EcranProfil({ userId }: { userId?: string }) {
   const estMoi = cible === moi;
 
   const contacts = useMemo(() => (session ? contactsDeLaSession(session) : null), [session]);
-  const env = useMemo(() => environnementMedia(), []);
+  const { env, telecharger, sauvegarder } = useMediaActions(session);
 
   useEffect(() => {
     if (session) enregistrerWipeNotes(session, globalThis.indexedDB);
@@ -67,14 +67,7 @@ export function EcranProfil({ userId }: { userId?: string }) {
     };
   }, [session, cible, revision]);
 
-  const telecharger = useCallback(
-    async (fichier: Parameters<typeof downloadAttachment>[2], mimeType?: string) => {
-      if (!session) throw new Error("session absente : aucun média déchiffrable");
-      const octets = await downloadAttachment(session, env, fichier);
-      return new Blob([octets as BlobPart], { type: mimeType ?? "application/octet-stream" });
-    },
-    [session, env],
-  );
+
 
   if (!session || !profil || !contacts) {
     return <Placeholder titre="Profil" explication="Chargement…" />;
@@ -134,6 +127,7 @@ export function EcranProfil({ userId }: { userId?: string }) {
             evenements={listerMessages(session, dm.roomId)}
             epingles={getPinnedEvents(session, dm.roomId)}
             telecharger={telecharger}
+            onSauvegarder={sauvegarder}
           />
         ) : undefined
       }
