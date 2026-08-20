@@ -36,9 +36,14 @@ la spec 11, pas une hypothèse à valider dans le code de ce package.
 
 ## Limites assumées
 
-- **Le serveur voit la taille et la date de chaque pièce jointe.** Le blob est opaque —
-  AES-CTR 256, clé et IV jamais transmis au serveur — mais son poids, son horodatage et
-  le fait qu'il existe restent lisibles. Métadonnées assumées, cf. `infra/LIMITES.md`.
+- **Le serveur voit la taille et la date de chaque pièce jointe — donc la durée.** Le blob
+  est opaque — AES-CTR 256, clé et IV jamais transmis au serveur — mais son poids, son
+  horodatage et le fait qu'il existe restent lisibles. AES-CTR ne padant pas, le chiffré
+  fait exactement le poids du clair : à débit quasi constant (D-04), **taille ÷ débit
+  ≈ durée**, et celle d'une vidéo ou d'un vocal se déduit du seul blob alors qu'elle est
+  rangée dans l'événement chiffré. **D-11 : on ne pade pas**, parce que le même
+  observateur détient déjà le graphe social et le profil d'activité (REQ-INF-13).
+  Métadonnées assumées, cf. `infra/LIMITES.md`.
 - **Le nom du fichier ne part pas au serveur** (`includeFilename: false`) : il ne vit que
   dans l'événement chiffré. Un nom de fichier est du contenu.
 - **Les vignettes sont chiffrées séparément**, avec leur propre clé : le serveur ne peut

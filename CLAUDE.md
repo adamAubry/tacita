@@ -1,6 +1,6 @@
 # CLAUDE.md — Messagerie E2EE auto-hébergée (PWA Matrix)
 
-PWA de messagerie chiffrée de bout en bout remplaçant les DM/groupes Instagram. Synapse + PostgreSQL, client matrix-js-sdk, appels via LiveKit + Element Call en widget. **Principe directeur : le serveur ne voit jamais de contenu en clair.**
+PWA de messagerie chiffrée de bout en bout remplaçant les DM/groupes Instagram. Synapse + PostgreSQL, client matrix-js-sdk, appels via LiveKit + Element Call en widget. **Principe directeur : le serveur ne voit jamais de contenu en clair.** *(Précisé le 20/08/2026, D-11 : « contenu » est le mot exact, et il ne couvre pas les métadonnées. Le serveur voit qui parle à qui, quand, à quelle fréquence, et **le poids de chaque pièce jointe — donc, à débit quasi constant, la durée de chaque vidéo et de chaque vocal**. C'est assumé, borné et écrit dans `infra/LIMITES.md` ; ce n'est pas un défaut à corriger en silence, et surtout pas une promesse à laisser lire plus large qu'elle n'est.)*
 
 ## Source de vérité
 

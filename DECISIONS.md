@@ -2,7 +2,7 @@
 
 Décisions PM fermes. Les specs s'y réfèrent par leur ID. Toute remise en cause passe par le PM, pas par un contournement dans le code.
 
-**D-01 à D-10 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — D-11 en est un. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
+**D-01 à D-11 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — il n'y en a plus au 20/08/2026, D-11 ayant été tranchée le jour même. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
 
 ## D-01 — Plafond de l'index de recherche local
 **Décision : plafond en nombre d'événements, 200 000, éviction par ancienneté (FIFO).**
@@ -129,7 +129,17 @@ Si la file reprend un téléversement après redémarrage, le chiffré doit êtr
 **Ce qui déplacerait la conclusion** est nommé par D-06 et reste post-V1 : une clé de pickle sur le store crypto **plus** un écran de déverrouillage à chaque ouverture. Le jour où cette décision sera prise, le store de la file et le cache de ciphertext (REQ-MED-16) devront entrer dans le même périmètre — sans quoi on chiffrerait la serrure en laissant la porte.
 
 ## D-11 — Padding de taille des blobs médias (E-24)
-> **OUVERTE — NON TRANCHÉE au 20/08/2026.** Aucune implémentation ne peut s'en réclamer. Cette entrée existe pour que la question ne se reperde pas, pas pour autoriser quoi que ce soit.
+**Décision : on ne pade pas. La conséquence documentaire est due, et elle est écrite.** *(Tranchée le 20/08/2026, après instruction. L'entrée est restée ouverte le temps que le dossier soit constitué ; le paragraphe « ce qui manque pour trancher » ci-dessous a été suivi jusqu'au bout, et sa réponse est ici.)*
+
+**Le motif tient en une phrase : la concession existait déjà.** REQ-INF-13 et D-09 accordent explicitement à un opérateur de serveur — légitime ou après compromission — le graphe social complet et le profil d'activité : qui parle à qui, quand, à quelle fréquence. Le poids d'une pièce jointe appartient au même ensemble, et `infra/LIMITES.md` le documentait déjà nommément. Pader les médias sans rouvrir REQ-INF-13 protégerait la durée d'une vidéo devant un observateur à qui l'on donne déjà la liste de ses correspondants et le rythme de ses échanges : ce serait payer quelques pour cent de bande passante pour fermer une fenêtre dans un mur qui n'en a pas.
+
+**Ce qui est dû en échange, et qui est fait** : la documentation cesse de laisser entendre que le serveur n'apprend rien. Le fait à écrire n'était pas « la taille est visible » — il l'était déjà — mais son **inférence** : à débit quasi constant, taille ÷ débit ≈ durée. Cacher `duration` dans l'événement chiffré ne cache donc pas la durée, et personne ne l'avait écrit. Interdit n°13, règle 5 : tenir la promesse ou la retirer.
+
+**Ce qui rouvrirait la décision, et dans quel ordre.** Si le modèle de menace devait inclure un opérateur qui fait de l'analyse de trafic, **c'est REQ-INF-13 qu'il faudrait rouvrir d'abord** : le padding des médias n'en serait qu'une pièce, et la poser seule laisserait l'essentiel du signal. Deux points à ne pas perdre ce jour-là — le padding doit tomber **à l'intérieur de la zone hachée**, avec troncature après vérification, ce qui demande désormais de rouvrir le hachage par blocs (REQ-MED-18, livré le 20/08/2026) et non d'ajouter une couche ; et la **vignette est un second blob** dont la taille et l'horodatage corrèlent avec le premier.
+
+<details>
+<summary>Le dossier d'instruction, conservé</summary>
+
 
 **Le fait.** AES-CTR ne pade pas : la taille du chiffré est celle du clair à l'octet près. À débit quasi constant, taille ÷ débit ≈ durée. On cache donc la durée dans l'événement chiffré et on la redonne par canal latéral.
 
@@ -145,4 +155,6 @@ Si la file reprend un téléversement après redémarrage, le chiffré doit êtr
 
 **Deux points à ne pas perdre si le choix est de pader.** Le padding doit tomber **à l'intérieur de la zone hachée**, avec troncature **après** vérification — il se conçoit donc **avec** le hachage par blocs, jamais après, sous peine de dessiner le découpage deux fois. Et la **vignette est un second blob** dont la taille et l'horodatage corrèlent avec le premier : un padding qui ne couvrirait que le média principal laisserait passer l'essentiel du signal.
 
-**Ce qui manque pour trancher** : le modèle de menace, et lui seul. La question n'est pas technique — les trois options sont implémentables — mais produit : **inclut-on un opérateur de serveur qui fait de l'analyse de trafic dans ce contre quoi Tacita protège ?** D-09 et REQ-INF-13 concèdent déjà le graphe social et le profil d'activité à cet opérateur. Si cette concession tient, « ne rien faire » est cohérent avec le reste du produit et c'est la réponse ; si elle ne tient plus, c'est REQ-INF-13 qu'il faut rouvrir d'abord, et le padding des médias n'en serait qu'une pièce.
+**Ce qui manquait pour trancher** : le modèle de menace, et lui seul. La question n'était pas technique — les trois options sont implémentables — mais produit : **inclut-on un opérateur de serveur qui fait de l'analyse de trafic dans ce contre quoi Tacita protège ?** D-09 et REQ-INF-13 concèdent déjà le graphe social et le profil d'activité à cet opérateur. Cette concession tient : c'est la réponse, et elle est en tête de section.
+
+</details>

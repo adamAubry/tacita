@@ -74,6 +74,12 @@
 - Les opérations lourdes (transcodage, compression vidéo) tournent en Web Worker — jamais sur le thread principal.
 - Hors scope : UI de capture, galerie, lecteur (spec 11) ; file d'envoi (spec 07 — le pipeline produit un contenu prêt à `enqueue`). *(**Portée amendée le 20/08/2026 — E-22.** « File d'envoi hors scope » laissait la **reprise d'un téléversement interrompu** sans propriétaire : la spec 07 possède les retries d'**événements**, celle-ci met la file hors scope, et un envoi de 200 Mo qui échoue à 90 % n'était réessayé par personne. Deux specs respectées, le trou entre elles — le motif exact de la règle 1. La reprise appartient désormais à la file (REQ-OBX-10) ; ce paquet expose l'étape idempotente qu'elle rejoue (REQ-MED-17) et ne retente rien lui-même.)*
 
+## Limites assumées
+
+- **Le poids d'un média est visible du serveur, et il dit sa durée.** AES-CTR ne pade pas : le chiffré fait exactement le poids du clair. À débit quasi constant (D-04), taille ÷ débit ≈ durée — celle d'une vidéo ou d'un vocal se déduit donc du seul blob, alors qu'`info.duration` voyage dans l'événement chiffré. **D-11 (20/08/2026) : on ne pade pas.** Le motif est écrit là-bas, et il tient à ce que REQ-INF-13 concède déjà le graphe social et le profil d'activité au même observateur. La limite est documentée côté infra (`infra/LIMITES.md`) et côté paquet (`packages/media-pipeline/README.md`) ; elle ne se masque pas (interdit n°13).
+- **Le son d'une source non-AAC est perdu** (REQ-MED-13) : le pipeline recopie une piste, il n'en convertit aucune. L'expéditeur en est averti à l'envoi ; le destinataire reçoit une vidéo muette.
+- **Un événement sans `info.size` échappe aux deux plafonds de REQ-MED-15.** Notre pipeline l'écrit toujours ; un client tiers qui l'omet retombe sur le comportement d'avant cette REQ.
+
 ## Objectif mesurable
 
 Suite Vitest, une describe par REQ : REQ-MED-01/08 (round-trip chiffrer → déchiffrer = octets identiques ; blob altéré → rejet par hash) ; REQ-MED-02 (un PDF et une image empruntent le même chemin de code d'upload — spy sur la fonction unique) ; REQ-MED-04 (profil réseau contraint injecté → dimensions/bitrate cibles D-04 dans les paramètres de compression) ; REQ-MED-06/07 (sortie déclarée `audio/ogg`, entrée AAC simulée → passage par le transcodeur) ; REQ-MED-11 (la photo de profil sort **non chiffrée** et compressée par le même chemin — assertion sur le blob téléversé ; test structurel : un seul site d'appel dans tout le dépôt). APIs navigateur mockées via l'injection prévue.
