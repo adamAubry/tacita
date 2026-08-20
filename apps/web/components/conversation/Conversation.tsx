@@ -23,7 +23,7 @@ import {
   typingUsers,
   type MentionCandidate,
 } from "@tacita/messaging";
-import { prepareAttachment, saveOriginal } from "@tacita/media-pipeline";
+import { prepareAttachment, refusePourTaille, saveOriginal } from "@tacita/media-pipeline";
 import { useOutbox } from "./OutboxProvider";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -40,7 +40,7 @@ import { Button, Icon } from "../foundation/primitives";
 import { MediaPicker } from "../media/MediaPicker";
 import { MediaViewer } from "../media/MediaViewer";
 import { PhotoCapture } from "../media/PhotoCapture";
-import { mediaDe, type Media } from "../media/media";
+import { mediaDe, tailleLisible, type Media } from "../media/media";
 import { useMediaActions } from "../media/useMediaActions";
 import { useSession } from "../onboarding/SessionProvider";
 import { Composer } from "./Composer";
@@ -300,6 +300,21 @@ export function Conversation({ roomId }: { roomId: string }) {
          * sans rechiffrer, y compris après un rechargement de la page.
          */
         const { contenu, televersements } = await prepareAttachment(env, fichier);
+
+        /*
+         * REQ-MED-19 — **on ne met pas en file ce que le serveur refusera.** Le plafond
+         * vient du serveur lui-même, pas d'une constante : sans ce contrôle, une vidéo
+         * de onze minutes partait en 206 Mo pour s'entendre refuser à la fin, et le refus
+         * arrivait sous une forme que le navigateur masquait (413 sans en-tête CORS).
+         */
+        const refus = await refusePourTaille(session, televersements);
+        if (refus) {
+          setErreurMedia(
+            `Cette pièce jointe est trop volumineuse pour ce serveur : ${tailleLisible(refus.taille)}, limite ${tailleLisible(refus.plafond)}.`,
+          );
+          continue;
+        }
+
         await outbox.enqueue(
           roomId,
           contenu,
@@ -321,9 +336,19 @@ export function Conversation({ roomId }: { roomId: string }) {
       }
     } catch (cause) {
       // REQ-MED-10 — le message ne cite jamais le fichier : ni son nom, ni ses octets.
+      /*
+       * REQ-MED-04 — **trois phrases, parce que ce sont trois situations.** « Ce
+       * navigateur ne sait pas lire ce format » se règle en changeant d'appareil ou en
+       * réexportant la vidéo ; « il ne sait pas l'encoder » non. Les confondre — ce que
+       * faisait la phrase unique — envoyait chercher une solution qui n'existe pas :
+       * mesuré le 20/08/2026 sur un `.mov` d'iPhone en HEVC, refusé sous le mot
+       * « compresser » alors que rien n'avait pu être décodé.
+       */
       setErreurMedia(
         cause instanceof TranscodageIndisponible
-          ? "Impossible de compresser cette vidéo sur cet appareil."
+          ? cause.motif === "codec-source"
+            ? "Ce navigateur ne sait pas lire ce format de vidéo. Réexportez-la en H.264, ou envoyez-la depuis un autre appareil."
+            : "Impossible de compresser cette vidéo sur cet appareil."
           : "L'envoi de cette pièce jointe a échoué.",
       );
     } finally {

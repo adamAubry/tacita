@@ -13,7 +13,7 @@
  */
 import type { VideoTargets } from "@tacita/media-pipeline";
 
-import { transcoderVideo } from "./transcode-video";
+import { EchecTranscodage, transcoderVideo, type MotifEchec } from "./transcode-video";
 
 export interface DemandeTranscodage {
   blob: Blob;
@@ -22,7 +22,7 @@ export interface DemandeTranscodage {
 
 export type ReponseTranscodage =
   | { ok: true; blob: Blob; width: number; height: number; durationMs: number; sansSon: boolean }
-  | { ok: false; message: string };
+  | { ok: false; motif: MotifEchec; message: string };
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -34,6 +34,9 @@ self.onmessage = async ({ data }: MessageEvent<DemandeTranscodage>) => {
     // Le message ne cite jamais le média (REQ-MED-10) — seulement la nature de l'échec.
     self.postMessage({
       ok: false,
+      // Le motif traverse, pas seulement le texte : c'est lui qui décide de la phrase
+      // montrée, et une phrase ne se devine pas en relisant un message d'erreur.
+      motif: cause instanceof EchecTranscodage ? cause.motif : "autre",
       message: cause instanceof Error ? cause.message : "transcodage vidéo impossible",
     } satisfies ReponseTranscodage);
   }

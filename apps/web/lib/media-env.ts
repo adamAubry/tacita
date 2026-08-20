@@ -1,5 +1,6 @@
 import type { MediaEnvironment, Raster } from "@tacita/media-pipeline";
 
+import type { MotifEchec } from "./transcode-video";
 import type { DemandeTranscodage, ReponseTranscodage } from "./transcode-worker";
 
 /**
@@ -32,9 +33,13 @@ import type { DemandeTranscodage, ReponseTranscodage } from "./transcode-worker"
  * **dans le paquet** — jamais une dépendance d'`apps/web`, REQ-UI-02 restant close.
  */
 export class TranscodageIndisponible extends Error {
-  constructor(quoi: "video" | "audio", detail?: string) {
+  /** REQ-MED-04 — ce qui a échoué, pour que l'UI dise laquelle des trois phrases. */
+  readonly motif: MotifEchec;
+
+  constructor(quoi: "video" | "audio", detail?: string, motif: MotifEchec = "autre") {
     super(detail ?? `transcodage ${quoi} indisponible dans le shard : voir ESCALATIONS E-10`);
     this.name = "TranscodageIndisponible";
+    this.motif = motif;
   }
 }
 
@@ -157,7 +162,7 @@ export function environnementMedia(options: { signaler?: MediaEnvironment["signa
               durationMs: data.durationMs,
               sansSon: data.sansSon,
             });
-          else rejeter(new TranscodageIndisponible("video", data.message));
+          else rejeter(new TranscodageIndisponible("video", data.message, data.motif));
         };
         worker.onerror = () => {
           worker.terminate();

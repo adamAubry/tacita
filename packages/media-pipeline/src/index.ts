@@ -215,6 +215,45 @@ async function blocsDe(env: MediaEnvironment, enAttente: Televersement[]): Promi
  * Acceptable — un blob opaque de plus, que jamais aucun événement ne référence — mais
  * écrit, sinon « idempotent » se lit comme une propriété de bout en bout.
  */
+/**
+ * REQ-MED-19 — **ce que le serveur accepte, demandé au serveur.**
+ *
+ * `m.upload.size` de `/_matrix/media/v3/config`. Pas de constante en dur : le plafond
+ * appartient au déploiement (REQ-INF-06), et un client qui le devine se trompera le jour
+ * où il change. Rend `undefined` quand le serveur ne l'annonce pas — c'est la seule
+ * réponse honnête, et l'appelant laisse alors passer.
+ */
+export async function plafondTeleversement(session: Session): Promise<number | undefined> {
+  try {
+    const config = await session.client.getMediaConfig();
+    const plafond = (config as { "m.upload.size"?: unknown })["m.upload.size"];
+    return typeof plafond === "number" && plafond > 0 ? plafond : undefined;
+  } catch {
+    // Un serveur qui ne répond pas sur sa configuration ne doit pas empêcher un envoi :
+    // le refus viendra de lui, au pire, et il sera classé correctement.
+    return undefined;
+  }
+}
+
+/**
+ * REQ-MED-19 — le refus **avant** le téléversement, avec de quoi le dire.
+ *
+ * Mesuré le 20/08/2026 : une vidéo de onze minutes sort à environ 206 Mo aux cibles D-04,
+ * au-dessus du plafond de 200 Mo du déploiement. Sans ce contrôle, le client téléversait
+ * les 206 Mo pour s'entendre refuser à la fin — plusieurs minutes de réseau et de batterie
+ * pour un échec connu d'avance, et un message qui ne disait pas pourquoi.
+ */
+export async function refusePourTaille(
+  session: Session,
+  televersements: readonly Televersement[],
+): Promise<{ taille: number; plafond: number } | undefined> {
+  const plafond = await plafondTeleversement(session);
+  if (plafond === undefined) return undefined;
+
+  const trop = televersements.find((televersement) => televersement.ciphertext.length > plafond);
+  return trop ? { taille: trop.ciphertext.length, plafond } : undefined;
+}
+
 export async function uploadCiphertext(session: Session, ciphertext: Bytes): Promise<string> {
   const { content_uri } = await session.client.uploadContent(new Blob([ciphertext as BlobPart]), {
     includeFilename: false,

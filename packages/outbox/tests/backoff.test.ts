@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { backoffMs, BASE_BACKOFF_MS, createOutbox, MAX_BACKOFF_MS, type Outbox } from "../src";
+import {
+  ABANDON_SANS_STATUT,
+  backoffMs,
+  BASE_BACKOFF_MS,
+  createOutbox,
+  MAX_BACKOFF_MS,
+  type Outbox,
+} from "../src";
 import { fakeSession, matrixError, networkError } from "./session-mock";
 
 const ROOM = "!salon:tacita.test";
@@ -78,5 +85,57 @@ describe("REQ-OBX-07 — backoff exponentiel sur rate-limit et erreurs réseau",
     for (let i = 0; i < 10; i++) ctx.emitSync("SYNCING", "ERROR");
     await vi.advanceTimersByTimeAsync(0);
     expect(ctx.client.sendEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("REQ-OBX-04 — une erreur qu'on ne sait pas classer ne boucle pas indéfiniment", () => {
+  /**
+   * Mesuré le 20/08/2026 : un téléversement au-dessus du plafond recevait un **413 sans
+   * en-tête CORS**, que le navigateur masquait au JavaScript. Le client ne voyait qu'une
+   * erreur d'origine, sans statut, donc réessayable — et l'entrée réessayait à l'infini
+   * une requête qui ne pouvait pas aboutir. La cause est corrigée côté proxy ; ceci est le
+   * garde-fou pour la prochaine erreur qu'on ne saura pas classer.
+   */
+  const media = () => ({ msgtype: "m.image", body: "x", file: { url: "" } });
+  const enAttente = () => [{ chemin: ["file", "url"], octets: new Uint8Array(4).buffer }];
+
+  it("passe `failed` après six échecs sans statut, quand la sync répond", async () => {
+    // Ni `httpStatus`, ni `errcode` : exactement ce qu'un blocage d'origine produit.
+    const televerser = vi.fn(async () => {
+      throw new TypeError("NetworkError when attempting to fetch resource.");
+    });
+    const file = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB, televerser });
+    await file.enqueue(ROOM, media(), "t1", enAttente());
+
+    // Le backoff double à chaque échec : on avance le temps au lieu de l'attendre.
+    for (let essai = 0; essai < ABANDON_SANS_STATUT; essai++) {
+      await file.flush();
+      await vi.advanceTimersByTimeAsync(MAX_BACKOFF_MS);
+    }
+
+    expect(televerser.mock.calls.length).toBeGreaterThanOrEqual(ABANDON_SANS_STATUT);
+    expect(file.pending(ROOM)[0]?.status).toBe("failed");
+    // Et les octets sont toujours là : le renvoi manuel ne rechiffrera rien.
+    expect(file.pending(ROOM)[0]?.televersements).toHaveLength(1);
+    file.dispose();
+  });
+
+  it("hors ligne, la même erreur reste réessayable — c'est l'attente qui la résout", async () => {
+    const televerser = vi.fn(async () => {
+      throw new TypeError("NetworkError");
+    });
+    const file = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB, televerser });
+    await file.enqueue(ROOM, media(), "t2", enAttente());
+
+    // Sync tombée : la même erreur est alors ce qu'elle prétend être, et l'attente la
+    // résoudra. Rien ne doit passer `failed`.
+    ctx.emitSync("ERROR", "SYNCING");
+    for (let essai = 0; essai < ABANDON_SANS_STATUT + 2; essai++) {
+      await file.flush();
+      await vi.advanceTimersByTimeAsync(MAX_BACKOFF_MS);
+    }
+
+    expect(file.pending(ROOM)[0]?.status).not.toBe("failed");
+    file.dispose();
   });
 });

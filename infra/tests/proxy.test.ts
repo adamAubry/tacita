@@ -87,3 +87,39 @@ describe("REQ-INF-14 — le certificat de dev couvre le nom que Synapse appelle"
     expect(script).toMatch(/\$\{TURN_DOMAIN:\+,DNS:\$TURN_DOMAIN\}/);
   });
 });
+
+/**
+ * REQ-INF-06 — **le plafond de téléversement doit être annonçable au client.**
+ *
+ * Un rejet produit par nginx n'atteint jamais Synapse, donc ne porte aucun en-tête CORS :
+ * le navigateur masque le statut au JavaScript et ne rend qu'une erreur d'origine. Le
+ * client ne peut alors pas distinguer « refusé pour toujours » de « réseau coupé », et
+ * une file d'envoi réessaie en boucle. Mesuré le 20/08/2026, avec un envoi de plus de
+ * 200 Mo.
+ */
+describe("REQ-INF-06 — un 413 reste lisible par le navigateur", () => {
+  const bloc = /location @televersement_trop_gros \{([^}]*)\}/s.exec(nginxConf)?.[1];
+
+  it("le 413 est routé vers un bloc qui pose les en-têtes CORS", () => {
+    expect(nginxConf).toMatch(/error_page\s+413\s+@televersement_trop_gros;/);
+    expect(bloc, "bloc @televersement_trop_gros absent").toBeDefined();
+    // `always` : sans lui, nginx n'ajoute les en-têtes que sur 2xx et 3xx — donc jamais
+    // sur celui-ci, ce qui annulerait tout le correctif.
+    expect(bloc).toMatch(/add_header Access-Control-Allow-Origin\s+\*\s+always;/);
+  });
+
+  it("le corps est une erreur Matrix, pas une page HTML", () => {
+    // Le client lit `errcode` pour classer : un code qui ne se résout pas par l'attente
+    // doit passer `failed`, pas boucler (règle 2).
+    expect(bloc).toContain("M_TOO_LARGE");
+    expect(bloc).toMatch(/return 413/);
+    expect(bloc).toMatch(/default_type application\/json;/);
+  });
+
+  it("l'en-tête n'est pas posé sur le chemin normal — il y en aurait deux", () => {
+    // Synapse pose déjà `Access-Control-Allow-Origin` sur ses propres réponses ; un
+    // `add_header` inconditionnel en produirait un second, et les navigateurs refusent.
+    const matrix = /location \/_matrix \{([^}]*)\}/s.exec(nginxConf)?.[1];
+    expect(matrix).not.toContain("Access-Control-Allow-Origin");
+  });
+});

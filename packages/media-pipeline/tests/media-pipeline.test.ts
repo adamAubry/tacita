@@ -12,6 +12,7 @@ import {
   encryptAttachment,
   MediaIntegrityError,
   PROFILES,
+  refusePourTaille,
   saveOriginal,
   THUMBNAIL,
   uploadAttachment,
@@ -82,6 +83,10 @@ function fakeSession() {
         ): string | null => "https://tacita.test/_matrix/client/v1/media/download/tacita.test/blob",
       ),
       getAccessToken: () => "syt_token",
+      /** REQ-MED-19 — le plafond que le serveur annonce ; 200 Mo, comme le déploiement. */
+      getMediaConfig: vi.fn(
+        async (): Promise<Record<string, unknown>> => ({ "m.upload.size": 200 * 1024 * 1024 }),
+      ),
     },
   };
 }
@@ -515,5 +520,37 @@ describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel
       "apps/web/components/profil/EcranProfil.tsx",
       "apps/web/lib/identite-par-defaut.ts",
     ]);
+  });
+});
+
+describe("REQ-MED-19 — on ne téléverse pas ce que le serveur refusera", () => {
+  /**
+   * Mesuré le 20/08/2026 : une vidéo de onze minutes sort à environ 206 Mo aux cibles
+   * D-04, au-dessus du plafond de 200 Mo du déploiement. Sans ce contrôle, le client
+   * téléversait les 206 Mo pour s'entendre refuser à la fin — plusieurs minutes de réseau
+   * et de batterie pour un échec connu d'avance.
+   */
+  const televersement = (taille: number) => ({
+    chemin: ["file", "url"],
+    ciphertext: new Uint8Array(taille) as never,
+  });
+
+  it("rend la taille fautive et le plafond, de quoi écrire une phrase juste", async () => {
+    const refus = await refusePourTaille(session, [televersement(10), televersement(300 * 1024 * 1024)]);
+    expect(refus).toEqual({ taille: 300 * 1024 * 1024, plafond: 200 * 1024 * 1024 });
+  });
+
+  it("sous le plafond, rien ne s'oppose à l'envoi", async () => {
+    expect(await refusePourTaille(session, [televersement(1024)])).toBeUndefined();
+  });
+
+  it("un serveur qui n'annonce pas de plafond ne bloque rien", async () => {
+    // Deviner un plafond serait pire que ne pas en avoir : le refus viendrait de nous,
+    // sur une valeur inventée, alors que le serveur aurait accepté.
+    fake.client.getMediaConfig.mockResolvedValueOnce({});
+    expect(await refusePourTaille(session, [televersement(10 ** 9)])).toBeUndefined();
+
+    fake.client.getMediaConfig.mockRejectedValueOnce(new Error("hors ligne"));
+    expect(await refusePourTaille(session, [televersement(10 ** 9)])).toBeUndefined();
   });
 });

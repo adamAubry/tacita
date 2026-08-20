@@ -22,6 +22,23 @@ export const NOT_ENCRYPTED = "TACITA_NOT_ENCRYPTED";
 export const BASE_BACKOFF_MS = 1_000;
 export const MAX_BACKOFF_MS = 60_000;
 
+/**
+ * REQ-OBX-04 — au bout de combien d'échecs **sans statut HTTP** une entrée cesse de
+ * réessayer, quand le serveur est joignable.
+ *
+ * Une erreur sans statut est indiscernable d'une panne réseau, et une panne réseau se
+ * résout par l'attente : c'est pourquoi elle est réessayable. Mais si `/sync` répond —
+ * donc si le serveur est là — et que la même requête échoue six fois de suite sans
+ * jamais rendre de statut, l'attente ne résout rien. Elle boucle.
+ *
+ * Mesuré le 20/08/2026 : un téléversement au-dessus du plafond recevait un 413 **sans
+ * en-tête CORS**, que le navigateur masquait au JavaScript. Le client ne voyait qu'une
+ * erreur d'origine, sans statut, donc réessayable — et l'entrée réessayait indéfiniment
+ * une requête qui ne pouvait pas aboutir. La cause est corrigée côté proxy ; ce plafond
+ * est le garde-fou pour la prochaine erreur qu'on ne saura pas classer.
+ */
+export const ABANDON_SANS_STATUT = 6;
+
 /** États de sync qui valent « le homeserver répond ». */
 const HEALTHY: ReadonlySet<SyncState | null> = new Set([SyncState.Prepared, SyncState.Syncing]);
 
@@ -236,8 +253,18 @@ export async function createOutbox(
     } catch (error) {
       const attempts = entry.attempts + 1;
       const errcode = errcodeOf(error);
+      /*
+       * Règle 2 — une erreur se classe par sa **résolubilité**. Une erreur sans statut
+       * pendant que la sync répond n'est pas une panne réseau : c'est quelque chose que
+       * le navigateur nous cache, et l'attente ne le lèvera pas. `failed` veut dire
+       * « l'utilisateur doit agir sur ce message », et c'est bien le cas — il verra le
+       * bouton de renvoi au lieu d'une file qui tourne en silence.
+       */
+      const inclassableEtRepete =
+        synced && httpStatusOf(error) === undefined && attempts >= ABANDON_SANS_STATUT;
+
       await save(
-        isPermanent(error)
+        isPermanent(error) || inclassableEtRepete
           ? { ...entry, status: "failed", attempts, errcode }
           : {
               ...entry,

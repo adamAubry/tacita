@@ -26,6 +26,24 @@ import {
  * sous-échantillonnage chroma.
  */
 
+/**
+ * REQ-MED-04 — pourquoi un échec de transcodage porte un motif et pas seulement un texte.
+ *
+ * « Ce navigateur ne sait pas encoder » et « ce navigateur ne sait pas **lire** ce
+ * format » n'appellent pas la même conduite : le second se règle en changeant d'appareil
+ * ou en exportant la vidéo autrement, le premier non. Mesuré le 20/08/2026 : un `.mov`
+ * d'iPhone en HEVC échouait sous la phrase « impossible de compresser », qui est fausse —
+ * on n'a même pas pu la décoder.
+ */
+export type MotifEchec = "codec-source" | "encodeur" | "autre";
+
+export class EchecTranscodage extends Error {
+  constructor(readonly motif: MotifEchec, message: string) {
+    super(message);
+    this.name = "EchecTranscodage";
+  }
+}
+
 /** Une image clé toutes les deux secondes : sans elles, aucun déplacement dans la vidéo. */
 const INTERVALLE_CLE_US = 2 * TIMESCALE_US;
 
@@ -140,9 +158,34 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
   if (remuxable(source, cibles)) return remuxer(source);
 
   const { largeur, hauteur } = dimensionsCibles(source.largeur, source.hauteur, cibles.height);
+
+  /*
+   * **Le codec de la source se mesure avant tout le reste**, et c'est ce qui manquait :
+   * on ne vérifiait que l'encodeur. L'ancien chemin passait par une balise `<video>`, qui
+   * décode ce que la plateforme sait décoder ; `VideoDecoder` est plus étroit — Firefox
+   * n'a pas de HEVC du tout, et un `.mov` d'iPhone échouait donc sous une phrase qui
+   * parlait de compression alors que rien n'avait pu être lu.
+   */
+  const configSource: VideoDecoderConfig = {
+    codec: source.codec,
+    description: source.description as BufferSource,
+    codedWidth: source.largeur,
+    codedHeight: source.hauteur,
+  };
+  const lisible =
+    typeof VideoDecoder !== "undefined" &&
+    (await VideoDecoder.isConfigSupported(configSource).catch(() => ({ supported: false })))
+      .supported === true;
+  if (!lisible) {
+    throw new EchecTranscodage(
+      "codec-source",
+      `format vidéo non décodable par ce navigateur : ${source.codec}`,
+    );
+  }
+
   const config = await configuration({ width: largeur, height: hauteur, bitrate: cibles.bitrate });
-  if (!config || typeof VideoDecoder === "undefined") {
-    throw new Error("cet appareil ne sait pas encoder de vidéo : compression impossible");
+  if (!config) {
+    throw new EchecTranscodage("encodeur", "cet appareil ne sait pas encoder de vidéo");
   }
 
   const echantillons: EchantillonVideo[] = [];
@@ -204,12 +247,7 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
       erreur ??= new Error(`décodage vidéo interrompu : ${cause.name}`);
     },
   });
-  decodeur.configure({
-    codec: source.codec,
-    description: source.description as BufferSource,
-    codedWidth: source.largeur,
-    codedHeight: source.hauteur,
-  });
+  decodeur.configure(configSource);
 
   try {
     for (const echantillon of source.echantillons) {

@@ -89,13 +89,30 @@ export type Rotation = 0 | 90 | 180 | 270;
 
 const encodeur = new TextEncoder();
 
-/** Une boîte ISO BMFF : taille (4), type (4), charge utile. */
+/**
+ * Une boîte ISO BMFF : taille (4), type (4), charge utile.
+ *
+ * **Rien n'est étalé.** La version précédente faisait `morceaux.flatMap((m) => [...m])` :
+ * pour le `mdat` d'une vidéo de 20 Mo, c'était vingt millions d'octets convertis en autant
+ * d'éléments de tableau JavaScript — plusieurs centaines de mégaoctets d'allocation et
+ * plusieurs secondes, dans le worker. Invisible sur les échantillons de quelques
+ * kilo-octets des tests, décisif sur un fichier réel : c'est ce qui rendait l'envoi d'une
+ * vidéo « très long » (mesuré le 20/08/2026, sur un fichier de 89 Mo).
+ *
+ * `Uint8Array.set` accepte aussi bien une vue qu'un tableau ordinaire : une seule
+ * allocation, une copie par morceau, et les entiers restent des octets.
+ */
 function boite(type: string, ...morceaux: (Bytes | number[])[]): Bytes {
-  const corps = morceaux.flatMap((morceau) => [...morceau]);
-  const sortie = new Uint8Array(8 + corps.length);
+  const longueur = morceaux.reduce((somme, morceau) => somme + morceau.length, 0);
+  const sortie = new Uint8Array(8 + longueur);
   new DataView(sortie.buffer).setUint32(0, sortie.length);
   sortie.set(encodeur.encode(type), 4);
-  sortie.set(corps, 8);
+
+  let position = 8;
+  for (const morceau of morceaux) {
+    sortie.set(morceau, position);
+    position += morceau.length;
+  }
   return sortie;
 }
 

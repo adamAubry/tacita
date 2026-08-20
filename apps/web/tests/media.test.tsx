@@ -961,3 +961,41 @@ describe("REQ-MED-08 (b) — le viewer ne lit par plages que quand les trois con
     expect(cablage).toContain("telechargerChiffre={telechargerChiffre}");
   });
 });
+
+/**
+ * REQ-MED-04 / REQ-MED-19 — **les trois échecs d'envoi, relus à la source.**
+ *
+ * `Conversation` ne se rend pas en jsdom sans une session complète, et ces trois phrases
+ * dépendent d'un worker que jsdom n'a pas. Ce que ces tests tiennent, c'est que chaque
+ * situation garde sa phrase, et que le contrôle de taille reste **avant** la mise en file
+ * — mesuré le 20/08/2026, où les trois se confondaient en une seule.
+ */
+describe("REQ-MED-04 / REQ-MED-19 — un échec d'envoi dit lequel", () => {
+  const ecran = sansCommentaires(lire("components/conversation/Conversation.tsx"));
+
+  it("un format illisible ne se confond plus avec un échec de compression", () => {
+    // Un `.mov` d'iPhone en HEVC échouait sous le mot « compresser » alors que rien
+    // n'avait pu être décodé : la phrase envoyait chercher une solution qui n'existe pas.
+    expect(ecran).toContain('cause.motif === "codec-source"');
+    expect(ecran).toMatch(/ne sait pas lire ce format de vidéo/);
+    expect(ecran).toMatch(/Impossible de compresser cette vidéo sur cet appareil/);
+  });
+
+  it("le refus de taille tombe avant `enqueue`, jamais après", () => {
+    const refus = ecran.indexOf("refusePourTaille");
+    const miseEnFile = ecran.indexOf("outbox.enqueue");
+    expect(refus).toBeGreaterThan(0);
+    expect(refus).toBeLessThan(miseEnFile);
+    // Et la phrase porte les deux nombres : sans eux, « trop volumineuse » n'apprend rien.
+    expect(ecran).toContain("tailleLisible(refus.taille)");
+    expect(ecran).toContain("tailleLisible(refus.plafond)");
+  });
+
+  it("le codec de la source est mesuré avant d'être décodé", () => {
+    // Le décodeur est plus étroit que la balise `<video>` d'avant : Firefox n'a pas de
+    // HEVC du tout. On mesure, on ne suppose pas (règle 3).
+    const transcode = sansCommentaires(lire("lib/transcode-video.ts"));
+    expect(transcode).toContain("VideoDecoder.isConfigSupported(configSource)");
+    expect(transcode).toContain('new EchecTranscodage(\n      "codec-source"');
+  });
+});
