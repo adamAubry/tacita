@@ -112,3 +112,96 @@ describe("REQ-OBX-08 — le store est enregistré au registre de wipe de la Sess
     rechargé.dispose();
   });
 });
+
+describe("REQ-OBX-10 — la reprise d'un téléversement média appartient à la file", () => {
+  const octets = (taille: number): ArrayBuffer => new Uint8Array(taille).fill(7).buffer;
+  const media = () => ({
+    msgtype: "m.image",
+    body: "plage.jpg",
+    file: { url: "", key: {}, iv: "iv", hashes: {}, v: "v2" },
+    info: { thumbnail_file: { url: "" } },
+  });
+
+  const enAttente = () => [
+    { chemin: ["file", "url"], octets: octets(32) },
+    { chemin: ["info", "thumbnail_file", "url"], octets: octets(8) },
+  ];
+
+  it("téléverse chaque blob, pose son URL au bon endroit, puis envoie l'événement", async () => {
+    let rang = 0;
+    const televerser = vi.fn(async () => `mxc://tacita.test/${(rang += 1)}`);
+    const file = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB, televerser });
+
+    await file.enqueue(ROOM, media(), "t1", enAttente());
+    await vi.waitFor(() => expect(ctx.client.sendEvent).toHaveBeenCalled());
+
+    expect(televerser).toHaveBeenCalledTimes(2);
+    const [, , contenu] = ctx.client.sendEvent.mock.calls[0]!;
+    expect((contenu as { file: { url: string } }).file.url).toBe("mxc://tacita.test/1");
+    expect(
+      (contenu as { info: { thumbnail_file: { url: string } } }).info.thumbnail_file.url,
+    ).toBe("mxc://tacita.test/2");
+    file.dispose();
+  });
+
+  /**
+   * Le cœur de la REQ : un téléversement de 200 Mo qui échoue au second blob ne doit pas
+   * refaire le premier. Sans cette propriété, la « reprise » est un renvoi complet.
+   */
+  it("un échec au second blob ne re-téléverse pas le premier", async () => {
+    const televerses: number[] = [];
+    let echoue = true;
+    const televerser = vi.fn(async (donnees: ArrayBuffer) => {
+      if (donnees.byteLength === 8 && echoue) {
+        echoue = false;
+        throw new Error("réseau coupé");
+      }
+      televerses.push(donnees.byteLength);
+      return "mxc://tacita.test/ok";
+    });
+
+    const file = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB, televerser });
+    await file.enqueue(ROOM, media(), "t1", enAttente());
+
+    await vi.waitFor(() => expect(televerses).toContain(32));
+    // Le premier est passé, le second a échoué : l'entrée reste en file avec le seul
+    // téléversement qui manque.
+    await vi.waitFor(() => expect(file.pending(ROOM)[0]?.televersements).toHaveLength(1));
+    expect(file.pending(ROOM)[0]!.televersements![0]!.octets.byteLength).toBe(8);
+    // Et le contenu porte déjà l'URL du premier : elle a été persistée, pas recalculée.
+    expect((file.pending(ROOM)[0]!.content as { file: { url: string } }).file.url).toBe(
+      "mxc://tacita.test/ok",
+    );
+
+    await file.flush();
+    await vi.waitFor(() => expect(ctx.client.sendEvent).toHaveBeenCalled());
+    // Deux tailles téléversées en tout : 32 une seule fois, puis 8.
+    expect(televerses).toEqual([32, 8]);
+    file.dispose();
+  });
+
+  it("ce qui reste à téléverser survit à un redémarrage du module", async () => {
+    const televerser = vi.fn(async () => {
+      throw new Error("hors ligne");
+    });
+    const file = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB, televerser });
+    await file.enqueue(ROOM, media(), "t1", enAttente());
+    await vi.waitFor(() => expect(televerser).toHaveBeenCalled());
+    file.dispose();
+
+    const relancee = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB, televerser });
+    // Les octets chiffrés sont toujours là : la reprise ne rechiffrera rien.
+    expect(relancee.pending(ROOM)[0]?.televersements).toHaveLength(2);
+    expect(relancee.pending(ROOM)[0]!.televersements![0]!.octets.byteLength).toBe(32);
+    relancee.dispose();
+  });
+
+  it("sans téléverseur injecté, une pièce jointe ne part pas en silence", async () => {
+    const file = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB });
+    await file.enqueue(ROOM, media(), "t1", enAttente());
+
+    await vi.waitFor(() => expect(file.pending(ROOM)[0]?.attempts).toBeGreaterThan(0));
+    expect(ctx.client.sendEvent).not.toHaveBeenCalled();
+    file.dispose();
+  });
+});

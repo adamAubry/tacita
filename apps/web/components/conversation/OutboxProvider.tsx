@@ -1,5 +1,6 @@
 "use client";
 
+import { uploadCiphertext, type Bytes } from "@tacita/media-pipeline";
 import { createOutbox, type Outbox } from "@tacita/outbox";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
@@ -32,7 +33,14 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
     let vivant = true;
     let creee: Outbox | undefined;
 
-    void createOutbox(session).then((file) => {
+    /*
+     * REQ-OBX-10 / REQ-MED-17 — l'étape de téléversement est **injectée** : la file
+     * possède la reprise, le pipeline fournit l'étape idempotente, et aucun des deux
+     * paquets ne dépend de l'autre. C'est ici, et seulement ici, qu'ils se rencontrent.
+     */
+    void createOutbox(session, {
+      televerser: (octets) => uploadCiphertext(session, new Uint8Array(octets) as Bytes),
+    }).then((file) => {
       if (!vivant) {
         file.dispose();
         return;

@@ -1,7 +1,7 @@
 import type { Session } from "@tacita/client-core";
 import { ClientEvent, SyncState } from "matrix-js-sdk";
 
-import { byQueuedAt, type OutboxEntry } from "./entry";
+import { byQueuedAt, type OutboxEntry, type TeleversementEnAttente } from "./entry";
 import { openOutboxStore } from "./store";
 
 /**
@@ -28,6 +28,14 @@ const HEALTHY: ReadonlySet<SyncState | null> = new Set([SyncState.Prepared, Sync
 export interface OutboxOptions {
   /** Injectable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
+  /**
+   * REQ-OBX-10 — l'étape de téléversement, **injectée** : ce paquet ne connaît ni les
+   * médias, ni le chiffrement, ni l'API media de Matrix. Le pipeline (spec 08,
+   * REQ-MED-17) fournit une étape idempotente, la file décide quand la rejouer.
+   *
+   * Absente ⇒ une entrée qui attend un téléversement ne peut pas partir, et le dit.
+   */
+  televerser?: (octets: ArrayBuffer) => Promise<string>;
 }
 
 export interface Outbox {
@@ -35,6 +43,8 @@ export interface Outbox {
     roomId: string,
     content: Record<string, unknown>,
     txnId?: string,
+    /** REQ-OBX-10 — les blobs chiffrés à téléverser avant l'envoi de l'événement. */
+    televersements?: TeleversementEnAttente[],
   ): Promise<OutboxEntry>;
   /** REQ-OBX-04 — renvoi manuel après échec définitif. */
   retry(txnId: string): Promise<void>;
@@ -91,6 +101,7 @@ export async function createOutbox(
   options: OutboxOptions = {},
 ): Promise<Outbox> {
   const store = await openOutboxStore(options.indexedDB ?? globalThis.indexedDB);
+  const { televerser } = options;
   const entries = new Map<string, OutboxEntry>();
   const listeners = new Set<() => void>();
 
@@ -156,7 +167,9 @@ export async function createOutbox(
     timer = setTimeout(() => void flush(), Math.max(0, Math.min(...due) - Date.now()));
   };
 
-  const attempt = async (entry: OutboxEntry): Promise<boolean> => {
+  const attempt = async (entree: OutboxEntry): Promise<boolean> => {
+    // Réassignable : les téléversements réussis avancent l'entrée avant l'envoi.
+    let entry = entree;
     // REQ-OBX-09 — rien ne part vers un salon non chiffré. Le contrôle est ici et
     // non à l'enqueue : la file est différée par nature, l'état du salon au moment
     // de la mise en file n'est pas celui de l'envoi.
@@ -177,6 +190,41 @@ export async function createOutbox(
 
     mark({ ...entry, status: "sending" });
     try {
+      /*
+       * REQ-OBX-10 — **les téléversements d'abord, un par un, et chacun persisté.**
+       *
+       * Un envoi média se fait en deux temps, et le premier n'appartenait à personne : la
+       * spec 08 met la file hors scope, celle-ci ne parlait que d'événements, et un
+       * téléversement de 200 Mo qui échouait à 90 % n'était réessayé par personne.
+       *
+       * Chaque réussite sort de la liste **et l'entrée est réécrite** : une reprise — après
+       * un échec réseau comme après un redémarrage — ne rechiffre rien et ne re-téléverse
+       * que ce qui manquait. Un échec, lui, tombe dans le `catch` commun : c'est le même
+       * backoff et le même statut que pour l'envoi, parce que c'est la même question — est-ce
+       * que réessayer a une chance de marcher ?
+       */
+      while (entry.televersements && entry.televersements.length > 0) {
+        const [prochain, ...reste] = entry.televersements as [
+          TeleversementEnAttente,
+          ...TeleversementEnAttente[],
+        ];
+        if (!televerser) throw new Error("aucun téléverseur : la pièce jointe ne peut pas partir");
+
+        const url = await televerser(prochain.octets);
+        const content = { ...entry.content };
+        poser(content, prochain.chemin, url);
+        /*
+         * **`entry` avance à chaque réussite, avant l'appel suivant.** Écrit dans une
+         * variable locale rendue à la fin, un échec au second blob aurait fait persister
+         * l'entrée d'origine par le `catch` — donc re-téléverser le premier à la reprise,
+         * et la « reprise » n'aurait été qu'un renvoi complet. C'est le test à deux blobs
+         * qui l'a montré.
+         */
+        entry = { ...entry, content, televersements: reste };
+        await save(entry);
+        mark({ ...entry, status: "sending" });
+      }
+
       await session.client.sendEvent(
         entry.roomId,
         EVENT_TYPE as never,
@@ -269,12 +317,13 @@ export async function createOutbox(
   schedule();
 
   return {
-    async enqueue(roomId, content, txnId = session.client.makeTxnId()) {
+    async enqueue(roomId, content, txnId = session.client.makeTxnId(), televersements) {
       const now = Date.now();
       const entry: OutboxEntry = {
         txnId,
         roomId,
         content,
+        ...(televersements && televersements.length > 0 ? { televersements } : {}),
         status: "queued",
         attempts: 0,
         queuedAt: now,
@@ -318,4 +367,22 @@ export async function createOutbox(
       store.close();
     },
   };
+}
+
+/**
+ * Écrit une URL au bout d'un chemin dans le contenu. Le chemin existe : c'est le pipeline
+ * qui l'a créé en même temps que le téléversement qui l'accompagne (REQ-MED-17).
+ */
+function poser(contenu: Record<string, unknown>, chemin: string[], url: string): void {
+  let noeud: Record<string, unknown> = contenu;
+  for (const cle of chemin.slice(0, -1)) {
+    const suivant = noeud[cle];
+    if (typeof suivant !== "object" || suivant === null) return;
+    noeud = { ...(suivant as Record<string, unknown>) };
+    // Copie à chaque niveau : l'entrée persistée ne doit pas partager de branche avec
+    // celle qu'on vient de lire, sinon une reprise réécrirait un objet déjà modifié.
+    (contenu as Record<string, unknown>)[cle] = noeud;
+    contenu = noeud;
+  }
+  noeud[chemin.at(-1)!] = url;
 }

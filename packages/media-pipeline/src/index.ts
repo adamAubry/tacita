@@ -133,6 +133,24 @@ export type AttachmentContent = {
   "org.matrix.msc3245.voice"?: Record<string, never>;
 };
 
+/**
+ * REQ-MED-17 — un blob chiffré qui attend son URL, et l'endroit du contenu où l'écrire.
+ *
+ * Le chemin plutôt qu'un nom de champ : la vignette vit deux niveaux plus bas que le
+ * fichier principal, et une file d'envoi qui ne connaît rien aux médias doit pouvoir
+ * poser l'URL sans savoir lequel des deux elle vient de téléverser.
+ */
+export interface Televersement {
+  chemin: string[];
+  ciphertext: Bytes;
+}
+
+/** Ce que le pipeline produit **sans toucher au réseau** : le contenu, et ce qu'il reste à faire. */
+export interface PieceJointePreparee {
+  contenu: AttachmentContent;
+  televersements: Televersement[];
+}
+
 type Kind = "image" | "video" | "audio" | "file";
 
 const kindOf = (mimeType: string): Kind => {
@@ -145,28 +163,58 @@ const kindOf = (mimeType: string): Kind => {
  * tout passe ici, aucun canal parallèle. Le nom du fichier n'est pas envoyé au serveur,
  * il ne vit que dans l'événement chiffré.
  */
-async function encryptAndUpload(
-  session: Session,
+/**
+ * REQ-MED-17 — un blob chiffré, **et rangé en attente de téléversement**.
+ *
+ * L'URL est vide à ce stade : c'est la file d'envoi qui la posera, au chemin indiqué,
+ * quand elle aura réussi le téléversement (REQ-OBX-10). Séparer les deux est ce qui rend
+ * une reprise possible sans rechiffrer.
+ */
+async function chiffrerEnAttente(
   env: MediaEnvironment,
   blob: Blob,
+  chemin: string[],
+  enAttente: Televersement[],
 ): Promise<EncryptedFile> {
   const { ciphertext, keys } = await encryptAttachment(new Uint8Array(await blob.arrayBuffer()), env);
-  const { content_uri } = await session.client.uploadContent(new Blob([ciphertext]), {
+  enAttente.push({ chemin: [...chemin, "url"], ciphertext });
+  return { ...keys, url: "" };
+}
+
+/**
+ * REQ-MED-17 — **l'étape de téléversement, exposée à part, idempotente, sans retry propre.**
+ *
+ * Rejouée avec le même chiffré, elle ne rechiffre rien et ne régénère rien : ni clé, ni
+ * IV, ni empreinte. C'est ce qui permet à la file d'envoi (spec 07, REQ-OBX-10) de
+ * reprendre un téléversement interrompu sans repasser par la compression.
+ *
+ * **Le pipeline ne retente jamais de lui-même** : une erreur remonte telle quelle, et
+ * c'est la file qui décide du backoff, parce que c'est elle qui sait ce qui attend
+ * derrière.
+ *
+ * **Limite de l'idempotence, à ne pas surestimer : elle est côté application, pas côté
+ * serveur.** L'API media de Matrix n'offre aucune clé d'idempotence ; un téléversement
+ * réussi dont la réponse se perd laisse un blob orphelin, et le rejeu en crée un second.
+ * Acceptable — un blob opaque de plus, que jamais aucun événement ne référence — mais
+ * écrit, sinon « idempotent » se lit comme une propriété de bout en bout.
+ */
+export async function uploadCiphertext(session: Session, ciphertext: Bytes): Promise<string> {
+  const { content_uri } = await session.client.uploadContent(new Blob([ciphertext as BlobPart]), {
     includeFilename: false,
     type: "application/octet-stream",
   });
-  return { ...keys, url: content_uri };
+  return content_uri;
 }
 
 /** REQ-MED-03 — vignette chiffrée séparément : deux blobs opaques, deux jeux de clés. */
 async function thumbnailOf(
-  session: Session,
   env: MediaEnvironment,
   source: Blob,
+  enAttente: Televersement[],
 ): Promise<{ thumbnail_file: EncryptedFile; thumbnail_info: Record<string, unknown> }> {
   const raster = await env.resizeImage(source, THUMBNAIL);
   return {
-    thumbnail_file: await encryptAndUpload(session, env, raster.blob),
+    thumbnail_file: await chiffrerEnAttente(env, raster.blob, ["info", "thumbnail_file"], enAttente),
     thumbnail_info: {
       // **Le type obtenu, pas le type demandé.** Un canvas qui ne sait pas encoder le
       // format demandé rend du PNG en silence ; écrire ici la cible ferait mentir
@@ -212,10 +260,23 @@ async function versOggOpus(env: MediaEnvironment, file: File): Promise<Blob> {
  * Chiffre, téléverse et rend un contenu d'événement prêt à `enqueue` (spec 07).
  * REQ-MED-04 — le profil réseau est détecté ici, une fois, et fixe les cibles D-04.
  */
-export async function uploadAttachment(
-  session: Session,
+export async function prepareAttachment(
   env: MediaEnvironment,
   file: File,
+): Promise<PieceJointePreparee> {
+  const enAttente: Televersement[] = [];
+  const contenu = await construireContenu(env, file, enAttente);
+  return { contenu, televersements: enAttente };
+}
+
+/**
+ * REQ-MED-01/02 — le contenu d'événement, **sans réseau** : tout est compressé, chiffré,
+ * et ce qui reste à téléverser est rangé dans `enAttente`.
+ */
+async function construireContenu(
+  env: MediaEnvironment,
+  file: File,
+  enAttente: Televersement[],
 ): Promise<AttachmentContent> {
   const targets = PROFILES[detectProfile(env.connection)];
   const body = file.name;
@@ -233,9 +294,9 @@ export async function uploadAttachment(
           w: raster.width,
           h: raster.height,
           size: raster.blob.size,
-          ...(await thumbnailOf(session, env, raster.blob)),
+          ...(await thumbnailOf(env, raster.blob, enAttente)),
         },
-        file: await encryptAndUpload(session, env, raster.blob),
+        file: await chiffrerEnAttente(env, raster.blob, ["file"], enAttente),
       };
     }
 
@@ -253,9 +314,9 @@ export async function uploadAttachment(
           h: video.height,
           duration: video.durationMs,
           size: video.blob.size,
-          ...(await thumbnailOf(session, env, await env.extractPoster(video.blob))),
+          ...(await thumbnailOf(env, await env.extractPoster(video.blob), enAttente)),
         },
-        file: await encryptAndUpload(session, env, video.blob),
+        file: await chiffrerEnAttente(env, video.blob, ["file"], enAttente),
       };
     }
 
@@ -270,7 +331,7 @@ export async function uploadAttachment(
         msgtype: "m.audio",
         body,
         info: { mimetype: VOICE_MIME_TYPE, duration: durationMs, size: ogg.size },
-        file: await encryptAndUpload(session, env, ogg),
+        file: await chiffrerEnAttente(env, ogg, ["file"], enAttente),
         "org.matrix.msc1767.audio": { duration: durationMs, waveform: waveform(samples) },
         "org.matrix.msc3245.voice": {},
       };
@@ -283,9 +344,37 @@ export async function uploadAttachment(
         msgtype: "m.file",
         body,
         info: { mimetype: file.type || "application/octet-stream", size: file.size },
-        file: await encryptAndUpload(session, env, file),
+        file: await chiffrerEnAttente(env, file, ["file"], enAttente),
       };
   }
+}
+
+/**
+ * REQ-MED-01/02 — **le** chemin d'upload, version « tout de suite » : prépare puis
+ * téléverse dans la foulée.
+ *
+ * Conservé pour les appelants qui n'ont pas de file derrière eux — et parce que c'est lui
+ * qui porte la promesse de l'interdit n°11 : un seul pipeline, quel que soit le type.
+ * `Conversation` passe désormais par `prepareAttachment`, la file possédant la reprise
+ * (REQ-OBX-10).
+ */
+export async function uploadAttachment(
+  session: Session,
+  env: MediaEnvironment,
+  file: File,
+): Promise<AttachmentContent> {
+  const { contenu, televersements } = await prepareAttachment(env, file);
+  for (const televersement of televersements) {
+    poserUrl(contenu, televersement.chemin, await uploadCiphertext(session, televersement.ciphertext));
+  }
+  return contenu;
+}
+
+/** Écrit une URL au bout d'un chemin. Le chemin existe : c'est le pipeline qui l'a créé. */
+export function poserUrl(contenu: Record<string, unknown>, chemin: string[], url: string): void {
+  let noeud: Record<string, unknown> = contenu;
+  for (const cle of chemin.slice(0, -1)) noeud = noeud[cle] as Record<string, unknown>;
+  noeud[chemin.at(-1)!] = url;
 }
 
 /**

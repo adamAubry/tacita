@@ -23,7 +23,7 @@ import {
   typingUsers,
   type MentionCandidate,
 } from "@tacita/messaging";
-import { saveOriginal, uploadAttachment } from "@tacita/media-pipeline";
+import { prepareAttachment, saveOriginal } from "@tacita/media-pipeline";
 import { useOutbox } from "./OutboxProvider";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -293,8 +293,26 @@ export function Conversation({ roomId }: { roomId: string }) {
     avis.current = undefined;
     try {
       for (const fichier of fichiers) {
-        const contenu = await uploadAttachment(session, env, fichier);
-        await outbox.enqueue(roomId, contenu);
+        /*
+         * REQ-OBX-10 — **la compression et le chiffrement ici, le téléversement dans la
+         * file.** Rien ne part au réseau avant `enqueue` : ce qui est mis en file porte
+         * ses octets chiffrés, donc un envoi interrompu reprend là où il s'est arrêté,
+         * sans rechiffrer, y compris après un rechargement de la page.
+         */
+        const { contenu, televersements } = await prepareAttachment(env, fichier);
+        await outbox.enqueue(
+          roomId,
+          contenu,
+          undefined,
+          televersements.map(({ chemin, ciphertext }) => ({
+            chemin,
+            // `ArrayBuffer` : c'est ce qu'IndexedDB range et rend tel quel.
+            octets: ciphertext.buffer.slice(
+              ciphertext.byteOffset,
+              ciphertext.byteOffset + ciphertext.byteLength,
+            ),
+          })),
+        );
       }
       // REQ-MED-13 — la vidéo est partie ; ce qu'elle a laissé en route se dit maintenant,
       // à l'expéditeur et à lui seul.
