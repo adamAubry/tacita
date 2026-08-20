@@ -2,6 +2,8 @@
 
 Décisions PM fermes. Les specs s'y réfèrent par leur ID. Toute remise en cause passe par le PM, pas par un contournement dans le code.
 
+**D-01 à D-10 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — D-11 en est un. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
+
 ## D-01 — Plafond de l'index de recherche local
 **Décision : plafond en nombre d'événements, 200 000, éviction par ancienneté (FIFO).**
 Un plafond en octets est difficile à mesurer de façon fiable en IndexedDB ; un compteur d'événements est trivial à tester. 200 000 messages couvrent plusieurs années d'usage personnel. Pas de fenêtre temporelle en plus : un seul critère, un seul chemin de purge (YAGNI).
@@ -79,3 +81,68 @@ Les clés Megolm sont partagées avec les appareils **signés par l'identité cr
 **Pas de messages éphémères.** Ils contrediraient D-02 et exigeraient des purges serveur. L'option n'apparaît pas dans l'UI, pas même grisée : une option grisée est une promesse non tenue affichée (interdit n°13).
 
 **L'invitation par lien obtient un service de tokens côté serveur** — `specs/12-invite-tokens.md`. C'est la seule pièce non native, parce qu'aucun mécanisme Matrix ne porte un lien partageable à durée de vie bornée. **Son cadre est étroit et il est écrit : un utilisateur existant ajoute un autre utilisateur existant.** Tout ce qui en sort a un comportement défini et un message honnête — jamais une erreur technique, jamais une inscription que `enable_registration: false` interdit. **Ce que la décision cède, à documenter côté utilisateur :** un composant serveur de plus apprend qui invite qui. C'est de la métadonnée, jamais du contenu, et elle rejoint la limite déjà assumée par REQ-INF-13.
+
+## D-10 — Refonte du pipeline vidéo : ce qui est amendé, et ce qui ne l'est pas
+**Tranchée le 20/08/2026.** Les specs sont amendées **avant** l'implémentation, qui sera écrite contre elles. Aucun code, aucun test, aucune configuration n'a été touché par cette passe — c'est la condition qui rend l'exercice utile : une spec amendée après coup ne fait que ratifier ce qui est déjà écrit.
+
+| # | Amendement | E-xx | Où |
+|---|---|---|---|
+| 1 | « Muxeurs sans dépendance » s'ouvre au **démuxage et au muxage de conteneur**, sous régime d'épinglage (règle 5). E-10 intacte, « zéro DOM » intacte, aucune bibliothèque nommée | E-17 | `specs/08` § Méthode |
+| 2 | Portée de « le destinataire ne reçoit que la version compressée » : **le chemin de capture in-app**. La propriété protégée devient le **conteneur normalisé unique en sortie** ; remuxage conforme, passthrough brut interdit | E-18 | `specs/08` REQ-MED-05 |
+| 3 | Source déjà conforme aux cibles ⇒ **remuxage seul**. Conséquence UI : message d'échec de compression dédié, distinct de l'absence de bouton | E-18 | `specs/08` REQ-MED-04, D-04 |
+| 4 | **REQ-MED-12** — liste close des types rendus, vidéo **et** image, par défaut de refus ; `application/octet-stream` cesse d'être un repli ; support du codec vérifié avant d'afficher un lecteur | E-19 | `specs/08` |
+| 5 | **REQ-MED-13** — piste audio AAC-LC ; muet assumé et dit plutôt qu'un conteneur non éprouvé. **D-03 mise hors sujet explicitement** | E-20 | `specs/08`, D-03, D-04 |
+| 6 | **REQ-MED-14** — orientation préservée. Elle ne l'était que par accident du canvas | — | `specs/08` |
+| 7 | **REQ-MED-08 reformulée en principe** : aucun octet servi, rendu ou écrit sans vérification réussie ; hash global et hachage par blocs énumérés comme mécanismes conformes. Note sur l'intégrité par transitivité via l'enveloppe Megolm | E-23 | `specs/08` |
+| 8 | **REQ-MED-15** — deux plafonds de taille en réception, et le schéma « vérification globale puis déchiffrement par tranches » déclaré conforme | — | `specs/08` |
+| 9 | **REQ-MED-16** — cache de ciphertext, inscrit au registre de wipe (REQ-COR-10) | E-21 | `specs/08` |
+| 10 | **REQ-OBX-10 et REQ-MED-17** — la reprise de téléversement appartient à la file ; le pipeline expose une étape idempotente et ne retente pas seul. **Les deux portées amendées dans la même passe** | E-22 | `specs/07`, `specs/08` |
+| 11 | Cibles d'encodage : hauteur bornée par la source, profil High avec repli mesuré, débit variable, image clé inchangée | — | D-04 |
+
+**Ce que cette passe ne fait pas.** Elle ne nomme aucune bibliothèque, ne tranche pas le padding (D-11), et n'écrit aucune REQ pour le hachage par blocs — dont la phase n'est pas ordonnancée. Les deux notes ci-dessous préparent cette phase ; ce sont des **notes de conception, pas des exigences**, et aucun test ne les nomme.
+
+### Note de conception — bornes du service worker (préparation du hachage par blocs)
+
+Il n'y a **qu'un service worker par scope** : celui qui servirait les médias **sera** celui du push, donc réveillé hors de toute page. La borne ne peut pas être architecturale — on ne peut pas « avoir un autre SW » —, elle doit être structurelle et vérifiable. À écrire le moment venu, sous cette forme :
+
+- table des clés en portée module, **en mémoire**, vide au démarrage à froid ;
+- alimentée **uniquement** par `postMessage` depuis un client vivant ;
+- jamais persistée, et **jamais de `caches.put` d'une réponse déchiffrée** (interdit n°8, REQ-UI-01) ;
+- purgée à la terminaison du worker ;
+- URL virtuelle non devinable, liée à la durée de vie de la page ;
+- le handler `push` **ne lit jamais** cette table.
+
+Et le test qui rend la borne réelle, sans lequel elle n'est qu'un commentaire : **SW démarré à froid par un push ⇒ table vide ⇒ aucune requête média servie tant qu'aucun client n'a posté de clé.**
+
+### Note de conception — champ propriétaire des hashes par blocs
+
+Le champ portant la liste des hashes est namespacé **`org.tacita.*`**, documenté comme nôtre, et **jamais présenté comme du Matrix natif** — même discipline que l'accusé « délivré » (interdit n°9). `hashes.sha256` standard est **conservé en parallèle**. Double chemin en réception : champ présent ⇒ progressif ; absent ⇒ chemin legacy inchangé, donc aucune régression avec Element.
+
+### Note instruite — persistance de l'outbox et clés de fichier (question posée avec E-22)
+
+Si la file reprend un téléversement après redémarrage, le chiffré doit être persisté, et la clé AES du fichier vit dans le contenu de l'événement en attente. La question posée était : ce store est-il chiffré au repos, et crée-t-on un chemin où clé et chiffré coexistent hors de l'enveloppe Megolm ?
+
+**Les faits, relevés dans le code et les specs.** `OutboxEntry.content` est stocké **tel quel** en IndexedDB (REQ-OBX-06, `packages/outbox/src/entry.ts`), sans chiffrement au repos : un `m.video` en attente porte donc déjà `file.key` en clair, aujourd'hui, indépendamment de toute reprise de téléversement.
+
+**C'est déjà arbitré, et l'arbitrage est D-06.** `initRustCrypto` tourne sans clé de pickle : les **clés Megolm** sont déjà en clair dans la même IndexedDB, et D-06 en tire la conséquence en toutes lettres — « qui a accès au profil du navigateur a accès au compte et à l'historique déchiffrable ». Une clé de fichier posée à côté d'elles n'ajoute rien au modèle de menace ; persister le chiffré non plus. Le même raisonnement vaut pour l'intégrité, qui est le point sensible de la note de REQ-MED-08 : un attaquant local capable de réécrire le store détient déjà les clés Megolm, donc peut forger l'événement entier — il n'a aucun besoin de substituer un média.
+
+**Ce qui déplacerait la conclusion** est nommé par D-06 et reste post-V1 : une clé de pickle sur le store crypto **plus** un écran de déverrouillage à chaque ouverture. Le jour où cette décision sera prise, le store de la file et le cache de ciphertext (REQ-MED-16) devront entrer dans le même périmètre — sans quoi on chiffrerait la serrure en laissant la porte.
+
+## D-11 — Padding de taille des blobs médias
+> **OUVERTE — NON TRANCHÉE au 20/08/2026.** Aucune implémentation ne peut s'en réclamer. Cette entrée existe pour que la question ne se reperde pas, pas pour autoriser quoi que ce soit.
+
+**Le fait.** AES-CTR ne pade pas : la taille du chiffré est celle du clair à l'octet près. À débit quasi constant, taille ÷ débit ≈ durée. On cache donc la durée dans l'événement chiffré et on la redonne par canal latéral.
+
+**Options, avec leur coût.**
+
+| Option | Ce qu'elle laisse fuir | Ce qu'elle coûte |
+|---|---|---|
+| Buckets de 256 KiB | granularité réduite, inférence pas supprimée | ~128 KiB par fichier en moyenne, quelques % de bande passante |
+| Puissances de 2 | quasi rien | jusqu'à 100 % de surcoût — inacceptable en mobile |
+| Ne rien faire | taille, donc durée, compte de médias, rythme d'échange | rien |
+
+**La conséquence documentaire est inconditionnelle.** Si le choix est « ne rien faire », la documentation doit cesser de laisser entendre que le serveur n'apprend rien — tenir la promesse ou la retirer (interdit n°13). *À verser au dossier : `infra/LIMITES.md` documente **déjà** la fuite, et nommément la taille des pièces jointes (« même chiffrées, la taille du blob S3 est visible »). L'option « ne rien faire » ne demande donc pas d'écrire une limite nouvelle — seulement de vérifier que le principe directeur de `CLAUDE.md` et la spec 08 ne promettent pas plus que ce que `LIMITES.md` concède.*
+
+**Deux points à ne pas perdre si le choix est de pader.** Le padding doit tomber **à l'intérieur de la zone hachée**, avec troncature **après** vérification — il se conçoit donc **avec** le hachage par blocs, jamais après, sous peine de dessiner le découpage deux fois. Et la **vignette est un second blob** dont la taille et l'horodatage corrèlent avec le premier : un padding qui ne couvrirait que le média principal laisserait passer l'essentiel du signal.
+
+**Ce qui manque pour trancher** : le modèle de menace, et lui seul. La question n'est pas technique — les trois options sont implémentables — mais produit : **inclut-on un opérateur de serveur qui fait de l'analyse de trafic dans ce contre quoi Tacita protège ?** D-09 et REQ-INF-13 concèdent déjà le graphe social et le profil d'activité à cet opérateur. Si cette concession tient, « ne rien faire » est cohérent avec le reste du produit et c'est la réponse ; si elle ne tient plus, c'est REQ-INF-13 qu'il faut rouvrir d'abord, et le padding des médias n'en serait qu'une pièce.

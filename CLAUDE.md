@@ -8,7 +8,7 @@ Spec-driven development : les specs sont exécutables, le code les implémente, 
 
 - `specs/00-conventions.md` — architecture du monorepo, IDs d'exigence, séquencement. **Les règles de comportement qui y vivaient sont désormais ici** (§ Boucle de développement, § Tests, § Sept règles) : ce fichier-ci est chargé à chaque session, pas lui, et une règle rangée là où personne ne la lit au bon moment n'a jamais rien empêché. Un fait, une maison — si les deux fichiers se contredisent, c'est un bug à corriger, pas une préséance à appliquer.
 - `specs/01..12-*.md` — un contrat par module. Ne travailler que dans le module assigné.
-- `DECISIONS.md` — arbitrages produit tranchés (D-01 à D-09). Ne pas les rediscuter dans le code ; escalader au PM.
+- `DECISIONS.md` — arbitrages produit tranchés (**D-01 à D-10**). Ne pas les rediscuter dans le code ; escalader au PM. Une entrée peut aussi porter des **notes de conception** non normatives et des **points ouverts** — elle le dit alors en tête, et c'est le cas de **D-11** (padding de taille), qui n'autorise rien tant qu'il n'est pas tranché. *(Étendu le 20/08/2026.)*
 - `specs/ui/` — découpage frontend du shard UI (modules M-A à M-I, plan, ESCALATIONS.md). Pour tout travail dans `apps/web`, le module M-X assigné est le contrat ; la SPEC 11 reste l'autorité fonctionnelle.
 - `PRODUCT.md` et `DESIGN.md` (racine) — stratégie produit et système visuel (voir section impeccable).
 
@@ -90,7 +90,7 @@ Valeur de jurisprudence : chacune a été posée sur un cas vécu **dans ce dép
 
 **Les trois outils ont été évalués le 05/08/2026** — application Next.js 15 réellement construite, rendu éprouvé, registre npm interrogé. Ce qu'il faut en savoir tient en cinq points ; le reste est dans `specs/11-ui-shard.md` et `specs/ui/M-A.md`, qui sont les contrats.
 
-1. **Seul Astryx s'exécute chez l'utilisateur.** ponytail et impeccable sont des plugins d'agent, sans empreinte à l'exécution — ils ne peuvent être incompatibles ni avec les gestes, ni avec la PWA, ni avec le hors-ligne.
+1. **Seul Astryx s'exécute chez l'utilisateur.** ponytail et impeccable sont des plugins d'agent, sans empreinte à l'exécution — ils ne peuvent être incompatibles ni avec les gestes, ni avec la PWA, ni avec le hors-ligne. *(La phrase parle **de ces trois outils-là**, pas du dépôt entier : depuis E-17, 20/08/2026, `packages/media-pipeline` peut porter une dépendance runtime de démuxage/muxage de conteneur, qui s'exécute évidemment chez l'utilisateur. Elle relève du même régime d'épinglage que le point 5.)*
 2. **Trois contraintes de construction, non négociables**, sans lesquelles `next build` échoue : jamais le barrel `@astryxdesign/core` (toujours le sous-chemin) ; le `Theme` d'Astryx enveloppé dans un composant `"use client"` du shard ; une palette fournie par le shard (`defineTheme`), le cœur n'en embarque aucune.
 3. **Astryx est en `0.2.0` et a six semaines.** Version épinglée, CHANGELOG relu avant tout bump — même jurisprudence que les digests d'images du compose.
 4. Toute incompatibilité **découverte depuis** : ne pas contourner silencieusement, escalader au PM.
