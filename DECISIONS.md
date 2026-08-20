@@ -20,6 +20,8 @@ Un format propriétaire MP4/AAC rendrait les vocaux iPhone illisibles par tout c
 
 **Où vit le transcodage — tranché avec la révision.** Muxeurs et encodeurs prennent des octets et rendent des octets : ils n'ont aucun DOM et vivent dans `packages/media-pipeline`, dont la spec 08 sanctionne déjà le WASM. Le shard ne garde que les appels navigateur (`MediaRecorder`, `WebCodecs`) dans son `MediaEnvironment`. **REQ-UI-02 n'est pas amendée** : on n'ouvre une liste close que lorsqu'il n'existe aucun autre lieu — c'était le cas de `@stylexjs/stylex`, peer dependency d'Astryx ; ce n'est pas le cas d'un codec. Détail et branches dans `specs/ui/ESCALATIONS.md` § E-10.
 
+**Portée précisée le 20/08/2026 — E-20.** D-03 porte sur les **messages vocaux** (`m.audio`), et sur eux seuls. La **piste audio d'une vidéo** n'entre pas dans son périmètre : elle est gouvernée par D-04, et son format est l'AAC-LC (spec 08, REQ-MED-13). Écrit ici parce que rien ne le disait, et qu'« AAC » lu à côté de « D-03 » passe pour une violation.
+
 ## D-04 — Seuils de compression adaptative
 **Décision : deux profils réseau, détectés via Network Information API (`effectiveType`), profil « bon réseau » par défaut si l'API est absente (Safari).**
 
@@ -29,6 +31,25 @@ Un format propriétaire MP4/AAC rendrait les vocaux iPhone illisibles par tout c
 | Vidéo | 720p, 2.5 Mbps | 480p, 1 Mbps |
 
 Formats de sortie : JPEG (images), MP4/H.264 (vidéos — lisible partout, la vidéo n'a pas la contrainte d'interop Opus). Pas de 3e profil, pas de réglage utilisateur en V1.
+
+**Révision 20/08/2026 — les cibles vidéo se précisent, et la vidéo gagne une piste audio (E-18, E-20).** Les deux profils et leur détection ne changent pas ; la ligne « Vidéo » du tableau se lit désormais ainsi :
+
+| Vidéo | Bon réseau | Réseau contraint |
+|---|---|---|
+| Hauteur | `min(hauteur source, 720)` | `min(hauteur source, 480)` |
+| Débit | ~2,5 Mbit/s, **mode variable** | ~1 Mbit/s, mode variable |
+| Profil H.264 | **High**, repli Main puis Baseline | idem |
+| Image clé | toutes les 2 s (inchangé) | idem |
+| Piste audio | AAC-LC, 128 kbit/s stéréo / 96 kbit/s mono, 44,1 ou 48 kHz | idem |
+
+Quatre motifs, un par ligne modifiée :
+
+- **La hauteur est bornée par la source.** « 720p » se lisait comme une cible et non comme un plafond : une source 480p était *agrandie* — plus grosse, plus moche, plus lente à produire. `min(source, plafond)` est ce que la décision voulait dire, et ce que le tableau dit maintenant.
+- **Profil High plutôt que Baseline.** Baseline interdit CABAC et les B-frames : 15 à 25 % de débit perdu à qualité perçue égale. L'échelle de repli — High, puis Main, puis Baseline — est retenue à la **première configuration supportée**, mesurée et non supposée. *(Conséquence d'implémentation à ne pas manquer : les B-frames impliquent des horodatages de présentation différents de ceux de décodage, donc une table `ctts` dans le conteneur.)*
+- **Débit variable.** Un débit fixe gaspille sur une source statique et sature sur du mouvement rapide.
+- **Piste audio.** Le format et ses bornes vivent ici ; l'obligation, son unique repli honnête — partir muet, en le disant — et l'interdiction de tout autre repli vivent dans REQ-MED-13. **D-03 n'est pas concernée**, voir la précision de portée ajoutée ci-dessus.
+
+**Source déjà conforme aux cibles ⇒ remuxage seul, pas de réencodage (E-18).** Réencoder ce qui respecte déjà les plafonds coûte une génération de perte et une attente, sans rien rendre. Le remuxage, lui, reste dû : le passthrough brut du fichier source ferait sortir du pipeline un conteneur que rien n'a normalisé, ce que REQ-MED-05 amendée continue d'interdire.
 
 ## D-05 — Index de recherche et rotation de session Megolm
 **Décision : aucune réindexation, incrémental pur.**
