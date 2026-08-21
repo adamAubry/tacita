@@ -186,7 +186,7 @@ async function mesurerVideo(blob: Blob): Promise<{ width: number; height: number
 function viaWorker(
   blob: Blob,
   cibles: Parameters<MediaEnvironment["transcodeVideo"]>[1],
-): Promise<Raster & { durationMs: number; sansSon?: boolean }> {
+): Promise<Raster & { durationMs: number; sansSon?: boolean; poster?: Blob }> {
   return new Promise((resoudre, rejeter) => {
     const worker = new Worker(new URL("./transcode-worker.ts", import.meta.url));
     worker.onmessage = ({ data }: MessageEvent<ReponseTranscodage>) => {
@@ -198,6 +198,7 @@ function viaWorker(
           height: data.height,
           durationMs: data.durationMs,
           sansSon: data.sansSon,
+          poster: data.poster,
         });
       else rejeter(new TranscodageIndisponible("video", data.message, data.motif));
     };

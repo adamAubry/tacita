@@ -914,6 +914,36 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
     expect(source).toContain("if (largeur === source.largeur && hauteur === source.hauteur)");
   });
 
+  it("la vignette sort du décodeur, sur les deux chemins qui décodent", () => {
+    /*
+     * REQ-MED-03 — le poster était pris en rejouant le fichier dans un `<video>` sur le
+     * thread principal : le plus faible des trois mécanismes, employé y compris là où un
+     * décodeur était déjà ouvert. Quand ce lecteur refusait le fichier — et il le refusait
+     * —, la vidéo partait sans vignette, et la timeline n'avait rien à montrer.
+     *
+     * Ce que ces lignes tiennent (règle 7, jsdom n'ayant pas WebCodecs) : le chemin de
+     * réencodage peint depuis les frames qu'il décode déjà, et le chemin rapide — qui ne
+     * décode rien par construction — décode **une** image clé, pas un fichier.
+     */
+    expect(source).toContain("peindrePoster(poster, image, source.rotation)");
+    expect(source).toContain("poster: await rendrePoster(poster)");
+    expect(source).toContain("poster: await posterDUneCle(source)");
+    expect(source).toContain('source.echantillons.find((echantillon) => echantillon.cle)');
+  });
+
+  it("la vignette porte l'orientation affichée, pas les pixels codés", () => {
+    /*
+     * REQ-MED-14 — le `<video>` appliquait la matrice du `tkhd` pour nous ; un décodeur
+     * rend la frame codée. Sans redressement, la vignette d'une vidéo filmée en portrait
+     * sortait couchée à côté d'une vidéo qui, elle, se lisait droite.
+     *
+     * Le sens a été vérifié contre ffmpeg le 21/08/2026 — la valeur est l'angle horaire
+     * d'affichage, et le repère du canvas tourne déjà dans ce sens.
+     */
+    expect(source).toContain("pinceau.rotate((rotation * Math.PI) / 180)");
+    expect(source).toContain("new OffscreenCanvas(pivote ? hauteur : largeur, pivote ? largeur : hauteur)");
+  });
+
   it("le contrôle de flux borne les deux files, pas une", () => {
     // Sans lecteur pour cadencer, c'est la seule chose entre le décodeur et la mémoire.
     expect(source).toContain("encodeur.encodeQueueSize > FILE_MAX");

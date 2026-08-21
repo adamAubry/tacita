@@ -21,15 +21,35 @@ export interface DemandeTranscodage {
 }
 
 export type ReponseTranscodage =
-  | { ok: true; blob: Blob; width: number; height: number; durationMs: number; sansSon: boolean }
+  | {
+      ok: true;
+      blob: Blob;
+      width: number;
+      height: number;
+      durationMs: number;
+      sansSon: boolean;
+      /** REQ-MED-03 — l'image de la vignette, prise au décodeur. Absente si rien n'a pu être peint. */
+      poster?: Blob;
+    }
   | { ok: false; motif: MotifEchec; message: string };
 
 declare const self: DedicatedWorkerGlobalScope;
 
 self.onmessage = async ({ data }: MessageEvent<DemandeTranscodage>) => {
   try {
-    const { blob, width, height, durationMs, sansSon } = await transcoderVideo(data.blob, data.cibles);
-    self.postMessage({ ok: true, blob, width, height, durationMs, sansSon } satisfies ReponseTranscodage);
+    const { blob, width, height, durationMs, sansSon, poster } = await transcoderVideo(
+      data.blob,
+      data.cibles,
+    );
+    self.postMessage({
+      ok: true,
+      blob,
+      width,
+      height,
+      durationMs,
+      sansSon,
+      poster,
+    } satisfies ReponseTranscodage);
   } catch (cause) {
     // Le message ne cite jamais le média (REQ-MED-10) — seulement la nature de l'échec.
     self.postMessage({

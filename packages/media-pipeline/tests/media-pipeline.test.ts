@@ -278,6 +278,35 @@ describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
     expect(contenu.info.size).toBe(source.size);
   });
 
+  it("la vignette vient du décodeur quand il en a une, du lecteur seulement sinon", async () => {
+    /*
+     * REQ-MED-03 — **le poster suit le décodeur, pas le lecteur.** Les deux chemins qui
+     * décodent tiennent déjà une frame ; rouvrir le fichier dans un `<video>` pour
+     * redemander ce qu'on avait sous la main était le detour qui laissait les vidéos sans
+     * vignette dès que ce lecteur refusait le fichier. `extractPoster` n'est plus qu'un
+     * dernier recours — celui du seul chemin qui ne décode rien.
+     */
+    const duDecodeur = new Blob([bytes("image du decodeur")], { type: "image/jpeg" });
+    env = fakeEnv({
+      transcodeVideo: vi.fn(async () => ({
+        blob: new Blob([bytes("mp4")]),
+        width: 1280,
+        height: 720,
+        durationMs: 4200,
+        poster: duDecodeur,
+      })),
+    });
+
+    await uploadAttachment(session, env, new File([bytes("x")], "a.mp4", { type: "video/mp4" }));
+    expect(env.extractPoster).not.toHaveBeenCalled();
+    expect(env.resizeImage).toHaveBeenCalledWith(duDecodeur, THUMBNAIL);
+
+    // Sans poster — la source part telle quelle, rien n'a été décodé — le lecteur reprend.
+    env = fakeEnv();
+    await uploadAttachment(session, env, new File([bytes("x")], "a.webm", { type: "video/webm" }));
+    expect(env.extractPoster).toHaveBeenCalledTimes(1);
+  });
+
   it("une vignette impossible ne fait pas échouer l'envoi de la vidéo", async () => {
     /*
      * REQ-MED-03 — la vignette est un confort, l'envoi est la fonction. Un poster que le

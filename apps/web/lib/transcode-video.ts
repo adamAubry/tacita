@@ -109,17 +109,140 @@ function calibre(largeur: number, hauteur: number, rotation: Rotation, dureeMs: 
 
 const enMp4 = (octets: Bytes): Blob => new Blob([octets as BlobPart], { type: "video/mp4" });
 
+/**
+ * REQ-MED-03 — **l'image de la vignette vient du décodeur, pas d'un lecteur.**
+ *
+ * Le poster était extrait en rejouant le fichier dans un `<video>` sur le thread
+ * principal : le mécanisme le plus faible des trois disponibles, employé y compris sur les
+ * deux chemins qui tiennent déjà un décodeur. Quand il échouait — et il échouait —, la
+ * vidéo partait sans vignette. Ici, si on a su décoder pour réencoder, on sait donner une
+ * image.
+ *
+ * Après le tout début, jamais la première frame : celle d'une vidéo de téléphone est très
+ * souvent noire, et une vignette noire n'aide personne.
+ */
+const SEUIL_POSTER_US = 100_000;
+
+/** Le poster en cours de constitution : une toile, et le fait qu'on tienne mieux que rien. */
+interface Poster {
+  toile: OffscreenCanvas;
+  pinceau: OffscreenCanvasRenderingContext2D;
+  fige: boolean;
+  peint: boolean;
+}
+
+/**
+ * REQ-MED-14 — la toile du poster porte l'orientation **affichée**, pas les pixels codés.
+ *
+ * Le `<video>` appliquait la matrice du `tkhd` pour nous ; un décodeur rend la frame
+ * codée, matrice non appliquée. Sans cette rotation, la vignette d'une vidéo filmée en
+ * portrait sortait couchée à côté d'une vidéo qui, elle, se lisait droite.
+ *
+ * Sens vérifié contre ffmpeg le 21/08/2026 : la valeur rendue par `rotationDeMatrice` est
+ * l'angle **horaire** à appliquer pour l'affichage — `270` reproduit exactement la frame
+ * qu'`ffmpeg` sort avec sa rotation automatique. Le repère du canvas ayant l'axe Y vers le
+ * bas, `rotate()` tourne déjà dans ce sens : l'angle passe tel quel.
+ */
+function ouvrirPoster(largeur: number, hauteur: number, rotation: Rotation): Poster | undefined {
+  const pivote = rotation === 90 || rotation === 270;
+  const toile = new OffscreenCanvas(pivote ? hauteur : largeur, pivote ? largeur : hauteur);
+  const pinceau = toile.getContext("2d", { alpha: false });
+  // Une vignette est un confort : son absence ne doit jamais coûter l'envoi (REQ-MED-03).
+  return pinceau ? { toile, pinceau, fige: false, peint: false } : undefined;
+}
+
+/** Peint une frame dans la toile du poster, redressée. Ne fait rien une fois figé. */
+function peindrePoster(poster: Poster | undefined, image: VideoFrame, rotation: Rotation): void {
+  if (!poster || poster.fige) return;
+
+  const { toile, pinceau } = poster;
+  const largeur = toile.width;
+  const hauteur = toile.height;
+  pinceau.save();
+  pinceau.translate(largeur / 2, hauteur / 2);
+  pinceau.rotate((rotation * Math.PI) / 180);
+  // Les demi-dimensions sont celles de l'image **codée** : après rotation d'un quart de
+  // tour, ce sont les côtés de la toile échangés.
+  const pivote = rotation === 90 || rotation === 270;
+  const codeeL = pivote ? hauteur : largeur;
+  const codeeH = pivote ? largeur : hauteur;
+  pinceau.drawImage(image, -codeeL / 2, -codeeH / 2, codeeL, codeeH);
+  pinceau.restore();
+
+  poster.peint = true;
+  // La première frame sert de repli ; la première passé le seuil arrête tout.
+  if (image.timestamp >= SEUIL_POSTER_US) poster.fige = true;
+}
+
+const rendrePoster = async (poster: Poster | undefined): Promise<Blob | undefined> =>
+  poster?.peint ? poster.toile.convertToBlob({ type: "image/jpeg", quality: 0.7 }) : undefined;
+
 /** Laisse les files se vider avant d'en remettre : le seul garde-fou mémoire du chemin. */
 async function attendre(pleine: () => boolean): Promise<void> {
   while (pleine()) await new Promise((suite) => setTimeout(suite, 1));
 }
 
 /**
+ * REQ-MED-03 — **une image clé, décodée seule, pour le chemin rapide.**
+ *
+ * Le remuxage ne décode rien : c'est tout son intérêt, et c'est pourquoi il n'avait
+ * aucune image à offrir à la vignette. Décoder la **première clé** coûte une frame, pas un
+ * fichier — sans commune mesure avec le réencodage qu'on vient justement d'éviter.
+ *
+ * Rend `undefined` sur le moindre accroc : la vignette est un confort, et `remuxer` doit
+ * rendre sa vidéo quoi qu'il arrive (REQ-MED-03).
+ */
+async function posterDUneCle(source: SourceVideo): Promise<Blob | undefined> {
+  const premiere = source.echantillons.find((echantillon) => echantillon.cle);
+  if (!premiere || typeof VideoDecoder === "undefined") return undefined;
+
+  const poster = ouvrirPoster(source.largeur, source.hauteur, source.rotation);
+  if (!poster) return undefined;
+
+  const decodeur = new VideoDecoder({
+    output: (image) => {
+      // Une seule image attendue ; `fige` garantit qu'une seconde ne l'écraserait pas.
+      peindrePoster(poster, image, source.rotation);
+      poster.fige = true;
+      image.close();
+    },
+    error: () => {},
+  });
+
+  try {
+    decodeur.configure({
+      codec: source.codec,
+      description: source.description as BufferSource,
+      codedWidth: source.largeur,
+      codedHeight: source.hauteur,
+    });
+    decodeur.decode(
+      new EncodedVideoChunk({
+        type: "key",
+        timestamp: premiere.timestampUs,
+        data: premiere.donnees as BufferSource,
+      }),
+    );
+    await decodeur.flush();
+  } catch {
+    return undefined;
+  } finally {
+    if (decodeur.state !== "closed") decodeur.close();
+  }
+
+  return rendrePoster(poster);
+}
+
+/**
  * REQ-MED-04 / E-18 — **le chemin rapide** : une source déjà conforme change de
  * conteneur, pas de pixels. Zéro attente, zéro génération de perte.
  */
-function remuxer(source: SourceVideo): Sortie {
+async function remuxer(source: SourceVideo): Promise<Sortie> {
   return {
+    // REQ-MED-03 — une seule image clé décodée, pour la vignette et rien d'autre. Le
+    // chemin rapide ne décode rien par construction ; c'est justement pourquoi il n'avait
+    // aucune image à donner, et pourquoi la vignette retombait sur un lecteur.
+    poster: await posterDUneCle(source),
     blob: enMp4(
       ecrireMp4({
         largeur: source.largeur,
@@ -150,12 +273,12 @@ function echantillonDe(morceau: EncodedVideoChunk): EchantillonVideo {
  * Lève quand ce navigateur ne sait pas encoder : c'est le message d'échec dédié de l'UI
  * qui prend le relais (REQ-MED-04), jamais un fichier approximatif.
  */
-type Sortie = Raster & { durationMs: number; sansSon: boolean };
+type Sortie = Raster & { durationMs: number; sansSon: boolean; poster?: Blob };
 
 export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise<Sortie> {
   const source = await lireMp4(new Uint8Array(await blob.arrayBuffer()) as Bytes);
 
-  if (remuxable(source, cibles)) return remuxer(source);
+  if (remuxable(source, cibles)) return await remuxer(source);
 
   const { largeur, hauteur } = dimensionsCibles(source.largeur, source.hauteur, cibles.height);
 
@@ -226,11 +349,22 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
   const pinceau = toile.getContext("2d", { alpha: false });
   if (!pinceau) throw new EchecTranscodage("autre", "contexte 2d indisponible : réduction impossible");
 
+  /*
+   * REQ-MED-03 — **la vignette sort d'ici, et elle ne coûte rien.** Ce chemin décode déjà
+   * chaque image ; les jeter toutes puis rouvrir le fichier dans un `<video>` pour en
+   * redemander une était le detour qui laissait les vidéos sans vignette quand ce lecteur
+   * refusait le fichier. Deux dessins au plus : la première image comme repli, la première
+   * passé 0,1 s comme définitive.
+   */
+  const poster = ouvrirPoster(source.largeur, source.hauteur, source.rotation);
+
   let derniereCleUs = -INTERVALLE_CLE_US;
   const decodeur = new VideoDecoder({
     output: (image) => {
       const cle = image.timestamp - derniereCleUs >= INTERVALLE_CLE_US;
       if (cle) derniereCleUs = image.timestamp;
+
+      peindrePoster(poster, image, source.rotation);
 
       if (largeur === source.largeur && hauteur === source.hauteur) {
         encodeur.encode(image, { keyFrame: cle });
@@ -299,6 +433,7 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
   if (!description) throw new Error("aucun paramètre de codec produit : transcodage abandonné");
 
   return {
+    poster: await rendrePoster(poster),
     blob: enMp4(
       ecrireMp4({
         largeur,

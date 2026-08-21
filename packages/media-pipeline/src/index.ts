@@ -76,12 +76,28 @@ export interface Raster {
 export interface MediaEnvironment extends CryptoEnvironment {
   /** Canvas/OffscreenCanvas. Sert aussi aux vignettes : même code, cibles différentes. */
   resizeImage(blob: Blob, targets: ImageTargets): Promise<Raster>;
-  /** WebCodecs, dans un Worker. `sansSon` remonte le cas de REQ-MED-13. */
+  /**
+   * WebCodecs, dans un Worker. `sansSon` remonte le cas de REQ-MED-13.
+   *
+   * REQ-MED-03 — **`poster` quand le transcodeur a pu peindre une image.** Les deux
+   * chemins qui décodent (réencodage, et remuxage via une seule image clé) tiennent déjà
+   * une frame : la rendre ici évite de rouvrir le fichier dans un lecteur pour redemander
+   * ce qu'on avait sous la main. Absent sur le seul chemin qui ne décode rien — l'envoi
+   * de la source telle quelle —, où `extractPoster` reste la réponse.
+   */
   transcodeVideo(
     blob: Blob,
     targets: VideoTargets,
-  ): Promise<Raster & { durationMs: number; sansSon?: boolean }>;
-  /** Une image extraite de la vidéo, source de la vignette (REQ-MED-03). */
+  ): Promise<Raster & { durationMs: number; sansSon?: boolean; poster?: Blob }>;
+  /**
+   * Une image extraite de la vidéo par un lecteur, **en dernier recours** (REQ-MED-03).
+   *
+   * Le mécanisme le plus faible des trois : il rejoue le fichier dans un `<video>`, donc
+   * il dépend de ce que la plateforme sait lire, et il échoue en silence là où un décodeur
+   * aurait rendu une image. Il n'est appelé que lorsque `transcodeVideo` n'a pas de poster
+   * — c'est-à-dire quand la source part telle quelle, le seul cas où l'on sait déjà que ce
+   * lecteur ouvre le fichier, puisqu'il vient d'en donner les dimensions.
+   */
   extractPoster(blob: Blob): Promise<Blob>;
   /** REQ-MED-07 — encodeur Opus WASM. */
   transcodeAudio(blob: Blob): Promise<Blob>;
@@ -425,7 +441,13 @@ async function construireContenu(
           h: video.height,
           duration: video.durationMs,
           size: video.blob.size,
-          ...(await vignetteEventuelle(env, () => env.extractPoster(video.blob), enAttente)),
+          ...(await vignetteEventuelle(
+            env,
+            // REQ-MED-03 — l'image du décodeur d'abord, le lecteur seulement s'il n'y en a
+            // pas : si on a su décoder la vidéo, on n'a aucune raison de la rouvrir.
+            async () => video.poster ?? (await env.extractPoster(video.blob)),
+            enAttente,
+          )),
         },
         file: await chiffrerEnAttente(env, video.blob, ["file"], enAttente),
         [CHAMP_BLOCS]: await blocsDe(env, enAttente),
