@@ -36,6 +36,15 @@ cd .. && npm run smoke
   qui confirme l'hypothèse par construction ne l'éprouve pas. Elle y asserte la forme de
   l'instruction SQL ; ici, on l'exécute.
 
+- **Que l'annuaire répond à qui ne partage rien** (`annuaire.smoke.test.ts`,
+  REQ-INF-18) : deux comptes créés pour l'occasion, aucun salon en commun, et l'un
+  trouve l'autre par un fragment de son nom d'affichage. Le test de config atteste que
+  `search_all_users: true` est écrit dans le fichier ; il n'atteste pas qu'une recherche
+  aboutisse — c'est exactement l'écart qui a produit E-21, où le réglage par défaut était
+  conforme à une spec muette pendant que « Ajouter un ami » ne trouvait personne.
+  Éprouvé le 21/08/2026 dans les deux sens : avec `search_all_users: false`, les deux
+  assertions d'annuaire échouent et seul le chemin du profil (adresse exacte) répond.
+
 ## Ce qu'elle ne couvre pas
 
 **Le flux de login complet.** La cible s'arrête à la redirection vers Keycloak : aller
@@ -43,7 +52,8 @@ plus loin exigerait de piloter un formulaire HTML, donc un navigateur, donc Play
 interdit. Le jeton des tests de session vient donc du secret partagé de REQ-INF-04, pas
 du flux SSO.
 
-`seedCredentials` est le seul endroit où la cible triche, et exactement du montant de ce
+`semerCredentials` (dans `harness.ts`, une seule copie pour les quatre cibles qui ouvrent
+une session) est le seul endroit où la cible triche, et exactement du montant de ce
 qui reste : en production ces trois valeurs viennent de `initSession()` après le SSO.
 
 ## Pourquoi elle est hors de la suite par défaut

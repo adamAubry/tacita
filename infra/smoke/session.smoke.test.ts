@@ -6,7 +6,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { restoreSession, type Session } from "@tacita/client-core";
 import { createGroupChat, messages, sendText } from "@tacita/messaging";
 
-import { HOMESERVER, registerAccount, uniqueLocalpart, type Account } from "./harness";
+import {
+  HOMESERVER,
+  registerAccount,
+  semerCredentials,
+  uniqueLocalpart,
+  type Account,
+} from "./harness";
 
 /**
  * Le défaut de `vi.waitFor` est d'une seconde : ici on attend un aller-retour
@@ -43,7 +49,7 @@ beforeAll(async () => {
   // Le jeton vient du secret partagé plutôt que de l'OIDC, mais il est ensuite
   // consommé par le vrai chemin : on sème le magasin de credentials, et c'est
   // `restoreSession` — le code de C4 — qui ouvre la session.
-  await seedCredentials(disque, compte);
+  await semerCredentials(disque, compte);
   const restaurée = await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: disque });
   expect(restaurée, "restoreSession n'a pas rendu de session").not.toBeNull();
   session = restaurée!;
@@ -135,30 +141,3 @@ describe("Fumée — REQ-COR-11, la session se rouvre sans réseau", () => {
     expect(await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: new IDBFactory() })).toBeNull();
   });
 });
-
-/**
- * Écrit les credentials là où `restoreSession` les lit. C'est le seul endroit où la
- * cible triche, et elle triche exactement du montant du tronçon OIDC manquant : en
- * production ces trois valeurs viennent de `initSession()` après le flux SSO.
- */
-function seedCredentials(indexedDB: IDBFactory, account: Account): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const open = indexedDB.open("tacita-session", 1);
-    open.onupgradeneeded = () => open.result.createObjectStore("credentials");
-    open.onerror = () => reject(open.error);
-    open.onsuccess = () => {
-      const transaction = open.result.transaction("credentials", "readwrite");
-      transaction.objectStore("credentials").put(
-        {
-          accessToken: account.accessToken,
-          userId: account.userId,
-          deviceId: account.deviceId,
-        },
-        "current",
-      );
-      transaction.oncomplete = () => resolve();
-      transaction.onabort = transaction.onerror = () =>
-        reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
-    };
-  });
-}

@@ -132,3 +132,27 @@ describe("REQ-INF-09 — OIDC Keycloak seul fournisseur d'auth", () => {
     expect(compose.services.keycloak.environment.KC_HTTP_RELATIVE_PATH).toBe(prefix);
   });
 });
+
+describe("REQ-INF-18 — annuaire ouvert à tous les comptes locaux", () => {
+  /**
+   * E-21, tranchée le 21/08/2026. Le défaut de Synapse (`false`) ne liste que les
+   * comptes avec qui on partage déjà un salon ; ce déploiement n'a aucun salon public,
+   * donc l'annuaire ne rendait rien et « Ajouter un ami » n'aboutissait qu'avec un
+   * identifiant exact déjà connu.
+   */
+  it("search_all_users est explicitement true", () => {
+    expect(homeserver.user_directory.search_all_users).toBe(true);
+  });
+
+  it("l'annuaire lui-même est explicitement activé, pas laissé au défaut", () => {
+    expect(homeserver.user_directory.enabled).toBe(true);
+  });
+
+  it("la reconstruction de l'annuaire est documentée là où l'opérateur la lira", () => {
+    // Sans le job `regenerate_directory`, le réglage ne vaut que pour les comptes créés
+    // après lui : les comptes existants restent introuvables et le changement paraît
+    // sans effet. La valeur seule ne suffit donc pas — la procédure fait partie de la REQ.
+    const readme = readFileSync(new URL("../README.md", import.meta.url), "utf-8");
+    expect(readme).toContain("regenerate_directory");
+  });
+});

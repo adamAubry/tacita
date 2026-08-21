@@ -11,7 +11,10 @@ import { Button, Skeleton, Text, TextInput } from "../foundation/primitives";
 import { Suggestions } from "./FriendsList";
 
 export interface AjouterAmisProps {
-  /** REQ-MSG-19 — l'annuaire du homeserver. Rien à voir avec l'interdit n°3. */
+  /**
+   * REQ-MSG-19 — l'annuaire du homeserver, ouvert à tous les comptes locaux depuis E-21
+   * (REQ-INF-18). Rien à voir avec l'interdit n°3, qui vise la recherche de **contenu**.
+   */
   chercher: (terme: string) => Promise<Profile[]>;
   /** REQ-UIX-28 — crée puis partage un lien (spec 12). Rend ce qui s'est passé. */
   onPartagerLien: () => Promise<"partage" | "copie" | "annule">;
@@ -22,7 +25,7 @@ export interface AjouterAmisProps {
  * REQ-UIX-28 — Add-friends.
  *
  * Deux chemins, dans l'ordre où ils servent : partager un lien (on connaît déjà la
- * personne, hors de Tacita), puis chercher un identifiant (elle y est déjà).
+ * personne, hors de Tacita), puis la chercher dans l'annuaire (elle y est déjà).
  *
  * **Les suggestions serveur n'existent pas et l'écran le dit.** D-09 a refusé le graphe
  * social : il n'y a aucune source de données pour suggérer qui que ce soit. Un carrousel
@@ -107,17 +110,22 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
       )}
 
       <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
-        {/* REQ-MSG-19 / REQ-UIX-42 — le domaine ne se tape plus : il est le même pour
-            tout le monde, et `identifiantComplet` le remet. */}
+        {/* REQ-UIX-28 — « par identifiant » n'est plus le seul chemin depuis que
+            l'annuaire couvre tout le serveur (REQ-INF-18, E-21) : le libellé le dit,
+            sans quoi personne n'essaierait un prénom. REQ-UIX-42 — le domaine, lui, ne
+            se tape plus : `identifiantComplet` le remet. */}
         <TextInput
-          label="Ajouter par identifiant"
+          label="Rechercher par nom ou identifiant"
           value={terme}
           onChange={setTerme}
-          placeholder="@quelquun"
+          placeholder="mira, ou @mira"
         />
+        {/* Interdit n°13, pris par les deux bouts : ce que la recherche trouve, et ce
+            qu'elle expose. L'annuaire est réciproque — le dire ici est la seule place où
+            l'utilisateur peut l'apprendre au moment où ça le concerne. */}
         <Text type="supporting" color="secondary">
-          Un identifiant exact suffit — sans le domaine. Les noms d&apos;affichage ne sont
-          trouvés que pour les personnes avec qui vous partagez déjà une conversation.
+          Les comptes de ce serveur sont trouvables par leur nom ou leur identifiant, sans
+          le domaine — y compris le vôtre.
         </Text>
       </div>
 
@@ -136,7 +144,7 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
       {!chargement && resultats !== null && resultats.length === 0 && (
         <Placeholder
           titre="Personne à ce nom"
-          explication="Vérifiez l'orthographe de l'identifiant, ou partagez plutôt un lien d'invitation."
+          explication="Vérifiez l'orthographe, ou partagez plutôt un lien d'invitation."
         />
       )}
 
@@ -147,7 +155,7 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
       {resultats === null && !chargement && (
         <Placeholder
           titre="Aucune suggestion"
-          explication="Tacita ne construit pas de graphe social : personne ne peut vous suggérer qui ajouter. Partagez un lien, ou cherchez un identifiant."
+          explication="Tacita ne construit pas de graphe social : personne ne peut vous suggérer qui ajouter. Partagez un lien, ou cherchez un nom."
           action={<Button label="Partager un lien" onClick={() => void partager()} />}
         />
       )}

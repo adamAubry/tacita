@@ -245,6 +245,20 @@ describe("REQ-MSG-19 — le domaine ne se saisit pas", () => {
     ]);
   });
 
+  it("un nom d'affichage partiel remonte par l'annuaire", async () => {
+    // REQ-INF-18 (E-21, 21/08/2026) : l'annuaire couvre tous les comptes du serveur, donc
+    // un fragment de nom aboutit. Avant, ce chemin était muet et seul l'identifiant exact
+    // trouvait quelqu'un — c'est le « uniquement de l'exact match » signalé.
+    const { session, client } = fakeSession({
+      annuaire: [{ user_id: MIRA, display_name: "Mira Dupont" }],
+    });
+    client.getProfileInfo.mockRejectedValueOnce(new Error("M_NOT_FOUND"));
+
+    await expect(searchUsers(session, "Mira D")).resolves.toEqual([
+      { userId: MIRA, displayName: "Mira Dupont", avatarUrl: undefined },
+    ]);
+  });
+
   it("une saisie qui n'est pas un identifiant n'interroge aucun profil", async () => {
     // Un nom d'affichage avec majuscule ou espace n'est pas un localpart : lui inventer
     // un domaine ferait un aller-retour par frappe pour une adresse impossible.

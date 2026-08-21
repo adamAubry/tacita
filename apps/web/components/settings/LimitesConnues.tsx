@@ -54,6 +54,12 @@ const LIMITES: Limite[] = [
       "Le contenu ne lui est jamais lisible. L'appartenance aux salons, les horodatages, la taille des fichiers et les conversations mises en silence, si — ce sont les métadonnées dont il a besoin pour acheminer.",
   },
   {
+    cle: "annuaire",
+    titre: "Votre nom est trouvable par tous les comptes de ce serveur",
+    texte:
+      "Pour qu'on puisse vous ajouter sans connaître votre identifiant par cœur, l'annuaire du serveur répond à toutes les recherches : votre nom d'affichage et votre identifiant y apparaissent, même pour quelqu'un à qui vous n'avez jamais parlé. Vos messages, eux, n'y sont pas.",
+  },
+  {
     cle: "recherche",
     titre: "La recherche porte sur cet appareil",
     texte:

@@ -260,8 +260,8 @@ describe("REQ-UI-13 — mode masqué : la bascule agit, et l'effet symétrique e
   });
 });
 
-describe("REQ-UIX-32 — limites connues : sobre, et complet sur les cinq sujets", () => {
-  it("nomme les réactions, les épinglés, « délivré », les métadonnées et la recherche", () => {
+describe("REQ-UIX-32 — limites connues : sobre, et complet sur les six sujets", () => {
+  it("nomme les réactions, les épinglés, « délivré », les métadonnées, l'annuaire et la recherche", () => {
     render(<LimitesConnues />);
 
     expect(screen.getByText(/réactions circulent en clair/i)).toBeTruthy();
@@ -269,6 +269,9 @@ describe("REQ-UIX-32 — limites connues : sobre, et complet sur les cinq sujets
     expect(screen.getByText(/« Délivré » est une extension à nous/)).toBeTruthy();
     expect(screen.getByText(/voit qui parle à qui/i)).toBeTruthy();
     expect(screen.getByText(/recherche porte sur cet appareil/i)).toBeTruthy();
+    // REQ-INF-18 (E-21) : l'annuaire ouvert est une exposition, donc une limite. Elle
+    // est écrite dans `infra/LIMITES.md` ; cet écran est l'endroit où l'utilisateur la lit.
+    expect(screen.getByText(/trouvable par tous les comptes de ce serveur/i)).toBeTruthy();
   });
 
   it("le type d'événement vient du paquet, il n'est pas recopié", () => {

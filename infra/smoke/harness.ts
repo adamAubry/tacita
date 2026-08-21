@@ -149,3 +149,37 @@ export function postViaProxy(
 export const uniqueLocalpart = (prefix: string): string =>
   `${prefix}${randomUUID().replace(/-/g, "").slice(0, 10)}`;
 
+
+/**
+ * Écrit les credentials là où `restoreSession` les lit.
+ *
+ * **C'est le seul endroit où la cible triche**, et elle triche exactement du montant du
+ * tronçon OIDC manquant : en production ces trois valeurs viennent d'`initSession()`
+ * après le flux SSO (voir `registerAccount` ci-dessus).
+ *
+ * Ici et non recopié dans chaque fichier : les trois cibles qui ouvrent une session le
+ * faisaient chacune de leur côté, à l'identique. Une quatrième copie aurait rendu la
+ * divergence inévitable — le nom de la base et celui de la clé sont un contrat avec
+ * `client-core`, pas un détail de test.
+ */
+export function semerCredentials(indexedDB: IDBFactory, account: Account): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open("tacita-session", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("credentials");
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const transaction = open.result.transaction("credentials", "readwrite");
+      transaction.objectStore("credentials").put(
+        {
+          accessToken: account.accessToken,
+          userId: account.userId,
+          deviceId: account.deviceId,
+        },
+        "current",
+      );
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = transaction.onerror = () =>
+        reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
+    };
+  });
+}

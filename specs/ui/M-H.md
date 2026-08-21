@@ -11,7 +11,7 @@ Layout Settings, layout Conversation info (1:1 et groupe), et toutes les options
 ### Settings
 - **REQ-UIX-31** — Settings layout : header ; Settings profile card (composant 24 : carte non fondue, avatar + nom, chevron → profil propre) ; liste d'Options ouvrant chacune une modal : thème sombre/clair (mécanisme M-A, REQ-UI-03), confidentialité, notifications, stockage local (taille index/caches, bouton purge), à propos/limites connues.
 - **REQ-UI-13 (réglage)** — Dans confidentialité : « mode masqué » (bascule `m.read.private`, REQ-RCP-07) avec explication de l'effet symétrique : vos reçus deviennent privés ET vos correspondants ne verront plus « délivré/lu » de votre part.
-- **REQ-UIX-32** — Écran « limites connues » (honnêteté produit, spec 00) : réactions et épinglés en clair, « délivré » non standard, métadonnées visibles serveur, périmètre de recherche. Rédaction sobre, pas anxiogène.
+- **REQ-UIX-32** — Écran « limites connues » (honnêteté produit, spec 00) : réactions et épinglés en clair, « délivré » non standard, métadonnées visibles serveur, **annuaire ouvert — l'utilisateur y est trouvable par tout compte du serveur** (REQ-INF-18, E-21), périmètre de recherche. Rédaction sobre, pas anxiogène. *(L'annuaire ajouté le 21/08/2026 avec la décision qui l'ouvre : une exposition consignée dans `infra/LIMITES.md` mais absente de cet écran serait une limite écrite là où l'utilisateur ne la lit jamais.)*
 
 ### Conversation info
 - **REQ-UIX-33** — Layout info : header ; avatar + nom centrés ; Info buttons (composant 14, taille navbar + libellé sous l'icône, 4 boutons équirépartis) — 1:1 : profil, rechercher dans la conversation (PowerSearch pré-armée token conversation, M-F), muter, options ; groupe : ajouter un membre, rechercher, muter, options.

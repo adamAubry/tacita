@@ -19,6 +19,17 @@ Documentées, jamais masquées (spec 00 — Honnêteté produit).
   profil d'activité ci-dessus ; fermer cette fenêtre-là seule ne changerait pas
   ce qu'il sait. Rouvrir la question passe par cette limite-ci d'abord, pas par
   le pipeline média.
+- **L'annuaire est énumérable par tout compte** *(ajouté le 21/08/2026, REQ-INF-18,
+  escalade E-21 tranchée par le PM)*. `search_all_users: true` : une recherche de
+  quelques lettres rend **tous** les comptes du serveur dont l'identifiant ou le nom
+  d'affichage correspond, sans qu'aucun salon ne soit partagé. Autrement dit, qui a un
+  compte peut dresser la liste des autres, nom d'affichage compris, en balayant les
+  préfixes. C'est le prix payé pour qu'« ajouter un ami » fonctionne sans connaître par
+  cœur l'identifiant exact de la personne, sur un déploiement sans salon public. Ce que
+  la limite **ne** couvre pas : aucun contenu de message n'entre dans l'annuaire, qui ne
+  porte que des identifiants, des noms d'affichage et des avatars — tous déjà publics au
+  sens de Matrix. Rouvrir la question, c'est choisir entre l'énumération et un produit
+  où l'on ne se trouve que par lien d'invitation (spec 12).
 - **SSE-S3 (REQ-INF-08) n'est pas une protection de confidentialité.**
   L'opérateur du bucket détient les clés de chiffrement au repos ; ça ne
   protège que contre le vol physique du support de stockage, pas contre

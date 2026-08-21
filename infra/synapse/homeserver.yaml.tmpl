@@ -99,6 +99,32 @@ rc_invites:
 # REQ-INF-06 — le défaut (50M) est insuffisant pour le partage de fichiers.
 max_upload_size: 200M
 
+# REQ-INF-18 — **l'annuaire couvre tous les comptes du serveur** (escalade E-21, tranchée
+# par le PM le 21/08/2026).
+#
+# Le défaut de Synapse (`search_all_users: false`) ne montre que les gens avec qui on
+# partage déjà un salon, ou qui sont dans un salon public — et ce déploiement n'en a
+# aucun. Conséquence mesurée le 07/08/2026 contre un vrai Synapse : l'annuaire rendait
+# `results: []` pour un compte qui existe, donc « Ajouter un ami » ne trouvait personne
+# tant qu'on ne connaissait pas l'identifiant exact. Le parcours d'entrée du produit
+# passait par une adresse qu'il fallait déjà avoir.
+#
+# Ce que ça expose, et qui est assumé (`infra/LIMITES.md`) : n'importe quel compte peut
+# **énumérer les autres** par préfixe de nom d'affichage ou d'identifiant. Vérifié dans la
+# doc de la version déployée (v1.155, `user_directory.html`) : « all users known to the
+# server (matching the search query) will be returned », sans restriction de visibilité.
+# Aucun contenu n'entre là-dedans — l'annuaire porte des identifiants et des noms
+# d'affichage, jamais de messages, et l'interdit n°3 (`/search`) est intact.
+#
+# **Après tout changement de ce réglage, l'annuaire doit être reconstruit** — même source :
+# « use the admin API and execute the job `regenerate_directory` », c'est-à-dire
+# `POST /_synapse/admin/v1/background_updates/start_job` avec `{"job_name":
+# "regenerate_directory"}`. Sans cette reprise, les comptes déjà créés restent absent de
+# l'index et le réglage paraît sans effet. Procédure dans `infra/README.md`.
+user_directory:
+  enabled: true
+  search_all_users: true
+
 # REQ-INF-07 — DECISIONS D-02 (révisée le 03/08/2026) : rétention illimitée, identique
 # DM/groupes. Le bloc est présent explicitement, pas absent par omission — « politique
 # définie » veut dire bloc explicite dans la config, pas fonctionnalité active.

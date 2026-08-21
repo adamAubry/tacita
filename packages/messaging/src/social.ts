@@ -203,6 +203,12 @@ export function identifiantComplet(terme: string, domaine: string | undefined): 
  *
  * Un terme vide ne part pas : l'annuaire rendrait un échantillon arbitraire du serveur,
  * ce qui n'est pas une réponse à « qui cherchez-vous ? ».
+ *
+ * **L'annuaire couvre tous les comptes du serveur depuis le 21/08/2026** (REQ-INF-18,
+ * escalade E-21 tranchée) : une recherche par nom d'affichage ou par fragment
+ * d'identifiant aboutit, ce qui n'était pas le cas auparavant. La conséquence — tout
+ * compte peut énumérer les autres — est assumée et écrite dans `infra/LIMITES.md` ;
+ * l'écran d'ajout la dit aussi, parce qu'elle vaut pour l'utilisateur lui-même.
  */
 export async function searchUsers(
   session: Session,
@@ -213,36 +219,37 @@ export async function searchUsers(
   if (recherche.length === 0) return [];
 
   /**
-   * REQ-MSG-19 — **un identifiant complet se résout par son profil, pas par l'annuaire.**
+   * REQ-MSG-19 — **une adresse exacte se résout par son profil, pas par l'annuaire.**
    *
-   * Mesuré contre un vrai Synapse le 07/08/2026 : `/user_directory/search` rend
-   * `results: []` pour un compte qui existe pourtant, tandis que `/profile/@…` rend son
-   * nom d'affichage. Ce n'est pas une panne — c'est le défaut de Synapse
-   * (`search_all_users: false`) : l'annuaire ne montre que les gens avec qui on partage
-   * déjà un salon, ou qui sont dans un salon public. Notre déploiement n'en a aucun.
+   * Mesuré contre un vrai Synapse le 07/08/2026 : `/user_directory/search` rendait
+   * `results: []` pour un compte qui existe pourtant, tandis que `/profile/@…` rendait
+   * son nom d'affichage — le défaut `search_all_users: false` ne montrant que les gens
+   * avec qui on partage déjà un salon. E-21 a depuis ouvert l'annuaire (REQ-INF-18), et
+   * ce chemin **reste**, pour deux raisons qui n'ont rien d'historique :
    *
-   * Conséquence sans ce chemin : « Ajouter par identifiant » (D-09, REQ-UIX-28) ne
-   * trouve **jamais** personne, et il est impossible d'entamer une première
-   * conversation — le parcours d'entrée du produit.
+   * - l'index de l'annuaire est **construit en fond** et peut retarder — juste après un
+   *   changement de configuration, tant que `regenerate_directory` n'a pas tourné, il
+   *   ignore les comptes déjà créés. Une adresse exacte, elle, résout toujours ;
+   * - l'annuaire **exclut** certaines catégories de comptes (désactivés, support,
+   *   application services), là où un profil demandé nommément répond ou n'existe pas.
    *
-   * On ne rend pas pour autant tout le serveur cherchable (`search_all_users: true`
-   * côté infra) : cela exposerait chaque compte à tout autre. Quand on connaît déjà
-   * l'identifiant, on n'a pas besoin d'un annuaire — on a une adresse.
+   * Autrement dit : l'annuaire est le chemin de la découverte, le profil celui de la
+   * certitude. Les deux répondent à des questions différentes.
    */
   /*
    * **Le domaine ne se tape plus.** La rédaction précédente n'empruntait le chemin du
    * profil que sur un identifiant *complet* : taper « adam » n'interrogeait que
-   * l'annuaire, qui ne rend rien sur ce déploiement (voir ci-dessus), et il fallait donc
-   * écrire `@adam:chat.example.org` en entier pour trouver qui que ce soit. Signalé par
-   * les utilisateurs, et c'est bien ce que le code faisait.
+   * l'annuaire, muet à l'époque (voir ci-dessus), et il fallait donc écrire
+   * `@adam:chat.example.org` en entier pour trouver qui que ce soit. Signalé par les
+   * utilisateurs, et c'est bien ce que le code faisait.
    *
    * Le domaine étant unique (fédération désactivée, REQ-INF-02), le compléter n'invente
    * rien : `@adam` ne peut désigner personne d'autre que `@adam:<notre serveur>`.
    */
   const complet = identifiantComplet(recherche, domaineLocal(session));
 
-  // Une adresse entière ne doit rien à l'annuaire : il ne la connaît pas mieux que le
-  // profil, et l'interroger coûterait une requête par frappe pour rien.
+  // Une adresse entière ne doit rien à l'annuaire : le profil répond exactement à la
+  // question posée, et l'interroger en plus coûterait une requête par frappe pour rien.
   if (complet === recherche) return rendus(await profileOf(session, complet), []);
 
   /*

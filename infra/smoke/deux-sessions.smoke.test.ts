@@ -6,7 +6,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { restoreSession, type Session } from "@tacita/client-core";
 import { createDirectMessage, messages, sendText } from "@tacita/messaging";
 
-import { HOMESERVER, registerAccount, uniqueLocalpart, type Account } from "./harness";
+import {
+  HOMESERVER,
+  registerAccount,
+  semerCredentials,
+  uniqueLocalpart,
+  type Account,
+} from "./harness";
 
 /**
  * Deux `MatrixClient` sur le même IndexedDB.
@@ -41,7 +47,7 @@ let erreurSeconde: unknown;
 
 beforeAll(async () => {
   compte = await registerAccount(uniqueLocalpart("double"));
-  await semer(disque, compte);
+  await semerCredentials(disque, compte);
 
   première = (await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: disque }))!;
   await première.setupRecoveryKey();
@@ -95,28 +101,4 @@ async function attendre<T>(lire: () => T | undefined): Promise<T | undefined> {
     await new Promise((r) => setTimeout(r, ATTENTE.interval));
   }
   return undefined;
-}
-
-function semer(indexedDB: IDBFactory, account: Account): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const open = indexedDB.open("tacita-session", 1);
-    open.onupgradeneeded = () => open.result.createObjectStore("credentials");
-    open.onerror = () => reject(open.error);
-    open.onsuccess = () => {
-      const transaction = open.result.transaction("credentials", "readwrite");
-      transaction
-        .objectStore("credentials")
-        .put(
-          {
-            accessToken: account.accessToken,
-            userId: account.userId,
-            deviceId: account.deviceId,
-          },
-          "current",
-        );
-      transaction.oncomplete = () => resolve();
-      transaction.onabort = transaction.onerror = () =>
-        reject(transaction.error ?? new Error("transaction IndexedDB avortée"));
-    };
-  });
 }

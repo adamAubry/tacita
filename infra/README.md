@@ -94,6 +94,34 @@ archivé début 2026 (plus de mises à jour de sécurité). Convient pour le dev
 local ; en production, pointer `s3_storage_provider` vers un vrai bucket
 S3-compatible maintenu (OVH, Scaleway, AWS) via les mêmes variables d'env.
 
+## REQ-INF-18 — annuaire ouvert, et sa reconstruction
+
+`user_directory.search_all_users: true` (E-21, tranchée le 21/08/2026). Le défaut de
+Synapse ne liste que les comptes avec qui on partage déjà un salon ou qui sont dans un
+salon public : ce déploiement n'en a aucun, donc l'annuaire ne répondait à personne, et
+« Ajouter un ami » exigeait de connaître l'identifiant exact.
+
+**Ce que ça expose, et qui est assumé** (`LIMITES.md`) : tout compte peut énumérer les
+autres par préfixe de nom d'affichage ou d'identifiant. Aucun contenu de message n'entre
+dans l'annuaire.
+
+**Le réglage n'est pas rétroactif tout seul.** Les comptes créés *avant* lui restent
+absents de l'index tant que l'annuaire n'a pas été reconstruit — et le symptôme est
+exactement celui qu'on venait de corriger : une recherche par nom qui ne rend rien. La
+doc de la version déployée (v1.155, `user_directory.html`) donne la procédure : « use the
+admin API and execute the job `regenerate_directory` ». Avec un access token
+d'administrateur :
+
+```sh
+curl -X POST http://localhost:8008/_synapse/admin/v1/background_updates/start_job \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"job_name": "regenerate_directory"}'
+```
+
+La tâche tourne en fond ; « depending on the size of your homeserver (number of users and
+rooms) this can take a while ». À rejouer à chaque fois que ce réglage change.
+
 ## REQ-INF-12 — authenticated media (Synapse v1.155.0)
 
 Vérifié dans le changelog Synapse : `enable_authenticated_media` est passé à

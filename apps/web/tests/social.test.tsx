@@ -216,7 +216,7 @@ describe("REQ-UIX-28 — Add-friends : lien, annuaire débouncé, aucune suggest
       chercher: vi.fn().mockResolvedValue([MIRA]),
     });
 
-    const champ = screen.getByLabelText("Ajouter par identifiant");
+    const champ = screen.getByLabelText("Rechercher par nom ou identifiant");
     for (let rang = 1; rang <= 20; rang++) {
       fireEvent.change(champ, { target: { value: "m".repeat(rang) } });
       act(() => {
@@ -236,7 +236,7 @@ describe("REQ-UIX-28 — Add-friends : lien, annuaire débouncé, aucune suggest
     vi.useFakeTimers();
     const { onOuvrirProfil } = rendre({ chercher: vi.fn().mockResolvedValue([MIRA]) });
 
-    fireEvent.change(screen.getByLabelText("Ajouter par identifiant"), {
+    fireEvent.change(screen.getByLabelText("Rechercher par nom ou identifiant"), {
       target: { value: "mira" },
     });
     await act(async () => {
@@ -675,7 +675,7 @@ describe("REQ-UIX-42 — l'identifiant s'affiche sans son domaine", () => {
       onOuvrirProfil,
     });
 
-    fireEvent.change(screen.getByLabelText("Ajouter par identifiant"), {
+    fireEvent.change(screen.getByLabelText("Rechercher par nom ou identifiant"), {
       target: { value: "mira" },
     });
     await waitFor(() => expect(chercher).toHaveBeenCalled());
@@ -695,9 +695,44 @@ describe("REQ-UIX-42 — l'identifiant s'affiche sans son domaine", () => {
 
   it("le champ d'ajout n'exige plus le domaine", () => {
     rendreAjouter();
-    const champ = screen.getByLabelText("Ajouter par identifiant") as HTMLInputElement;
+    const champ = screen.getByLabelText("Rechercher par nom ou identifiant") as HTMLInputElement;
     // Un placeholder qui montre une adresse entière est une consigne : il faisait
     // recopier le domaine à la main.
     expect(champ.placeholder).not.toContain(":");
+  });
+});
+
+describe("REQ-UIX-28 — le champ nomme les deux chemins, et dit ce qu'ils exposent", () => {
+  /**
+   * E-21, tranchée le 21/08/2026 : l'annuaire couvre tous les comptes du serveur
+   * (REQ-INF-18). Deux conséquences d'écran, et elles vont ensemble — l'une dit ce que
+   * la recherche peut, l'autre ce qu'elle coûte.
+   */
+  const rendre = () =>
+    render(
+      <AjouterAmis
+        chercher={vi.fn().mockResolvedValue([])}
+        onPartagerLien={vi.fn().mockResolvedValue("copie" as const)}
+        onOuvrirProfil={vi.fn()}
+      />,
+    );
+
+  it("un prénom est une recherche valable, et le libellé le dit", () => {
+    rendre();
+    // « Ajouter par identifiant » était exact tant que l'annuaire ne répondait qu'à une
+    // adresse entière : personne n'aurait essayé un nom.
+    expect(screen.getByLabelText("Rechercher par nom ou identifiant")).toBeTruthy();
+  });
+
+  it("l'écran dit que l'utilisateur est lui aussi trouvable", () => {
+    rendre();
+    // La réciprocité de l'annuaire est une exposition assumée (`infra/LIMITES.md`) :
+    // c'est ici, au moment où la personne s'en sert, qu'elle doit pouvoir l'apprendre.
+    expect(screen.getByText(/y compris le vôtre/)).toBeTruthy();
+  });
+
+  it("plus une ligne ne prétend que les noms d'affichage sont hors de portée", () => {
+    rendre();
+    expect(screen.queryByText(/partagez déjà une conversation/)).toBeNull();
   });
 });
