@@ -111,9 +111,22 @@ export function Composer({
           qu'une icône et ne peut pas partager la ligne du champ sans l'écraser. */}
       {contexte && (
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
-          <Text type="supporting" color="secondary" maxLines={1}>
-            {contexte.libelle} : {contexte.extrait}
-          </Text>
+          {/* Le filet reprend celui de la citation en timeline : c'est le même objet à
+              deux moments — ce qu'on va citer, puis ce qu'on a cité. */}
+          <div
+            style={{
+              flex: 1,
+              // Une ligne tronquée ne s'enroule pas : sans `minWidth: 0`, un long message
+              // cité pousse le bouton « Annuler » hors de l'écran au lieu d'être coupé.
+              minWidth: 0,
+              borderInlineStart: "2px solid var(--color-border)",
+              paddingInlineStart: "var(--spacing-2)",
+            }}
+          >
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {contexte.libelle} : {contexte.extrait}
+            </Text>
+          </div>
           <Button label="Annuler" variant="ghost" onClick={contexte.onAnnuler} />
         </div>
       )}

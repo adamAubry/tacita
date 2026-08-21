@@ -130,6 +130,15 @@ export function Timeline({
    * Le drapeau part à `true` : le premier rendu **est** une arrivée en bas. Ensuite il
    * suit le défilement, si bien qu'un message reçu pendant qu'on relit le passé ne
    * ramène personne au bas de force.
+   *
+   * **`chargement` est en dépendance, et c'est lui qui manquait.** Tant que la timeline
+   * rend ses squelettes, elle rend un *autre* élément : `zone` n'est attachée à rien, et
+   * l'effet sort sans rien positionner. Quand les messages arrivent, leur nombre n'a
+   * souvent pas changé — le paquet les tenait déjà, seul `pret` a basculé — donc l'effet
+   * ne se rejouait pas, et la conversation s'ouvrait sur le message le plus **ancien**.
+   * Signalé par les utilisateurs après que REQ-UI-06 a été posée : la logique était juste,
+   * elle ne s'exécutait pas. Le test d'origine rendait la timeline sans jamais passer par
+   * l'état de chargement, donc sans jamais emprunter le chemin réel.
    */
   const presDuBas = useRef(true);
   /** La marge sous laquelle « en bas » veut encore dire en bas — une ligne ou deux. */
@@ -139,7 +148,7 @@ export function Timeline({
     const element = zone.current;
     if (!element || !presDuBas.current) return;
     element.scrollTop = element.scrollHeight;
-  }, [messages.length]);
+  }, [messages.length, chargement]);
 
   /** À quelle distance du haut on demande la suite. Une hauteur d'écran, environ. */
   const SEUIL_REMONTEE = 400;

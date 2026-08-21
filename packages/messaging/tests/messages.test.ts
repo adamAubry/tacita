@@ -12,6 +12,9 @@ import {
   REACTIONS_METADATA,
   redact,
   reply,
+  replyRelation,
+  replyTo,
+  replyToOf,
   sendText,
   subscribe,
 } from "../src";
@@ -94,6 +97,38 @@ describe("REQ-MSG-04 — réponse via m.in_reply_to", () => {
   });
 });
 
+describe("REQ-MSG-04 — la réponse, dans les deux sens", () => {
+  it("écrit la relation `m.in_reply_to`", async () => {
+    await reply(ctx.session, ROOM, "$cible", "oui");
+    expect(lastSend()[2]).toMatchObject({
+      body: "oui",
+      "m.relates_to": { "m.in_reply_to": { event_id: "$cible" } },
+    });
+  });
+
+  /**
+   * Le côté lecture manquait, et c'est ce qui empêchait le shard de montrer à quel
+   * message une réponse répond : le `body` porte bien une citation en `> `, mais
+   * `messageText` la retire (REQ-MSG-07), et elle ne dit ni qui ni quoi quand le message
+   * cité est une photo.
+   */
+  it("relit la cible depuis l'événement comme depuis un contenu en file", () => {
+    const evenement = fakeEvent("$reponse", replyRelation("$cible"));
+    expect(replyTo(evenement as never)).toBe("$cible");
+    // La file d'envoi (spec 07) tient un contenu, pas encore un événement : l'affichage
+    // optimiste doit citer aussi bien qu'un message revenu de /sync.
+    expect(replyToOf(replyRelation("$cible"))).toBe("$cible");
+  });
+
+  it("un message ordinaire ne répond à rien, et une relation malformée non plus", () => {
+    expect(replyTo(fakeEvent("$a", { body: "x" }) as never)).toBeUndefined();
+    expect(replyToOf({ "m.relates_to": { "m.in_reply_to": { event_id: 42 } } })).toBeUndefined();
+    expect(replyToOf(undefined)).toBeUndefined();
+    // Une édition est une relation, mais pas une réponse.
+    expect(replyToOf({ "m.relates_to": { rel_type: "m.replace", event_id: "$c" } })).toBeUndefined();
+  });
+});
+
 describe("REQ-MSG-05 — réactions emoji en clair, métadonnée exposée", () => {
   it("envoie une annotation m.reaction", async () => {
     await react(ctx.session, ROOM, "$cible", "👍");
@@ -139,6 +174,52 @@ describe("REQ-MSG-05 — réactions emoji en clair, métadonnée exposée", () =
     });
 
     expect(reactions(salon.session, ROOM, "$cible")).toEqual([{ key: "👍", count: 1, mine: true }]);
+  });
+
+  /**
+   * Le défaut signalé par les utilisateurs : « les réactions d'un message peuvent être
+   * spam (pas 1 par utilisateur) ». `react` ne savait qu'ajouter, et le `ToggleButton`
+   * de la timeline appelait donc un envoi de plus à chaque appui — le compteur montait
+   * sans fin, et rien ne redescendait jamais.
+   */
+  it("réagir deux fois avec le même emoji le retire au lieu de l'empiler", async () => {
+    const salon = fakeSession({
+      reactions: [{ key: "👍", sender: "@luca:tacita.test", id: "$mienne" }],
+    });
+
+    await react(salon.session, ROOM, "$cible", "👍");
+
+    expect(salon.client.redactEvent).toHaveBeenCalledWith(ROOM, "$mienne", undefined);
+    expect(salon.client.sendEvent).not.toHaveBeenCalled();
+  });
+
+  it("l'emoji d'un autre n'est pas le mien : réagir l'ajoute, sans rien retirer", async () => {
+    const salon = fakeSession({
+      reactions: [{ key: "👍", sender: "@adam:tacita.test", id: "$sienne" }],
+    });
+
+    await react(salon.session, ROOM, "$cible", "👍");
+
+    expect(salon.client.redactEvent).not.toHaveBeenCalled();
+    expect(salon.client.sendEvent.mock.calls.at(-1)![1]).toBe("m.reaction");
+  });
+
+  /**
+   * La bascule empêche d'en écrire de nouveaux ; elle n'efface pas ceux qui sont déjà
+   * dans les salons. Le compte est donc **par personne**, sinon un message spammé hier
+   * resterait affiché avec son « 👍 7 » pour toujours.
+   */
+  it("un même émetteur ne compte qu'une fois, même s'il a déjà empilé", () => {
+    const salon = fakeSession({
+      reactions: [
+        { key: "👍", sender: "@adam:tacita.test" },
+        { key: "👍", sender: "@adam:tacita.test" },
+        { key: "👍", sender: "@adam:tacita.test" },
+        { key: "👍", sender: "@luca:tacita.test" },
+      ],
+    });
+
+    expect(reactions(salon.session, ROOM, "$cible")).toEqual([{ key: "👍", count: 2, mine: true }]);
   });
 });
 

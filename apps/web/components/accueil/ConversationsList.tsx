@@ -86,7 +86,12 @@ export function ConversationsList({
       style={{ display: "grid", gap: "var(--spacing-1)", padding: "var(--spacing-2)" }}
     >
       {ordonner(conversations, tri).map((conversation) => (
-        <div role="listitem" key={conversation.roomId}>
+        /* `minWidth: 0` : un élément de grille refuse par défaut de descendre sous la
+           largeur minimale de son contenu, et l'aperçu tronqué d'un long message — que
+           `maxLines` rend insécable (`white-space: nowrap`) — élargissait donc la piste,
+           puis la page. Le `overflow-wrap` global de `tokens.css` ne peut rien pour une
+           ligne qui ne s'enroule pas : c'est ici que la largeur se laisse contraindre. */
+        <div role="listitem" key={conversation.roomId} style={{ minWidth: 0 }}>
           <ConversationPreview
             conversation={conversation}
             onOuvrir={onOuvrir}

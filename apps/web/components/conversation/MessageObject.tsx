@@ -10,6 +10,7 @@ import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { MediaMessage } from "../media/MediaMessage";
 import type { Media, Telecharger } from "../media/media";
 import { Button, Text, ToggleButton } from "../foundation/primitives";
+import { TexteMessage } from "./TexteMessage";
 import { texteAffiche, type MessageAffiche } from "./message";
 
 export interface MessageObjectProps {
@@ -177,6 +178,31 @@ export function MessageObject({
           </div>
         )}
 
+        {/* REQ-UI-08 — **à quel message celui-ci répond.** Sans cette ligne, une réponse
+            était un message comme un autre : le lien vers ce qu'elle vise existait dans
+            l'événement, et n'était rendu nulle part.
+
+            Un filet à gauche et de l'encre secondaire, pas un cadre : la timeline est sans
+            bulles (DESIGN.md), et le cité doit se lire comme un rappel — plus discret que
+            le message qui le porte, sinon c'est lui qu'on lit. Une seule ligne, tronquée :
+            citer trois lignes de quelqu'un d'autre déplacerait le sujet de la colonne. */}
+        {message.repondA && (
+          <div
+            style={{
+              borderInlineStart: "2px solid var(--color-border)",
+              paddingInlineStart: "var(--spacing-2)",
+              marginBottom: "var(--spacing-1)",
+              minWidth: 0,
+            }}
+          >
+            <Text type="supporting" color="secondary" maxLines={1}>
+              {message.repondA.nom
+                ? `${message.repondA.nom} · ${message.repondA.extrait}`
+                : message.repondA.extrait}
+            </Text>
+          </div>
+        )}
+
         {/* REQ-UI-14 — une pièce jointe remplace le corps de texte : le `body` d'un
             média est son nom de fichier, que la tuile porte déjà. */}
         {media && telecharger && (
@@ -188,8 +214,18 @@ export function MessageObject({
           />
         )}
 
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--spacing-2)" }}>
-          {!message.media && <Text type="body">{texteAffiche(message.texte)}</Text>}
+        {/* `minWidth: 0` sur la colonne du corps : un enfant de flex refuse par défaut de
+            descendre sous la largeur de son contenu, et un mot insécable — une URL, un
+            « aaaaaaa… » — poussait donc la rangée hors de l'écran. */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            gap: "var(--spacing-2)",
+            minWidth: 0,
+          }}
+        >
+          {!message.media && <TexteMessage texte={texteAffiche(message.texte)} />}
 
           {/* REQ-UI-09 — révélées par le geste, jamais affichées en permanence : une
               heure sur chaque ligne, c'est une colonne de bruit. */}

@@ -11,7 +11,7 @@ import { Navbar, ONGLETS } from "../components/foundation/Navbar";
 import { Placeholder } from "../components/foundation/Placeholder";
 import { Sheet } from "../components/foundation/Sheet";
 import { SegmentedControl, SegmentedControlItem, Skeleton } from "../components/foundation/primitives";
-import { RACINE, sansCommentaires, sourcesLivrees } from "./sources";
+import { RACINE, lire, sansCommentaires, sourcesLivrees } from "./sources";
 
 /**
  * `next/navigation` n'existe pas hors du rendu de Next. Les deux fonctions dont les
@@ -447,6 +447,33 @@ describe("REQ-UIX-05 — primitives partagées", () => {
       );
 
     expect(fautives).toEqual([]);
+  });
+});
+
+describe("DESIGN.md — un mot insécable ne doit pas élargir l'écran", () => {
+  /**
+   * Signalé par les utilisateurs : un long message « casse le layout », en conversation
+   * comme sur l'accueil, où l'écran entier devenait plus large.
+   *
+   * jsdom ne calcule aucune mise en page : ce test ne prouve pas le rendu, il empêche la
+   * ligne qui le tient de disparaître (règle 7 — une valeur qu'aucun site de lecture ne
+   * relit est indétectable). La mesure, elle, a été faite au navigateur le 21/08/2026.
+   */
+  it("`body` porte la coupure, et c'est `anywhere` — `break-word` ne suffirait pas", () => {
+    const feuille = sansCommentaires(
+      readFileSync(join(RACINE, "components/foundation/tokens.css"), "utf8"),
+    );
+    // `anywhere` compte dans la largeur minimale intrinsèque, `break-word` non : c'est
+    // cette largeur qu'une piste de grille lit pour se dimensionner. Avec `break-word`,
+    // le texte se couperait et la page resterait large.
+    expect(feuille).toMatch(/body\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  });
+
+  it("l'aperçu de l'accueil se laisse contraindre : sa ligne ne s'enroule pas", () => {
+    // `maxLines={1}` rend l'aperçu `white-space: nowrap` — le `overflow-wrap` de `body`
+    // ne peut rien pour lui, et l'élément de grille doit accepter de rétrécir.
+    const liste = sansCommentaires(lire("components/accueil/ConversationsList.tsx"));
+    expect(liste).toMatch(/role="listitem"[^>]*minWidth: 0/);
   });
 });
 

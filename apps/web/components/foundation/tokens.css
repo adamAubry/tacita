@@ -301,6 +301,31 @@
 }
 
 /*
+ * **Un mot qui ne se coupe pas ne doit pas élargir l'écran.**
+ *
+ * Signalé par les utilisateurs : un long message « casse le layout », en conversation
+ * comme sur l'accueil où l'écran entier devenait plus large. C'est le comportement par
+ * défaut du web — une suite de caractères sans espace (une URL, un « aaaaaaa… », un mot
+ * collé) est insécable, elle impose sa largeur à son conteneur, et le conteneur la
+ * transmet à la page.
+ *
+ * `anywhere` et non `break-word`, et la différence est tout l'intérêt : les deux coupent
+ * à l'affichage, mais `anywhere` **compte dans la largeur minimale intrinsèque** et
+ * `break-word` non. Or c'est précisément cette largeur minimale qu'une piste de grille ou
+ * un conteneur flex lit pour se dimensionner : avec `break-word`, le texte se coupe et la
+ * page reste large quand même. Mesuré au navigateur le 21/08/2026 ; jsdom ne calcule
+ * aucune mise en page et ne pouvait pas le voir (même angle mort que `box-sizing`).
+ *
+ * Sur `body` plutôt qu'au cas par cas : la propriété est héritée, le défaut du web est
+ * l'anomalie, et le prochain écran qui affichera du texte d'autrui naîtrait cassé. Elle
+ * ne coupe jamais un mot qui tient — elle n'agit qu'au moment où le débordement aurait
+ * lieu.
+ */
+body {
+  overflow-wrap: anywhere;
+}
+
+/*
  * Les marges d'agent utilisateur des titres et paragraphes, remises à zéro — même famille
  * d'oubli que `box-sizing` juste au-dessus.
  *

@@ -17,6 +17,9 @@ import {
   react,
   reactions as listerReactions,
   redact,
+  replyRelation,
+  replyTo,
+  replyToOf,
   setPinnedEvents,
   subscribe,
   subscribeTyping,
@@ -48,7 +51,7 @@ import { Composer } from "./Composer";
 import { ConversationStarter } from "./ConversationStarter";
 import { HoldMenu } from "./HoldMenu";
 import { Timeline } from "./Timeline";
-import { depuisFile, texteAffiche, type MessageAffiche } from "./message";
+import { apercu, citation, depuisFile, type MessageAffiche } from "./message";
 
 /** Ce que le composer est en train de faire : rien, une réponse, ou une modification. */
 type Intention =
@@ -245,27 +248,49 @@ export function Conversation({ roomId }: { roomId: string }) {
     if (!session) return [];
     const moi = session.client.getUserId() ?? "";
 
-    const timeline = listerMessages(session, roomId).map((evenement) => {
+    const lus = listerMessages(session, roomId).map((evenement) => {
       const auteur = evenement.getSender() ?? "";
       return {
-        cle: evenement.getId() ?? "",
-        eventId: evenement.getId(),
-        auteur,
-        nom: nomDe(auteur),
-        avatar: avatarDe(auteur),
-        texte: messageText(evenement),
-        horodatage: evenement.getTs(),
-        moi: auteur === moi,
-        // REQ-MSG-06 — les droits viennent du paquet, message par message. Les calculer
-        // ici, où l'on tient déjà l'événement, évite de le rechercher au moment du menu.
-        modifiable: canEdit(session, roomId, evenement),
-        supprimable: canRedact(session, roomId, evenement),
-        media: mediaDe(evenement),
-      } satisfies MessageAffiche;
+        // REQ-UI-08 — l'événement cité, lu par le paquet : le `body` porte bien une
+        // citation en `> `, mais `messageText` la retire et elle ne dit ni qui ni quoi
+        // quand le message cité est une photo.
+        citeId: replyTo(evenement),
+        message: {
+          cle: evenement.getId() ?? "",
+          eventId: evenement.getId(),
+          auteur,
+          nom: nomDe(auteur),
+          avatar: avatarDe(auteur),
+          texte: messageText(evenement),
+          horodatage: evenement.getTs(),
+          moi: auteur === moi,
+          // REQ-MSG-06 — les droits viennent du paquet, message par message. Les calculer
+          // ici, où l'on tient déjà l'événement, évite de le rechercher au moment du menu.
+          modifiable: canEdit(session, roomId, evenement),
+          supprimable: canRedact(session, roomId, evenement),
+          media: mediaDe(evenement),
+        } satisfies MessageAffiche,
+      };
     });
 
+    /*
+     * REQ-UI-08 — de quoi résoudre une citation **sans repasser par le SDK** : le message
+     * cité est presque toujours quelques lignes plus haut, et la fenêtre chargée le porte
+     * déjà. Ce qu'elle ne porte pas se dit tel quel (`citation`), plutôt que d'aller le
+     * chercher au serveur ligne par ligne.
+     */
+    const parId = new Map(
+      lus.filter(({ message }) => message.eventId).map(({ message }) => [message.eventId!, message]),
+    );
+    const citer = (citeId: string | undefined, message: MessageAffiche): MessageAffiche =>
+      citeId === undefined ? message : { ...message, repondA: citation(parId.get(citeId)) };
+
+    const timeline = lus.map(({ citeId, message }) => citer(citeId, message));
+
+    // Une réponse encore en file se cite comme une autre : c'est le propre de l'envoi
+    // optimiste, et c'est le message qu'on vient d'écrire — celui qu'on regarde.
     const attente = (outbox?.pending(roomId) ?? []).map((entree) =>
-      depuisFile(entree, nomDe(moi), moi, avatarDe(moi)),
+      citer(replyToOf(entree.content), depuisFile(entree, nomDe(moi), moi, avatarDe(moi))),
     );
     // REQ-UI-06 — les entrées en attente vont **à la fin**, sans exception : elles n'ont
     // pas encore d'ordre dans /sync, et leur donner une place au milieu supposerait un
@@ -276,6 +301,34 @@ export function Conversation({ roomId }: { roomId: string }) {
     // l'abonnement qui dit qu'elles ont changé.
     return [...timeline, ...attente];
   }, [session, roomId, outbox, nomDe, avatarDe, version]);
+
+  /**
+   * REQ-RCP-07 / REQ-UIX-08 — **ouvrir une conversation la marque lue.**
+   *
+   * Le badge de non-lus est le compteur natif du serveur (`getUnreadNotificationCount`,
+   * REQ-MSG-13) : il ne retombe que sur un reçu `m.read`, et **personne ne l'émettait**.
+   * `createReceipts` exposait `markRead` depuis le premier jour, sans un seul appelant —
+   * le compteur ne pouvait donc que monter, ce que les utilisateurs ont signalé tel quel.
+   * C'est exactement la règle 7 : un membre que rien ne lit est indétectable.
+   *
+   * Un reçu vaut « lu jusqu'ici » : marquer le dernier message suffit, les précédents
+   * suivent. La garde par identifiant évite de réémettre à chaque tour de `version` —
+   * la timeline se rafraîchit à chaque frappe d'en face, pas seulement à chaque message.
+   *
+   * ponytail: aucune condition de visibilité ni de position de défilement — écran ouvert
+   * vaut lu, comme Instagram. À affiner le jour où quelqu'un veut « garder non lu ».
+   */
+  const dernierLu = useRef<string>(undefined);
+  useEffect(() => {
+    if (!session || !pret) return;
+    const dernier = listerMessages(session, roomId).at(-1);
+    const eventId = dernier?.getId();
+    if (!dernier || !eventId || dernierLu.current === eventId) return;
+    dernierLu.current = eventId;
+    // Un reçu perdu n'est pas une panne d'écran : le prochain message le rattrapera.
+    // Rien n'est journalisé — l'erreur porterait le salon (interdit n°8).
+    void receipts.current?.markRead(dernier).catch(() => {});
+  }, [session, roomId, pret, version]);
 
   // REQ-UI-13 — l'accusé se rend sur le dernier message envoyé, et sur lui seul.
   const dernierEnvoye = [...messages].reverse().find((message) => message.moi && message.eventId);
@@ -298,11 +351,17 @@ export function Conversation({ roomId }: { roomId: string }) {
     } else {
       // REQ-UIX-15 — envoi optimiste : l'entrée entre dans la file, la timeline la rend
       // aussitôt. Chiffrement et reprises sont l'affaire de la spec 07.
+      /*
+       * REQ-UI-08 — la relation vient du paquet (REQ-MSG-04), et elle porte l'`event_id`
+       * du message cité — jamais sa `cle`, qui est un identifiant de transaction tant que
+       * le serveur n'a rien attribué. Répondre à un message encore en file aurait posé une
+       * relation vers un événement qui n'existe nulle part : personne ne l'aurait résolue,
+       * et rien à l'écran ne l'aurait dit.
+       */
+      const cite = intention?.quoi === "repondre" ? intention.message.eventId : undefined;
       void outbox?.enqueue(roomId, {
         ...contenu,
-        ...(intention?.quoi === "repondre"
-          ? { "m.relates_to": { "m.in_reply_to": { event_id: intention.message.cle } } }
-          : {}),
+        ...(cite ? replyRelation(cite) : {}),
       } as Record<string, unknown>);
     }
 
@@ -504,7 +563,9 @@ export function Conversation({ roomId }: { roomId: string }) {
           contexte={
             intention && {
               libelle: intention.quoi === "repondre" ? `Réponse à ${intention.message.nom}` : "Modification",
-              extrait: texteAffiche(intention.message.texte),
+              // REQ-UI-08 — « Photo », « Vidéo », « Message vocal » : un média n'a pas de
+              // texte, et son `body` est un nom de fichier que personne ne reconnaît.
+              extrait: apercu(intention.message),
               onAnnuler: () => setIntention(undefined),
             }
           }

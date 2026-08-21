@@ -99,6 +99,7 @@ Composants composés (les 26 du wireframe, mappés dans `specs/ui/00-plan-fronte
 - Aligner tout sur la grille de 4 pt ; en cas de doute, plus d'espace plutôt qu'un trait de plus.
 - Animations 120–180 ms, ease-out, transform/opacity uniquement ; le mouvement confirme, il ne divertit pas.
 - Gestes : seuils d'axe et de distance, zone morte de 20 px au bord gauche pour le swipe droit sur message ; chaque geste a un équivalent visible.
+- Le texte reçu d'autrui est insécable par nature (URL, mot collé) : la coupure se règle une fois pour toutes sur `body` en `overflow-wrap: anywhere`, jamais composant par composant. `break-word` ne compte pas dans la largeur minimale intrinsèque : il coupe le texte et laisse la page s'élargir quand même. Une ligne qui ne s'enroule pas (`maxLines`) échappe à la règle — c'est à son conteneur d'accepter de rétrécir.
 - Libellés honnêtes sur les limites (réactions en clair, « délivré » non standard, note locale, périmètre de recherche) — une phrase sobre, non modale.
 - Permissions demandées au moment de l'usage, chemin de rattrapage en réglages.
 

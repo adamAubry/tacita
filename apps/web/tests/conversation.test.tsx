@@ -6,8 +6,11 @@ import { Composer } from "../components/conversation/Composer";
 import { ConversationStarter } from "../components/conversation/ConversationStarter";
 import { HoldMenu } from "../components/conversation/HoldMenu";
 import { MessageObject } from "../components/conversation/MessageObject";
+import { decouperLiens } from "../components/conversation/TexteMessage";
 import { Timeline } from "../components/conversation/Timeline";
 import {
+  apercu,
+  citation,
   depuisFile,
   FENETRE_GROUPE_MS,
   nouveauJour,
@@ -16,8 +19,8 @@ import {
   type MessageAffiche,
 } from "../components/conversation/message";
 import { mediaDe } from "../components/media/media";
-import { SEUIL_GLISSEMENT, ZONE_MORTE_BORD } from "../lib/gestes";
-import { lire } from "./sources";
+import { DUREE_APPUI_LONG, SEUIL_GLISSEMENT, ZONE_MORTE_BORD } from "../lib/gestes";
+import { lire, sansCommentaires } from "./sources";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/c/!salon",
@@ -46,6 +49,7 @@ function message(partiel: Partial<MessageAffiche> = {}): MessageAffiche {
  */
 function glisser(cible: HTMLElement, depuis: number, jusqu: number) {
   fireEvent(cible, new MouseEvent("pointerdown", { bubbles: true, clientX: depuis, clientY: 0 }));
+  fireEvent(cible, new MouseEvent("pointermove", { bubbles: true, clientX: jusqu, clientY: 0 }));
   fireEvent(cible, new MouseEvent("pointerup", { bubbles: true, clientX: jusqu, clientY: 0 }));
 }
 
@@ -230,6 +234,155 @@ describe("REQ-UI-06 — l'ordre du paquet, les séparateurs de date, la file d'e
   });
 });
 
+describe("REQ-UI-08 — une réponse montre le message qu'elle vise", () => {
+  /**
+   * Le défaut signalé : « lorsqu'on répond à un message, une photo, une vidéo, un
+   * document ou autre, il n'y a pas d'UI spécifique montrant à quel message on fait
+   * référence ». La relation `m.in_reply_to` était bien posée à l'envoi — donc lisible
+   * par les autres clients — et n'était rendue **nulle part** chez nous. Règle 7.
+   */
+  const photo = message({
+    cle: "$photo",
+    nom: "zoe",
+    media: mediaDe({
+      getId: () => "$photo",
+      getContent: () => ({
+        msgtype: "m.image",
+        body: "IMG_4417.HEIC",
+        file: { url: "mxc://tacita.test/def", key: {}, iv: "iv", hashes: {}, v: "v2" },
+        info: { size: 2048, mimetype: "image/jpeg" },
+      }),
+    }),
+  });
+
+  it("nomme la nature d'un média cité, jamais son nom de fichier", () => {
+    expect(apercu(photo)).toBe("Photo");
+    expect(apercu(message({ texte: "coucou" }))).toBe("coucou");
+  });
+
+  it("cite l'auteur et l'extrait du message visé", () => {
+    expect(citation(message({ nom: "zoe", texte: "on mange où ?" }))).toEqual({
+      nom: "zoe",
+      extrait: "on mange où ?",
+    });
+  });
+
+  /**
+   * Le message cité peut être hors de la fenêtre chargée : le repli le dit au lieu de
+   * rendre une citation vide, et surtout au lieu d'aller chercher l'événement au serveur
+   * — ce serait un aller-retour réseau par ligne de timeline.
+   */
+  it("un message cité absent se dit, il ne se devine pas", () => {
+    expect(citation(undefined)).toEqual({ extrait: "Message plus ancien" });
+  });
+
+  it("rend la citation au-dessus du corps, auteur compris", () => {
+    rendreMessage({
+      message: message({ texte: "au bar", repondA: { nom: "zoe", extrait: "on mange où ?" } }),
+    });
+    expect(screen.getByText(/zoe · on mange où \?/)).toBeTruthy();
+  });
+
+  it("un message ordinaire n'en porte aucune", () => {
+    rendreMessage();
+    expect(screen.queryByText(/·/)).toBeNull();
+  });
+
+  /** Le composer cite la même chose, par la même fonction : « Photo », pas « IMG_1.jpg ». */
+  it("le bandeau du composer cite le média par sa nature", () => {
+    render(
+      <Composer
+        mentions={[]}
+        contexte={{ libelle: "Réponse à zoe", extrait: apercu(photo), onAnnuler: vi.fn() }}
+        onEnvoyer={vi.fn()}
+        onFrappe={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Réponse à zoe : Photo/)).toBeTruthy();
+  });
+
+  /**
+   * L'écran pose la relation avec l'`event_id` du message cité, jamais sa `cle` — qui est
+   * un identifiant de transaction tant que le serveur n'a rien attribué. Une relation vers
+   * un `txnId` ne se résout chez personne, et rien à l'écran ne l'aurait dit.
+   */
+  it("la relation part du paquet et porte un event_id", () => {
+    const ecran = sansCommentaires(lire("components/conversation/Conversation.tsx"));
+    expect(ecran).toContain("intention.message.eventId");
+    expect(ecran).toContain("replyRelation(cite)");
+    expect(ecran).not.toMatch(/m\.in_reply_to/);
+  });
+});
+
+describe("REQ-UI-06 — les liens d'un message se voient et se cliquent", () => {
+  /**
+   * Le défaut signalé : « les liens n'apparaissent pas en bleu et on ne peut pas les
+   * cliquer ». Le corps était rendu tel quel, donc une URL restait de l'encre ordinaire.
+   *
+   * L'encre est celle d'`accent` et non un bleu : DESIGN.md § Colors range les liens dans
+   * `accent`, et § Typography n'autorise l'encre d'accent que pour eux et les actions.
+   */
+  it("découpe le texte autour des URL, schéma explicite ou `www.`", () => {
+    expect(decouperLiens("va voir https://tacita.test/a puis www.exemple.org/b, merci")).toEqual([
+      { texte: "va voir " },
+      { texte: "https://tacita.test/a", lien: "https://tacita.test/a" },
+      { texte: " puis " },
+      // Sans schéma, le `href` serait relatif et enverrait sur `/c/www.exemple.org/b`.
+      { texte: "www.exemple.org/b", lien: "https://www.exemple.org/b" },
+      { texte: ", merci" },
+    ]);
+  });
+
+  it("la ponctuation de fin de phrase n'entre pas dans l'URL", () => {
+    expect(decouperLiens("regarde https://tacita.test.")).toEqual([
+      { texte: "regarde " },
+      { texte: "https://tacita.test", lien: "https://tacita.test" },
+      { texte: "." },
+    ]);
+  });
+
+  it("un texte sans lien reste un seul morceau, et rien n'est cliquable", () => {
+    expect(decouperLiens("on se voit demain ?")).toEqual([{ texte: "on se voit demain ?" }]);
+  });
+
+  /** `javascript:` écrit dans un message est du texte, et le reste. */
+  it("aucun autre schéma ne devient cliquable", () => {
+    expect(decouperLiens("javascript:alert(1)")).toEqual([{ texte: "javascript:alert(1)" }]);
+    expect(decouperLiens("écris-moi à data:text/html,x")).toEqual([
+      { texte: "écris-moi à data:text/html,x" },
+    ]);
+  });
+
+  it("le lien rendu est une ancre ouvrant à l'extérieur, en encre d'accent", () => {
+    rendreMessage({ message: message({ texte: "c'est là : https://tacita.test/salon" }) });
+
+    const lien = screen.getByRole("link", { name: "https://tacita.test/salon" });
+    expect(lien.getAttribute("href")).toBe("https://tacita.test/salon");
+    expect(lien.getAttribute("target")).toBe("_blank");
+    // `noopener` contre le `window.opener`, `noreferrer` contre la fuite de référent —
+    // l'URL d'une PWA de messagerie n'a pas à voyager chez un tiers.
+    expect(lien.getAttribute("rel")).toContain("noopener");
+    expect(lien.getAttribute("rel")).toContain("noreferrer");
+    expect(lien.style.color).toBe("var(--color-text-accent)");
+  });
+
+  /** Viser un lien ne doit pas armer le glissement du message qui le porte. */
+  it("un appui sur le lien n'arme pas la réponse", () => {
+    const { onRepondre } = rendreMessage({
+      message: message({ texte: "https://tacita.test/salon" }),
+    });
+    const lien = screen.getByRole("link", { name: "https://tacita.test/salon" });
+
+    fireEvent(lien, new MouseEvent("pointerdown", { bubbles: true, clientX: 200, clientY: 0 }));
+    fireEvent(
+      carteMessage(),
+      new MouseEvent("pointerup", { bubbles: true, clientX: 200 - SEUIL_GLISSEMENT, clientY: 0 }),
+    );
+
+    expect(onRepondre).not.toHaveBeenCalled();
+  });
+});
+
 describe("REQ-UI-08 — glissement gauche : répondre", () => {
   it("au-delà du seuil, la réponse est armée", () => {
     const { onRepondre } = rendreMessage();
@@ -257,6 +410,82 @@ describe("REQ-UI-08 — glissement gauche : répondre", () => {
     expect(screen.getByText(/Réponse à adam/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
     expect(onAnnuler).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("REQ-UI-08 — le glissement survit à sa propre durée, et se voit pendant", () => {
+  /**
+   * Le défaut signalé : « slider pour répondre ne marche pas ».
+   *
+   * Deux causes, et la première suffisait. L'appui long n'était annulé qu'au relâchement :
+   * un glissement tranquille — c'est le geste normal, on ne balaie pas un message en
+   * 200 ms — franchissait les 500 ms en chemin, le hold menu s'ouvrait par-dessus et
+   * avalait la fin du geste. La seconde est qu'à l'écran, rien ne bougeait : le geste ne
+   * disait ni qu'il avait été pris, ni dans quel sens il allait, ni qu'il fallait insister.
+   */
+  it("un glissement lent répond, sans ouvrir le hold menu en route", () => {
+    vi.useFakeTimers();
+    try {
+      const { onRepondre, onHold } = rendreMessage();
+      const carte = carteMessage();
+
+      fireEvent(carte, new MouseEvent("pointerdown", { bubbles: true, clientX: 200, clientY: 0 }));
+      // Le doigt part, puis prend son temps : bien au-delà des 500 ms de l'appui long.
+      fireEvent(carte, new MouseEvent("pointermove", { bubbles: true, clientX: 180, clientY: 0 }));
+      vi.advanceTimersByTime(DUREE_APPUI_LONG * 2);
+      fireEvent(
+        carte,
+        new MouseEvent("pointerup", { bubbles: true, clientX: 200 - SEUIL_GLISSEMENT, clientY: 0 }),
+      );
+
+      expect(onHold).not.toHaveBeenCalled();
+      expect(onRepondre).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("le doigt immobile ouvre toujours le hold menu — l'appui long n'est pas perdu", () => {
+    vi.useFakeTimers();
+    try {
+      const { onHold } = rendreMessage();
+      fireEvent(
+        carteMessage(),
+        new MouseEvent("pointerdown", { bubbles: true, clientX: 200, clientY: 0 }),
+      );
+      vi.advanceTimersByTime(DUREE_APPUI_LONG);
+      expect(onHold).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("le message suit le doigt pendant le geste, et revient en place après", () => {
+    rendreMessage();
+    const carte = carteMessage();
+
+    fireEvent(carte, new MouseEvent("pointerdown", { bubbles: true, clientX: 200, clientY: 0 }));
+    fireEvent(carte, new MouseEvent("pointermove", { bubbles: true, clientX: 160, clientY: 0 }));
+    expect(carte.style.transform).toBe("translateX(-40px)");
+
+    fireEvent(carte, new MouseEvent("pointerup", { bubbles: true, clientX: 160, clientY: 0 }));
+    expect(carte.style.transform).toBe("");
+  });
+
+  it("un doigt qui descend la liste rend la main : rien ne suit, et rien ne se déclenche", () => {
+    const { onRepondre, onRevelerHeures } = rendreMessage();
+    const carte = carteMessage();
+
+    fireEvent(carte, new MouseEvent("pointerdown", { bubbles: true, clientX: 200, clientY: 0 }));
+    fireEvent(carte, new MouseEvent("pointermove", { bubbles: true, clientX: 190, clientY: 120 }));
+    expect(carte.style.transform).toBe("");
+
+    fireEvent(
+      carte,
+      new MouseEvent("pointerup", { bubbles: true, clientX: 200 - SEUIL_GLISSEMENT, clientY: 120 }),
+    );
+    expect(onRepondre).not.toHaveBeenCalled();
+    expect(onRevelerHeures).not.toHaveBeenCalled();
   });
 });
 
@@ -601,6 +830,25 @@ describe("REQ-MED-05 — un fichier reçu se télécharge sur l'appareil", () =>
   });
 });
 
+describe("REQ-UIX-08 — lire une conversation fait retomber son badge de non-lus", () => {
+  /**
+   * Le défaut signalé : « le compteur de messages non lus ne fait que monter malgré leur
+   * lecture ». Le badge est le compteur natif du serveur (REQ-MSG-13) ; il ne retombe que
+   * sur un reçu `m.read`, et `markRead` — exposé par la spec 06 dès son premier jour —
+   * n'avait **aucun appelant** dans tout le dépôt.
+   *
+   * Structurel, et c'est le bon niveau : la spec 06 prouve déjà que `markRead` émet le
+   * bon reçu, la spec 05 que le badge suit `RoomEvent.Receipt`. Ce qui manquait est le
+   * fil entre les deux, et c'est un fil qu'aucun des deux paquets ne peut voir — règle 7,
+   * une valeur écrite là où rien ne la lit est indétectable.
+   */
+  it("l'écran émet le reçu de lecture sur le dernier message du salon", () => {
+    const ecran = sansCommentaires(lire("components/conversation/Conversation.tsx"));
+    expect(ecran).toContain("receipts.current?.markRead(dernier)");
+    expect(ecran).toMatch(/listerMessages\(session, roomId\)\.at\(-1\)/);
+  });
+});
+
 describe("REQ-UI-21 — la timeline remonte l'historique quand on approche du haut", () => {
   /**
    * jsdom ne fait aucune mise en page : `scrollTop` et `scrollHeight` y valent zéro et
@@ -737,5 +985,59 @@ describe("REQ-UI-06 — une conversation s'ouvre sur son dernier message", () =>
     );
 
     expect(zone.scrollTop).toBe(3000);
+  });
+
+  /**
+   * Le chemin réel, et celui qui était cassé : la timeline rend d'abord ses squelettes
+   * (`chargement`), donc `zone` n'est attachée à rien et l'effet sort sans rien
+   * positionner. Les messages arrivent ensuite **sans changer de nombre** — le paquet les
+   * tenait déjà, seul `pret` a basculé côté écran —, et l'effet ne se rejouait pas.
+   *
+   * Le test précédent passait au vert en rendant la timeline directement chargée : il
+   * éprouvait la bonne logique par un chemin que l'app n'emprunte jamais.
+   */
+  it("se positionne en bas quand les squelettes cèdent la place, à nombre de messages égal", () => {
+    const messages = [message({ cle: "$a" }), message({ cle: "$b" })];
+    const rendre = (chargement: boolean) => (
+      <Timeline
+        messages={messages}
+        chargement={chargement}
+        onRepondre={vi.fn()}
+        onHold={vi.fn()}
+        onReagir={vi.fn()}
+        onRenvoyer={vi.fn()}
+        onAbandonner={vi.fn()}
+      />
+    );
+
+    /*
+     * La géométrie est posée sur le **prototype** et non sur l'élément : la zone
+     * défilante n'existe pas encore au moment du premier rendu — c'est tout le sujet —,
+     * et il n'y a donc rien à instrumenter avant la bascule.
+     */
+    let position = 0;
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+      configurable: true,
+      get: () => 3000,
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollTop", {
+      configurable: true,
+      get: () => position,
+      set: (valeur: number) => {
+        position = valeur;
+      },
+    });
+
+    try {
+      const { rerender } = render(rendre(true));
+      expect(screen.queryByRole("log")).toBeNull();
+
+      rerender(rendre(false));
+
+      expect(screen.getByRole("log").scrollTop).toBe(3000);
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollTop");
+    }
   });
 });

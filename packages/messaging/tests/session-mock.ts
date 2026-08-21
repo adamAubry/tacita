@@ -36,6 +36,8 @@ export interface FakeReaction {
   key: string;
   sender?: string;
   redacted?: boolean;
+  /** Défaut : `$reaction-<rang>`. La bascule de REQ-MSG-05 redacte **par identifiant**. */
+  id?: string;
 }
 
 export interface FakeRoomOptions {
@@ -105,8 +107,8 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     relations: {
       getChildEventsForEvent: vi.fn((_eventId: string, _relType: string, _type: string) => ({
         getRelations: () =>
-          reactions.map(({ key, sender = "@luca:tacita.test", redacted = false }) => ({
-            ...fakeEvent("$reaction", { "m.relates_to": { key } }, sender, "m.reaction"),
+          reactions.map(({ key, sender = "@luca:tacita.test", redacted = false, id }, rang) => ({
+            ...fakeEvent(id ?? `$reaction-${rang}`, { "m.relates_to": { key } }, sender, "m.reaction"),
             isRedacted: () => redacted,
           })),
       })),

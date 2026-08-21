@@ -62,6 +62,38 @@ export function sendText(
   return send(session, roomId, EventType.RoomMessage, textContent(text, opts), opts.txnId);
 }
 
+/**
+ * REQ-MSG-04 — la relation de réponse, **telle qu'elle s'écrit**.
+ *
+ * Exportée parce que deux chemins la posent : `reply` ici, et la file d'envoi du shard,
+ * qui met en file un contenu déjà formé (REQ-OBX-05). Deux littéraux recopiés auraient
+ * dérivé, et la lecture d'en face n'aurait plus reconnu que l'un des deux.
+ */
+export const replyRelation = (inReplyToEventId: string) => ({
+  "m.relates_to": { "m.in_reply_to": { event_id: inReplyToEventId } },
+});
+
+/**
+ * REQ-MSG-04, côté **lecture** — l'événement auquel ce contenu répond, s'il y en a un.
+ *
+ * Sans ce membre, le shard ne pouvait pas dire à quel message une réponse répond : le
+ * `body` porte bien une citation en `> `, mais `messageText` la retire (REQ-MSG-07) et
+ * elle ne dit de toute façon ni qui, ni quoi quand le cité est une photo. Signalé par les
+ * utilisateurs : « rien ne montre à quel message on fait référence ».
+ *
+ * Prend un **contenu** et non un événement : une entrée de la file d'envoi n'est pas
+ * encore un événement, et l'affichage optimiste doit citer aussi bien qu'un message reçu.
+ */
+export function replyToOf(content: unknown): string | undefined {
+  const relation = (content as { "m.relates_to"?: { "m.in_reply_to"?: { event_id?: unknown } } })
+    ?.["m.relates_to"];
+  const eventId = relation?.["m.in_reply_to"]?.event_id;
+  return typeof eventId === "string" ? eventId : undefined;
+}
+
+/** REQ-MSG-04 — la même lecture, sur un événement de la timeline. */
+export const replyTo = (event: MatrixEvent): string | undefined => replyToOf(event.getContent());
+
 /** REQ-MSG-04 — réponse via la relation `m.in_reply_to`. */
 export function reply(
   session: Session,
@@ -72,7 +104,7 @@ export function reply(
 ): Promise<ISendEventResponse> {
   const content: TextContent = {
     ...textContent(text, opts),
-    "m.relates_to": { "m.in_reply_to": { event_id: inReplyToEventId } },
+    ...replyRelation(inReplyToEventId),
   };
   return send(session, roomId, EventType.RoomMessage, content, opts.txnId);
 }
@@ -130,29 +162,51 @@ export interface ReactionTally {
 }
 
 /**
+ * Les annotations vivantes d'un message. Les redactions sont exclues : une réaction
+ * retirée reste dans la relation, vidée de son contenu — la compter afficherait un emoji
+ * fantôme que personne ne peut retirer.
+ */
+function annotations(session: Session, roomId: string, eventId: string): MatrixEvent[] {
+  return (
+    session.client
+      .getRoom(roomId)
+      ?.relations.getChildEventsForEvent(eventId, RelationType.Annotation, EventType.Reaction)
+      ?.getRelations() ?? []
+  ).filter((event) => !event.isRedacted());
+}
+
+/** La clé d'une annotation, ou `undefined` si l'événement n'en porte pas. */
+const cleDe = (event: MatrixEvent): string | undefined => {
+  const key = (event.getContent()["m.relates_to"] as { key?: unknown } | undefined)?.key;
+  return typeof key === "string" ? key : undefined;
+};
+
+/**
  * REQ-MSG-05, côté **lecture** — les réactions d'un message, déjà agrégées.
  *
  * L'agrégation est celle du SDK (`relations`), pas une reconstruction : c'est le serveur
  * qui groupe les annotations, et le SDK qui tient le résultat à jour. Sans ce membre, le
  * shard UI pourrait envoyer des réactions sans jamais en afficher — une moitié de
  * fonctionnalité, que l'interdit n°13 proscrit.
- *
- * Les redactions sont exclues : une réaction retirée reste dans la relation, vidée de son
- * contenu. La compter afficherait un emoji fantôme que personne ne peut retirer.
  */
 export function reactions(session: Session, roomId: string, eventId: string): ReactionTally[] {
   const self = session.client.getUserId();
-  const related =
-    session.client
-      .getRoom(roomId)
-      ?.relations.getChildEventsForEvent(eventId, RelationType.Annotation, EventType.Reaction)
-      ?.getRelations() ?? [];
 
   const tallies = new Map<string, ReactionTally>();
-  for (const event of related) {
-    if (event.isRedacted()) continue;
-    const key = (event.getContent()["m.relates_to"] as { key?: unknown } | undefined)?.key;
-    if (typeof key !== "string") continue;
+  /*
+   * **Un émetteur ne compte qu'une fois par emoji.** Matrix n'interdit pas d'envoyer deux
+   * fois la même annotation, et `react` l'a fait pendant tout le temps où il ne savait
+   * qu'ajouter : les salons portent donc des doublons déjà écrits, qu'aucune bascule ne
+   * retirera jamais tous. Compter par personne les rend inoffensifs — signalé par les
+   * utilisateurs comme « les réactions peuvent être spam ».
+   */
+  const vus = new Set<string>();
+  for (const event of annotations(session, roomId, eventId)) {
+    const key = cleDe(event);
+    if (key === undefined) continue;
+    const empreinte = `${key}\u0000${event.getSender()}`;
+    if (vus.has(empreinte)) continue;
+    vus.add(empreinte);
 
     const tally = tallies.get(key) ?? { key, count: 0, mine: false };
     tally.count += 1;
@@ -162,6 +216,14 @@ export function reactions(session: Session, roomId: string, eventId: string): Re
   return [...tallies.values()];
 }
 
+/**
+ * REQ-MSG-05 — **une réaction est une bascule, pas une pile.** Réagir avec un emoji déjà
+ * posé le retire ; c'est ce que rend `mine`, et ce qu'attend le `ToggleButton` de la
+ * timeline, qui appelait jusqu'ici un envoi de plus à chaque appui.
+ *
+ * La bascule vit ici et non dans le shard : deux appelants la demandent (la ligne de
+ * réactions et le hold menu), et une garde posée chez l'un aurait laissé l'autre empiler.
+ */
 export function react(
   session: Session,
   roomId: string,
@@ -169,6 +231,13 @@ export function react(
   key: string,
   opts: SendOptions = {},
 ): Promise<ISendEventResponse> {
+  const self = session.client.getUserId();
+  const mienne = annotations(session, roomId, eventId).find(
+    (event) => event.getSender() === self && cleDe(event) === key,
+  );
+  const idMien = mienne?.getId();
+  if (idMien) return redact(session, roomId, idMien, opts);
+
   const content = {
     "m.relates_to": { rel_type: RelationType.Annotation, event_id: eventId, key },
   };

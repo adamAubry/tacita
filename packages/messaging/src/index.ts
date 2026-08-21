@@ -9,6 +9,9 @@ export {
   REACTIONS_METADATA,
   redact,
   reply,
+  replyRelation,
+  replyTo,
+  replyToOf,
   sendText,
   subscribe,
 } from "./messages";

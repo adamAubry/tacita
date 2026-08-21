@@ -34,6 +34,15 @@ export interface MessageAffiche {
   supprimable?: boolean;
   /** REQ-UI-14 — la pièce jointe, quand le message en porte une (M-E). */
   media?: Media;
+  /** REQ-UI-08 — le message cité, quand celui-ci est une réponse. */
+  repondA?: Citation;
+}
+
+/** Ce qu'on montre du message auquel on répond : qui, et quoi en une ligne. */
+export interface Citation {
+  /** Absent quand le message cité n'est pas dans la fenêtre chargée. */
+  nom?: string;
+  extrait: string;
 }
 
 /** Une entrée de file, rendue comme un message. Le contenu n'est jamais journalisé. */
@@ -56,6 +65,41 @@ export function depuisFile(
     moi: true,
   };
 }
+
+/**
+ * REQ-UI-08 — **une ligne pour dire de quoi on parle.**
+ *
+ * Une pièce jointe n'a pas de texte : son `body` est un nom de fichier, et citer
+ * « IMG_4417.HEIC » ne dit à personne de quelle photo il s'agit. On nomme donc la nature
+ * du média, comme toutes les messageries — c'est ce qui manquait à l'écran de réponse,
+ * signalé pour la photo, la vidéo et le document à la fois.
+ */
+export function apercu(message: MessageAffiche): string {
+  switch (message.media?.msgtype) {
+    case "m.image":
+      return "Photo";
+    case "m.video":
+      return "Vidéo";
+    case "m.audio":
+      return "Message vocal";
+    case "m.file":
+      // Le nom de fichier est du contenu, et il est ici sous les yeux de qui y a déjà
+      // accès : c'est le seul cas où il aide à reconnaître la pièce citée.
+      return message.media.nom || "Document";
+    default:
+      return texteAffiche(message.texte);
+  }
+}
+
+/**
+ * REQ-UI-08 — la citation d'un message, ou le repli quand il n'est pas chargé.
+ *
+ * Le repli est **explicite** et ne prétend rien (interdit n°13) : remonter chercher
+ * l'événement au serveur serait un aller-retour réseau par ligne de timeline, et une
+ * citation vide laisserait croire à un message vide.
+ */
+export const citation = (cible: MessageAffiche | undefined): Citation =>
+  cible ? { nom: cible.nom, extrait: apercu(cible) } : { extrait: "Message plus ancien" };
 
 /**
  * REQ-MSG-10 dit que le corps porte `@room` — c'est ce littéral que la push rule native
