@@ -260,6 +260,56 @@ describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
     );
   });
 
+  it("décrit les octets livrés, pas la cible visée : un envoi non compressé le dit", async () => {
+    /*
+     * REQ-MED-04 / REQ-MED-12 — **le repli du shard, vu du pipeline.** Là où ce navigateur
+     * ne sait ni démuxer ni encoder — WebM, HEVC hors Safari, Firefox sans encodeur —,
+     * `transcodeVideo` rend la source telle quelle plutôt que de refuser l'envoi. Écrire
+     * alors `video/mp4` dans l'événement ferait mentir le contenu sur ses propres octets,
+     * et c'est `info.mimetype` qui décide du rendu chez le destinataire.
+     */
+    const source = new Blob([bytes("webm brut")], { type: "video/webm" });
+    env = fakeEnv({
+      transcodeVideo: vi.fn(async () => ({ blob: source, width: 1920, height: 1080, durationMs: 8000 })),
+    });
+
+    const contenu = await uploadAttachment(session, env, new File([bytes("x")], "a.webm", { type: "video/webm" }));
+    expect(contenu.info.mimetype).toBe("video/webm");
+    expect(contenu.info.size).toBe(source.size);
+  });
+
+  it("une vignette impossible ne fait pas échouer l'envoi de la vidéo", async () => {
+    /*
+     * REQ-MED-03 — la vignette est un confort, l'envoi est la fonction. Un poster que le
+     * navigateur ne sait pas extraire — codec illisible dans un `<video>` — faisait échouer
+     * tout l'envoi. `thumbnail_file` est facultatif dans l'événement ; l'absence d'un
+     * confort ne doit pas coûter le message.
+     */
+    env = fakeEnv({ extractPoster: vi.fn(async () => { throw new Error("vidéo illisible"); }) });
+    const contenu = await uploadAttachment(session, env, new File([bytes("x")], "a.mp4", { type: "video/mp4" }));
+
+    expect(contenu.msgtype).toBe("m.video");
+    expect(contenu.file.url).toBe(MXC);
+    expect(contenu.info.thumbnail_file).toBeUndefined();
+    // Et surtout : aucun téléversement orphelin. Un chiffré rangé pour un champ que le
+    // contenu ne porte pas casserait `poserUrl` au retour du serveur.
+    expect(session.client.uploadContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("un fichier sans type déclaré est reconnu à ses octets, pas rangé en « fichier »", async () => {
+    /*
+     * REQ-MED-12 — `File.type` est vide plus souvent qu'on ne le croit : glisser-déposer,
+     * `.mkv` sous Windows, partages Android via un fournisseur qui ne mappe pas
+     * l'extension. Le fichier partait alors en `m.file`, ni compressé ni vignetté.
+     */
+    const ftyp = new Uint8Array(32);
+    ftyp.set(bytes("ftypisom"), 4);
+    const contenu = await uploadAttachment(session, env, new File([ftyp], "clip", { type: "" }));
+
+    expect(contenu.msgtype).toBe("m.video");
+    expect(env.transcodeVideo).toHaveBeenCalled();
+  });
+
   it("retombe sur « bon réseau » quand l'API est absente, et suit saveData", () => {
     expect(detectProfile(undefined)).toBe("good");
     expect(detectProfile({ effectiveType: "4g" })).toBe("good");

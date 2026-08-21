@@ -329,10 +329,15 @@ export function Conversation({ roomId }: { roomId: string }) {
           })),
         );
       }
-      // REQ-MED-13 — la vidéo est partie ; ce qu'elle a laissé en route se dit maintenant,
-      // à l'expéditeur et à lui seul.
+      // REQ-MED-13 / REQ-MED-04 — la vidéo est partie ; ce qu'elle a laissé en route se dit
+      // maintenant, à l'expéditeur et à lui seul. Une vidéo envoyée est un succès ; la
+      // taire à moitié serait l'interdit n°13.
       if (avis.current === "video-sans-son") {
         setErreurMedia("Cette vidéo est partie sans le son : son format audio ne peut pas être transporté.");
+      } else if (avis.current === "video-non-compressee") {
+        setErreurMedia(
+          "Cette vidéo est partie telle quelle : ce navigateur ne sait pas la recompresser. Elle est donc plus lourde que d'habitude.",
+        );
       }
     } catch (cause) {
       // REQ-MED-10 — le message ne cite jamais le fichier : ni son nom, ni ses octets.

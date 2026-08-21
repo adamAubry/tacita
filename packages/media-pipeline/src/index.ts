@@ -20,6 +20,7 @@ import {
 } from "./profiles";
 
 import { remuxWebmOpusVersOgg, WEBM_OPUS_MIME } from "./remux";
+import { TAILLE_SNIFF, typeSniffe } from "./types-rendus";
 
 export {
   decryptAttachment,
@@ -113,8 +114,12 @@ export interface MediaEnvironment extends CryptoEnvironment {
    * Un rappel plutôt qu'une valeur de retour : `uploadAttachment` rend un contenu
    * d'événement, et une vidéo partie sans son n'a rien à y écrire — c'est une information
    * pour **l'expéditeur**, pas pour le destinataire ni pour le serveur.
+   *
+   * `video-non-compressee` suit la même règle : le fichier part, entier, parce que ce
+   * navigateur n'a pas su le recompresser. Le destinataire le lira ; l'expéditeur, lui,
+   * doit savoir qu'il vient d'envoyer l'original et non une version allégée.
    */
-  signaler?(avis: "video-sans-son"): void;
+  signaler?(avis: "video-sans-son" | "video-non-compressee"): void;
 }
 
 /**
@@ -169,6 +174,21 @@ const kindOf = (mimeType: string): Kind => {
   const [type] = mimeType.split("/");
   return type === "image" || type === "video" || type === "audio" ? type : "file";
 };
+
+/**
+ * Le type du fichier choisi — **déclaré si l'appareil en donne un, reniflé sinon.**
+ *
+ * `File.type` est vide plus souvent qu'on ne le croit : glisser-déposer depuis certains
+ * gestionnaires de fichiers, `.mkv` sous Windows, partages Android passant par un
+ * fournisseur qui ne mappe pas l'extension. Le fichier partait alors en `m.file` — donc
+ * ni compressé, ni vignetté, et affiché comme une pièce jointe quelconque au lieu d'une
+ * vidéo. Les octets, eux, savent ce qu'ils sont : `typeSniffe` les lit (REQ-MED-12).
+ */
+async function typeDuFichier(file: File): Promise<string> {
+  if (file.type) return file.type;
+  const entete = new Uint8Array(await file.slice(0, TAILLE_SNIFF).arrayBuffer());
+  return typeSniffe(entete) ?? "";
+}
 
 /**
  * REQ-MED-01/02 — **le** chemin d'upload. Photos, vidéos, vocaux, ZIP, PDF, bureautique :
@@ -262,7 +282,33 @@ export async function uploadCiphertext(session: Session, ciphertext: Bytes): Pro
   return content_uri;
 }
 
-/** REQ-MED-03 — vignette chiffrée séparément : deux blobs opaques, deux jeux de clés. */
+/**
+ * REQ-MED-03 — vignette chiffrée séparément : deux blobs opaques, deux jeux de clés.
+ *
+ * Rend `{}` quand la source d'image n'a pas pu être produite. **La vignette est un
+ * confort, l'envoi est la fonction** : une vidéo dont le navigateur ne sait pas extraire
+ * de poster — ce qui arrive dès qu'un codec n'est pas décodable dans un `<video>` — faisait
+ * échouer tout l'envoi sous « L'envoi de cette pièce jointe a échoué ». `thumbnail_file`
+ * est facultatif dans l'événement, et un destinataire sans vignette affiche le premier
+ * plan du média lui-même.
+ */
+async function vignetteEventuelle(
+  env: MediaEnvironment,
+  source: () => Promise<Blob>,
+  enAttente: Televersement[],
+): Promise<Record<string, unknown>> {
+  // Le repère avant tentative : une vignette qui échoue **après** avoir été chiffrée
+  // laisserait un téléversement en attente pointant vers un champ que le contenu ne porte
+  // pas, et `poserUrl` casserait sur ce chemin au retour du serveur.
+  const avant = enAttente.length;
+  try {
+    return await thumbnailOf(env, await source(), enAttente);
+  } catch {
+    enAttente.length = avant;
+    return {};
+  }
+}
+
 async function thumbnailOf(
   env: MediaEnvironment,
   source: Blob,
@@ -301,10 +347,10 @@ export function waveform(samples: Float32Array, buckets = WAVEFORM_BUCKETS): num
  * coûte une recopie d'octets, et seul Safari paie un encodage — que `transcodeAudio` porte,
  * dans le `MediaEnvironment` injecté.
  */
-async function versOggOpus(env: MediaEnvironment, file: File): Promise<Blob> {
-  if (file.type.startsWith(VOICE_MIME_TYPE)) return file;
+async function versOggOpus(env: MediaEnvironment, file: File, type: string): Promise<Blob> {
+  if (type.startsWith(VOICE_MIME_TYPE)) return file;
 
-  if (file.type.startsWith(WEBM_OPUS_MIME)) {
+  if (type.startsWith(WEBM_OPUS_MIME)) {
     const ogg = remuxWebmOpusVersOgg(new Uint8Array(await file.arrayBuffer()));
     return new Blob([ogg as BlobPart], { type: VOICE_MIME_TYPE });
   }
@@ -336,8 +382,9 @@ async function construireContenu(
 ): Promise<AttachmentContent> {
   const targets = PROFILES[detectProfile(env.connection)];
   const body = file.name;
+  const type = await typeDuFichier(file);
 
-  switch (kindOf(file.type)) {
+  switch (kindOf(type)) {
     case "image": {
       // REQ-MED-04 — compression avant chiffrement : chiffrer d'abord rendrait le blob
       // incompressible.
@@ -366,12 +413,19 @@ async function construireContenu(
         msgtype: "m.video",
         body,
         info: {
-          mimetype: targets.video.mimeType,
+          /*
+           * **Le type des octets livrés, pas celui de la cible.** `transcodeVideo` peut
+           * rendre la source telle quelle quand ce navigateur ne sait pas la recompresser :
+           * annoncer `video/mp4` sur un `.mov` ou un `.webm` ferait mentir l'événement sur
+           * ses propres octets, et c'est `info.mimetype` qui décide du rendu chez le
+           * destinataire (REQ-MED-12). Même règle que la vignette, pour la même raison.
+           */
+          mimetype: video.blob.type || targets.video.mimeType,
           w: video.width,
           h: video.height,
           duration: video.durationMs,
           size: video.blob.size,
-          ...(await thumbnailOf(env, await env.extractPoster(video.blob), enAttente)),
+          ...(await vignetteEventuelle(env, () => env.extractPoster(video.blob), enAttente)),
         },
         file: await chiffrerEnAttente(env, video.blob, ["file"], enAttente),
         [CHAMP_BLOCS]: await blocsDe(env, enAttente),
@@ -383,7 +437,7 @@ async function construireContenu(
       // chemins, trois coûts (E-10) : Firefox rend déjà de l'Ogg/Opus, Chrome rend le même
       // flux Opus dans un conteneur WebM — un remuxage suffit, sans encodeur ni perte —,
       // et Safari rend du MP4/AAC, seul cas qui demande un vrai encodage.
-      const ogg = await versOggOpus(env, file);
+      const ogg = await versOggOpus(env, file, type);
       const { samples, durationMs } = await env.decodeAudio(ogg);
       return {
         msgtype: "m.audio",
@@ -402,7 +456,7 @@ async function construireContenu(
       return {
         msgtype: "m.file",
         body,
-        info: { mimetype: file.type || "application/octet-stream", size: file.size },
+        info: { mimetype: type || "application/octet-stream", size: file.size },
         file: await chiffrerEnAttente(env, file, ["file"], enAttente),
         [CHAMP_BLOCS]: await blocsDe(env, enAttente),
       };

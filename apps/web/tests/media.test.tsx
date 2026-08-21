@@ -851,16 +851,35 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
   // qu'il ne fait plus.
   const source = sansCommentaires(lire("lib/transcode-video.ts"));
 
-  it("plus de lecteur ni de canvas dans le chemin nominal", () => {
-    // Les deux lignes qui coûtaient « trois minutes pour trois minutes ».
+  it("plus de lecteur pour cadencer la lecture", () => {
+    // Les deux lignes qui coûtaient « trois minutes pour trois minutes » : c'est le
+    // **lecteur** qui les coûtait, en imposant la vitesse de lecture au décodage.
     expect(source).not.toContain("createElement(\"video\")");
     expect(source).not.toContain("requestVideoFrameCallback");
-    expect(source).not.toContain("OffscreenCanvas");
-    expect(source).not.toContain("drawImage");
-    // Le scaler natif remplace le canvas, et les deux images sont refermées.
-    expect(source).toContain("new VideoFrame(image, {");
-    expect(source).toContain("displayWidth: largeur");
+    // Les deux images sont refermées : une `VideoFrame` oubliée par image fait tomber
+    // l'onglet sur une vidéo un peu longue.
+    expect(source).toContain("image.close()");
     expect(source).toContain("reduite.close()");
+  });
+
+  it("la réduction produit vraiment la taille demandée, elle ne se contente pas de la déclarer", () => {
+    /*
+     * **Le défaut du 21/08/2026, tenu par ce test.** La version précédente écrivait
+     * `new VideoFrame(image, { displayWidth: largeur, displayHeight: hauteur })` et
+     * l'appelait « scaler natif ». Il n'en existe pas : ces deux champs sont des
+     * métadonnées d'affichage, ils ne rééchantillonnent rien. On remettait donc des images
+     * 1080p à un encodeur configuré en 720p, et ce que WebCodecs dit de ce cas est : rien.
+     * Chrome redimensionnait en silence, d'autres moteurs refusaient la frame — et l'échec
+     * remontait sous une phrase parlant de compression.
+     *
+     * Ce que la ligne doit dire, et que jsdom ne peut pas exécuter (règle 7) : les pixels
+     * passent par une mise à l'échelle explicite avant l'encodeur.
+     */
+    expect(source).not.toContain("displayWidth: largeur");
+    expect(source).toContain("pinceau.drawImage(image, 0, 0, largeur, hauteur)");
+    expect(source).toContain("new VideoFrame(toile, { timestamp: horodatage");
+    // Et le chemin sans réduction ne paie pas la toile : il encode la frame telle quelle.
+    expect(source).toContain("if (largeur === source.largeur && hauteur === source.hauteur)");
   });
 
   it("le contrôle de flux borne les deux files, pas une", () => {
@@ -880,6 +899,43 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
     const env = sansCommentaires(lire("lib/media-env.ts"));
     expect(env).toContain('new Worker(new URL("./transcode-worker.ts", import.meta.url))');
     expect(env).toContain("worker.terminate()");
+  });
+
+  it("un transcodage impossible envoie la source telle quelle plutôt que rien", () => {
+    /*
+     * REQ-MED-04 / interdit n°13 — trois familles de sources échouent au chemin nominal et
+     * aucune n'est marginale : les conteneurs que le démuxeur ne connaît pas (WebM,
+     * Matroska — tout ce qu'un navigateur enregistre lui-même), les codecs que
+     * `VideoDecoder` refuse là où l'appareil sait pourtant les lire (HEVC hors Safari), et
+     * les navigateurs sans encodeur H.264. Refuser l'envoi, c'était refuser une vidéo que
+     * le destinataire aurait parfaitement lue.
+     *
+     * La condition du repli est mesurée, pas supposée : si le navigateur sait ouvrir le
+     * fichier, il en donne les dimensions. Sinon, l'échec d'origine remonte avec son motif.
+     */
+    const env = sansCommentaires(lire("lib/media-env.ts"));
+    expect(env).toContain("const mesure = await mesurerVideo(blob).catch(() => undefined);");
+    expect(env).toContain("if (!mesure) throw cause;");
+    // Et l'expéditeur l'apprend : le fichier part entier, donc plus lourd.
+    expect(env).toContain('options.signaler?.("video-non-compressee")');
+    expect(sansCommentaires(lire("components/conversation/Conversation.tsx"))).toContain(
+      'avis.current === "video-non-compressee"',
+    );
+  });
+
+  it("aucune attente d'événement média n'est laissée sans issue", () => {
+    /*
+     * Un `<video>` qui ne sait pas décoder n'émet ni `loadeddata` ni toujours `error`, et
+     * un `seeked` peut ne jamais venir. La promesse restait alors ouverte pour de bon :
+     * l'envoi affichait « en cours » sans fin et sans message — le pire des états, parce
+     * qu'il n'a pas de sortie utilisateur.
+     */
+    const env = sansCommentaires(lire("lib/media-env.ts"));
+    expect(env).toContain("const minuteur = setTimeout(");
+    expect(env).toContain("clearTimeout(minuteur)");
+    // iOS refuse de décoder un média hors document sans ces deux-là, et l'élément reste vide.
+    expect(env).toContain("video.playsInline = true");
+    expect(env).toContain("video.muted = true");
   });
 
   it("la rotation de la source traverse jusqu'au conteneur et jusqu'aux dimensions", () => {

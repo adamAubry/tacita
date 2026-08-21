@@ -214,6 +214,18 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
   });
   encodeur.configure(config);
 
+  /**
+   * La toile de réduction, **allouée une fois** : une par image ferait autant de contextes
+   * GPU que d'images. `alpha: false` évite une passe de composition sur chaque frame, et
+   * `willReadFrequently` reste absent — on ne relit jamais les pixels côté CPU.
+   *
+   * ponytail: aller-retour RGBA par image redimensionnée, plafond connu. À remplacer le
+   * jour où WebCodecs expose une vraie mise à l'échelle — aucune n'existe aujourd'hui.
+   */
+  const toile = new OffscreenCanvas(largeur, hauteur);
+  const pinceau = toile.getContext("2d", { alpha: false });
+  if (!pinceau) throw new EchecTranscodage("autre", "contexte 2d indisponible : réduction impossible");
+
   let derniereCleUs = -INTERVALLE_CLE_US;
   const decodeur = new VideoDecoder({
     output: (image) => {
@@ -227,19 +239,31 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
       }
 
       /*
-       * Le scaler **natif** de `VideoFrame`, et non un canvas : il reste dans l'espace
-       * couleur du décodeur, là où le canvas imposait NV12 → RGBA → NV12 par image.
+       * **La réduction se fait ici, explicitement, et c'est le correctif du 21/08/2026.**
+       *
+       * La version précédente construisait `new VideoFrame(image, { displayWidth,
+       * displayHeight })` en la nommant « scaler natif ». Il n'en existe pas :
+       * `displayWidth`/`displayHeight` sont des **métadonnées d'affichage**, elles ne
+       * rééchantillonnent rien — la frame sortait toujours en 1920 × 1080 codés. On
+       * remettait donc à un encodeur configuré en 1280 × 720 des images d'une autre
+       * taille, et ce que la spécification WebCodecs dit de ce cas est : rien. Chrome
+       * redimensionne en silence, d'autres moteurs refusent la frame — et l'échec arrive
+       * dans le rappel `error`, après le premier `encode`, sous la forme d'une phrase qui
+       * parle de compression. C'était exactement le symptôme sur `.mp4` en 1080p.
+       *
+       * Un canvas coûte un aller-retour par image ; il a le mérite décisif de produire la
+       * taille demandée partout, et le chemin sans réduction (juste au-dessus) ne le paie
+       * jamais.
        *
        * `close()` sur les deux, et sans faute : les `VideoFrame` tiennent de la mémoire
        * GPU que le ramasse-miettes ne libère pas à temps — une seule oubliée par image
        * suffit à faire tomber l'onglet sur une vidéo un peu longue.
        */
-      const reduite = new VideoFrame(image, {
-        visibleRect: { x: 0, y: 0, width: source.largeur, height: source.hauteur },
-        displayWidth: largeur,
-        displayHeight: hauteur,
-      });
+      const horodatage = image.timestamp;
+      const duree = image.duration ?? undefined;
+      pinceau.drawImage(image, 0, 0, largeur, hauteur);
       image.close();
+      const reduite = new VideoFrame(toile, { timestamp: horodatage, duration: duree });
       encodeur.encode(reduite, { keyFrame: cle });
       reduite.close();
     },

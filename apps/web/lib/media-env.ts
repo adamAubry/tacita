@@ -82,6 +82,133 @@ async function dessiner(source: ImageBitmap, maxEdge: number, mimeType: string, 
   return { blob: await canvas.convertToBlob({ type: "image/jpeg", quality }), width, height };
 }
 
+const fini = (valeur: number): boolean => Number.isFinite(valeur) && valeur > 0;
+
+/**
+ * **Aucune attente d'événement média n'est laissée sans issue.** Un `<video>` qui ne peut
+ * pas décoder n'émet ni `loadeddata` ni toujours `error` — et un `seeked` qui n'arrive
+ * jamais laissait la promesse ouverte pour de bon : l'envoi restait « en cours » sans fin
+ * et sans message, ce qui est le pire des états. Dix secondes est large pour une
+ * ouverture locale, et fini.
+ */
+function evenement(cible: HTMLVideoElement, nom: string, delaiMs = 10_000): Promise<void> {
+  return new Promise((resoudre, rejeter) => {
+    const minuteur = setTimeout(() => {
+      fin();
+      rejeter(new Error(`vidéo : ${nom} n'est jamais venu`));
+    }, delaiMs);
+    const fin = () => {
+      clearTimeout(minuteur);
+      cible.removeEventListener(nom, ok);
+      cible.removeEventListener("error", ko);
+    };
+    const ok = () => {
+      fin();
+      resoudre();
+    };
+    const ko = () => {
+      fin();
+      rejeter(new Error("vidéo illisible par ce navigateur"));
+    };
+    cible.addEventListener(nom, ok, { once: true });
+    cible.addEventListener("error", ko, { once: true });
+  });
+}
+
+/**
+ * Un `<video>` hors document, chargé jusqu'à sa première image, et de quoi le relâcher.
+ *
+ * `playsInline` et `muted` ne sont pas cosmétiques : sans eux, iOS refuse de décoder un
+ * média qui n'est pas dans le document et l'élément reste vide — ce qui se voyait comme
+ * une vignette manquante, jamais comme une cause.
+ */
+async function ouvrirVideo(blob: Blob): Promise<{ video: HTMLVideoElement; liberer: () => void }> {
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  const url = URL.createObjectURL(blob);
+  video.src = url;
+  const liberer = () => {
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(url);
+  };
+
+  try {
+    await evenement(video, "loadeddata");
+    return { video, liberer };
+  } catch (cause) {
+    liberer();
+    throw cause;
+  }
+}
+
+/** Se place sur une image donnée, sans jamais rester suspendu si `seeked` n'arrive pas. */
+async function chercher(video: HTMLVideoElement, seconde: number): Promise<void> {
+  if (!(seconde > 0)) return;
+  video.currentTime = seconde;
+  // Un `seeked` qui n'arrive pas n'est pas un échec : l'image déjà chargée fera l'affaire.
+  await evenement(video, "seeked", 3_000).catch(() => {});
+}
+
+/**
+ * REQ-MED-04 — **ce que la source mesure, quand on n'a pas pu la transcoder.**
+ *
+ * Le `<video>` du navigateur lit beaucoup plus large que `VideoDecoder` : il ouvre les
+ * conteneurs que le démuxeur ne connaît pas (WebM, Matroska) et les codecs que WebCodecs
+ * refuse. Ce qu'il en dit — dimensions affichées, durée — suffit à décrire honnêtement le
+ * fichier dans l'événement.
+ */
+async function mesurerVideo(blob: Blob): Promise<{ width: number; height: number; durationMs: number }> {
+  const { video, liberer } = await ouvrirVideo(blob);
+  try {
+    if (!video.videoWidth || !video.videoHeight) throw new Error("vidéo sans dimensions lisibles");
+    return {
+      width: video.videoWidth,
+      height: video.videoHeight,
+      durationMs: fini(video.duration) ? Math.round(video.duration * 1000) : 0,
+    };
+  } finally {
+    liberer();
+  }
+}
+
+/**
+ * REQ-MED-04 — démuxage par le paquet, décodage et réencodage par `WebCodecs`,
+ * empaquetage par le muxeur du paquet (E-10). Le shard n'écrit aucun format.
+ *
+ * **Dans un worker**, comme la spec 08 l'exige depuis l'origine : un transcodage tient le
+ * processeur pendant des secondes, et sur le thread de rendu c'est la timeline qui se
+ * fige. Un worker par transcodage, terminé aussitôt après — pas de pool à tenir pour une
+ * opération que l'utilisateur déclenche une fois de temps en temps.
+ */
+function viaWorker(
+  blob: Blob,
+  cibles: Parameters<MediaEnvironment["transcodeVideo"]>[1],
+): Promise<Raster & { durationMs: number; sansSon?: boolean }> {
+  return new Promise((resoudre, rejeter) => {
+    const worker = new Worker(new URL("./transcode-worker.ts", import.meta.url));
+    worker.onmessage = ({ data }: MessageEvent<ReponseTranscodage>) => {
+      worker.terminate();
+      if (data.ok)
+        resoudre({
+          blob: data.blob,
+          width: data.width,
+          height: data.height,
+          durationMs: data.durationMs,
+          sansSon: data.sansSon,
+        });
+      else rejeter(new TranscodageIndisponible("video", data.message, data.motif));
+    };
+    worker.onerror = () => {
+      worker.terminate();
+      rejeter(new TranscodageIndisponible("video"));
+    };
+    worker.postMessage({ blob, cibles } satisfies DemandeTranscodage);
+  });
+}
+
 /**
  * La partie du `MediaEnvironment` que le navigateur couvre nativement : compression
  * d'image, poster de vidéo, décodage audio, sauvegarde locale, profil réseau.
@@ -108,25 +235,16 @@ export function environnementMedia(options: { signaler?: MediaEnvironment["signa
      * de téléphone est très souvent noire, et une vignette noire n'aide personne.
      */
     async extractPoster(blob) {
-      const video = document.createElement("video");
-      video.muted = true;
-      video.src = URL.createObjectURL(blob);
-
+      const { video, liberer } = await ouvrirVideo(blob);
       try {
-        await new Promise<void>((resolve, reject) => {
-          video.onloadeddata = () => resolve();
-          video.onerror = () => reject(new Error("vidéo illisible : aucune vignette"));
-        });
-        video.currentTime = Math.min(0.1, video.duration || 0);
-        await new Promise<void>((resolve) => {
-          video.onseeked = () => resolve();
-        });
+        await chercher(video, Math.min(0.1, (fini(video.duration) ? video.duration : 0) / 2));
+        if (!video.videoWidth || !video.videoHeight) throw new Error("vidéo sans image : aucune vignette");
 
         const canvas = new OffscreenCanvas(video.videoWidth, video.videoHeight);
         canvas.getContext("2d")?.drawImage(video, 0, 0);
         return await canvas.convertToBlob({ type: "image/jpeg", quality: 0.7 });
       } finally {
-        URL.revokeObjectURL(video.src);
+        liberer();
       }
     },
 
@@ -142,34 +260,36 @@ export function environnementMedia(options: { signaler?: MediaEnvironment["signa
       }
     },
 
-    // REQ-MED-04 — démuxage par le paquet, décodage et réencodage par `WebCodecs`,
-    // empaquetage par le muxeur du paquet (E-10). Le shard n'écrit aucun format.
-    //
-    // **Dans un worker**, comme la spec 08 l'exige depuis l'origine : un transcodage tient
-    // le processeur pendant des secondes, et sur le thread de rendu c'est la timeline qui
-    // se fige. Un worker par transcodage, terminé aussitôt après — pas de pool à tenir
-    // pour une opération que l'utilisateur déclenche une fois de temps en temps.
-    transcodeVideo: (blob, cibles) =>
-      new Promise((resoudre, rejeter) => {
-        const worker = new Worker(new URL("./transcode-worker.ts", import.meta.url));
-        worker.onmessage = ({ data }: MessageEvent<ReponseTranscodage>) => {
-          worker.terminate();
-          if (data.ok)
-            resoudre({
-              blob: data.blob,
-              width: data.width,
-              height: data.height,
-              durationMs: data.durationMs,
-              sansSon: data.sansSon,
-            });
-          else rejeter(new TranscodageIndisponible("video", data.message, data.motif));
-        };
-        worker.onerror = () => {
-          worker.terminate();
-          rejeter(new TranscodageIndisponible("video"));
-        };
-        worker.postMessage({ blob, cibles } satisfies DemandeTranscodage);
-      }),
+    async transcodeVideo(blob, cibles) {
+      try {
+        return await viaWorker(blob, cibles);
+      } catch (cause) {
+        /*
+         * REQ-MED-04 / interdit n°13 — **le dernier recours : la source telle quelle.**
+         *
+         * Trois familles de sources échouent au chemin nominal, et aucune n'est
+         * marginale : les conteneurs que le démuxeur ne connaît pas (WebM et Matroska,
+         * soit tout ce qu'un navigateur enregistre lui-même), les codecs que `VideoDecoder`
+         * refuse là où l'appareil sait pourtant les lire (HEVC hors Safari), et les
+         * navigateurs sans encodeur H.264 (Firefox, selon la version). Refuser l'envoi
+         * dans ces trois cas, c'était refuser une vidéo parfaitement lisible chez le
+         * destinataire — le contraire de ce que la compression est censée apporter.
+         *
+         * La condition tient en une phrase : **si le navigateur sait l'ouvrir, il sait
+         * en donner les dimensions**, et le destinataire saura la lire aussi. S'il ne
+         * sait pas l'ouvrir, l'échec est réel et l'erreur d'origine remonte, avec son
+         * motif et donc sa phrase.
+         *
+         * Ce qui est perdu est dit, pas masqué : le fichier part **non compressé**, il
+         * peut donc être gros, et `refusePourTaille` reste le garde-fou côté serveur.
+         */
+        const mesure = await mesurerVideo(blob).catch(() => undefined);
+        if (!mesure) throw cause;
+
+        options.signaler?.("video-non-compressee");
+        return { blob, ...mesure };
+      }
+    },
 
     transcodeAudio() {
       return Promise.reject(new TranscodageIndisponible("audio"));

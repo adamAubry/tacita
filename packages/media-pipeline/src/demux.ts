@@ -86,8 +86,23 @@ export function rotationDeMatrice(matrice: Matrix | undefined): Rotation {
   return 0;
 }
 
-/** La boîte de configuration d'une piste, écrite telle quelle par mp4box. */
-function boiteDe(fichier: ISOFile, pisteId: number, noms: string[], entete: boolean): Bytes {
+/**
+ * La boîte de configuration d'une piste, écrite telle quelle par mp4box — ou `undefined`
+ * quand la piste n'en porte aucune des formes demandées.
+ *
+ * **`undefined` et non une exception, et c'est le correctif du 21/08/2026.** Une piste
+ * audio sans `esds` — du PCM `sowt`, ce qu'écrivent les enregistrements d'écran et les
+ * vieux iPhone — faisait lever ici, et l'exception emportait **toute la vidéo** : le
+ * fichier ne partait pas, alors que sa piste image était parfaitement lisible. Le manque
+ * d'une piste facultative est une information, pas une panne ; c'est l'appelant qui sait
+ * laquelle des deux il tient.
+ */
+function boiteDe(
+  fichier: ISOFile,
+  pisteId: number,
+  noms: string[],
+  entete: boolean,
+): Bytes | undefined {
   const piste = fichier.getTrackById(pisteId);
   /*
    * La boîte de configuration porte un nom par codec — `avcC`, `hvcC`, `vpcC`, `av1C` —
@@ -96,13 +111,18 @@ function boiteDe(fichier: ISOFile, pisteId: number, noms: string[], entete: bool
    * cherche exactement une boîte sachant s'écrire dans un flux, et rien d'autre.
    */
   type Configuration = { write(flux: DataStream): void };
-  const entrees = (piste?.mdia?.minf?.stbl?.stsd?.entries ?? []) as unknown as Record<
-    string,
-    Configuration | undefined
-  >[];
+  type Entree = Record<string, Configuration | undefined>;
+  const entrees = (piste?.mdia?.minf?.stbl?.stsd?.entries ?? []) as unknown as Entree[];
 
   for (const entree of entrees) {
-    const config = noms.map((nom) => entree[nom]).find(Boolean);
+    /*
+     * **QuickTime range `esds` un étage plus bas, dans un atome `wave`.** C'est la forme
+     * qu'écrit tout `.mov` — donc toute vidéo d'iPhone —, et ne chercher qu'à la racine
+     * de l'entrée `mp4a` ne la trouvait jamais. Le MP4 « pur » (Android, caméras, export
+     * ffmpeg) la pose à la racine : les deux endroits existent, on regarde les deux.
+     */
+    const wave = entree.wave as unknown as Entree | undefined;
+    const config = noms.map((nom) => entree[nom] ?? wave?.[nom]).find(Boolean);
     if (!config) continue;
     const flux = new DataStream(undefined, 0, Endianness.BIG_ENDIAN);
     config.write(flux);
@@ -110,7 +130,28 @@ function boiteDe(fichier: ISOFile, pisteId: number, noms: string[], entete: bool
     // la boîte `esds` **entière**, en-tête compris, parce qu'elle est recopiée telle quelle.
     return new Uint8Array(entete ? flux.buffer : flux.buffer.slice(8)) as Bytes;
   }
-  throw new Error(`piste sans description de codec (${noms.join(", ")}) : source illisible`);
+  return undefined;
+}
+
+/**
+ * Les pistes sonores de la source, **lues au `hdlr`** et non au classement de mp4box.
+ *
+ * mp4box range une piste par le codec qu'il reconnaît : une piste `sowt` — du PCM, ce
+ * qu'écrivent les enregistrements d'écran et les vieux `.mov` — atterrit dans
+ * `otherTracks`, avec le type « metadata ». Elle disparaissait donc deux fois : le son
+ * partait sans que personne ne le dise (interdit n°13), et le chemin rapide la comptait
+ * pour une piste de timecode, donc remuxait en la perdant.
+ *
+ * Le `hdlr` est le seul endroit du format qui dise « ceci est du son », indépendamment du
+ * codec. C'est lui qu'on lit.
+ */
+function pistesSonores(fichier: ISOFile, info: { tracks?: { id: number }[] }): number[] {
+  return (info.tracks ?? [])
+    .filter((piste) => {
+      const hdlr = fichier.getTrackById(piste.id)?.mdia?.hdlr as { handler?: string } | undefined;
+      return hdlr?.handler === "soun";
+    })
+    .map((piste) => piste.id);
 }
 
 /**
@@ -135,10 +176,30 @@ export async function lireMp4(octets: Bytes): Promise<SourceVideo> {
         return;
       }
 
-      // REQ-MED-13 — la piste audio n'est reprise que si elle est **de l'AAC** : le
-      // muxeur recopie une piste, il n'en convertit aucune (voir `SourceVideo.audio`).
-      const pisteAudio = info.audioTracks?.[0];
-      const audioReprise = pisteAudio?.codec.startsWith("mp4a") === true;
+      /*
+       * REQ-MED-04 — **la description du codec vidéo est la seule qui soit obligatoire.**
+       * Sans elle rien ne se décode ni ne se remuxe ; on refuse ici, avec le mot juste.
+       */
+      const description = boiteDe(fichier, piste.id, ["avcC", "hvcC", "vpcC", "av1C"], false);
+      if (!description) {
+        reject(new Error("piste vidéo sans description de codec : source illisible"));
+        return;
+      }
+
+      /*
+       * REQ-MED-13 — la piste audio n'est reprise que si elle est **de l'AAC** et qu'elle
+       * porte son `esds` : le muxeur recopie une piste, il n'en convertit aucune (voir
+       * `SourceVideo.audio`). Le PCM d'un `.mov` d'enregistrement d'écran, ou une piste
+       * dont la description manque, tombent tous deux du même côté — la vidéo part muette
+       * et l'UI le dit, au lieu de ne pas partir du tout.
+       */
+      const sonores = pistesSonores(fichier, info);
+      const pisteAudio = info.audioTracks?.find((candidate) => sonores.includes(candidate.id));
+      const esds =
+        pisteAudio?.codec.startsWith("mp4a") === true
+          ? boiteDe(fichier, pisteAudio.id, ["esds"], true)
+          : undefined;
+      const audioReprise = esds !== undefined;
 
       const echantillons: EchantillonVideo[] = [];
       const echantillonsAudio: PisteAudio["echantillons"] = [];
@@ -173,27 +234,44 @@ export async function lireMp4(octets: Bytes): Promise<SourceVideo> {
 
       resolve({
         codec: piste.codec,
-        largeur: piste.track_width || piste.video?.width || 0,
-        hauteur: piste.track_height || piste.video?.height || 0,
+        /*
+         * **Les dimensions codées, pas celles du `tkhd`.** C'est l'entrée `stsd` qui dit
+         * ce que le flux contient réellement, et c'est cela que `VideoDecoder` exige dans
+         * `codedWidth`/`codedHeight` : le `tkhd` porte la taille d'**affichage**, qui en
+         * diffère dès qu'un `pasp` décrit des pixels non carrés. Configurer le décodeur
+         * sur la seconde, c'est le configurer sur une taille que le flux n'a pas.
+         */
+        largeur: piste.video?.width || piste.track_width || 0,
+        hauteur: piste.video?.height || piste.track_height || 0,
         rotation: rotationDeMatrice(piste.matrix),
         dureeMs,
         // Le débit **mesuré**, pas celui que le conteneur annonce : un champ d'en-tête se
         // recopie d'un transcodage à l'autre et ne décrit plus rien.
         debitBps: dureeMs > 0 ? Math.round((octetsUtiles * 8) / (dureeMs / 1000)) : 0,
-        description: boiteDe(fichier, piste.id, ["avcC", "hvcC", "vpcC", "av1C"], false),
+        description,
         echantillons,
-        pistes: info.tracks?.length ?? 1,
+        /*
+         * **Les pistes qui portent du signal, pas toutes les pistes.** Un iPhone écrit
+         * systématiquement une piste de métadonnées (`mebx`) à côté de l'image et du son :
+         * comptée, elle poussait `pistes` à trois et faisait échouer le prédicat du chemin
+         * rapide sur **toutes** les vidéos d'iPhone, qui se réencodaient donc sans raison.
+         * Ce que le prédicat veut savoir est « y a-t-il plus d'une image ou plus d'un
+         * son ? » — une piste de timecode ne se perd pas, elle ne contient rien à perdre.
+         */
+        pistes: (info.videoTracks?.length ?? 1) + sonores.length,
         audio:
-          pisteAudio && audioReprise && echantillonsAudio.length > 0
+          pisteAudio && esds && echantillonsAudio.length > 0
             ? {
-                esds: boiteDe(fichier, pisteAudio.id, ["esds"], true),
+                esds,
                 timescale: pisteAudio.timescale,
                 frequence: pisteAudio.audio?.sample_rate ?? pisteAudio.timescale,
                 canaux: pisteAudio.audio?.channel_count ?? 2,
                 echantillons: echantillonsAudio,
               }
             : undefined,
-        audioAbandonne: pisteAudio !== undefined && !audioReprise,
+        // REQ-MED-13 — « il y avait du son et il ne part pas », quel qu'ait été son codec :
+        // c'est le `hdlr` qui l'atteste, pas le fait que mp4box ait su nommer le codec.
+        audioAbandonne: sonores.length > 0 && !audioReprise,
       });
     };
 
