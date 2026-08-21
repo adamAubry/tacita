@@ -120,6 +120,12 @@ function makeClient(crypto: CryptoMock) {
         `https://tacita.test/_matrix/client/v3/auth/${loginType}/fallback/web?session=${sessionId}`,
     ),
     getRoom: vi.fn((_roomId: string): unknown => null),
+    /**
+     * REQ-COR-13 — la pagination arrière du SDK. Elle rend le salon, et c'est
+     * `oldState.paginationToken` — mis à `null` par le SDK quand il n'y a plus rien en
+     * amont — qui dit si l'historique est épuisé.
+     */
+    scrollback: vi.fn(async (room: unknown, _limit?: number) => room),
     logout: vi.fn(async (_stop?: boolean) => ({})),
     clearStores: vi.fn(async () => {}),
   };
@@ -143,7 +149,14 @@ export function fakeEvent(id: string, originServerTs: number) {
   };
 }
 
-/** Une `Room` réduite à `getLiveTimeline().getEvents()`. */
-export function fakeRoom(events: unknown[]) {
-  return { getLiveTimeline: () => ({ getEvents: () => events }) };
+/**
+ * Une `Room` réduite à ce que le module en lit : sa timeline vive, et le jeton de
+ * pagination de son ancien état (REQ-COR-13). Un jeton présent = il reste de l'historique
+ * en amont ; `null` = début du salon.
+ */
+export function fakeRoom(events: unknown[], paginationToken: string | null = "t42") {
+  return {
+    getLiveTimeline: () => ({ getEvents: () => events }),
+    oldState: { paginationToken },
+  };
 }

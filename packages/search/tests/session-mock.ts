@@ -100,7 +100,17 @@ export function fakeSession() {
   const listeners = new Map<string, ((event: MatrixEvent) => void)[]>();
   const listenersOf = (name: string) => listeners.get(name) ?? listeners.set(name, []).get(name)!;
 
+  /**
+   * REQ-SRC-01 — ce que le client tient déjà quand le proxy se branche. Vide par défaut :
+   * les tests qui parlent de l'amorçage le disent, les autres ne doivent pas voir un
+   * index se peupler tout seul.
+   */
+  let timelines: MatrixEvent[][] = [];
+
   const client = {
+    getRooms: vi.fn(() =>
+      timelines.map((events) => ({ getLiveTimeline: () => ({ getEvents: () => events }) })),
+    ),
     on: vi.fn((event: string, listener: (event: MatrixEvent) => void) => {
       listenersOf(event).push(listener);
     }),
@@ -129,6 +139,10 @@ export function fakeSession() {
   return {
     session: asSession(session),
     client,
+    /** À appeler **avant** `createSearch` : l'amorçage a lieu au branchement. */
+    chargerTimelines(...salons: MatrixEvent[][]) {
+      timelines = salons;
+    },
     emitDecrypted(event: MatrixEvent) {
       for (const listener of [...listenersOf(MatrixEventEvent.Decrypted)]) listener(event);
     },

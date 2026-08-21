@@ -17,6 +17,7 @@ Les trois états de la variation search + l'onglet Mentions. 100 % local (spec 0
 ## Contraintes
 
 - Aucun appel réseau déclenché par la recherche (REQ-SRC-03) — testé par spy.
+- **L'index n'appartient pas à cet écran.** `createSearch` est monté au-dessus des routes, avec la session (REQ-UI-16, même place que la file d'envoi) ; l'écran le consomme et ne le crée pas. Le créer ici le branchait sur les seuls déchiffrements survenus pendant que l'onglet était affiché — un index vide par construction. *(Ajoutée le 21/08/2026.)*
 - La navigation vers un message hors historique chargé charge la timeline locale, jamais le serveur.
 
 ## Hors scope

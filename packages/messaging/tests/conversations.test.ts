@@ -73,6 +73,7 @@ function fakeClient(salons: SalonFictif[], directs: Record<string, string[]> = {
           ({ texte, ts }) =>
             ({ ...fakeEvent("$e", { body: texte }, ADAM), getTs: () => ts }) as unknown as MatrixEvent,
         ),
+      paginate: async () => false,
     }),
   } as unknown as { client: unknown } & Partial<Omit<Session, "client">>);
 

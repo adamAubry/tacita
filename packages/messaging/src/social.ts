@@ -159,6 +159,42 @@ export async function updateProfile(
 }
 
 /**
+ * REQ-MSG-19 — le domaine de son propre identifiant, c'est-à-dire **le seul domaine du
+ * déploiement** : la fédération est désactivée (REQ-INF-02, `federation_domain_whitelist:
+ * []`), donc tout compte joignable vit ici. C'est ce qui autorise à compléter un
+ * identifiant partiel sans jamais se tromper de serveur.
+ */
+const domaineLocal = (session: Session): string | undefined =>
+  session.client.getUserId()?.split(":")[1];
+
+/**
+ * REQ-MSG-19 — la forme complète d'un identifiant Matrix, `@localpart:domaine`.
+ *
+ * La grammaire du localpart est celle de la spec (`a-z0-9._=/+-`) ; on ne l'élargit pas,
+ * une saisie qui n'y entre pas n'est pas un identifiant et part à l'annuaire telle quelle.
+ */
+const IDENTIFIANT_COMPLET = /^@[a-z0-9._=/+-]+:[^:\s]+$/;
+const LOCALPART_SEUL = /^@?[a-z0-9._=/+-]+$/;
+
+/**
+ * REQ-MSG-19 — **la forme canonique de ce que l'utilisateur a tapé**, quand c'en est une.
+ *
+ * `@adam:chat.example.org`, `@adam` et `adam` désignent la même personne sur un
+ * déploiement sans fédération, et l'utilisateur ne devrait pas avoir à écrire les deux
+ * tiers d'une adresse qu'il ne choisit pas. Rend `undefined` quand la saisie n'a pas la
+ * forme d'un identifiant — un nom d'affichage, un prénom avec une majuscule, une phrase.
+ *
+ * Exporté pour être éprouvé seul : c'est une fonction pure, et c'est elle qui décide si
+ * un aller-retour de profil part.
+ */
+export function identifiantComplet(terme: string, domaine: string | undefined): string | undefined {
+  const saisie = terme.trim();
+  if (IDENTIFIANT_COMPLET.test(saisie)) return saisie;
+  if (!domaine || !LOCALPART_SEUL.test(saisie)) return undefined;
+  return `@${saisie.replace(/^@/, "")}:${domaine}`;
+}
+
+/**
  * REQ-MSG-19 — recherche d'utilisateur dans l'**annuaire** du homeserver.
  *
  * À ne pas confondre avec la recherche de contenu : l'annuaire porte des identifiants et
@@ -193,17 +229,59 @@ export async function searchUsers(
    * côté infra) : cela exposerait chaque compte à tout autre. Quand on connaît déjà
    * l'identifiant, on n'a pas besoin d'un annuaire — on a une adresse.
    */
-  if (/^@[^:\s]+:[^:\s]+$/.test(recherche)) {
-    const profil = await profileOf(session, recherche);
-    // Un identifiant inexistant rend un profil de repli portant l'identifiant lui-même
-    // (REQ-MSG-18) : on ne propose que ce que le serveur a vraiment reconnu.
-    return profil.displayName === recherche ? [] : [profil];
-  }
+  /*
+   * **Le domaine ne se tape plus.** La rédaction précédente n'empruntait le chemin du
+   * profil que sur un identifiant *complet* : taper « adam » n'interrogeait que
+   * l'annuaire, qui ne rend rien sur ce déploiement (voir ci-dessus), et il fallait donc
+   * écrire `@adam:chat.example.org` en entier pour trouver qui que ce soit. Signalé par
+   * les utilisateurs, et c'est bien ce que le code faisait.
+   *
+   * Le domaine étant unique (fédération désactivée, REQ-INF-02), le compléter n'invente
+   * rien : `@adam` ne peut désigner personne d'autre que `@adam:<notre serveur>`.
+   */
+  const complet = identifiantComplet(recherche, domaineLocal(session));
 
-  const reponse = await session.client.searchUserDirectory({ term: recherche, limit: limite });
-  return reponse.results.map((resultat) => ({
-    userId: resultat.user_id,
-    displayName: resultat.display_name ?? resultat.user_id,
-    avatarUrl: resultat.avatar_url,
-  }));
+  // Une adresse entière ne doit rien à l'annuaire : il ne la connaît pas mieux que le
+  // profil, et l'interroger coûterait une requête par frappe pour rien.
+  if (complet === recherche) return rendus(await profileOf(session, complet), []);
+
+  /*
+   * Sinon les deux chemins partent **ensemble** : l'annuaire trouve par nom d'affichage
+   * les gens avec qui on partage déjà un salon, le profil trouve par identifiant exact
+   * ceux avec qui on n'en partage aucun. Aucun des deux ne remplace l'autre, et attendre
+   * le premier pour décider s'il faut lancer le second doublerait la latence de frappe.
+   *
+   * L'annuaire peut être refusé par le serveur : son échec ne doit pas emporter le
+   * résultat du profil, d'où le repli sur une liste vide plutôt qu'un rejet.
+   */
+  const [profil, annuaire] = await Promise.all([
+    complet ? profileOf(session, complet) : undefined,
+    session.client.searchUserDirectory({ term: recherche, limit: limite }).catch(() => ({
+      results: [] as { user_id: string; display_name?: string; avatar_url?: string }[],
+    })),
+  ]);
+
+  return rendus(
+    profil,
+    annuaire.results.map((resultat) => ({
+      userId: resultat.user_id,
+      displayName: resultat.display_name ?? resultat.user_id,
+      avatarUrl: resultat.avatar_url,
+    })),
+  );
+}
+
+/**
+ * REQ-MSG-19 — le profil résolu en tête, puis l'annuaire, sans doublon.
+ *
+ * Un identifiant inexistant rend un profil de repli portant l'identifiant lui-même
+ * (REQ-MSG-18) : le proposer ferait « trouver » n'importe quelle saisie, donc on ne
+ * garde que ce que le serveur a vraiment reconnu.
+ */
+function rendus(profil: Profile | undefined, annuaire: Profile[]): Profile[] {
+  const reconnu =
+    profil !== undefined &&
+    profil.displayName !== profil.userId &&
+    !annuaire.some((resultat) => resultat.userId === profil.userId);
+  return reconnu ? [profil, ...annuaire] : annuaire;
 }

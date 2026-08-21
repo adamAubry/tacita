@@ -107,15 +107,17 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
       )}
 
       <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
+        {/* REQ-MSG-19 / REQ-UIX-42 — le domaine ne se tape plus : il est le même pour
+            tout le monde, et `identifiantComplet` le remet. */}
         <TextInput
           label="Ajouter par identifiant"
           value={terme}
           onChange={setTerme}
-          placeholder="@quelquun:tacita.test"
+          placeholder="@quelquun"
         />
         <Text type="supporting" color="secondary">
-          Recherche dans l&apos;annuaire du serveur. Seuls les comptes qui s&apos;y sont rendus
-          visibles y apparaissent.
+          Un identifiant exact suffit — sans le domaine. Les noms d&apos;affichage ne sont
+          trouvés que pour les personnes avec qui vous partagez déjà une conversation.
         </Text>
       </div>
 
@@ -134,7 +136,7 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
       {!chargement && resultats !== null && resultats.length === 0 && (
         <Placeholder
           titre="Personne à ce nom"
-          explication="Vérifiez l'identifiant complet, ou partagez plutôt un lien d'invitation."
+          explication="Vérifiez l'orthographe de l'identifiant, ou partagez plutôt un lien d'invitation."
         />
       )}
 

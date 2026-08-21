@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { identifiantCourt } from "../../lib/identifiants";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { useImageMxc } from "../foundation/useImageMxc";
 import { Badge, Button, Icon, Text } from "../foundation/primitives";
@@ -347,9 +348,11 @@ export function ProfileCard({
         <Text type="display-2" weight="bold">
           {nom}
         </Text>
+        {/* REQ-UIX-42 — l'identifiant, sans le domaine : il est le même pour tout le
+            monde (fédération désactivée) et n'apprend rien à personne. */}
         {userId && (
           <Text type="supporting" color="secondary">
-            {userId}
+            {identifiantCourt(userId)}
           </Text>
         )}
       </div>

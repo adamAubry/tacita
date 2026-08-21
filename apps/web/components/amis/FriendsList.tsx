@@ -3,6 +3,7 @@
 import type { Profile } from "@tacita/messaging";
 
 import type { Demande } from "../../lib/contacts";
+import { identifiantCourt } from "../../lib/identifiants";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Button, ClickableCard, Text } from "../foundation/primitives";
 
@@ -36,8 +37,9 @@ export function Suggestions({ profils, onOuvrirProfil }: SuggestionsProps) {
                 <Text type="body" weight="bold" maxLines={1}>
                   {profil.displayName}
                 </Text>
+                {/* REQ-UIX-42 — sans le domaine : c'est le même pour tout le monde. */}
                 <Text type="supporting" color="secondary" maxLines={1}>
-                  {profil.userId}
+                  {identifiantCourt(profil.userId)}
                 </Text>
               </div>
             </div>
@@ -86,7 +88,7 @@ export function DemandesList({ demandes, onAccepter, onRefuser }: DemandesListPr
             </Text>
             {demande.userId && (
               <Text type="supporting" color="secondary" maxLines={1}>
-                {demande.userId}
+                {identifiantCourt(demande.userId)}
               </Text>
             )}
           </div>

@@ -5,6 +5,7 @@ import {
   conversations as listerConversations,
   createGroupChat,
   getPinnedEvents,
+  identifiantComplet,
   invite,
   memberCount,
   messages as listerMessages,
@@ -211,6 +212,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
 
         {panneau === "ajouter" && session && (
           <AjouterMembre
+            domaine={session.client.getUserId()?.split(":")[1]}
             onInviter={(userId) => {
               void invite(session, roomId, userId).then(() => {
                 setPanneau(undefined);
@@ -229,17 +231,29 @@ export function InfosConversation({ roomId }: { roomId: string }) {
  * Il **ne passe pas par le service de liens** (REQ-INV-16) — un service indisponible ne
  * doit jamais empêcher d'ajouter quelqu'un.
  */
-function AjouterMembre({ onInviter }: { onInviter: (userId: string) => void }) {
+function AjouterMembre({
+  domaine,
+  onInviter,
+}: {
+  /** REQ-MSG-19 — le domaine du déploiement, pour compléter une saisie sans domaine. */
+  domaine: string | undefined;
+  onInviter: (userId: string) => void;
+}) {
   const [identifiant, setIdentifiant] = useState("");
-  // La forme d'un identifiant Matrix, et rien de plus : le serveur reste seul juge de
-  // son existence. Une validation plus fine ici inventerait une règle qu'il n'a pas.
-  const plausible = /^@[^:\s]+:[^\s]+$/.test(identifiant.trim());
+  /*
+   * REQ-UIX-42 — **le domaine ne se tape plus.** `@adam` est une adresse complète ici
+   * (fédération désactivée, REQ-INF-02) ; l'exiger en entier faisait recopier à la main
+   * la partie que personne ne choisit. `identifiantComplet` rend la forme canonique, ou
+   * `undefined` quand la saisie n'est pas un identifiant — c'est notre seule validation.
+   * Le serveur reste seul juge de l'existence du compte.
+   */
+  const complet = identifiantComplet(identifiant, domaine);
 
   return (
     <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
       <TextInput
         label="Identifiant Matrix"
-        placeholder="@quelquun:tacita.test"
+        placeholder="@quelquun"
         value={identifiant}
         onChange={setIdentifiant}
       />
@@ -248,9 +262,9 @@ function AjouterMembre({ onInviter }: { onInviter: (userId: string) => void }) {
       </Text>
       <Button
         label="Inviter"
-        isDisabled={!plausible}
-        tooltip="Un identifiant Matrix ressemble à @quelquun:tacita.test."
-        onClick={() => onInviter(identifiant.trim())}
+        isDisabled={complet === undefined}
+        tooltip="Un identifiant ressemble à @quelquun ; le domaine est facultatif."
+        onClick={() => complet && onInviter(complet)}
       />
     </div>
   );

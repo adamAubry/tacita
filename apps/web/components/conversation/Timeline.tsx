@@ -2,7 +2,7 @@
 
 import type { ReactionTally } from "@tacita/messaging";
 import type { ReceiptStatus } from "@tacita/receipts";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Skeleton } from "../foundation/primitives";
 import { DateSeparator } from "./DateSeparator";
@@ -44,6 +44,14 @@ export interface TimelineProps {
    */
   ancre?: string;
   /**
+   * REQ-UI-21 — « remonte d'un cran dans l'historique ». Appelé quand le défilement
+   * approche du haut ; l'appelant décide s'il reste quelque chose à charger et cesse de
+   * répondre quand le salon est remonté jusqu'à son début.
+   *
+   * Absent, la timeline se comporte comme avant : elle n'affiche que ce qui est déjà là.
+   */
+  onRemonter?: () => void;
+  /**
    * REQ-UIX-35 — l'URL d'objet du fond d'écran choisi pour ce salon (M-H), quand il y
    * en a un. La timeline pose alors le voile de lisibilité (`scrim`), qui est ce qui
    * autorise à laisser l'utilisateur choisir n'importe quelle image.
@@ -78,12 +86,78 @@ export function Timeline({
   onOuvrirMedia,
   onSauvegarderMedia,
   ancre,
+  onRemonter,
   fondEcran,
 }: TimelineProps) {
   // REQ-UI-09 — l'état vit ici : le geste porte sur un message, la révélation porte sur
   // la colonne entière. C'est ce que fait Instagram, et c'est ce qu'on attend.
   const [heuresVisibles, setHeuresVisibles] = useState(false);
   const cible = useRef<HTMLDivElement>(null);
+  const zone = useRef<HTMLDivElement>(null);
+
+  /**
+   * REQ-UI-21 — la hauteur de la zone **avant** que des messages anciens s'insèrent en
+   * tête. Sans elle, l'insertion pousse tout le contenu vers le bas et le lecteur perd
+   * sa ligne : il repart en haut, ce qui redéclenche aussitôt une demande — une boucle,
+   * pas un chargement.
+   *
+   * `null` = aucune remontée en cours ; toute autre valeur est la hauteur à compenser.
+   */
+  const hauteurAvant = useRef<number | null>(null);
+
+  /*
+   * `useLayoutEffect` et non `useEffect` : la correction doit être appliquée **avant** que
+   * le navigateur peigne, sinon le saut est visible.
+   *
+   * La dépendance est la **tête** de la liste et non sa longueur : seule une insertion en
+   * tête déplace ce qu'on est en train de lire. Un message reçu par le bas allonge aussi
+   * la liste, et compenser là ferait descendre l'écran tout seul.
+   */
+  useLayoutEffect(() => {
+    const element = zone.current;
+    if (!element || hauteurAvant.current === null) return;
+    const delta = element.scrollHeight - hauteurAvant.current;
+    hauteurAvant.current = null;
+    if (delta > 0) element.scrollTop += delta;
+  }, [messages[0]?.cle]);
+
+  /**
+   * REQ-UI-06 — **une conversation s'ouvre sur son dernier message, et y reste tant qu'on
+   * n'est pas remonté.** Rien ne positionnait la zone : elle s'ouvrait donc à zéro, c'est
+   * à dire sur le message le plus ancien de la fenêtre chargée, et il fallait défiler
+   * jusqu'en bas pour lire ce qui venait d'arriver.
+   *
+   * Le drapeau part à `true` : le premier rendu **est** une arrivée en bas. Ensuite il
+   * suit le défilement, si bien qu'un message reçu pendant qu'on relit le passé ne
+   * ramène personne au bas de force.
+   */
+  const presDuBas = useRef(true);
+  /** La marge sous laquelle « en bas » veut encore dire en bas — une ligne ou deux. */
+  const SEUIL_BAS = 80;
+
+  useLayoutEffect(() => {
+    const element = zone.current;
+    if (!element || !presDuBas.current) return;
+    element.scrollTop = element.scrollHeight;
+  }, [messages.length]);
+
+  /** À quelle distance du haut on demande la suite. Une hauteur d'écran, environ. */
+  const SEUIL_REMONTEE = 400;
+
+  const surDefilement = () => {
+    const element = zone.current;
+    if (!element) return;
+    presDuBas.current =
+      element.scrollHeight - element.scrollTop - element.clientHeight <= SEUIL_BAS;
+
+    if (!onRemonter || element.scrollTop > SEUIL_REMONTEE) return;
+    // On mesure à chaque passage sous le seuil, et l'appelant se charge de ne pas
+    // relancer une requête déjà en vol. Se garder soi-même ici obligerait à savoir
+    // quand la remontée s'achève — y compris quand elle ne rend rien —, et une garde
+    // qui ne se relève pas dans ce cas-là fige l'historique pour de bon.
+    hauteurAvant.current = element.scrollHeight;
+    onRemonter();
+  };
 
   useEffect(() => {
     // `messages.length` en dépendance : l'ancre arrive souvent avant la timeline, et
@@ -91,6 +165,9 @@ export function Timeline({
     if (!ancre) return;
     // `scrollIntoView` manque à jsdom ; l'absence de défilement n'est pas une panne.
     cible.current?.scrollIntoView?.({ block: "center" });
+    // On vient d'un résultat de recherche : la lecture est ancrée là, pas en bas. Sans
+    // cette ligne, le message suivant reçu ramènerait au dernier message.
+    presDuBas.current = false;
   }, [ancre, messages.length]);
 
   if (chargement) {
@@ -122,6 +199,8 @@ export function Timeline({
       role="log"
       aria-label="Messages"
       aria-live="polite"
+      ref={zone}
+      onScroll={surDefilement}
       style={{
         // La timeline **est** la zone défilante de l'écran : c'est ce qui tient le
         // composer au bas de la fenêtre. `minHeight: 0` parce qu'un enfant de flex refuse

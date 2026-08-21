@@ -244,7 +244,7 @@ describe("REQ-UIX-28 — Add-friends : lien, annuaire débouncé, aucune suggest
     });
 
     const carte = screen.getByRole("button", { name: "mira" });
-    expect(within(carte.parentElement!).getByText("@mira:tacita.test")).toBeTruthy();
+    expect(within(carte.parentElement!).getByText("@mira")).toBeTruthy();
     // Ajouter se décide sur le profil, après l'avoir regardé.
     expect(screen.queryByRole("button", { name: "Ajouter" })).toBeNull();
 
@@ -408,7 +408,8 @@ describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", ()
     render(<ProfilMoi profil={MOI} onEnregistrer={vi.fn()} onPhoto={vi.fn()} />);
 
     expect(screen.getByText("adam")).toBeTruthy();
-    expect(screen.getByText("@adam:tacita.test")).toBeTruthy();
+    // REQ-UIX-42 — l'identifiant, sans son domaine : c'est le même pour tout le monde.
+    expect(screen.getByText("@adam")).toBeTruthy();
     // Pas de statut ami sur son propre profil : la question ne s'y pose pas.
     expect(screen.queryByText("Ami")).toBeNull();
   });
@@ -639,5 +640,64 @@ describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membr
     // `join` et non `new URL` : les crochets du segment dynamique de Next seraient
     // percent-encodés par l'URL, et le fichier deviendrait introuvable.
     expect(existsSync(join(import.meta.dirname, "../app/i/[token]/page.tsx"))).toBe(true);
+  });
+});
+
+describe("REQ-UIX-42 — l'identifiant s'affiche sans son domaine", () => {
+  const rendreAjouter = (props: Partial<Parameters<typeof AjouterAmis>[0]> = {}) => {
+    const actions = {
+      chercher: vi.fn().mockResolvedValue([]),
+      onPartagerLien: vi.fn().mockResolvedValue("copie" as const),
+      onOuvrirProfil: vi.fn(),
+      ...props,
+    };
+    render(<AjouterAmis {...actions} />);
+    return actions;
+  };
+
+  /**
+   * Retour utilisateur : « l'id `@adam:chat.example.org` est beaucoup trop long, il
+   * faudrait `@adam` uniquement ». La fédération étant désactivée (REQ-INF-02), le
+   * domaine est le même pour tout le monde : il occupe la place du nom sans rien
+   * apprendre. Ce que les callbacks reçoivent, en revanche, reste l'adresse entière.
+   */
+  it("la carte de profil montre `@adam`, pas l'adresse entière", () => {
+    render(<ProfilMoi profil={MOI} onEnregistrer={vi.fn()} onPhoto={vi.fn()} />);
+
+    expect(screen.getByText("@adam")).toBeTruthy();
+    expect(screen.queryByText(MOI.userId)).toBeNull();
+  });
+
+  it("un résultat de recherche d'amis aussi, et il ouvre le profil sur l'adresse entière", async () => {
+    const onOuvrirProfil = vi.fn();
+    const { chercher } = rendreAjouter({
+      chercher: vi.fn().mockResolvedValue([MIRA]),
+      onOuvrirProfil,
+    });
+
+    fireEvent.change(screen.getByLabelText("Ajouter par identifiant"), {
+      target: { value: "mira" },
+    });
+    await waitFor(() => expect(chercher).toHaveBeenCalled());
+    await screen.findByText("@mira");
+
+    fireEvent.click(screen.getByRole("button", { name: /mira/ }));
+    expect(onOuvrirProfil).toHaveBeenCalledWith(MIRA.userId);
+  });
+
+  it("une demande reçue montre l'identifiant court", () => {
+    const demande: Demande = { roomId: "!dm:t", userId: MIRA.userId, nom: "mira" };
+    render(<Demandes demandes={[demande]} onAccepter={vi.fn()} onRefuser={vi.fn()} onOuvrir={vi.fn()} />);
+
+    expect(screen.getByText("@mira")).toBeTruthy();
+    expect(screen.queryByText(MIRA.userId)).toBeNull();
+  });
+
+  it("le champ d'ajout n'exige plus le domaine", () => {
+    rendreAjouter();
+    const champ = screen.getByLabelText("Ajouter par identifiant") as HTMLInputElement;
+    // Un placeholder qui montre une adresse entière est une consigne : il faisait
+    // recopier le domaine à la main.
+    expect(champ.placeholder).not.toContain(":");
   });
 });

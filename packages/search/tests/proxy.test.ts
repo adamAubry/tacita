@@ -242,3 +242,55 @@ describe("REQ-SRC-08 — wipe enregistré au registre de la Session", () => {
     expect(ctx.client.off).toHaveBeenCalledWith(MatrixEventEvent.Decrypted, expect.any(Function));
   });
 });
+
+describe("REQ-SRC-01 — l'index s'amorce sur ce que le client tient déjà", () => {
+  /**
+   * L'écoute seule ne voit que les déchiffrements postérieurs au branchement. Sur une
+   * session rouverte, l'historique est relu depuis IndexedDB et déchiffré avant qu'on
+   * arrive : sans amorçage, la recherche ne trouve rien de ce que l'écran affiche.
+   */
+  it("indexe les timelines vives des salons au branchement", async () => {
+    const contexte = fakeSession();
+    contexte.chargerTimelines(
+      [matrixEvent("$vieux", ROOM, "on se voit à la réunion")],
+      [matrixEvent("$autre", "!groupe:tacita.test", "pizza ce soir")],
+    );
+
+    const canal = fakeWorker();
+    serve(canal.inside, createEngine({ indexedDB: new IDBFactory() }));
+    const amorce = createSearch(contexte.session, canal.outside);
+
+    expect((await amorce.search("réunion")).map((hit) => hit.eventId)).toEqual(["$vieux"]);
+    expect((await amorce.search("pizza")).map((hit) => hit.eventId)).toEqual(["$autre"]);
+    amorce.dispose();
+  });
+
+  it("n'indexe rien quand le client n'a encore aucun salon", async () => {
+    // Le cas d'une session neuve : aucun message posté au worker, donc aucun lot vide.
+    const contexte = fakeSession();
+    const canal = fakeWorker();
+    serve(canal.inside, createEngine({ indexedDB: new IDBFactory() }));
+    const amorce = createSearch(contexte.session, canal.outside);
+
+    expect(canal.posted).toEqual([]);
+    amorce.dispose();
+  });
+
+  it("réindexer un événement déjà connu ne le duplique pas", async () => {
+    // L'amorçage a lieu à chaque ouverture de session : il doit être sans effet la
+    // seconde fois, sans quoi il gonflerait l'index jusqu'au plafond D-01.
+    const evenement = matrixEvent("$vieux", ROOM, "on se voit à la réunion");
+    const contexte = fakeSession();
+    contexte.chargerTimelines([evenement]);
+
+    const canal = fakeWorker();
+    serve(canal.inside, createEngine({ indexedDB: new IDBFactory() }));
+    const amorce = createSearch(contexte.session, canal.outside);
+
+    contexte.emitDecrypted(evenement);
+    await new Promise((resolve) => setTimeout(resolve, BUFFER_MS + 10));
+
+    expect(await amorce.search("réunion")).toHaveLength(1);
+    amorce.dispose();
+  });
+});

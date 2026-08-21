@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   acceptInvitation,
   CHAMP_BANNIERE,
+  identifiantComplet,
   ignoredUsers,
   ignoreUser,
   leaveConversation,
@@ -156,6 +157,8 @@ describe("REQ-MSG-19 — annuaire du homeserver, jamais /search", () => {
         { user_id: "@sam:tacita.test" },
       ],
     });
+    // Aucun compte ne s'appelle littéralement « @mi » : seul l'annuaire répond ici.
+    client.getProfileInfo.mockRejectedValueOnce(new Error("M_NOT_FOUND"));
 
     await expect(searchUsers(session, "mi")).resolves.toEqual([
       { userId: MIRA, displayName: "mira", avatarUrl: "mxc://tacita.test/m" },
@@ -199,5 +202,64 @@ describe("REQ-MSG-19 — un identifiant complet se résout par son profil", () =
     const { session, client } = fakeSession();
     await searchUsers(session, "mira");
     expect(client.searchUserDirectory).toHaveBeenCalledWith({ term: "mira", limit: 20 });
+  });
+});
+
+describe("REQ-MSG-19 — le domaine ne se saisit pas", () => {
+  /**
+   * Retour utilisateur : « rechercher un utilisateur pour l'ajouter en ami requiert son
+   * identifiant complet ». C'était exact — seule une adresse entière empruntait le
+   * chemin du profil, et l'annuaire, seul chemin restant, ne rend rien sur ce
+   * déploiement (`search_all_users: false`).
+   */
+  it("complète un localpart avec le domaine du compte courant", async () => {
+    const { session, client } = fakeSession();
+    // Le compte courant du mock est `@luca:tacita.test` : c'est de lui que vient le
+    // domaine, jamais d'une constante recopiée.
+    await searchUsers(session, "mira");
+    expect(client.getProfileInfo).toHaveBeenCalledWith(MIRA);
+  });
+
+  it("accepte aussi bien `mira` que `@mira`", async () => {
+    const { session, client } = fakeSession();
+    await searchUsers(session, "@mira");
+    expect(client.getProfileInfo).toHaveBeenCalledWith(MIRA);
+  });
+
+  it("ne rend qu'une fois une personne que l'annuaire et le profil trouvent tous deux", async () => {
+    const { session } = fakeSession({ annuaire: [{ user_id: MIRA, display_name: "mira" }] });
+
+    await expect(searchUsers(session, "mira")).resolves.toEqual([
+      { userId: MIRA, displayName: "mira", avatarUrl: undefined },
+    ]);
+  });
+
+  it("rend le profil trouvé même quand l'annuaire est refusé par le serveur", async () => {
+    // L'annuaire peut être désactivé côté déploiement : son échec ne doit pas emporter
+    // le seul chemin qui fonctionne.
+    const { session, client } = fakeSession();
+    client.searchUserDirectory.mockRejectedValueOnce(new Error("M_FORBIDDEN"));
+
+    await expect(searchUsers(session, "mira")).resolves.toEqual([
+      { userId: MIRA, displayName: "luca", avatarUrl: undefined },
+    ]);
+  });
+
+  it("une saisie qui n'est pas un identifiant n'interroge aucun profil", async () => {
+    // Un nom d'affichage avec majuscule ou espace n'est pas un localpart : lui inventer
+    // un domaine ferait un aller-retour par frappe pour une adresse impossible.
+    const { session, client } = fakeSession();
+    await searchUsers(session, "Mira Dupont");
+    expect(client.getProfileInfo).not.toHaveBeenCalled();
+    expect(client.searchUserDirectory).toHaveBeenCalledWith({ term: "Mira Dupont", limit: 20 });
+  });
+
+  it("identifiantComplet est pur et rend la forme canonique, ou rien", () => {
+    expect(identifiantComplet("adam", "tacita.test")).toBe("@adam:tacita.test");
+    expect(identifiantComplet(" @adam ", "tacita.test")).toBe("@adam:tacita.test");
+    expect(identifiantComplet("@adam:autre.test", "tacita.test")).toBe("@adam:autre.test");
+    expect(identifiantComplet("Adam Dupont", "tacita.test")).toBeUndefined();
+    // Sans domaine connu — session sans identifiant —, on n'invente rien.
+    expect(identifiantComplet("adam", undefined)).toBeUndefined();
   });
 });

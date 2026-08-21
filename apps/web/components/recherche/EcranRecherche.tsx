@@ -5,13 +5,13 @@ import {
   subscribeConversations,
   type Conversation,
 } from "@tacita/messaging";
-import { createSearch, type Search } from "@tacita/search";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { contactsDeLaSession } from "../../lib/contacts";
 import { CHAMP_CONVERSATION } from "../../lib/recherche";
 import { useSession } from "../onboarding/SessionProvider";
+import { useRecherche } from "./RechercheProvider";
 import { Placeholder } from "../foundation/Placeholder";
 import { Recherche } from "./Recherche";
 import { routeConversation } from "../../lib/routes";
@@ -36,28 +36,15 @@ export function EcranRecherche({ variation }: { variation?: "search" | "mentions
    */
   const salonInitial = useSearchParams()?.get("salon") ?? undefined;
 
-  const [recherche, setRecherche] = useState<Search | null>(null);
+  /**
+   * L'index vient de la session (`RechercheProvider`), il n'est plus créé ici.
+   *
+   * Le créer à l'ouverture de l'onglet le branchait sur les déchiffrements **du seul
+   * temps où l'onglet était affiché** : il n'avait par construction rien à trouver.
+   * L'écran ne fait plus qu'interroger un index alimenté depuis l'ouverture de session.
+   */
+  const recherche = useRecherche();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-
-  useEffect(() => {
-    if (!session) return;
-    /**
-     * Le worker est construit ici et **fermé au démontage** : chacun porte une copie de
-     * l'index en mémoire, et en laisser un par visite d'onglet les accumulerait.
-     *
-     * `new URL(..., import.meta.url)` est la forme que les bundlers reconnaissent pour
-     * un worker ; le paquet ne connaît pas le nôtre et exige qu'on le lui fournisse.
-     */
-    const worker = new Worker(new URL("@tacita/search/worker", import.meta.url), {
-      type: "module",
-    });
-    const instance = createSearch(session, worker);
-    setRecherche(instance);
-    return () => {
-      instance.dispose();
-      setRecherche(null);
-    };
-  }, [session]);
 
   useEffect(() => {
     if (!session) return;

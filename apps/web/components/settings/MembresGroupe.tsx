@@ -4,6 +4,7 @@ import type { Session } from "@tacita/client-core";
 import { canKick, invite, kick, knockers, members, powerLevelOf } from "@tacita/messaging";
 import { useMemo, useState } from "react";
 
+import { identifiantCourt } from "../../lib/identifiants";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Button, List, ListItem, Text } from "../foundation/primitives";
 
@@ -53,10 +54,10 @@ export function MembresGroupe({ session, roomId }: MembresGroupeProps) {
             {attente.map((candidat) => (
               <ListItem
                 key={candidat.userId}
-                label={candidat.name || candidat.userId}
+                label={candidat.name || identifiantCourt(candidat.userId)}
                 description={candidat.userId}
                 startContent={
-                  <ConversationAvatar nom={candidat.name || candidat.userId} direct taille={36} />
+                  <ConversationAvatar nom={candidat.name || identifiantCourt(candidat.userId)} direct taille={36} />
                 }
                 endContent={
                   <Button
@@ -89,9 +90,9 @@ export function MembresGroupe({ session, roomId }: MembresGroupeProps) {
           return (
             <ListItem
               key={membre.userId}
-              label={membre.name || membre.userId}
+              label={membre.name || identifiantCourt(membre.userId)}
               description={niveau > 0 ? `${membre.userId} · niveau ${niveau}` : membre.userId}
-              startContent={<ConversationAvatar nom={membre.name || membre.userId} direct taille={36} />}
+              startContent={<ConversationAvatar nom={membre.name || identifiantCourt(membre.userId)} direct taille={36} />}
               endContent={
                 canKick(session, roomId, membre.userId) ? (
                   <Button

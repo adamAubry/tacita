@@ -1,10 +1,11 @@
 "use client";
 
-import { createSearch, type Search, type SearchStats } from "@tacita/search";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { SearchStats } from "@tacita/search";
+import { useCallback, useEffect, useState } from "react";
 
 import { tailleLisible } from "../media/media";
 import { useSession } from "../onboarding/SessionProvider";
+import { useRecherche } from "../recherche/RechercheProvider";
 import { Button, Text } from "../foundation/primitives";
 
 interface Mesure {
@@ -30,30 +31,22 @@ export function StockageLocal() {
   const { etat } = useSession();
   const session = etat.phase === "prete" ? etat.session : null;
 
-  const recherche = useRef<Search | null>(null);
+  // L'index est celui de la session (`RechercheProvider`) : cet écran le **mesure et le
+  // vide**, il n'en ouvre pas un second. Un moteur de plus sur la même base aurait donné
+  // deux chiffres pour un même stockage.
+  const recherche = useRecherche();
   const [mesure, setMesure] = useState<Mesure | null>(null);
 
   const relever = useCallback(async () => {
     const [index, estimation] = await Promise.all([
-      recherche.current?.stats().catch(() => null) ?? null,
+      recherche?.stats().catch(() => null) ?? null,
       navigator.storage?.estimate?.().catch(() => undefined),
     ]);
     setMesure({ index, octets: estimation?.usage });
-  }, []);
+  }, [recherche]);
 
   useEffect(() => {
-    if (!session) return;
-
-    // Le worker vit le temps de l'écran et est **terminé** au démontage : ouvrir les
-    // réglages ne doit pas laisser un moteur de plus branché sur la même base.
-    const worker = new Worker(new URL("../../lib/search-worker.ts", import.meta.url));
-    recherche.current = createSearch(session, worker);
-    void relever();
-
-    return () => {
-      recherche.current?.dispose();
-      recherche.current = null;
-    };
+    if (session) void relever();
   }, [session, relever]);
 
   return (
@@ -85,11 +78,11 @@ export function StockageLocal() {
       <Button
         label="Vider l'index de recherche"
         variant="secondary"
-        isDisabled={session === null}
+        isDisabled={recherche === null}
         onClick={() => {
           // La mesure est reprise après la purge : la relire est la seule confirmation
           // honnête qu'elle a eu lieu.
-          void recherche.current
+          void recherche
             ?.wipe()
             .catch(() => {})
             .then(relever);

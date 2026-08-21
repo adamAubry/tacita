@@ -14,6 +14,7 @@ import { ConnectionBannerLive } from "../components/foundation/ConnectionBanner"
 import { Theme, type ThemeMode } from "../components/foundation/primitives";
 import { tacitaTheme } from "../components/foundation/theme";
 import { PushNotifications } from "../components/notifications/PushNotifications";
+import { RechercheProvider } from "../components/recherche/RechercheProvider";
 import { RecoveryGate } from "../components/onboarding/RecoveryGate";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { HOMESERVER } from "../lib/config";
@@ -91,7 +92,13 @@ export function Providers({ children }: { children: ReactNode }) {
               ce qui a été écrit doit partir à la reconnexion quel que soit l'écran ouvert,
               y compris quand aucune conversation n'est affichée. */}
             <OutboxProvider>
-              <RecoveryGate>{children}</RecoveryGate>
+              {/* REQ-SRC-01 — l'index de recherche est **au-dessus des écrans**, pour la
+                même raison que la file : il n'indexe que ce qui se déchiffre pendant
+                qu'il est branché, et branché à l'ouverture d'un onglet il ne voyait
+                jamais passer un message. */}
+              <RechercheProvider>
+                <RecoveryGate>{children}</RecoveryGate>
+              </RechercheProvider>
             </OutboxProvider>
             {/* REQ-UI-18 — la chaîne push est **hors** de la porte de récupération : elle
               ne rend rien tant qu'un message n'est pas arrivé, et elle doit pouvoir

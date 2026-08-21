@@ -140,6 +140,37 @@ export function createSearch(session: Session, worker: Worker): Search {
   session.client.on(MatrixEventEvent.Decrypted, onDecrypted);
 
   /**
+   * REQ-SRC-01 — **l'amorçage : ce que le client tient déjà.**
+   *
+   * L'écoute seule ne voit que ce qui se déchiffre *après* le branchement. Sur une
+   * session rouverte, l'historique est relu depuis IndexedDB et déchiffré avant qu'on
+   * arrive : sans cette passe, un index neuf resterait vide jusqu'au message suivant, et
+   * la recherche ne trouverait rien de ce que l'utilisateur a sous les yeux.
+   *
+   * Le moteur remplace un document déjà connu par son identifiant (REQ-SRC-10) :
+   * réindexer ce qui l'est déjà est donc sans effet, ce qui rend cette passe sûre à
+   * chaque ouverture. Les événements non déchiffrés sont ignorés ici et rattrapés par
+   * l'écouteur au moment où leur clé arrive.
+   *
+   * ponytail: la timeline vive de chaque salon, pas l'historique entier du store. C'est
+   * ce que l'écran affiche, et la remontée d'historique (REQ-COR-13) fait entrer le reste
+   * au fil du défilement. Élargir le jour où « chercher sans avoir remonté » devient un
+   * besoin établi.
+   */
+  const amorcer = (): void => {
+    const rooms = session.client.getRooms?.() ?? [];
+    const connus: IndexableEvent[] = [];
+    for (const room of rooms) {
+      for (const event of room.getLiveTimeline().getEvents()) {
+        const entry = indexable(event);
+        if (entry) connus.push(entry);
+      }
+    }
+    if (connus.length > 0) void index(connus);
+  };
+  amorcer();
+
+  /**
    * REQ-SRC-10 — une suppression retire le document. Pas de tampon ici : une redaction
    * est une action utilisateur isolée, pas une rafale de sync, et la faire attendre
    * laisserait le texte trouvable pendant la fenêtre d'accumulation.

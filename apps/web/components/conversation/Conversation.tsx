@@ -29,6 +29,7 @@ import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/recei
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { identifiantCourt } from "../../lib/identifiants";
 import { routeAppel, routeInfos } from "../../lib/routes";
 import { TranscodageIndisponible } from "../../lib/media-env";
 import { brancherModeMasque } from "../../lib/mode-masque";
@@ -160,6 +161,48 @@ export function Conversation({ roomId }: { roomId: string }) {
 
   // On s'abonne, on ne dispose pas : la file ne nous appartient plus (`OutboxProvider`).
   useEffect(() => outbox?.subscribe(rafraichir), [outbox, rafraichir]);
+
+  /**
+   * REQ-UI-21 — **remonter l'historique.**
+   *
+   * Ce que /sync laisse dans le store est une fenêtre courte : au bout de quelques jours,
+   * les messages plus anciens n'y sont plus, et jusqu'ici rien n'allait les rechercher —
+   * ils paraissaient « oubliés ». `paginate` les redemande au serveur, un cran à la fois,
+   * quand le défilement approche du haut.
+   *
+   * Deux gardes, et elles ne disent pas la même chose : `enCours` empêche deux requêtes
+   * simultanées pour le même geste, `debut` retient qu'on a atteint la naissance du salon
+   * et arrête de demander pour de bon. Sans la seconde, arriver en haut d'un salon
+   * entièrement chargé relancerait une requête à chaque pixel de défilement.
+   *
+   * Les deux sont des `ref` et non des états : les relire ne doit pas provoquer de rendu,
+   * et le rendu suivant vient de toute façon de `rafraichir`.
+   */
+  const remontee = useRef({ enCours: false, debut: false });
+  useEffect(() => {
+    // Changer de salon repart d'une timeline neuve : l'état de remontée du précédent
+    // n'a plus rien à dire sur celle-ci.
+    remontee.current = { enCours: false, debut: false };
+  }, [roomId]);
+
+  const remonter = useCallback(() => {
+    if (!session || remontee.current.enCours || remontee.current.debut) return;
+    remontee.current.enCours = true;
+    void session
+      .timeline(roomId)
+      .paginate()
+      .then((reste) => {
+        remontee.current.debut = !reste;
+        rafraichir();
+      })
+      // Un échec réseau n'est pas la fin de l'historique : on relâche la garde et le
+      // prochain défilement réessaiera. Rien n'est journalisé — l'erreur porterait le
+      // salon (interdit n°8).
+      .catch(() => {})
+      .finally(() => {
+        remontee.current.enCours = false;
+      });
+  }, [session, roomId, rafraichir]);
 
   const candidats: MentionCandidate[] = useMemo(
     () => (session ? mentionCandidates(session, roomId) : []),
@@ -420,13 +463,15 @@ export function Conversation({ roomId }: { roomId: string }) {
           messages={messages}
           chargement={!pret}
           ancre={ancre ?? undefined}
+          onRemonter={remonter}
           fondEcran={fondEcran}
           starter={
             <ConversationStarter
               nom={salon?.name ?? ""}
               sousTitre={
                 salon?.direct
-                  ? (salon.peerId ?? "")
+                  ? // REQ-UIX-42 — l'identifiant sans son domaine, identique pour tous.
+                    (salon.peerId ? identifiantCourt(salon.peerId) : "")
                   : `${session ? memberCount(session, roomId) : 0} membres`
               }
               direct={salon?.direct ?? false}

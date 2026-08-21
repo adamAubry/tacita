@@ -10,6 +10,7 @@ const session = (await restoreSession({ homeserverUrl })) ?? (await initSession(
 
 session.client; // accès contrôlé pour les autres packages
 session.timeline(roomId).events(); // ordre canonique /sync
+await session.timeline(roomId).paginate(); // remonte l'historique ; false = début du salon
 await session.recoveryRequired(); // true tant que le backup n'est pas configuré
 await session.setupRecoveryKey(); // clé à afficher une fois, puis à oublier
 await session.identityResetOf(userId); // true = envoi bloqué jusqu'à confirmation UI
@@ -25,6 +26,10 @@ await session.logout(); // révocation + wipe complet
 - **Ordre.** `OrderedTimeline.events()` rend l'ordre d'accumulation `/sync`.
   Ne jamais retrier par `origin_server_ts` : l'horodatage est fixé par le
   serveur d'origine, il est indicatif seulement.
+- **Portée.** `events()` ne rend que la fenêtre que `/sync` a laissée dans le
+  store, et elle **glisse** : les messages anciens en sortent. `paginate()` va
+  chercher la suite au serveur et rend `false` au début du salon. Un écran qui
+  affiche un historique sans jamais paginer le verra rétrécir tout seul.
 - **Logs.** Utiliser `createLogger()` / `eventRef()`. Le logger filtre
   structurellement les corps d'événements ; un `console.log` direct sur un
   contenu déchiffré viole REQ-COR-09 même en dev.

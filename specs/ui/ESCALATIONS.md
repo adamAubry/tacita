@@ -55,6 +55,7 @@ contrat gagne.
 | E-13 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Tranché le 07/08/2026** — voie A : `knock`. Le porteur frappe, un membre confirme | `specs/05-messaging.md` — **REQ-MSG-20** (nouvelle) ; `specs/12-invite-tokens.md` — REQ-INV-06/13/15/16 amendées |
 | E-15 | La bannière de profil n'existe ni dans Matrix ni dans le projet, et le bandeau flottant qu'elle appelle demande du verre — que DESIGN.md interdit | **Tranché le 10/08/2026** — bannière en champ étendu MSC4133 (aucun changement d'infra : vérifié contre Synapse v1.155.0) ; exception glass **nommée et bornée** au seul bandeau du profil, ratifiée par le PM | `specs/05-messaging.md` — **REQ-MSG-21** (nouvelle) ; `specs/ui/M-G.md` — **REQ-UIX-41** (nouvelle), REQ-UIX-23 amendée ; `specs/11-ui-shard.md` — REQ-UI-20 amendée ; `specs/08-media-pipeline.md` — REQ-MED-11 étendue (lecture) ; **DESIGN.md** — Overview §4, Colors (`glass`), Components, Don'ts. **Interdit n°11 inchangé : un seul site d'appel du chemin public** |
 | E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
+| E-21 | Trouver quelqu'un par un **fragment** de son identifiant ou de son nom : l'annuaire de Synapse ne répond que pour les comptes avec qui on partage déjà un salon, et l'ouvrir à tout le serveur exposerait chaque compte à tout autre | **Ouverte le 21/08/2026** — le domaine cesse d'être exigé (REQ-MSG-19 étendue, REQ-UIX-42), ce qui couvre le cas signalé ; la recherche approximative reste **hors périmètre et l'écran le dit**, elle n'est pas promise | `specs/05-messaging.md` — REQ-MSG-19 étendue ; `specs/ui/M-G.md` — **REQ-UIX-42** (nouvelle), contrainte de recherche amendée. `search_all_users` **inchangé** côté infra |
 | E-16 | `ChatComposer` d'Astryx est un composer d'assistant : son corps est une colonne dont la rangée d'actions est rendue sous le champ, inconditionnellement. Une barre de messagerie est une rangée | **Ouverte le 11/08/2026** — le shard compose la rangée lui-même à partir de `ChatComposerInput` (mentions, Entrée, IME, collage) et de `Button` ; aucune primitive recodée, `ChatComposer` n'est plus réexporté | **DESIGN.md** — Components (barre d'écriture) ; `specs/ui/M-D.md` — REQ-UIX-15 à amender (le contrat dit « sur `Chat` »). Aucune exigence fonctionnelle modifiée |
 
 ---
@@ -784,6 +785,45 @@ comme primitive imposée du composer. Deux lectures possibles, et c'est l'arbitr
 **À revérifier au prochain bump d'Astryx**, comme les digests d'images : si une version
 ultérieure expose une disposition en rangée, ou rend la rangée d'actions conditionnelle,
 cette escalade se referme d'elle-même.
+
+---
+
+## E-21 — Chercher quelqu'un sans connaître son identifiant exact (M-G) — **ouverte**
+
+**Constatée le 21/08/2026**, sur retour utilisateur : « rechercher un utilisateur pour
+l'ajouter en ami requiert son identifiant complet, c'est uniquement de l'exact match donc
+on n'a pas d'approximations ».
+
+**Ce qui a été corrigé sans arbitrage**, parce que ce n'en demandait pas : le **domaine**
+n'est plus exigé. La fédération est désactivée (REQ-INF-02), donc `@adam` est une adresse
+complète sur ce déploiement ; le compléter avec le domaine du compte courant n'invente
+rien et ne peut désigner personne d'autre. `adam`, `@adam` et `@adam:<serveur>` mènent
+désormais au même profil, et les deux chemins — annuaire et profil — partent ensemble.
+C'était l'essentiel de la gêne signalée : l'identifiant à recopier faisait trois fois sa
+longueur utile.
+
+**Ce qui reste, et qui est l'escalade.** Chercher `ad` et voir apparaître `@adam` demande
+que le serveur accepte de chercher dans **tous** ses comptes — `search_all_users: true`
+côté Synapse. Le défaut (`false`) ne montre que les gens avec qui on partage déjà un salon
+ou un salon public, et notre déploiement n'en a aucun : l'annuaire est donc, en pratique,
+muet pour une première prise de contact.
+
+**Les deux options, et ce qu'elles coûtent :**
+
+- *Ouvrir l'annuaire* (`search_all_users: true`). Toute personne ayant un compte peut
+  alors énumérer les autres par préfixe — nom d'affichage compris. Sur une messagerie
+  privée qui remplace des DM entre proches, c'est un changement de nature : le produit
+  cesse d'être un carnet d'adresses pour devenir un annuaire. Ce n'est pas une décision
+  d'implémentation.
+- *Laisser fermé.* On se trouve par un lien d'invitation (spec 12) ou par un identifiant
+  connu — ce que D-09 avait déjà en tête en refusant le graphe social. C'est l'état
+  actuel, et l'écran le dit en toutes lettres plutôt que de laisser croire à une recherche
+  qui échoue : « Un identifiant exact suffit — sans le domaine. Les noms d'affichage ne
+  sont trouvés que pour les personnes avec qui vous partagez déjà une conversation. »
+
+**Ce qu'on demande au PM** : trancher si l'énumération des comptes est acceptable. Tant
+que ce n'est pas tranché, rien ne bouge côté infra — et surtout, aucune promesse d'écran
+ne dépasse ce que le serveur rend (interdit n°13).
 
 ---
 

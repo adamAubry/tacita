@@ -62,7 +62,10 @@ const poserRegle = vi.fn(async () => ({ event_id: "$s" }));
 const exclure = vi.fn(async () => ({}));
 const inviter = vi.fn(async () => ({}));
 
-vi.mock("@tacita/messaging", () => ({
+vi.mock("@tacita/messaging", async (original) => ({
+  // REQ-MSG-19 — `identifiantComplet` est une fonction **pure** du paquet : la mocker
+  // reviendrait à éprouver l'écran contre une règle de saisie qu'il n'a pas.
+  identifiantComplet: (await original<typeof import("@tacita/messaging")>()).identifiantComplet,
   conversations: () => salons(),
   createGroupChat: vi.fn(async () => ({ room_id: "!neuf:t" })),
   getPinnedEvents: () => [],
@@ -94,8 +97,14 @@ vi.mock("@tacita/media-pipeline", async (original) => ({
 
 const stats = vi.fn<() => Promise<SearchStats>>();
 const purger = vi.fn(async () => {});
-vi.mock("@tacita/search", () => ({
-  createSearch: () => ({
+/**
+ * REQ-UI-16 — l'index vient du provider de session, pas de l'écran : c'est lui qu'on
+ * mocke, et non `createSearch`. Le vrai provider construirait un `Worker`, que jsdom
+ * n'a pas — et l'écran de stockage n'est de toute façon qu'un lecteur de cet index.
+ */
+vi.mock("../components/recherche/RechercheProvider", () => ({
+  RechercheProvider: ({ children }: { children: React.ReactNode }) => children,
+  useRecherche: () => ({
     search: vi.fn(),
     index: vi.fn(),
     stats: () => stats(),
@@ -314,6 +323,24 @@ describe("REQ-UIX-33 — Info buttons : quatre boutons, et le premier suit la va
       expect(inviter).toHaveBeenCalledWith(expect.anything(), "!g:t", "@mira:t"),
     );
     expect(reseau).not.toHaveBeenCalled();
+  });
+
+  it("REQ-UIX-42 — un identifiant sans domaine suffit, et part complété", async () => {
+    salons.mockReturnValue([conversation({ roomId: "!g:t", name: "équipe", direct: false, peerId: undefined })]);
+    rendreAvecSession(<InfosConversation roomId="!g:t" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Ajouter" }));
+    fireEvent.change(await screen.findByLabelText("Identifiant Matrix"), {
+      target: { value: "mira" },
+    });
+
+    // Le bouton n'attend plus une adresse entière : le domaine vient du compte courant
+    // (`@luca:t`), qui est le seul du déploiement.
+    const bouton = screen.getByRole("button", { name: "Inviter" });
+    expect(bouton.getAttribute("aria-disabled")).not.toBe("true");
+    fireEvent.click(bouton);
+
+    await waitFor(() => expect(inviter).toHaveBeenCalledWith(expect.anything(), "!g:t", "@mira:t"));
   });
 });
 

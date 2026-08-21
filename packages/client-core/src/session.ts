@@ -102,6 +102,23 @@ export interface OrderedTimeline {
    * Aucun tri par `origin_server_ts` : l'horodatage est indicatif seulement.
    */
   events(): MatrixEvent[];
+  /**
+   * REQ-COR-13 — **remonte l'historique d'un cran, au serveur.**
+   *
+   * Sans elle, ce qu'un salon affiche est exactement ce que /sync a laissé dans
+   * l'accumulateur du store, c'est-à-dire une fenêtre courte et **glissante** : les
+   * messages plus vieux que cette fenêtre sortent du store et rien n'allait plus les
+   * chercher. Signalé par les utilisateurs — « quelques jours après, mes anciens
+   * messages ne se chargeaient plus » —, et c'était exact : rien dans le dépôt
+   * n'appelait `/messages`.
+   *
+   * Rend `true` s'il reste de l'historique en amont, `false` quand on a atteint le
+   * début du salon — c'est ce qui permet à l'UI de cesser de demander.
+   *
+   * L'ordre reste celui du flux : les événements arrivent **en tête** de la timeline
+   * du SDK, dans l'ordre que le serveur donne. Rien n'est trié ici (interdit n°6).
+   */
+  paginate(limit?: number): Promise<boolean>;
 }
 
 export interface Session {
@@ -389,6 +406,24 @@ async function buildSession(
     timeline(roomId) {
       return {
         events: () => client.getRoom(roomId)?.getLiveTimeline().getEvents() ?? [],
+
+        /*
+         * `scrollback` plutôt que `paginateEventTimeline` : il porte déjà le jeton de
+         * pagination du salon, insère les événements dans la timeline vive — celle que
+         * `events()` lit —, et **déduplique les appels concurrents** (le SDK rend la
+         * même promesse tant qu'une requête est en vol). Un défilement qui déclenche
+         * deux demandes n'en fait donc qu'une.
+         *
+         * `oldState.paginationToken` à `null` est le signal documenté du SDK pour
+         * « début du salon atteint ». On le relit **après** la requête, sinon on
+         * répondrait sur l'état d'avant.
+         */
+        async paginate(limit = 50) {
+          const room = client.getRoom(roomId);
+          if (!room) return false;
+          await client.scrollback(room, limit);
+          return room.oldState.paginationToken !== null;
+        },
       };
     },
 

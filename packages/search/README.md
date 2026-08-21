@@ -66,6 +66,13 @@ hors ligne est un bug, pas une dégradation.
   message jamais synchronisé sur cet appareil est introuvable. `stats()` rend
   `oldestTs`/`newestTs` précisément pour que l'UI (spec 11) l'affiche au lieu de
   laisser croire à une recherche exhaustive.
+- **L'amorçage lit les timelines vives, pas tout le store.** À la création,
+  `createSearch` indexe ce que le client tient déjà — ce que les écrans affichent.
+  Ce qui n'est plus dans la fenêtre de `/sync` n'entre dans l'index que lorsque la
+  remontée d'historique (REQ-COR-13) le redescend, donc au fil du défilement.
+- **Le proxy s'attache à une session, pas à un écran.** Il n'indexe que pendant
+  qu'il est branché : un `createSearch` créé à l'ouverture d'un onglet et jeté à sa
+  fermeture n'assiste à aucun déchiffrement et laisse l'index vide.
 - **Plafond de 200 000 événements ; les premiers indexés sortent** (DECISIONS
   D-01). L'éviction suit l'ordre d'indexation locale, jamais la date d'origine
   des messages : sinon un rattrapage d'historique — qui insère par définition

@@ -25,6 +25,7 @@ import {
   segmenter,
   termeDepuis,
 } from "../lib/recherche";
+import { lire, sansCommentaires, sourcesLivrees } from "./sources";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/recherche",
@@ -519,5 +520,33 @@ describe("REQ-UIX-22 — débounce des changements de critères, skeletons, zér
 
     expect(screen.queryByLabelText("Recherche en cours")).toBeNull();
     expect(screen.getByText("Aucun résultat")).toBeTruthy();
+  });
+});
+
+describe("REQ-UI-16 — l'index de recherche appartient à la session, pas à un écran", () => {
+  /**
+   * Le défaut que ces trois lectures empêchent, et qui ne se voit dans aucun rendu :
+   * `createSearch` n'indexe que ce qui se déchiffre **pendant qu'il est branché**. Créé à
+   * l'ouverture de l'onglet Recherche et jeté à sa fermeture, il n'assistait à aucun
+   * déchiffrement, et l'onglet interrogeait un index vide. Aucun test de composant ne
+   * pouvait le dire : chacun passe un `Search` mocké, donc déjà peuplé.
+   *
+   * C'est la règle 7 du dépôt — une valeur posée à une jonction que personne ne relit
+   * exige un test qui la relie à son site de lecture.
+   */
+  it("le provider est monté au-dessus des routes, comme la file d'envoi", () => {
+    const providers = sansCommentaires(lire("app/providers.tsx"));
+    expect(providers).toContain("<RechercheProvider>");
+    // Dans la session : hors d'elle, il n'aurait pas de client sur quoi s'abonner.
+    expect(providers.indexOf("<SessionProvider")).toBeLessThan(
+      providers.indexOf("<RechercheProvider>"),
+    );
+  });
+
+  it("aucun écran ne crée son propre index", () => {
+    for (const { chemin, code } of sourcesLivrees()) {
+      if (chemin.endsWith("/components/recherche/RechercheProvider.tsx")) continue;
+      expect(sansCommentaires(code), chemin).not.toContain("createSearch(");
+    }
   });
 });

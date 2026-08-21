@@ -201,7 +201,13 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     // événements réduits à ce que `messages()` en lit, alors que le contrat rend des
     // `MatrixEvent`. C'est le `satisfies` ci-dessous qui a révélé l'écart — le mock
     // annonçait `unknown[]`, et personne ne le voyait.
-    timeline: vi.fn((_roomId: string) => ({ events: () => timelineEvents as MatrixEvent[] })),
+    timeline: vi.fn((_roomId: string) => ({
+      events: () => timelineEvents as MatrixEvent[],
+      // REQ-COR-13 — la remontée d'historique appartient à `client-core` ; aucun test de
+      // ce paquet ne la déclenche, mais le contrat l'exige, et un mock qui l'omettrait ne
+      // compilerait pas (c'est le point du `satisfies`).
+      paginate: vi.fn(async () => false),
+    })),
     // Audit des jonctions — `satisfies` ancre les membres définis ici sur le vrai
     // contrat. Les membres absents sont complétés par `asSession`, qui les fait lever
     // au lieu de manquer. Le `client` reste un faux assumé.

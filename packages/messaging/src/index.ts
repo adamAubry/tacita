@@ -51,6 +51,7 @@ export type { JoinRule, RoomNotificationLevel } from "./rooms";
 export {
   acceptInvitation,
   CHAMP_BANNIERE,
+  identifiantComplet,
   ignoredUsers,
   ignoreUser,
   leaveConversation,

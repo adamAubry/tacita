@@ -19,11 +19,12 @@ Layouts Profile (soi / autrui), Add-friends, Friend request, et les composants s
 ### Amis
 - **REQ-UIX-28** — Add-friends : header, Buttons list de partage d'un lien d'invitation (Web Share API, lien interne V1 — E-05), puis « Ajouter par identifiant » + recherche ; résultats en Friends list (composant 16, variation suggestion : carte cliquable → profil). Suggestions serveur : Placeholder V1 (aucune source, E-04).
 - **REQ-UIX-29** — Friend request : liste des demandes (composant 16, variation demande : accepter vert / refuser rouge) via `Contacts` ; Placeholder dédié si aucune demande. Accepter → DM ouvert ; refuser → disparition immédiate (optimiste).
+- **REQ-UIX-42** — **L'identifiant s'affiche sans son domaine.** `@adam` partout où l'app montre un identifiant Matrix — carte de profil, résultats de recherche d'amis, demandes reçues, starter de conversation, liste de membres —, et le domaine ne se saisit nulle part (REQ-MSG-19). Ce n'est pas une troncature : la fédération étant désactivée (REQ-INF-02), `@adam` est une adresse complète sur ce déploiement, et le domaine est le seul segment qui n'apprend rien puisqu'il est commun à tous. Il reste juxtaposé au nom d'affichage avec des styles distincts (REQ-UIX-24) : l'un est choisi, l'autre est l'adresse. *(Créée le 21/08/2026 — retour utilisateur : « l'id `@adam:chat.example.org` est beaucoup trop long ». Le jour où la fédération s'ouvrirait, l'abréviation devrait être conditionnée au domaine du compte courant — un identifiant distant raccourci désignerait quelqu'un d'autre.)*
 - **REQ-UIX-30** — Bloquer (via starter M-D ou profil) : `m.ignored_user_list` natif, avec confirmation expliquant l'effet réel (ses messages ne s'affichent plus chez vous) — pas de sur-promesse. « Retirer l'ami » = quitter le DM, avec confirmation.
 
 ## Contraintes
 
-- Recherche d'utilisateur par identifiant : user directory Matrix (pas de recherche de contenu serveur) ; débouncée.
+- Recherche d'utilisateur par identifiant : user directory Matrix **et** lecture de profil (REQ-MSG-19, les deux chemins ensemble) ; pas de recherche de contenu serveur ; débouncée ; le domaine n'est jamais exigé de l'utilisateur. Les résultats s'affichent au fil de la frappe débouncée — aucune validation de la saisie n'est requise pour voir un aperçu.
 - La distinction ami/non-ami vient exclusivement de `Contacts` — aucune heuristique locale dispersée.
 
 ## Hors scope
@@ -32,4 +33,4 @@ Le graphe social dédié — refusé par D-09, pas reporté ; settings (M-H) ; a
 
 ## Objectif mesurable
 
-Vitest + Testing Library, interfaces mockées : REQ-UIX-25/26 (prop friend → selector Actions/Activity ; non-friend → Send invite ; jamais les deux) ; REQ-UIX-27 (note persistée puis relue ; libellé exact présent) ; REQ-UIX-29 (accept → callback Contacts.accept + navigation DM ; 0 demandes → Placeholder) ; REQ-UIX-30 (bloquer → appel ignore list + texte de confirmation conforme).
+Vitest + Testing Library, interfaces mockées : REQ-UIX-25/26 (prop friend → selector Actions/Activity ; non-friend → Send invite ; jamais les deux) ; REQ-UIX-27 (note persistée puis relue ; libellé exact présent) ; REQ-UIX-29 (accept → callback Contacts.accept + navigation DM ; 0 demandes → Placeholder) ; REQ-UIX-30 (bloquer → appel ignore list + texte de confirmation conforme) ; REQ-UIX-42 (un identifiant complet rendu à l'écran n'y montre pas son domaine ; l'identifiant passé aux callbacks reste entier).

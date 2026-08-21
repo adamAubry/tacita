@@ -600,3 +600,142 @@ describe("REQ-MED-05 — un fichier reçu se télécharge sur l'appareil", () =>
     expect(lire("components/media/useMediaActions.ts")).toContain("saveOriginal(env, blob, media.nom)");
   });
 });
+
+describe("REQ-UI-21 — la timeline remonte l'historique quand on approche du haut", () => {
+  /**
+   * jsdom ne fait aucune mise en page : `scrollTop` et `scrollHeight` y valent zéro et
+   * ne bougent pas. On les remplace par des accesseurs adossés à des variables — c'est
+   * la géométrie qui est simulée, pas le composant, et la logique éprouvée est bien la
+   * sienne.
+   */
+  function geometrie(element: HTMLElement, hauteur: number, position: number) {
+    const etat = { hauteur, position };
+    Object.defineProperty(element, "scrollHeight", { configurable: true, get: () => etat.hauteur });
+    Object.defineProperty(element, "scrollTop", {
+      configurable: true,
+      get: () => etat.position,
+      set: (valeur: number) => {
+        etat.position = valeur;
+      },
+    });
+    return etat;
+  }
+
+  const rendre = (messages: MessageAffiche[], onRemonter?: () => void) =>
+    render(
+      <Timeline
+        messages={messages}
+        onRemonter={onRemonter}
+        onRepondre={vi.fn()}
+        onHold={vi.fn()}
+        onReagir={vi.fn()}
+        onRenvoyer={vi.fn()}
+        onAbandonner={vi.fn()}
+      />,
+    );
+
+  it("demande la suite quand le défilement approche du haut", () => {
+    const onRemonter = vi.fn();
+    rendre([message()], onRemonter);
+
+    const zone = screen.getByRole("log");
+    geometrie(zone, 2000, 50);
+    fireEvent.scroll(zone);
+
+    expect(onRemonter).toHaveBeenCalled();
+  });
+
+  it("ne demande rien tant qu'on est loin du haut", () => {
+    const onRemonter = vi.fn();
+    rendre([message()], onRemonter);
+
+    const zone = screen.getByRole("log");
+    geometrie(zone, 5000, 3000);
+    fireEvent.scroll(zone);
+
+    expect(onRemonter).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Le défaut que ce test empêche : sans compensation, les messages insérés en tête
+   * poussent le contenu vers le bas, le lecteur se retrouve encore plus haut, et le
+   * défilement redemande aussitôt une page — une boucle, pas un chargement.
+   */
+  it("conserve la position de lecture quand des messages s'insèrent en tête", () => {
+    const { rerender } = rendre([message({ cle: "$b" })], vi.fn());
+
+    const zone = screen.getByRole("log");
+    const etat = geometrie(zone, 1000, 100);
+    fireEvent.scroll(zone);
+
+    // La page remontée arrive : la zone grandit de 400 px au-dessus de la position.
+    etat.hauteur = 1400;
+    rerender(
+      <Timeline
+        messages={[message({ cle: "$a" }), message({ cle: "$b" })]}
+        onRemonter={vi.fn()}
+        onRepondre={vi.fn()}
+        onHold={vi.fn()}
+        onReagir={vi.fn()}
+        onRenvoyer={vi.fn()}
+        onAbandonner={vi.fn()}
+      />,
+    );
+
+    expect(zone.scrollTop).toBe(500);
+  });
+
+  it("sans `onRemonter`, le défilement ne déclenche rien — la timeline reste passive", () => {
+    rendre([message()]);
+    const zone = screen.getByRole("log");
+    geometrie(zone, 2000, 0);
+    // Aucune exception, et aucune position touchée : le composant sans câblage est inerte.
+    expect(() => fireEvent.scroll(zone)).not.toThrow();
+    expect(zone.scrollTop).toBe(0);
+  });
+});
+
+describe("REQ-UI-06 — une conversation s'ouvre sur son dernier message", () => {
+  /**
+   * Rien ne positionnait la zone défilante : elle s'ouvrait à zéro, donc sur le message
+   * le **plus ancien** de la fenêtre chargée, et il fallait défiler jusqu'en bas pour
+   * lire ce qui venait d'arriver. jsdom ne met rien en page — la géométrie est simulée,
+   * la logique éprouvée est bien celle du composant.
+   */
+  it("se positionne en bas à l'arrivée", () => {
+    const { rerender } = render(
+      <Timeline
+        messages={[]}
+        onRepondre={vi.fn()}
+        onHold={vi.fn()}
+        onReagir={vi.fn()}
+        onRenvoyer={vi.fn()}
+        onAbandonner={vi.fn()}
+      />,
+    );
+
+    const zone = screen.getByRole("log");
+    let position = 0;
+    Object.defineProperty(zone, "scrollHeight", { configurable: true, get: () => 3000 });
+    Object.defineProperty(zone, "scrollTop", {
+      configurable: true,
+      get: () => position,
+      set: (valeur: number) => {
+        position = valeur;
+      },
+    });
+
+    rerender(
+      <Timeline
+        messages={[message({ cle: "$a" }), message({ cle: "$b" })]}
+        onRepondre={vi.fn()}
+        onHold={vi.fn()}
+        onReagir={vi.fn()}
+        onRenvoyer={vi.fn()}
+        onAbandonner={vi.fn()}
+      />,
+    );
+
+    expect(zone.scrollTop).toBe(3000);
+  });
+});
