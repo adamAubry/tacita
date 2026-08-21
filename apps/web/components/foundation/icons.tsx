@@ -72,6 +72,18 @@ export const IconePlus: ReactNode = (
  * quelqu'un, et c'est l'avion que toutes les messageries ont appris à leurs
  * utilisateurs.
  */
+/**
+ * Média sans aperçu — la tuile terminale de `MediaMessage`, quand l'expéditeur n'a pas pu
+ * produire de vignette. Même géométrie que les autres : 24×24, trait de 1,5.
+ */
+export const IconeImage: ReactNode = (
+  <svg {...trait}>
+    <rect x="3.5" y="5" width="17" height="14" rx="2" />
+    <circle cx="8.5" cy="10" r="1.5" />
+    <path d="m4 17 4.5-4.5 3.5 3.5 3-3L20 17" />
+  </svg>
+);
+
 export const IconeCamera: ReactNode = (
   <svg {...trait}>
     <path d="M3.5 8.5h3l1.5-2h6l1.5 2h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1" />

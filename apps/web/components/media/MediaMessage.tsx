@@ -3,6 +3,7 @@
 import type { EncryptedFile } from "@tacita/media-pipeline";
 import { useEffect, useState } from "react";
 
+import { IconeImage, IconeVideo } from "../foundation/icons";
 import { Button, Skeleton, Text } from "../foundation/primitives";
 import { VoicePlayer } from "./VoicePlayer";
 import { dureeLisible, tailleLisible, type Media, type Telecharger } from "./media";
@@ -196,7 +197,18 @@ export function MediaMessage({
     ? ({ width: "100%", aspectRatio: "1 / 1" } as const)
     : ({ width: LARGEUR_TUILE, height: hauteur, maxWidth: "100%" } as const);
 
-  if (!visuel.url)
+  /*
+   * **Attendre une vignette qui existe est un chargement ; attendre une vignette qui
+   * n'existe pas est une boucle sans fin.** Les deux se ressemblaient : `useBlob` rendu
+   * sans fichier sort de son effet sans rien faire, donc ni `url` ni `erreur` — et le
+   * squelette scintillait indéfiniment.
+   *
+   * Le cas est apparu le 21/08/2026, quand `thumbnail_file` est devenu facultatif côté
+   * pipeline pour qu'un poster impossible n'emporte plus l'envoi. Le paquet a changé son
+   * contrat, ce rendu supposait l'ancien : la jonction n'avait pas de propriétaire
+   * (règle 1). Il en a un maintenant, et c'est cette ligne.
+   */
+  if (media.vignette !== undefined && !visuel.url)
     return carre ? (
       <div style={boite}>
         <Skeleton width="100%" height="100%" />
@@ -204,6 +216,29 @@ export function MediaMessage({
     ) : (
       <Skeleton width={LARGEUR_TUILE} height={hauteur} />
     );
+
+  /*
+   * Pas de vignette, et il n'y en aura pas : une tuile **terminale**, de la même
+   * géométrie, qui garde l'ouverture du viewer. Le média entier est là et se lira très
+   * bien — c'est seulement son aperçu qui manque, et le dire par une image fixe vaut
+   * mieux que de le suggérer par une animation qui promet une suite.
+   */
+  const sansVignette = (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--color-background-surface)",
+        border: "1px solid var(--color-border)",
+        color: "var(--color-icon-secondary)",
+      }}
+    >
+      {media.msgtype === "m.video" ? IconeVideo : IconeImage}
+    </div>
+  );
 
   /*
     Un `<button>` nu, et non le `Button` d'Astryx : celui-ci est un contrôle de formulaire
@@ -238,6 +273,7 @@ export function MediaMessage({
           display: "block",
         }}
       >
+        {visuel.url === undefined ? sansVignette : (
         <img
           src={visuel.url}
           alt={media.nom}
@@ -247,6 +283,7 @@ export function MediaMessage({
           // par son pavage, pas par le cadrage de chaque photo.
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
+        )}
       </button>
   );
 

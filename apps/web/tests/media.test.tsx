@@ -116,6 +116,38 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
     expect(source).toContain('convertToBlob({ type: "image/jpeg", quality })');
   });
 
+  it("une vidéo sans vignette rend une tuile terminale, jamais un skeleton sans fin", async () => {
+    /*
+     * **Le défaut du 21/08/2026, et c'est une jonction (règle 1).** `thumbnail_file` est
+     * devenu facultatif côté pipeline pour qu'un poster impossible n'emporte plus l'envoi
+     * — ce qui était le bon arbitrage. Ce rendu, lui, supposait toujours la vignette
+     * présente : `useBlob` appelé sans fichier sort de son effet sans rien faire, donc ni
+     * `url` ni `erreur`, et le squelette scintillait indéfiniment. La vidéo était bien
+     * arrivée, entièrement lisible, derrière une animation qui promettait une suite.
+     *
+     * Les deux specs étaient respectées ; c'est l'espace entre elles qui ne l'était pas.
+     */
+    const sansVignette = mediaDe(
+      evenement({
+        msgtype: "m.video",
+        body: "clip.mp4",
+        file: FICHIER,
+        info: { size: 4096, mimetype: "video/mp4", duration: 8000, w: 1280, h: 720 },
+      }),
+    )!;
+
+    // Une promesse qui ne se résout jamais : si le rendu attendait quoi que ce soit, il
+    // attendrait pour toujours — et c'est précisément ce qu'on interdit.
+    render(<MediaMessage media={sansVignette} telecharger={() => new Promise<Blob>(() => {})} />);
+
+    // La tuile existe, elle est terminale, et elle garde son ouverture.
+    const tuile = await screen.findByRole("button", { name: /Vidéo clip\.mp4/ });
+    expect(tuile).toBeTruthy();
+    // Aucun déchiffrement n'a même été tenté : il n'y a pas de vignette à demander.
+    expect(tuile.querySelector("svg")).toBeTruthy();
+    expect(tuile.querySelector("img")).toBeNull();
+  });
+
   it("en attente du déchiffrement, un skeleton — pas un trou qui déplace la timeline", () => {
     // Une promesse qui ne se résout jamais : le déchiffrement est « en cours », et c'est
     // exactement l'état que le skeleton doit rendre.
