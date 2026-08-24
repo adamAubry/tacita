@@ -39,6 +39,10 @@ services:
       KEYCLOAK_OIDC_CLIENT_SECRET: ${KEYCLOAK_OIDC_CLIENT_SECRET}
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/tacita.json:ro
+      # REQ-INF-09 — thème de connexion aux couleurs du produit. Monté et non empaqueté :
+      # un thème posé dans `themes/` est chargé au démarrage, sans `kc.sh build` (cf. le
+      # README de l'image). Le realm le sélectionne par `loginTheme`.
+      - ./keycloak/themes/tacita:/opt/keycloak/themes/tacita:ro
       - keycloak-data:/opt/keycloak/data
     # REQ-INF-09 — « démarré » ne veut pas dire « realm importé ». Keycloak met une
     # quinzaine de secondes à publier `/auth/realms/tacita`, et Synapse interroge la
@@ -126,6 +130,8 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
     volumes:
       - ./synapse/homeserver.yaml.tmpl:/conf/homeserver.yaml.tmpl:ro
+      # REQ-INF-09 — gabarits SSO aux couleurs du produit (cf. `templates:` dans homeserver.yaml.tmpl).
+      - ./synapse/templates:/conf/templates:ro
       - synapse-data:/data
 
   # REQ-INF-14 — la spec 03 livre le service, la spec 01 le provisionne : sans ça, la

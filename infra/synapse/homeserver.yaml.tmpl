@@ -22,6 +22,25 @@ public_baseurl: "https://${SERVER_NAME}/"
 # compare la liste **par préfixe**, et `""` est le préfixe de toute URL.
 sso:
   client_whitelist: ${SSO_CLIENT_WHITELIST}
+
+# REQ-INF-09 — **les pages que Synapse rend lui-même, rendues aux couleurs du produit.**
+#
+# Six gabarits sont atteignables dans ce déploiement (les autres sont éteints par la
+# configuration : ni email, ni account_validity, ni captcha, ni user_consent, et un seul
+# fournisseur OIDC donc pas de sélecteur). Ils vivent dans `synapse/templates/`, monté
+# par le compose. Synapse retombe sur le gabarit d'origine pour tout fichier absent de ce
+# répertoire : l'override est partiel par construction, et n'a pas à être exhaustif.
+#
+# Ce ne sont pas des pages de décor. `sso_redirect_confirm.html` porte le jeton de
+# connexion, `sso_auth_success.html` porte le `postMessage("authDone")` qu'attend
+# `RecoveryStep` : les deux sont sur le chemin critique, et `infra/tests/
+# synapse-templates.test.ts` les garde.
+#
+# Version-dépendant comme le reste d'`infra/` : les noms de variables des gabarits
+# appartiennent à la version de l'image, ici v1.155.0. Relire `res/templates/` au bump,
+# au même titre que le CHANGELOG.
+templates:
+  custom_template_directory: /conf/templates
 report_stats: false
 media_store_path: /data/media_store
 

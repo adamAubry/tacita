@@ -28,7 +28,25 @@ export const PARAM_JETON = "loginToken";
  */
 export function urlConnexion(homeserverUrl: string, retour: string): string {
   const url = new URL("/_matrix/client/v3/login/sso/redirect", homeserverUrl);
-  url.searchParams.set("redirectUrl", retour);
+  /*
+   * **Normalisé, et pas recopié tel quel.** Synapse compare l'URL de retour aux entrées
+   * de `sso.client_whitelist` par **préfixe de chaîne**, sans normaliser quoi que ce soit
+   * (`handlers/auth.py`, v1.155.0). L'entrée rendue par `synapse/entrypoint.sh` se termine
+   * par `/` — et elle doit s'y terminer, sinon `https://tacita.test.evil.com` en serait
+   * un préfixe valide. C'est donc à l'appelant de fournir une URL qui commence par cette
+   * entrée, et `location.origin` n'en est pas une : il ne porte jamais de barre finale.
+   *
+   * Ce qu'un décalage d'un caractère coûtait, avant correction : la comparaison échouait,
+   * Synapse renonçait à rediriger et servait `sso_redirect_confirm.html` — une page à
+   * bouton « Continuer », **à chaque connexion de chaque utilisateur**. Rien ne cassait,
+   * personne ne voyait d'erreur, et le parcours gagnait un clic sur une page qui n'est
+   * pas la nôtre.
+   *
+   * `new URL(...).href` fait la normalisation que la plateforme sait déjà faire : une
+   * origine nue gagne sa barre, un chemin (`/i/<token>`) est laissé intact — et reste
+   * couvert par le même préfixe.
+   */
+  url.searchParams.set("redirectUrl", new URL(retour).href);
   return url.toString();
 }
 

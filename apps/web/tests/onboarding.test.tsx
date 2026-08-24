@@ -162,7 +162,20 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
   it("aucune UI de mot de passe : la connexion part chez le fournisseur", () => {
     const url = new URL(urlConnexion(HOMESERVER, "https://app.tacita.test"));
     expect(url.pathname).toBe("/_matrix/client/v3/login/sso/redirect");
-    expect(url.searchParams.get("redirectUrl")).toBe("https://app.tacita.test");
+    /*
+     * **La barre finale n'est pas cosmétique.** Synapse compare cette valeur aux entrées
+     * de `sso.client_whitelist` par préfixe de chaîne ; l'entrée rendue par
+     * `synapse/entrypoint.sh` vaut `https://${SERVER_NAME}/`. Sans la barre, la
+     * comparaison échoue et Synapse intercale `sso_redirect_confirm.html` — un clic de
+     * plus, sur une page qui n'est pas la nôtre, à chaque connexion.
+     */
+    expect(url.searchParams.get("redirectUrl")).toBe("https://app.tacita.test/");
+  });
+
+  it("un chemin est préservé, et reste couvert par la whitelist", () => {
+    const url = new URL(urlConnexion(HOMESERVER, "https://app.tacita.test/i/jeton"));
+    expect(url.searchParams.get("redirectUrl")).toBe("https://app.tacita.test/i/jeton");
+    expect(url.searchParams.get("redirectUrl")?.startsWith("https://app.tacita.test/")).toBe(true);
   });
 });
 

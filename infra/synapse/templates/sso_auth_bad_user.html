@@ -1,0 +1,32 @@
+{#
+  Ré-authentification faite avec un autre compte que celui ouvert dans l'app. Rendu dans
+  la fenêtre surgie, d'où le bouton de fermeture plutôt qu'un retour vers l'app.
+
+  Le gabarit d'origine parle de « SSO Identity Provider » et de « details » : du jargon
+  pour un produit dont les utilisateurs sont explicitement non-techniciens (PRODUCT.md).
+  Ce qui compte tient en deux phrases — ce n'est pas le bon compte, et voici lequel
+  reprendre.
+#}
+{% extends "_base.html" %}
+{% block title %}La confirmation a échoué{% endblock %}
+
+{% block body %}
+<div class="disque" aria-hidden="true">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 8v5M12 16h.01"/>
+    </svg>
+</div>
+
+<h1>La confirmation a échoué</h1>
+<p>La connexion a été faite avec un autre compte que celui ouvert dans Tacita. La demande n'a pas été validée.</p>
+
+<dl class="carte">
+    <dt>Compte à utiliser</dt>
+    <dd>{{ user_id_to_verify }}</dd>
+</dl>
+
+<div class="actions">
+    <button type="button" class="bouton bouton-primaire" onclick="window.close()">Fermer cette fenêtre</button>
+</div>
+{% endblock %}

@@ -1,8 +1,16 @@
 {
   "realm": "tacita",
   "enabled": true,
+  "displayName": "Tacita",
+  "displayNameHtml": "Tacita",
+  "loginTheme": "tacita",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "fr"
+  ],
+  "defaultLocale": "fr",
   "registrationAllowed": true,
-  "resetPasswordAllowed": true,
+  "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
   "webAuthnPolicyPasswordlessRpEntityName": "Tacita",
   "webAuthnPolicyPasswordlessRpId": "${SERVER_NAME}",
@@ -21,6 +29,24 @@
       "defaultAction": false,
       "priority": 10,
       "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "name": "Recovery Authentication Codes",
+      "providerId": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
     }
   ],
   "clients": [
@@ -35,9 +61,115 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "secret": "${KEYCLOAK_OIDC_CLIENT_SECRET}",
-      "redirectUris": ["https://${SERVER_NAME}/_synapse/client/oidc/callback"],
-      "webOrigins": ["https://${SERVER_NAME}"],
-      "defaultClientScopes": ["profile", "email"]
+      "redirectUris": [
+        "https://${SERVER_NAME}/_synapse/client/oidc/callback"
+      ],
+      "webOrigins": [
+        "https://${SERVER_NAME}"
+      ],
+      "defaultClientScopes": [
+        "profile",
+        "email"
+      ]
     }
-  ]
+  ],
+  "browserFlow": "tacita-browser",
+  "authenticationFlows": [
+    {
+      "alias": "tacita-browser",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "description": "Connexion Tacita : identifiant, puis cle d'acces / mot de passe / code de secours",
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticator": "identity-provider-redirector",
+          "requirement": "ALTERNATIVE",
+          "priority": 20
+        },
+        {
+          "authenticatorFlow": true,
+          "userSetupAllowed": false,
+          "flowAlias": "tacita-formulaires",
+          "requirement": "ALTERNATIVE",
+          "priority": 30
+        }
+      ]
+    },
+    {
+      "alias": "tacita-formulaires",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "description": "Identifiant, puis choix du facteur",
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticator": "auth-username-form",
+          "requirement": "REQUIRED",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": true,
+          "userSetupAllowed": false,
+          "flowAlias": "tacita-facteurs",
+          "requirement": "REQUIRED",
+          "priority": 20
+        }
+      ]
+    },
+    {
+      "alias": "tacita-facteurs",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "description": "Trois facons de prouver son identite, sans e-mail",
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticator": "webauthn-authenticator-passwordless",
+          "requirement": "ALTERNATIVE",
+          "priority": 10
+        },
+        {
+          "authenticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticator": "auth-password-form",
+          "requirement": "ALTERNATIVE",
+          "priority": 20
+        },
+        {
+          "authenticatorFlow": false,
+          "userSetupAllowed": false,
+          "authenticator": "auth-recovery-authn-code-form",
+          "requirement": "ALTERNATIVE",
+          "priority": 30
+        }
+      ]
+    }
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\"], \"edit\": [\"admin\"]}, \"multivalued\": false}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}]}"
+          ]
+        }
+      }
+    ]
+  }
 }

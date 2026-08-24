@@ -12,6 +12,63 @@ docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
 cd .. && npm run smoke
 ```
 
+## Connexion sans e-mail
+
+Demande la pile debout (`docker compose up -d postgres keycloak`).
+
+```sh
+cd infra
+sh smoke/connexion-sans-email.sh
+```
+
+Tranche la question que la configuration seule ne pouvait pas trancher : **les codes de
+secours de Keycloak peuvent-ils remplacer le mot de passe ?** Mesuré ici — oui. La cible
+enrôle un utilisateur jetable, se connecte avec un code sans jamais donner le mot de passe,
+vérifie que le code est à usage unique, puis supprime l'utilisateur.
+
+C'est ce qui rend la suppression de l'e-mail tenable : sans elle, un mot de passe perdu
+n'aurait plus aucun chemin de retour côté utilisateur.
+
+## Le thème de connexion Keycloak
+
+Demande la pile debout (`docker compose up -d postgres keycloak`).
+
+```sh
+cd infra
+sh smoke/theme-keycloak.sh
+```
+
+Il vérifie que Keycloak **sert** le thème, pas seulement qu'il est bien écrit : feuille liée
+*et* servie, feuille du parent conservée, page en français, dictionnaire appliqué, logo éteint.
+
+**Le piège qu'il a trouvé.** `start --import-realm` n'importe un realm que s'il n'existe pas
+déjà. Sur une pile ayant déjà démarré, modifier `keycloak/realm-export.json` — `loginTheme`
+compris — n'a **aucun effet**, sans erreur ni log. Réimporter, ou mettre à jour le realm :
+
+```sh
+docker compose exec keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://localhost:8080/auth --realm master \
+  --user "$KEYCLOAK_ADMIN" --password "$KEYCLOAK_ADMIN_PASSWORD"
+docker compose exec keycloak /opt/keycloak/bin/kcadm.sh update realms/tacita \
+  -s loginTheme=tacita -s displayNameHtml=Tacita \
+  -s internationalizationEnabled=true -s defaultLocale=fr -s 'supportedLocales=["fr"]'
+```
+
+## Le rendu des gabarits SSO
+
+Séparé de la cible ci-dessus : il n'a besoin d'aucune pile debout, seulement de l'image
+Synapse épinglée, parce qu'il emprunte son Jinja.
+
+```sh
+cd infra
+docker compose run --rm --no-deps -T --entrypoint python3 synapse - < smoke/rendu-gabarits.py
+```
+
+Il rend les six pages de `synapse/templates/` — les quatre branches de `sso_error`, et le
+compte sans nom d'affichage — et vérifie ce que la lecture de source ne peut pas voir :
+que le Jinja compile, que la feuille est bien incluse, que `postMessage("authDone")`
+survit au rendu, et que `error_description`, qui vient d'un tiers, est échappé.
+
 ## Ce qu'elle prouve, et que 189 tests ne prouvaient pas
 
 - **La crypto Rust réellement chargée** : `getVersion()` doit dire vodozemac, pas la
