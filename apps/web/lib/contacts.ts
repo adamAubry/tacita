@@ -59,10 +59,25 @@ export function contactsDeLaSession(session: Session): Contacts {
   const dmAvec = (userId: string) =>
     conversations(session).find((conversation) => conversation.peerId === userId);
 
+  /**
+   * REQ-UI-23 — **on n'est pas son propre ami.** La conversation personnelle du parcours
+   * d'accueil est inscrite dans `m.direct` sous son propre identifiant, ce qui la fait
+   * lire comme une conversation et non comme un groupe d'une personne. Sans cette ligne,
+   * elle entrerait aussi dans la liste d'amis et dans la feuille « nouvelle
+   * conversation » — on s'y proposerait à soi-même d'ouvrir un DM avec soi-même.
+   *
+   * Ici et pas dans l'écran : la distinction ami / non-ami ne se calcule qu'à cet endroit
+   * (contrainte M-G), et une seconde définition dériverait au premier cas limite.
+   */
+  const moi = session.client.getUserId();
+
   return {
     lister: () =>
       conversations(session)
-        .filter((conversation) => conversation.peerId !== undefined)
+        .filter(
+          (conversation) =>
+            conversation.peerId !== undefined && conversation.peerId !== moi,
+        )
         .map((conversation) => ({ userId: conversation.peerId!, nom: conversation.name })),
 
     demandes: () =>

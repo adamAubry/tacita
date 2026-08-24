@@ -65,3 +65,19 @@ globalThis.matchMedia ??= ((requete: string) =>
     removeListener: () => {},
     dispatchEvent: () => false,
   }) as MediaQueryList) as typeof globalThis.matchMedia;
+
+/**
+ * jsdom n'implémente pas `HTMLCanvasElement.getContext` : il journalise une erreur « not
+ * implemented » et rend `null`. Le `Spinner` d'Astryx dessine son anneau au canvas, donc
+ * chaque attente du parcours d'accueil (REQ-UI-22) faisait une pile d'erreur dans la
+ * sortie de test, sans qu'aucun test échoue — le pire des deux, parce qu'on finit par ne
+ * plus lire une sortie qui crie sans raison.
+ *
+ * Cinquième lacune de l'environnement, même traitement que les quatre autres. `null` est
+ * exactement ce que jsdom rendait : les composants qui savent s'en passer continuent de
+ * s'en passer, et les tests qui ont besoin d'un vrai contexte 2D (`media.test.tsx`)
+ * remplacent cette méthode par la leur, comme avant.
+ */
+if (typeof HTMLCanvasElement !== "undefined") {
+  HTMLCanvasElement.prototype.getContext = () => null;
+}

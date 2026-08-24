@@ -50,7 +50,19 @@ async function tramer(svg: string): Promise<File> {
 }
 
 /**
- * REQ-MSG-22 — appelée une fois, à la création du compte (voir `SessionProvider`).
+ * REQ-MED-11 — **le téléversement d'une image publique de profil, pour tout le shard.**
+ *
+ * Le chemin public du pipeline n'a que deux sites d'appel dans le dépôt, et un test
+ * structurel du paquet média échoue s'il en apparaît un troisième. Ce fichier en est un ;
+ * tout écran qui a besoin de poser une photo ou une bannière passe donc par ici plutôt
+ * que d'en ouvrir un nouveau — l'étape d'identité du parcours d'accueil comme le
+ * formulaire de profil.
+ */
+export const televerserImageProfil = (session: Session, fichier: File): Promise<string> =>
+  uploadPublicProfileImage(session, environnementMedia(), fichier);
+
+/**
+ * REQ-MSG-22 — appelée une fois, à la création du compte (parcours d'accueil, M-B).
  *
  * REQ-MED-11 — **le second des deux sites d'appel du chemin public**, et le test
  * structurel du paquet média les nomme tous les deux. Ces images sont publiques et non
@@ -58,8 +70,7 @@ async function tramer(svg: string): Promise<File> {
  * exception, elles empruntent celle qui existe.
  */
 export async function poserIdentiteParDefaut(session: Session): Promise<void> {
-  const env = environnementMedia();
   await poserImagesParDefaut(session, async (svg) =>
-    uploadPublicProfileImage(session, env, await tramer(svg)),
+    televerserImageProfil(session, await tramer(svg)),
   );
 }

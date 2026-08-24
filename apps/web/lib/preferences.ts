@@ -195,3 +195,23 @@ export const ecrireFondEcran = async (indexedDB: IDBFactory, roomId: string, ima
 /** La réinitialisation exigée par REQ-UIX-35 : la clé retombe à `undefined`. */
 export const effacerFondEcran = (indexedDB: IDBFactory, roomId: string) =>
   ecrirePreference(indexedDB, cleFond(roomId), undefined);
+
+/**
+ * REQ-UI-22 — **le parcours d'accueil est en cours sur cet appareil.**
+ *
+ * Il n'existe qu'un seul instant où « ce compte vient d'être créé » est une information
+ * disponible : `recoveryState()` vaut `creation` (spec 04), et il ne le vaut qu'une fois
+ * dans la vie du compte. Passée l'étape de la clé, ce signal a disparu — un rechargement
+ * au milieu du parcours retomberait alors sur une application vide, sans conversation et
+ * sans avoir jamais proposé quoi que ce soit.
+ *
+ * Cette marque est donc ce qui rend le parcours **reprenable**, et rien d'autre : elle
+ * est posée à son ouverture, retirée à sa fin. Sur l'appareil, parce qu'un parcours
+ * d'accueil est un geste d'appareil — un second appareil ne le rejoue pas, il déverrouille
+ * (`RecoveryUnlock`).
+ */
+export const lireOnboardingEnCours = async (indexedDB: IDBFactory) =>
+  (await lirePreference(indexedDB, "onboarding-en-cours")) === true;
+
+export const ecrireOnboardingEnCours = (indexedDB: IDBFactory, enCours: boolean) =>
+  ecrirePreference(indexedDB, "onboarding-en-cours", enCours);

@@ -8,7 +8,7 @@ import {
 } from "@tacita/client-core";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-import { poserIdentiteParDefaut } from "../../lib/identite-par-defaut";
+import { ecrireOnboardingEnCours } from "../../lib/preferences";
 import { etatDe, retirerJetonDeLUrl, urlConnexion, type EtatSession } from "../../lib/session";
 
 interface Contexte {
@@ -19,6 +19,11 @@ interface Contexte {
    * cet appareil est désormais signé, la porte s'ouvre.
    */
   recuperationConfirmee: () => void;
+  /**
+   * REQ-UI-22 — le parcours d'accueil est terminé (ou n'a jamais commencé). C'est la
+   * seule chose qui rende l'app atteignable une fois la clé confirmée sur un compte neuf.
+   */
+  onboardingTermine: () => void;
   /** REQ-UIX-06 — wipe complet (REQ-COR-10), après confirmation explicite. */
   deconnecter: (session: Session) => Promise<void>;
 }
@@ -26,6 +31,7 @@ interface Contexte {
 const ContexteSession = createContext<Contexte>({
   etat: { phase: "chargement" },
   recuperationConfirmee: () => {},
+  onboardingTermine: () => {},
   deconnecter: async () => {},
 });
 
@@ -36,6 +42,8 @@ export interface SessionProviderProps {
   homeserverUrl: string;
   /** Injecté en test ; en production, la vraie redirection du navigateur. */
   rediriger?: (url: string) => void;
+  /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
+  indexedDB?: IDBFactory;
 }
 
 /**
@@ -51,8 +59,14 @@ export interface SessionProviderProps {
  * Un jeton restauré n'est pas validé (limite assumée de `client-core`) : un
  * `M_UNKNOWN_TOKEN` au premier appel se traduit ici par un retour à l'OIDC.
  */
-export function SessionProvider({ children, homeserverUrl, rediriger }: SessionProviderProps) {
+export function SessionProvider({
+  children,
+  homeserverUrl,
+  rediriger,
+  indexedDB,
+}: SessionProviderProps) {
   const [etat, setEtat] = useState<EtatSession>({ phase: "chargement" });
+  const base = indexedDB ?? globalThis.indexedDB;
 
   const versOidc = useCallback(() => {
     const aller = rediriger ?? ((url: string) => globalThis.location.assign(url));
@@ -75,7 +89,7 @@ export function SessionProvider({ children, homeserverUrl, rediriger }: SessionP
           versOidc();
           return;
         }
-        setEtat(await etatDe(session));
+        setEtat(await etatDe(session, base));
       } catch {
         // Jeton révoqué, crypto indisponible, réseau absent au premier appel : dans tous
         // les cas l'entrée passe par l'OIDC. Rien n'est journalisé — un message d'erreur
@@ -90,7 +104,7 @@ export function SessionProvider({ children, homeserverUrl, rediriger }: SessionP
     return () => {
       annule = true;
     };
-  }, [homeserverUrl, versOidc]);
+  }, [homeserverUrl, versOidc, base]);
 
   /*
    * REQ-UIX-06 — un jeton que le serveur refuse ne doit pas survivre à l'écran.
@@ -112,27 +126,35 @@ export function SessionProvider({ children, homeserverUrl, rediriger }: SessionP
     if (etat.phase !== "recuperation-requise") return;
 
     /*
-     * REQ-MSG-22 — **le seul endroit du produit où « le compte vient d'être créé » est
-     * une information disponible.** `mode` vaut `creation` quand le compte n'a aucune
-     * identité cross-signing, c'est-à-dire à la toute première ouverture et à ce
-     * moment-là seulement ; toute reconnexion passe par `deverrouillage`. Poser les
-     * images ailleurs — au premier /sync, à l'ouverture du profil — aurait demandé un
-     * marqueur local à maintenir, alors que la porte le sait déjà.
+     * REQ-UI-22 — **le seul endroit du produit où « le compte vient d'être créé » est une
+     * information disponible.** `mode` vaut `creation` quand le compte n'a aucune identité
+     * cross-signing, c'est-à-dire à la toute première ouverture et à ce moment-là
+     * seulement ; toute reconnexion passe par `deverrouillage`.
      *
-     * Sans attendre, et sans bruit si ça échoue : l'étape qui vient de se terminer est
-     * celle du chiffrement, et rien ne justifie de retenir l'entrée dans l'app pour deux
-     * images décoratives. `poserImagesParDefaut` est sans effet au second appel, ce qui
-     * rend ce départ sans garde sûr. Rien n'est journalisé — un échec de téléversement
-     * porte l'URL d'un média (interdit n°8).
+     * C'est donc ici, et nulle part ailleurs, que le parcours d'accueil peut savoir qu'il
+     * a lieu d'être. Un déverrouillage, lui, entre directement dans l'app : la personne a
+     * déjà un profil, des notifications réglées et des conversations — lui rejouer le
+     * parcours serait lui redemander ce qu'elle a déjà répondu.
      *
-     * ponytail: pas de reprise si le réseau tombe pile ici ; le compte reste sur ses
-     * initiales jusqu'à ce qu'il choisisse une photo. Ajouter une reprise le jour où
-     * l'écran de profil montre que c'est arrivé pour de vrai.
+     * La marque IndexedDB qui rend le parcours reprenable après un rechargement est posée
+     * par le parcours lui-même (`Onboarding`), pas ici : c'est lui qui sait quand il
+     * commence et quand il finit.
      */
-    if (etat.mode === "creation") void poserIdentiteParDefaut(etat.session).catch(() => {});
-
-    setEtat({ phase: "prete", session: etat.session });
+    setEtat({
+      phase: "prete",
+      session: etat.session,
+      onboarding: etat.mode === "creation",
+    });
   }, [etat]);
+
+  const onboardingTermine = useCallback(() => {
+    if (etat.phase !== "prete") return;
+    // Sans bruit si l'écriture échoue : le pire cas est un parcours reproposé au prochain
+    // lancement, jamais une app inatteignable — la marque n'ouvre aucune porte, elle en
+    // retarde une.
+    if (base) void ecrireOnboardingEnCours(base, false).catch(() => {});
+    setEtat({ phase: "prete", session: etat.session });
+  }, [etat, base]);
 
   const deconnecter = useCallback(
     async (session: Session) => {
@@ -144,7 +166,9 @@ export function SessionProvider({ children, homeserverUrl, rediriger }: SessionP
   );
 
   return (
-    <ContexteSession.Provider value={{ etat, recuperationConfirmee, deconnecter }}>
+    <ContexteSession.Provider
+      value={{ etat, recuperationConfirmee, onboardingTermine, deconnecter }}
+    >
       {children}
     </ContexteSession.Provider>
   );

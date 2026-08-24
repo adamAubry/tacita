@@ -23,6 +23,14 @@ export interface ProfileCardProps {
    * profil : la question ne s'y pose pas.
    */
   statut?: "ami" | "non-ami" | "bloque";
+  /**
+   * Le bouton de retour. Présent partout où cette carte est une **page** ; absent là où
+   * elle n'en est pas une — l'étape d'identité du parcours d'accueil (M-B), où il n'y a
+   * aucun écran derrière et où `router.back()` sortirait de l'application. Un bouton qui
+   * ne mène nulle part est pire qu'un bouton absent (même jurisprudence que l'engrenage
+   * retiré de ce bandeau).
+   */
+  retour?: boolean;
 }
 
 const LIBELLE_STATUT = {
@@ -161,6 +169,7 @@ export function ProfileCard({
   bannerUrl,
   actions,
   statut,
+  retour = true,
 }: ProfileCardProps) {
   const router = useRouter();
   const banniere = useImageMxc(bannerUrl);
@@ -234,6 +243,7 @@ export function ProfileCard({
             non dans un `style` inline : un style inline gagne sur `:hover`, donc il
             **interdit** tout état de survol. C'est la seule raison — pas une préférence de
             rangement. */}
+        {retour ? (
         <Button
           label="Retour"
           variant="ghost"
@@ -246,6 +256,12 @@ export function ProfileCard({
           icon={<Icon icon="chevronLeft" />}
           onClick={() => router.back()}
         />
+        ) : (
+          // La place du retour reste tenue : sans elle, le badge et les actions
+          // remonteraient à gauche sous l'encoche. Un `span` vide, pas un `div` — il n'y a
+          // rien à annoncer.
+          <span />
+        )}
 
         <div
           style={{

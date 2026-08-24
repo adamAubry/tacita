@@ -5,11 +5,63 @@ import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IosPushEducation } from "../components/onboarding/IosPushEducation";
+import { ETAPES } from "../components/onboarding/etapes";
 import { LogoutButton } from "../components/onboarding/LogoutButton";
 import { RecoveryGate } from "../components/onboarding/RecoveryGate";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
+import { contactsDeLaSession } from "../lib/contacts";
+import { NOM_NOTES } from "../lib/premiere-conversation";
+import { routeConversation } from "../lib/routes";
 import { retirerJetonDeLUrl, urlConnexion } from "../lib/session";
-import { ecrireRefusEducationIOS } from "../lib/preferences";
+import { ecrireOnboardingEnCours, ecrireRefusEducationIOS } from "../lib/preferences";
+
+const pousser = vi.fn();
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ push: pousser, back: vi.fn() }),
+}));
+
+/**
+ * Les paquets 04–10 sont mockés à leurs interfaces (spec 11). Ce fichier en voit plus
+ * qu'avant : le parcours d'accueil traverse le profil (REQ-MSG-18/22), la création de la
+ * conversation personnelle (REQ-MSG-02/15) et la chaîne push.
+ */
+const profil = vi.fn(async (_session: unknown, userId: string) => ({
+  userId,
+  displayName: "Mira",
+  avatarUrl: "mxc://tacita.test/avatar",
+  bannerUrl: "mxc://tacita.test/banniere",
+}));
+const updateProfile = vi.fn(async () => {});
+const listees = vi.fn(() => [] as { roomId: string; peerId?: string; name: string }[]);
+const createGroupChat = vi.fn(async () => ({ room_id: "!notes:tacita.test" }));
+const registerDirect = vi.fn(async () => {});
+const poserImagesParDefaut = vi.fn(async () => {});
+vi.mock("@tacita/messaging", () => ({
+  profileOf: (...args: unknown[]) => profil(...(args as [unknown, string])),
+  updateProfile: (...args: unknown[]) => updateProfile(...(args as [])),
+  conversations: () => listees(),
+  createGroupChat: (...args: unknown[]) => createGroupChat(...(args as [])),
+  registerDirect: (...args: unknown[]) => registerDirect(...(args as [])),
+  poserImagesParDefaut: (...args: unknown[]) => poserImagesParDefaut(...(args as [])),
+  TAILLE_IDENTITE: 512,
+  // Lues par `lib/push.ts`, que la chaîne des notifications importe.
+  mentionCandidates: () => [],
+  messages: () => [],
+  messageText: () => "",
+  invitations: () => [],
+  subscribeConversations: () => () => {},
+  ignoredUsers: () => [],
+  ignoreUser: vi.fn(),
+  unignoreUser: vi.fn(),
+  acceptInvitation: vi.fn(),
+  leaveConversation: vi.fn(),
+  openDirectMessage: vi.fn(),
+}));
+vi.mock("@tacita/media-pipeline", () => ({
+  uploadPublicProfileImage: vi.fn(async () => "mxc://tacita.test/choisie"),
+  downloadPublicImage: vi.fn(async () => new Blob()),
+}));
 
 const HOMESERVER = "https://chat.tacita.test";
 const MOI = "@moi:tacita.test";
@@ -53,13 +105,25 @@ function fausseSession(options: { recuperation?: RecoveryState } = {}) {
 
 const rediriger = vi.fn();
 
-const monter = (session: Session | null, enfant = <p>Conversations</p>) => {
+const monter = (
+  session: Session | null,
+  enfant = <p>Conversations</p>,
+  indexedDB = new IDBFactory(),
+) => {
   restoreSession.mockResolvedValue(session);
   return render(
-    <SessionProvider homeserverUrl={HOMESERVER} rediriger={rediriger}>
+    <SessionProvider homeserverUrl={HOMESERVER} rediriger={rediriger} indexedDB={indexedDB}>
       <RecoveryGate>{enfant}</RecoveryGate>
     </SessionProvider>,
   );
+};
+
+/** REQ-UI-22 — franchir l'étape bloquante, qui est la première du parcours. */
+const franchirLaCle = async () => {
+  await waitFor(() => expect(screen.getByText("Continuer")).toBeTruthy());
+  fireEvent.click(screen.getByText("Continuer"));
+  await waitFor(() => expect(screen.getByText("J'ai sauvegardé ma clé")).toBeTruthy());
+  fireEvent.click(screen.getByText("J'ai sauvegardé ma clé"));
 };
 
 beforeEach(() => {
@@ -75,6 +139,11 @@ afterEach(() => {
   initSession.mockReset();
   restoreSession.mockReset();
   rediriger.mockReset();
+  pousser.mockReset();
+  listees.mockReturnValue([]);
+  createGroupChat.mockClear();
+  registerDirect.mockClear();
+  updateProfile.mockClear();
 });
 
 describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () => {
@@ -113,8 +182,14 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
     // La promesse est tenue telle qu'elle est faite : elle ne sera plus affichée.
     expect(screen.getByText(/ne sera plus affichée/)).toBeTruthy();
 
+    /*
+     * La confirmation ne rend plus l'app : elle rend l'étape suivante du parcours
+     * (REQ-UI-22). Ce qu'elle libère est le chiffrement, pas la porte — et la porte reste
+     * fermée jusqu'au bout du parcours, qui se termine dans une conversation ouverte.
+     */
     fireEvent.click(screen.getByText("J'ai sauvegardé ma clé"));
-    await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+    expect(screen.queryByText("Conversations")).toBeNull();
   });
 
   it("dit la vérité sur ce qu'on perd sans la clé", async () => {
@@ -460,5 +535,200 @@ describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé,
 
     await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
     expect(screen.queryByText("Entrez votre clé de récupération")).toBeNull();
+  });
+});
+
+describe("REQ-UI-22 — le parcours d'accueil, de la clé au premier message", () => {
+  it("enchaîne ses étapes et n'ouvre l'application qu'à la fin", async () => {
+    const { session } = fausseSession({ recuperation: "creation" });
+    monter(session);
+
+    // 1 — la clé. Bloquante : c'est elle qui rend le chiffrement possible (D-08).
+    await franchirLaCle();
+
+    // 2 — l'identité, dessinée pendant que l'écran se monte.
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+    expect(poserImagesParDefaut).toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Continuer"));
+
+    // 3 — les notifications, avec l'écran des réglages lui-même (M-H).
+    await waitFor(() => expect(screen.getByText("Ne ratez pas un message")).toBeTruthy());
+    fireEvent.click(screen.getByText("Continuer"));
+
+    // 4 — la conversation, et l'application est toujours fermée derrière.
+    await waitFor(() => expect(screen.getByText("Écrivez votre premier message")).toBeTruthy());
+    expect(screen.queryByText("Conversations")).toBeNull();
+
+    fireEvent.click(screen.getByText("Ouvrir et écrire"));
+    await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
+    expect(pousser).toHaveBeenCalledWith(routeConversation("!notes:tacita.test"));
+  });
+
+  it("dit à chaque écran où l'on en est, et sur combien", async () => {
+    const { session } = fausseSession({ recuperation: "creation" });
+    monter(session);
+
+    // Le total vient de la liste, pas d'un nombre écrit dans l'indicateur : une étape
+    // ajoutée sans que le compte suive donnerait « étape 4 sur 3 ».
+    await waitFor(() =>
+      expect(screen.getByText(`Étape 1 sur ${ETAPES.length}`)).toBeTruthy(),
+    );
+    await franchirLaCle();
+    await waitFor(() =>
+      expect(screen.getByText(`Étape 2 sur ${ETAPES.length}`)).toBeTruthy(),
+    );
+  });
+
+  it("ce qui est facultatif se passe ; ce qui bloque n'offre aucune sortie", async () => {
+    const { session } = fausseSession({ recuperation: "creation" });
+    monter(session);
+
+    // L'étape de la clé n'a pas de « passer » : elle n'est ni sautable, ni différable.
+    await waitFor(() => expect(screen.getByText("Votre clé de récupération")).toBeTruthy());
+    expect(screen.queryByText("Passer")).toBeNull();
+
+    await franchirLaCle();
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+
+    // Passer l'identité n'écrit rien : c'est ce qui distingue « passer » de « continuer ».
+    fireEvent.click(screen.getByText("Passer"));
+    await waitFor(() => expect(screen.getByText("Ne ratez pas un message")).toBeTruthy());
+    expect(updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("une étape qui prépare quelque chose le montre, sans spinner plein écran", async () => {
+    const { session } = fausseSession({ recuperation: "creation" });
+    // Le dessin des images ne rend jamais la main : l'écran doit dire qu'il travaille.
+    poserImagesParDefaut.mockImplementationOnce(() => new Promise(() => {}));
+    monter(session);
+    await franchirLaCle();
+
+    await waitFor(() => expect(screen.getByText("Création de votre identité…")).toBeTruthy());
+    // La progression reste lisible au-dessus : l'attente est localisée (DESIGN.md).
+    expect(screen.getByText(`Étape 2 sur ${ETAPES.length}`)).toBeTruthy();
+    expect(screen.queryByText("Voici votre identité")).toBeNull();
+  });
+
+  it("ne se contourne pas par l'URL : ce n'est pas une route, c'est le shell", async () => {
+    const { session } = fausseSession({ recuperation: "creation" });
+    globalThis.history.replaceState(null, "", "/c?room=!salon:tacita.test");
+    monter(session);
+
+    await franchirLaCle();
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+    expect(screen.queryByText("Conversations")).toBeNull();
+  });
+
+  it("un rechargement au milieu du parcours le reprend, il ne le perd pas", async () => {
+    // Le compte a sa clé (l'étape est franchie), et la marque dit que le parcours court
+    // encore. Sans elle, ce rechargement tomberait sur une application vide.
+    const indexedDB = new IDBFactory();
+    await ecrireOnboardingEnCours(indexedDB, true);
+    const { session } = fausseSession({ recuperation: "prete" });
+    monter(session, <p>Conversations</p>, indexedDB);
+
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+    expect(screen.queryByText("Conversations")).toBeNull();
+  });
+
+  it("une reconnexion sur un compte existant ne rejoue pas le parcours", async () => {
+    // `deverrouillage` : la personne a déjà un profil, des réglages et des conversations.
+    // Lui rejouer le parcours serait lui redemander ce qu'elle a déjà répondu.
+    const { session } = fausseSession({ recuperation: "deverrouillage" });
+    monter(session);
+
+    await waitFor(() => expect(screen.getByText("Entrez votre clé de récupération")).toBeTruthy());
+    expect(screen.queryByText(/Étape 1 sur/)).toBeNull();
+  });
+
+  it("la liste des étapes est la seule source : en retirer une retire son écran", async () => {
+    // La modularité, prouvée plutôt qu'affirmée : le parcours ne connaît aucune étape en
+    // dur, ni pour les afficher, ni pour les compter.
+    const cles = ETAPES.map((etape) => etape.cle);
+    expect(cles).toEqual([
+      "cle-de-recuperation",
+      "identite",
+      "notifications",
+      "premiere-conversation",
+    ]);
+
+    const { Onboarding } = await import("../components/onboarding/Onboarding");
+    const { session } = fausseSession();
+    render(
+      <SessionProvider homeserverUrl={HOMESERVER} rediriger={rediriger} indexedDB={new IDBFactory()}>
+        <Onboarding
+          session={session}
+          depart={0}
+          indexedDB={new IDBFactory()}
+          etapes={[
+            { cle: "seule", Contenu: () => <p>Une seule étape</p> },
+          ]}
+        />
+      </SessionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("Une seule étape")).toBeTruthy());
+    expect(screen.getByText("Étape 1 sur 1")).toBeTruthy();
+  });
+});
+
+describe("REQ-UI-23 — la première conversation, pour que l'application ne s'ouvre pas vide", () => {
+  const allerAuBout = async () => {
+    await franchirLaCle();
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+    fireEvent.click(screen.getByText("Passer"));
+    await waitFor(() => expect(screen.getByText("Ne ratez pas un message")).toBeTruthy());
+    fireEvent.click(screen.getByText("Continuer"));
+  };
+
+  it("ouvre un salon chiffré à soi, inscrit comme conversation et non comme groupe", async () => {
+    const { session } = fausseSession({ recuperation: "creation" });
+    monter(session);
+    await allerAuBout();
+
+    await waitFor(() => expect(createGroupChat).toHaveBeenCalledWith(session, NOM_NOTES));
+    // `m.direct` sous son propre identifiant : c'est ce qui la fait lire comme une
+    // conversation — nom, avatar, et « c'est le début de votre conversation ».
+    expect(registerDirect).toHaveBeenCalledWith(session, MOI, "!notes:tacita.test");
+  });
+
+  it("jamais deux fois : un salon à soi qui existe est celui qu'on rouvre", async () => {
+    listees.mockReturnValue([
+      { roomId: "!deja:tacita.test", peerId: MOI, name: NOM_NOTES },
+    ]);
+    const { session } = fausseSession({ recuperation: "creation" });
+    monter(session);
+    await allerAuBout();
+
+    await waitFor(() => expect(screen.getByText("Ouvrir et écrire")).toBeTruthy());
+    expect(createGroupChat).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Ouvrir et écrire"));
+    expect(pousser).toHaveBeenCalledWith(routeConversation("!deja:tacita.test"));
+  });
+
+  it("si la création échoue, on entre quand même — et on le dit", async () => {
+    // Interdit n°13 : un bouton « ouvrir » sans salon à ouvrir serait un bouton mort.
+    createGroupChat.mockRejectedValueOnce(new Error("réseau"));
+    const { session } = fausseSession({ recuperation: "creation" });
+    monter(session);
+    await allerAuBout();
+
+    await waitFor(() =>
+      expect(screen.getByText("La conversation n'a pas pu être créée")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByText("Entrer dans l'application"));
+    await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
+  });
+
+  it("on n'est pas son propre ami : la conversation à soi n'entre pas dans la liste", async () => {
+    listees.mockReturnValue([
+      { roomId: "!notes:tacita.test", peerId: MOI, name: NOM_NOTES },
+      { roomId: "!dm:tacita.test", peerId: "@mira:tacita.test", name: "Mira" },
+    ]);
+    const { session } = fausseSession();
+
+    expect(contactsDeLaSession(session).lister()).toEqual([
+      { userId: "@mira:tacita.test", nom: "Mira" },
+    ]);
   });
 });

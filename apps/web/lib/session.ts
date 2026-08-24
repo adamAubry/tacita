@@ -1,5 +1,7 @@
 import type { RecoveryState, Session } from "@tacita/client-core";
 
+import { lireOnboardingEnCours } from "./preferences";
+
 /**
  * L'état d'entrée dans l'app, tel que l'UI a besoin de le connaître. Rien de plus :
  * la logique vit dans `client-core` (spec 04), le shard ne fait que router dessus.
@@ -17,7 +19,11 @@ export type EtatSession =
    * création s'ouvrait devant quelqu'un qui avait sa clé depuis longtemps.
    */
   | { phase: "recuperation-requise"; session: Session; mode: Exclude<RecoveryState, "prete"> }
-  | { phase: "prete"; session: Session };
+  /**
+   * REQ-UI-22 — l'app est atteignable. `onboarding` dit qu'elle ne s'ouvre pas encore :
+   * le parcours d'accueil est commencé et n'est pas fini, sur cet appareil.
+   */
+  | { phase: "prete"; session: Session; onboarding?: boolean };
 
 /** Le paramètre que Synapse ajoute au retour du fournisseur OIDC. */
 export const PARAM_JETON = "loginToken";
@@ -84,9 +90,20 @@ export function retirerJetonDeLUrl(location: Location, history: History): string
  * déconnexion/reconnexion dans le même navigateur, elle laissait passer un appareil non
  * signé, muet et sourd, avec l'application entière derrière.
  */
-export async function etatDe(session: Session): Promise<EtatSession> {
+export async function etatDe(session: Session, indexedDB?: IDBFactory): Promise<EtatSession> {
   const etat = await session.recoveryState();
-  return etat === "prete"
-    ? { phase: "prete", session }
-    : { phase: "recuperation-requise", session, mode: etat };
+  if (etat !== "prete") return { phase: "recuperation-requise", session, mode: etat };
+
+  /*
+   * REQ-UI-22 — la reprise du parcours d'accueil. Elle est lue **ici** et non dans un
+   * écran : la porte montre déjà une géométrie d'attente pendant que cette fonction
+   * répond, et une lecture faite plus tard ferait clignoter l'accueil avant le parcours.
+   *
+   * Une base absente ou illisible vaut « pas de parcours en cours » : le pire cas est
+   * quelqu'un qui reprend la main une étape trop tôt, jamais quelqu'un bloqué dehors.
+   */
+  const onboarding = indexedDB
+    ? await lireOnboardingEnCours(indexedDB).catch(() => false)
+    : false;
+  return { phase: "prete", session, onboarding };
 }
