@@ -193,6 +193,17 @@ Les clés VAPID, sans installer Node sur la machine :
 docker run --rm node:22-alpine npx -y web-push generate-vapid-keys
 ```
 
+Recopier les deux valeurs **telles quelles** : sans guillemets, sans espace, sans retour
+à la ligne. Une paire valide fait 87 et 43 caractères (65 et 32 octets décodés), et la
+passerelle refuse désormais de démarrer autrement, en nommant la variable — laissées sur
+`change-me`, elle redémarrait en boucle sur un message parlant d'octets décodés, et
+`/push/config` répondait 502 sans que rien ne dise pourquoi.
+
+```sh
+# Contrôle : doit rendre 87 puis 43
+awk -F= '/^VAPID_(PUBLIC|PRIVATE)_KEY=/ {print length($2)}' infra/.env
+```
+
 `infra/.env` est ignoré par git et ne doit jamais y entrer. Il n'existe qu'ici.
 
 ---
@@ -351,7 +362,9 @@ docker compose -f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker
 | `kcadm.sh` répond `404 Not Found`                                        | `--server` sans `/auth`                                                                                                  | § 7      |
 | Une modification de `realm-export.json` n'a aucun effet                  | le realm n'est importé qu'au premier démarrage du volume                                                                 | § 7      |
 | `RtcFociMissing` à l'écran d'appel                                       | pile sans SFU — attendu ici                                                                                              | § 9      |
-| Aucune notification push ne parvient                                     | jamais délivré de bout en bout à ce jour ; c'est l'inconnue de cet environnement                                         | § 0      |
+| `push-gateway` redémarre en boucle, « Vapid public key should be 65 bytes long » | `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` invalides dans `infra/.env` — service jamais démarré, donc aucun push possible | § 5 |
+| `502` sur `/push/config`                                                 | la passerelle ne tourne pas — voir la ligne au-dessus                                                                    | § 5      |
+| Aucune notification push ne parvient, la passerelle tournant             | lire `docker compose … logs push-gateway` : aucune ligne ⇒ Synapse n'appelle pas (`SYNAPSE_IP_RANGE_WHITELIST`, ou salon en silencieux) ; `push_failed` ⇒ le code dit lequel. L'écran Profil › Réglages › Notifications dit le maillon manquant | `infra/README.md` § REQ-INF-14 |
 
 Pour ce qui ressemble à une limite du produit plutôt qu'à une panne, la liste « Ce qui
 n'est pas prouvé » d'`apps/web/README.md` fait foi, et `infra/LIMITES.md` porte les

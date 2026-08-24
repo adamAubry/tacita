@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -103,5 +104,43 @@ describe("REQ-INF-14 — la passerelle Web Push est provisionnée par ce module"
     const gabarit = read("../synapse/homeserver.yaml.tmpl");
     expect(gabarit).toContain("REQ-PSH-01");
     expect(readme).toContain("SYNAPSE_IP_RANGE_WHITELIST");
+  });
+
+  /**
+   * Règle 4, et son cas d'école. Les vingt REQ de la spec 03 étaient vertes pendant que
+   * la passerelle **redémarrait en boucle sur le staging depuis le premier jour** : le
+   * `.env` portait encore `change-me`, le contrôle de présence le laissait passer, et
+   * `web-push` refusait la clé avec un message qui parle d'octets décodés sans nommer ni
+   * la variable ni le fichier. Service jamais démarré ⇒ `/push/config` en 502 ⇒ aucun
+   * push possible, jamais.
+   *
+   * Le sous-processus est lancé avec `--experimental-strip-types`, **le moteur qui fait
+   * tourner ce service** : Vitest transpile, lui non, et un service peut avoir toutes ses
+   * REQ vertes sans démarrer. Ce test prouve les deux à la fois — le module se charge
+   * sous ce moteur, et il refuse une clé invalide en le disant.
+   */
+  it("refuse une clé VAPID invalide en nommant la variable, pas des octets", () => {
+    const entree = new URL("../../apps/push-gateway/src/index.ts", import.meta.url);
+    let sortie = "";
+    try {
+      execFileSync(process.execPath, ["--experimental-strip-types", entree.pathname], {
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          VAPID_SUBJECT: "mailto:admin@example.org",
+          // Exactement ce que `.env.example` livre, et ce qu'un déploiement oublie.
+          VAPID_PUBLIC_KEY: "change-me",
+          VAPID_PRIVATE_KEY: "change-me",
+        },
+      });
+    } catch (erreur) {
+      sortie = String((erreur as { stderr?: Buffer }).stderr ?? "");
+    }
+
+    expect(sortie, "le service a démarré avec une clé invalide").toContain("VAPID_PUBLIC_KEY");
+    expect(sortie).toContain("generate-vapid-keys");
+    expect(sortie).toContain("infra/.env");
+    // REQ-PSH-04 : la taille, jamais la valeur.
+    expect(sortie).not.toContain("change-me");
   });
 });
