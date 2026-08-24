@@ -53,12 +53,98 @@ export function apercuLocal(session: Session, roomId: string, eventId?: string):
   }
 }
 
-/** `Notification` n'existe pas partout — un navigateur sans push n'est pas une panne. */
-export const pushDisponible = (): boolean =>
-  typeof Notification !== "undefined" && "serviceWorker" in globalThis.navigator;
+/**
+ * REQ-PSH-05 — sur iOS, le Web Push n'existe **que** pour une PWA installée à l'écran
+ * d'accueil. Hors standalone, `Notification` n'existe même pas dans Safari : sans cette
+ * distinction, l'écran des réglages annonce « ce navigateur ne gère pas les
+ * notifications » à quelqu'un dont le navigateur les gère très bien — il lui manque un
+ * geste, et c'est le seul message qui l'aide.
+ *
+ * Ces deux prédicats vivaient dans `components/onboarding/IosPushEducation.tsx`. Ils
+ * sont ici parce que l'état de l'abonnement en dépend, et qu'un module de `lib/` ne
+ * remonte pas vers un composant.
+ *
+ * `standalone` sur `navigator` est une extension Safari, absente du type standard.
+ */
+export const estIOS = (userAgent: string) =>
+  /iPad|iPhone|iPod/.test(userAgent) ||
+  // iPadOS 13+ se présente comme un Macintosh dès qu'il est en « site pour ordinateur »,
+  // ce qui est son défaut sur grand écran. Sans cette seconde branche, un iPad dans
+  // Safari s'entend répondre « ce navigateur ne gère pas les notifications » — faux, et
+  // sans issue, alors qu'il lui manque exactement le même geste qu'à un iPhone. Le
+  // pointeur tactile est le seul signal qui reste : un Mac en rend 0.
+  (/Macintosh/.test(userAgent) && (globalThis.navigator?.maxTouchPoints ?? 0) > 1);
 
-export const permissionPush = (): NotificationPermission | "indisponible" =>
-  pushDisponible() ? Notification.permission : "indisponible";
+export const estInstallee = (): boolean =>
+  globalThis.matchMedia?.("(display-mode: standalone)").matches === true ||
+  (globalThis.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+/**
+ * Les six états de l'abonnement, et le seul vocabulaire que l'interface emploie.
+ *
+ * Ils sont **ordonnés par cause** et non par gravité : chacun nomme le geste qui manque,
+ * parce que c'est la seule chose qu'un écran de réglages puisse dire d'utile.
+ *
+ * - `indisponible` — ce navigateur n'a ni `Notification` ni service worker ;
+ * - `ios-a-installer` — iPhone hors écran d'accueil : rien n'est possible avant l'ajout ;
+ * - `refuse` — permission refusée ; elle ne se redemande pas, elle se lève dans le
+ *   navigateur ;
+ * - `possible` — permission jamais demandée : un geste suffit ;
+ * - `a-reparer` — permission accordée et pourtant **rien ne notifie** : abonnement du
+ *   navigateur absent, ou pusher jamais enregistré sur le compte. C'est l'état qui
+ *   n'existait pas, et son absence est ce qui faisait afficher « Notifications
+ *   activées » à quelqu'un qui n'en recevait aucune (interdit n°13) ;
+ * - `abonne` — les trois maillons sont en place.
+ */
+export type EtatPush =
+  | "indisponible"
+  | "ios-a-installer"
+  | "refuse"
+  | "possible"
+  | "a-reparer"
+  | "abonne";
+
+/**
+ * L'état lisible **sans réseau ni session**, au premier rendu des réglages.
+ *
+ * `accordee` n'est pas un `EtatPush` : c'est le cas où seule une vérification en ligne
+ * peut trancher entre `abonne` et `a-reparer`. Le dire ici évite de promettre l'un ou
+ * l'autre avant d'avoir regardé.
+ */
+export function etatPushLocal(): Exclude<EtatPush, "abonne" | "a-reparer"> | "accordee" {
+  // L'ordre compte : sur iPhone hors standalone, `Notification` est absent, et le
+  // diagnostic « navigateur incapable » y serait faux **et** décourageant.
+  if (typeof navigator !== "undefined" && estIOS(navigator.userAgent) && !estInstallee()) {
+    return "ios-a-installer";
+  }
+  if (typeof Notification === "undefined" || !("serviceWorker" in globalThis.navigator)) {
+    return "indisponible";
+  }
+  if (Notification.permission === "denied") return "refuse";
+  if (Notification.permission === "default") return "possible";
+  return "accordee";
+}
+
+/**
+ * Les trois maillons de la chaîne, séparément.
+ *
+ * C'est **le** livrable de cet écran, et pas un confort de développeur : la chaîne
+ * traverse un navigateur, un service worker, un service push tiers, Synapse et une
+ * passerelle. Un seul booléen « activé » ne dit pas lequel a lâché, et c'est exactement
+ * ce qui rendait la panne muette — permission accordée, aucun abonnement, aucun pusher,
+ * et l'écran qui répondait « Notifications activées ».
+ */
+export interface DiagnosticPush {
+  etat: EtatPush;
+  /** L'utilisateur a accordé la permission à ce navigateur. */
+  permission: boolean;
+  /** Le navigateur a une `PushSubscription` vivante, chiffrée avec **notre** clé VAPID. */
+  abonnement: boolean;
+  /** Synapse connaît ce pusher : c'est lui qui appellera la passerelle. */
+  pusher: boolean;
+}
+
+const APP_ID = "org.tacita.web";
 
 /** REQ-PSH-03 — la clé publique VAPID, servie par la passerelle. */
 async function cleVapid(): Promise<string> {
@@ -77,54 +163,187 @@ function octetsDeBase64Url(valeur: string): Uint8Array {
 }
 
 /**
- * REQ-UI-18 — l'abonnement complet : permission, subscription navigateur, pusher Matrix.
+ * Le service worker **actif**, ou `null` — jamais une attente sans fin.
  *
- * Rend `false` sur refus de permission, sans lever : c'est un choix, pas une erreur, et
- * les réglages (M-H) en affichent l'état avec son chemin de rattrapage.
+ * `navigator.serviceWorker.ready` ne rejette pas : sans enregistrement, elle attend pour
+ * toujours. C'était le défaut exact du bouton « Activer les notifications » — un appui,
+ * une promesse jamais résolue, aucun message, rien. Un état terminal vaut mieux qu'un
+ * spinner éternel, même quand il dit non.
  *
- * Les clés de la subscription partent dans `data` du pusher : c'est de là que la
- * passerelle les relit à chaque notification (spec 03), ce qui lui évite une base.
+ * L'enregistrement est retenté ici, à la demande : si celui du démarrage a échoué
+ * (REQ-UI-01), c'est le moment où quelqu'un demande explicitement des notifications qui
+ * mérite une seconde chance. Hors production on ne l'enregistre pas — même règle que
+ * `app/register-sw.tsx`, et pour la même raison.
  */
-export async function abonnerAuxNotifications(session: Session): Promise<boolean> {
-  if (!pushDisponible()) return false;
-  if ((await Notification.requestPermission()) !== "granted") return false;
+const DELAI_SW_MS = 10_000;
 
-  const enregistrement = await navigator.serviceWorker.ready;
-  const cle = await cleVapid();
-  const abonnement =
-    (await enregistrement.pushManager.getSubscription()) ??
-    (await enregistrement.pushManager.subscribe({
+async function serviceWorkerActif(): Promise<ServiceWorkerRegistration | null> {
+  if (!("serviceWorker" in navigator)) return null;
+
+  const existant = await navigator.serviceWorker.getRegistration().catch(() => undefined);
+  const enregistrement =
+    existant ??
+    (process.env.NODE_ENV === "production"
+      ? await navigator.serviceWorker.register("/sw.js").catch(() => null)
+      : null);
+
+  if (!enregistrement) return null;
+  if (enregistrement.active) return enregistrement;
+
+  // L'installation est en cours : on l'attend, mais bornée.
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resoudre) => setTimeout(() => resoudre(null), DELAI_SW_MS)),
+  ]);
+}
+
+/**
+ * Une subscription créée avec une **autre** clé VAPID est indéchiffrable par notre
+ * passerelle : le service push répond 403 et rien n'arrive, sans que rien ne le dise.
+ * Le cas se produit dès qu'un déploiement régénère ses clés.
+ *
+ * `true` quand la clé n'est pas lisible : certains navigateurs n'exposent pas
+ * `options.applicationServerKey`. Y répondre « différente » ferait se réabonner à chaque
+ * ouverture, donc changerait d'endpoint à chaque fois, donc laisserait derrière un pusher
+ * mort à chaque fois. Dans le doute, on garde.
+ */
+function memeCleVapid(abonnement: PushSubscription, cle: Uint8Array): boolean {
+  const posee = abonnement.options?.applicationServerKey;
+  if (!posee) return true;
+  const octets = new Uint8Array(posee);
+  return octets.length === cle.length && octets.every((octet, i) => octet === cle[i]);
+}
+
+/**
+ * REQ-UI-18 — met la chaîne en état, et **rend ce qu'elle vaut vraiment**.
+ *
+ * Idempotente, sans effet de bord visible, appelable à chaque ouverture de l'app : c'est
+ * elle qui répare toute seule les trois pannes qu'on ne peut pas empêcher — la
+ * subscription que le navigateur fait tourner, le pusher que Synapse a supprimé après un
+ * 410, et la clé VAPID régénérée au déploiement. Elle ne demande **jamais** la
+ * permission : c'est le rôle de
+ * {@link demanderEtBrancher}, qui a le geste de l'utilisateur pour elle.
+ *
+ * Le pusher n'est réécrit que s'il manque. Sa présence est relue après écriture : une
+ * promesse résolue ne prouve que l'acceptation du POST, et REQ-PSH-01 fait de Synapse
+ * l'appelant de la passerelle — un pusher absent du compte, c'est une chaîne coupée à
+ * l'endroit précis où personne ne regarde.
+ */
+export async function brancherPush(session: Session): Promise<DiagnosticPush> {
+  const local = etatPushLocal();
+  if (local !== "accordee") {
+    return { etat: local, permission: false, abonnement: false, pusher: false };
+  }
+
+  const echec = (): DiagnosticPush => ({
+    etat: "a-reparer",
+    permission: true,
+    abonnement: false,
+    pusher: false,
+  });
+
+  try {
+    const enregistrement = await serviceWorkerActif();
+    if (!enregistrement) return echec();
+
+    // Les deux en parallèle : la clé sert à valider l'abonnement existant, la liste des
+    // pushers à savoir s'il y a quoi que ce soit à écrire.
+    const [cleBrute, pushers] = await Promise.all([
+      cleVapid(),
+      session.client.getPushers().then(({ pushers }) => pushers),
+    ]);
+    const cle = octetsDeBase64Url(cleBrute);
+
+    let abonnement = await enregistrement.pushManager.getSubscription();
+    if (abonnement && !memeCleVapid(abonnement, cle)) {
+      await abonnement.unsubscribe().catch(() => false);
+      abonnement = null;
+    }
+    abonnement ??= await enregistrement.pushManager.subscribe({
       // Exigé par les navigateurs : tout réveil push doit produire une notification
       // visible. C'est aussi ce que nous faisons — y compris quand elle est générique.
       userVisibleOnly: true,
-      applicationServerKey: octetsDeBase64Url(cle) as BufferSource,
-    }));
+      applicationServerKey: cle as BufferSource,
+    });
 
-  const { endpoint, keys } = abonnement.toJSON() as {
-    endpoint: string;
-    keys?: { p256dh?: string; auth?: string };
-  };
+    const { endpoint, keys } = abonnement.toJSON() as {
+      endpoint: string;
+      keys?: { p256dh?: string; auth?: string };
+    };
+    // Sans ces deux clés, la passerelle ne peut chiffrer aucun push et rejette le pusher
+    // (REQ-PSH-01) : l'enregistrer serait enregistrer une panne.
+    if (!keys?.p256dh || !keys.auth) return { ...echec(), abonnement: false };
 
-  await session.client.setPusher({
-    kind: "http",
-    app_id: "org.tacita.web",
-    pushkey: endpoint,
-    app_display_name: "Tacita",
-    device_display_name: session.client.getDeviceId() ?? "web",
-    lang: "fr",
-    // La spec Matrix laisse `data` libre ; le type du SDK ne connaît que `url`, `format`
-    // et `brand`. Les clés de la subscription y sont indispensables — c'est là que la
-    // passerelle les relit (spec 03), et sans elles aucun push ne peut être chiffré.
-    data: {
-      url: PUSH_NOTIFY_URL,
-      // REQ-PSH-02 — le format que la passerelle relaie : jamais de contenu, seulement
-      // de quoi réveiller ce navigateur.
-      format: "event_id_only",
-      p256dh: keys?.p256dh,
-      auth: keys?.auth,
-    } as { url: string; format: string },
-    append: false,
-  });
+    const deja = pushers.some((pusher) => pusher.pushkey === endpoint && pusher.app_id === APP_ID);
+    if (deja) return { etat: "abonne", permission: true, abonnement: true, pusher: true };
 
-  return true;
+    await session.client.setPusher({
+      kind: "http",
+      app_id: APP_ID,
+      pushkey: endpoint,
+      app_display_name: "Tacita",
+      device_display_name: session.client.getDeviceId() ?? "web",
+      lang: "fr",
+      // La spec Matrix laisse `data` libre ; le type du SDK ne connaît que `url`, `format`
+      // et `brand`. Les clés de la subscription y sont indispensables — c'est là que la
+      // passerelle les relit (spec 03), et sans elles aucun push ne peut être chiffré.
+      data: {
+        url: PUSH_NOTIFY_URL,
+        // REQ-PSH-02 — le format que la passerelle relaie : jamais de contenu, seulement
+        // de quoi réveiller ce navigateur.
+        format: "event_id_only",
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      } as { url: string; format: string },
+      append: false,
+    });
+
+    // Relu au serveur : c'est la seule preuve que Synapse appellera la passerelle.
+    const { pushers: apres } = await session.client.getPushers();
+    const pusher = apres.some((p) => p.pushkey === endpoint && p.app_id === APP_ID);
+    return {
+      etat: pusher ? "abonne" : "a-reparer",
+      permission: true,
+      abonnement: true,
+      pusher,
+    };
+  } catch {
+    // Passerelle injoignable, service push en panne, réseau coupé : l'état le dit, et
+    // l'écran des réglages propose de réessayer. Rien n'est journalisé (interdit n°8).
+    return echec();
+  }
+}
+
+/**
+ * REQ-UI-18 — l'abonnement complet, **depuis un geste de l'utilisateur**.
+ *
+ * `Notification.requestPermission()` n'a d'effet que dans un gestionnaire d'événement :
+ * appelée ailleurs, elle rend `denied` sur mobile sans rien afficher. Tous les appelants
+ * de cette fonction sont donc des `onClick`, et aucun `await` ne la précède.
+ */
+export async function demanderEtBrancher(session: Session): Promise<DiagnosticPush> {
+  const local = etatPushLocal();
+  if (local !== "possible" && local !== "accordee") {
+    return { etat: local, permission: false, abonnement: false, pusher: false };
+  }
+
+  if (Notification.permission === "default") {
+    const reponse = await Notification.requestPermission().catch(() => "denied" as const);
+    if (reponse !== "granted") {
+      // Un refus est un choix, pas une erreur : l'état le porte, personne ne lève. Et
+      // l'invite **fermée sans répondre** rend `default` : c'est encore `possible`, pas
+      // un refus — le dire faux fermerait la porte que l'utilisateur a seulement laissée
+      // entrouverte. La réponse fait foi, pas `Notification.permission` relu après coup :
+      // les deux disent la même chose dans un navigateur, et seule la première existe
+      // partout au moment où on en a besoin.
+      return {
+        etat: reponse === "denied" ? "refuse" : "possible",
+        permission: false,
+        abonnement: false,
+        pusher: false,
+      };
+    }
+  }
+
+  return brancherPush(session);
 }

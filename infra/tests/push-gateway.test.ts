@@ -74,4 +74,34 @@ describe("REQ-INF-14 — la passerelle Web Push est provisionnée par ce module"
     expect(readme).toContain("http://push-gateway:8008/_matrix/push/v1/notify");
     expect(readme).toContain("/push/config");
   });
+
+  /**
+   * Règle 7, appliquée au dernier maillon que rien ne relisait.
+   *
+   * L'URL du pusher est un **nom du réseau du compose** : elle résout vers une adresse
+   * privée, que la protection SSRF de Synapse refuse par défaut. Le raccordement était
+   * donc correct des deux côtés — le client enregistre la bonne URL, la passerelle écoute
+   * dessus — et Synapse ne l'appelait jamais. Aucun test ne pouvait l'attraper : les deux
+   * moitiés du contrat étaient justes, et le trou était entre elles (règle 1).
+   *
+   * La liste vivait dans `.env.example` avec un commentaire ne parlant que d'OIDC. Elle
+   * est maintenant livrée remplie, et ce test est ce qui empêche de la revider en croyant
+   * ne toucher qu'au login.
+   */
+  it("la protection SSRF de Synapse laisse passer l'appel du pusher", () => {
+    const [, liste] = /^SYNAPSE_IP_RANGE_WHITELIST=(.*)$/m.exec(envExample) ?? [];
+    expect(liste, "SYNAPSE_IP_RANGE_WHITELIST absent de .env.example").toBeDefined();
+
+    const plages = JSON.parse(liste!) as string[];
+    // Vide, Synapse n'appelle jamais `push-gateway` — et rien ne le dit : le pusher est
+    // enregistré, l'application annonce des notifications actives, aucune n'arrive.
+    expect(plages.length, "liste vide : aucun push ne peut partir").toBeGreaterThan(0);
+    expect(plages.some((plage) => /^(10|172|192)\./.test(plage))).toBe(true);
+
+    // Et la raison est écrite là où on la cherchera : dans le gabarit que l'opérateur
+    // lit, et dans la doc du module.
+    const gabarit = read("../synapse/homeserver.yaml.tmpl");
+    expect(gabarit).toContain("REQ-PSH-01");
+    expect(readme).toContain("SYNAPSE_IP_RANGE_WHITELIST");
+  });
 });

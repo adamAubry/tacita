@@ -12,6 +12,29 @@ export type Notification = {
   devices?: Device[];
 };
 
+/**
+ * Les quatre réglages d'émission, mesurés contre le comportement des services push et
+ * non contre leurs valeurs par défaut :
+ *
+ * - `TTL` — le défaut de `web-push` est de **28 jours**. Un « nouveau message » remis
+ *   trois semaines plus tard n'est plus une notification, c'est du bruit. Vingt-quatre
+ *   heures couvrent une nuit et un téléphone éteint, et rien au-delà ;
+ * - `urgency` — le défaut est `normal`, que les services push regroupent et diffèrent
+ *   pour économiser la batterie. Une messagerie est le cas d'usage de `high` ;
+ * - `timeout` — sans lui, un service push muet retient la requête de Synapse, qui a son
+ *   propre délai et considérera le pusher en échec. Mieux vaut échouer vite : le message
+ *   est de toute façon rattrapé par le `/sync` suivant.
+ */
+const OPTIONS = {
+  TTL: 86_400,
+  urgency: "high",
+  timeout: 10_000,
+  // Écrit alors que c'est déjà le défaut de `web-push@3.6.7` : **Apple n'accepte que
+  // celui-ci**, et un défaut de bibliothèque qui change à la faveur d'un bump retirerait
+  // silencieusement les iPhone du produit. Écrit ici, il est relu par un test.
+  contentEncoding: "aes128gcm",
+} as const;
+
 /** Relaie une notification Synapse en Web Push ; retourne les pushkeys à supprimer. */
 export async function notify(notification: Notification): Promise<string[]> {
   const { event_id, room_id, devices = [] } = notification;
@@ -29,7 +52,14 @@ export async function notify(notification: Notification): Promise<string[]> {
       try {
         // REQ-PSH-02 : event_id et room_id, rien d'autre. Le client déchiffre après réveil.
         const subscription = { endpoint: pushkey, keys: { p256dh: data.p256dh, auth: data.auth } };
-        await webpush.sendNotification(subscription, JSON.stringify({ event_id, room_id }));
+        const envoi = await webpush.sendNotification(
+          subscription,
+          JSON.stringify({ event_id, room_id }),
+          OPTIONS,
+        );
+        // REQ-PSH-04 : un code de statut, rien d'autre. C'est la seule preuve qu'un
+        // push est bien parti, et le seul endroit du déploiement où elle soit lisible.
+        console.info("push_ok", { status: envoi?.statusCode ?? 0 });
       } catch (error) {
         const status = (error as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) rejected.push(pushkey);

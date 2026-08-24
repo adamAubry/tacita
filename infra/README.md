@@ -178,6 +178,45 @@ un endpoint sans authentification.
 passerelle en a besoin pour chiffrer le push (sans elles, elle rejette la
 pushkey — REQ-PSH-01).
 
+### `SYNAPSE_IP_RANGE_WHITELIST` n'est pas facultatif ici
+
+C'est **Synapse** qui appelle la passerelle, et l'URL du pusher est un nom du
+réseau du compose : elle résout vers une adresse privée. Le client HTTP sortant
+de Synapse applique `ip_range_blacklist`, qui contient `172.16.0.0/12` par
+défaut. Liste vide ⇒ Synapse n'appelle jamais `push-gateway`, et **rien ne le
+dit** : le pusher est bien enregistré sur le compte, l'application annonce des
+notifications actives, aucune n'arrive.
+
+C'est le même blocage que le 503 muet du login OIDC, sur le second client
+sortant de Synapse. `infra/.env.example` livre donc `["172.16.0.0/12"]`, et le
+garde-fou reste le même : ne pas activer `url_preview_enabled` tant que cette
+liste n'est pas vide.
+
+### Vérifier que la chaîne est branchée, sans téléphone
+
+Les quatre maillons se lisent séparément, et dans cet ordre :
+
+1. **la clé publique sort** — `curl -sk https://<SERVER_NAME>/push/config` rend
+   `{"vapid_public_key":"…"}` ;
+2. **le pusher est sur le compte** — `GET /_matrix/client/v3/pushers` avec le
+   jeton de l'utilisateur contient une entrée `app_id: org.tacita.web` dont
+   `data.url` pointe sur `push-gateway`. L'écran Profil › Réglages ›
+   Notifications affiche la même chose en clair, maillon par maillon ;
+3. **Synapse appelle la passerelle** — après un message reçu,
+   `docker compose logs push-gateway` porte une ligne `push_ok` ou
+   `push_failed`. **Aucune ligne** signifie que Synapse n'a pas appelé : c'est
+   la liste ci-dessus, ou une push rule qui coupe (Profil › Réglages ›
+   Notifications, niveau de la conversation) ;
+4. **le service push a accepté** — `push_ok {"status":201}`. Un `push_failed`
+   porte le code : `410`/`404` = subscription morte (Synapse supprime le pusher,
+   l'application s'en réenregistre un à la prochaine ouverture), `403` = clé
+   VAPID désaccordée entre la passerelle et l'abonnement du navigateur,
+   `400` = `VAPID_SUBJECT` refusé par le service push (Apple exige un `mailto:`
+   ou un `https:` réel).
+
+Aucune de ces lignes ne porte de contenu : des identifiants et des codes de
+statut, comme l'exige REQ-PSH-04.
+
 ## REQ-INF-15 — service de liens d'invitation
 
 Le service de la spec 12 est construit et démarré par ce compose, par la même

@@ -12,7 +12,7 @@
  * Une réponse de `/_matrix/…` n'a donc aucun chemin vers le cache : ce n'est pas une
  * précaution, c'est qu'aucune branche ne l'y mène.
  */
-const VERSION = "tacita-coquille-v1";
+const VERSION = "tacita-coquille-v2";
 
 /**
  * La coquille : des routes vides et le manifeste. Zéro donnée utilisateur.
@@ -25,8 +25,19 @@ const VERSION = "tacita-coquille-v1";
  */
 const COQUILLE = ["/", "/c", "/c/infos", "/recherche", "/mentions", "/profil", "/manifest.webmanifest"];
 
+/*
+ * `skipWaiting` + `claim` — **une PWA installée ne ferme jamais tous ses onglets.**
+ *
+ * Sans eux, un worker corrigé reste « en attente » indéfiniment : la correction est
+ * livrée, personne ne la reçoit. C'est particulièrement vrai du handler `push`, qui est
+ * la seule chose que l'utilisateur ne peut ni voir ni relancer lui-même.
+ *
+ * Le risque habituel de ce couple — une page servie à moitié par l'ancien worker et à
+ * moitié par le nouveau — n'existe pas ici : le seul chemin de cache porte sur
+ * `/_next/static/`, dont les URL sont versionnées par le build.
+ */
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(COQUILLE)));
+  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(COQUILLE)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
@@ -35,7 +46,8 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((noms) => Promise.all(noms.filter((nom) => nom !== VERSION).map((nom) => caches.delete(nom)))),
+      .then((noms) => Promise.all(noms.filter((nom) => nom !== VERSION).map((nom) => caches.delete(nom))))
+      .then(() => self.clients.claim()),
   );
 });
 
@@ -190,15 +202,57 @@ function demanderApercu(roomId, eventId) {
   });
 }
 
+/**
+ * Les options de toute notification affichée ici, au même endroit.
+ *
+ * `renotify` est le correctif le moins visible et le plus coûteux de la série : avec un
+ * `tag` et **sans lui**, la deuxième notification d'une même conversation remplace la
+ * première *en silence* — pas de son, pas de vibration, rien à l'écran verrouillé. Du
+ * point de vue de l'utilisateur, les notifications « ne marchent plus » à partir du
+ * deuxième message, ce qui est indiscernable d'une chaîne push cassée.
+ *
+ * `icon` et `badge` : sans eux, Android affiche un rond gris à la place de l'application.
+ */
+function optionsNotification(roomId, eventId, apercu) {
+  return {
+    body: apercu ? apercu.texte : "",
+    icon: "/icone-192.png",
+    badge: "/icone-192.png",
+    // Groupées par conversation : un salon bavard remplace sa notification au lieu
+    // d'en empiler une par message — mais il réalerte (voir `renotify`).
+    tag: roomId,
+    renotify: true,
+    data: { roomId, eventId },
+  };
+}
+
 self.addEventListener("push", (event) => {
   let charge = null;
   try {
     charge = event.data ? event.data.json() : null;
   } catch {
-    // Un payload illisible ne vient pas de notre passerelle : rien à réveiller.
+    // Un payload illisible ne vient pas de notre passerelle : rien à en tirer.
   }
   const roomId = charge && charge.room_id;
-  if (!roomId) return;
+
+  if (!roomId) {
+    /*
+     * **Un réveil push doit toujours produire une notification.** C'est le contrat de
+     * `userVisibleOnly`, et le navigateur le fait respecter : à défaut il affiche
+     * lui-même « ce site a été mis à jour en arrière-plan », puis finit par retirer la
+     * permission — une panne définitive, silencieuse, que l'utilisateur ne peut pas
+     * diagnostiquer.
+     *
+     * Le cas ne devrait pas se produire : la passerelle n'émet **rien** sans `event_id`
+     * ni `room_id` (REQ-PSH-01), badges de Synapse compris. S'il se produit quand même,
+     * c'est un réveil dont on ne sait rien dire — et « Nouveau message » est alors plus
+     * vrai que le silence.
+     */
+    event.waitUntil(
+      self.registration.showNotification("Nouveau message", optionsNotification("tacita", undefined, null)),
+    );
+    return;
+  }
 
   event.waitUntil(
     demanderApercu(roomId, charge.event_id)
@@ -206,13 +260,10 @@ self.addEventListener("push", (event) => {
       .then((apercu) =>
         // REQ-UIX-40 — clés absentes, événement pas encore synchronisé, aucune fenêtre
         // ouverte : notification **générique**, sans contenu et sans erreur bruyante.
-        self.registration.showNotification(apercu ? apercu.expediteur : "Nouveau message", {
-          body: apercu ? apercu.texte : "",
-          // Groupées par conversation : un salon bavard remplace sa notification au lieu
-          // d'en empiler une par message.
-          tag: roomId,
-          data: { roomId },
-        }),
+        self.registration.showNotification(
+          apercu ? apercu.expediteur : "Nouveau message",
+          optionsNotification(roomId, charge.event_id, apercu),
+        ),
       ),
   );
 });
@@ -227,12 +278,20 @@ self.addEventListener("notificationclick", (event) => {
   // paire, pas la vigilance.
   const cible = `/c?room=${encodeURIComponent(roomId)}`;
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
-      const fenetre = fenetres[0];
-      if (!fenetre) return self.clients.openWindow(cible);
-      // `navigate` n'existe pas partout : à défaut, la fenêtre revient au premier plan
-      // là où elle était — moins bien, mais jamais rien.
-      return fenetre.focus().then((active) => (active.navigate ? active.navigate(cible) : null));
-    }),
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((fenetres) => {
+        const fenetre = fenetres[0];
+        if (!fenetre) return self.clients.openWindow(cible);
+        // `navigate` n'existe pas partout, et **rejette** quand la fenêtre n'est pas
+        // contrôlée par ce worker — le cas d'un onglet ouvert avant son installation.
+        // Un tap qui n'ouvre rien est la pire réponse possible : on retombe alors sur
+        // une fenêtre neuve, qui elle atterrit toujours au bon endroit.
+        return fenetre
+          .focus()
+          .then((active) => (active.navigate ? active.navigate(cible) : null))
+          .catch(() => self.clients.openWindow(cible));
+      })
+      .catch(() => null),
   );
 });

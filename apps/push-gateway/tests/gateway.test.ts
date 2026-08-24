@@ -97,6 +97,29 @@ describe("REQ-PSH-01 — endpoint /_matrix/push/v1/notify conforme", () => {
   });
 });
 
+describe("REQ-PSH-01 — l'émission est réglée pour une messagerie, pas pour un bulletin", () => {
+  /**
+   * Trois valeurs posées à une jonction que **personne ne relit** — la règle 7. Elles ne
+   * changent rien à un test fonctionnel, et tout à ce que l'utilisateur reçoit :
+   * un défaut de `web-push` remettrait un « nouveau message » vingt-huit jours plus tard,
+   * en `urgency: normal` que les services push regroupent et diffèrent, et le jour où la
+   * bibliothèque changerait son encodage par défaut, **les iPhone sortiraient du produit
+   * en silence** — Apple n'accepte que `aes128gcm`.
+   */
+  it("borne la durée de vie, priorise la remise, et fixe l'encodage exigé par Apple", async () => {
+    await postNotify(synapsePayload([device("https://push.example/ep1")]));
+
+    expect(sendNotification.mock.calls[0]?.[2]).toMatchObject({
+      TTL: 86_400,
+      urgency: "high",
+      contentEncoding: "aes128gcm",
+    });
+    // Sans délai, un service push muet retient la requête de Synapse jusqu'à son propre
+    // abandon, et le pusher passe pour défaillant.
+    expect(sendNotification.mock.calls[0]?.[2]?.timeout).toBeGreaterThan(0);
+  });
+});
+
 describe("REQ-PSH-02 — le payload sortant ne porte que event_id et room_id", () => {
   it("n'expose ni expéditeur, ni nom de salon, ni contenu", async () => {
     await postNotify(synapsePayload([device("https://push.example/ep1")]));
@@ -133,6 +156,22 @@ describe("REQ-PSH-04 — aucun contenu utilisateur dans les logs", () => {
     await postNotify(synapsePayload([device("https://push.example/ep1")]));
 
     expect(lines.join("\n")).not.toMatch(new RegExp(secrets.join("|")));
+  });
+
+  it("laisse une trace du push réussi — un code de statut, et rien d'autre", async () => {
+    // La seule preuve, depuis le déploiement, que Synapse a bien appelé la passerelle et
+    // que le service push a accepté. **Aucun de ces maillons n'est observable depuis un
+    // poste de développement** ; `docker compose logs push-gateway` est le seul endroit
+    // où la chaîne se lit, et une chaîne qu'on ne peut pas lire ne se répare pas.
+    const lines = spyConsole();
+    sendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
+
+    await postNotify(synapsePayload([device("https://push.example/ep1")]));
+
+    const logs = lines.join("\n");
+    expect(logs).toContain("push_ok");
+    expect(logs).toContain("201");
+    expect(logs).not.toMatch(new RegExp(secrets.join("|")));
   });
 
   it("ne logge qu'un ID d'événement et un code de statut quand le push échoue", async () => {

@@ -3,7 +3,15 @@
 import { subscribeConversations, conversations as listerConversations } from "@tacita/messaging";
 import { useCallback, useEffect, useState } from "react";
 
-import { abonnerAuxNotifications, apercuLocal, permissionPush, TYPE_APERCU } from "../../lib/push";
+import { ecrireDemandePushFaite, lireDemandePushFaite } from "../../lib/preferences";
+import {
+  apercuLocal,
+  brancherPush,
+  demanderEtBrancher,
+  etatPushLocal,
+  TYPE_APERCU,
+  type EtatPush,
+} from "../../lib/push";
 import { Sheet } from "../foundation/Sheet";
 import { Button, Text, VStack } from "../foundation/primitives";
 import { IosPushEducation } from "../onboarding/IosPushEducation";
@@ -12,23 +20,37 @@ import { useSession } from "../onboarding/SessionProvider";
 /**
  * REQ-UI-18 — la chaîne push côté fenêtre. Elle ne rend presque jamais rien.
  *
- * Deux rôles, tous deux invisibles la plupart du temps :
+ * Trois rôles, tous invisibles la plupart du temps :
  *
  * 1. **répondre au service worker.** Réveillé par un push, il ne peut pas déchiffrer :
  *    les clés Megolm sont dans le store crypto de cette fenêtre. Il demande donc
  *    l'aperçu ici, et nous le rendons — rien n'est conservé de part ni d'autre
  *    (REQ-UIX-40) ;
- * 2. **demander la permission au bon moment.** Jamais au premier lancement : au premier
- *    message reçu, quand la question a un sens et une réponse évidente. La demande passe
- *    par une feuille avec un bouton — les navigateurs exigent un geste, et une invite
- *    système surgie seule est le plus court chemin vers un refus définitif.
+ * 2. **réparer l'abonnement à chaque ouverture.** Une `PushSubscription` tourne sans
+ *    prévenir, un pusher disparaît du compte au premier 410, une reconnexion donne un
+ *    `device_id` neuf : rien de tout cela n'est une panne, et rien de tout cela ne se
+ *    voit. Sans ce rôle, « notifications activées » finissait par ne plus rien vouloir
+ *    dire, et c'est le défaut le plus coûteux des quatre — l'utilisateur ne reçoit rien
+ *    et l'interface le félicite ;
+ * 3. **demander la permission une seule fois.** Jamais au premier lancement : au premier
+ *    message reçu, quand la question a un sens et une réponse évidente. Une seule fois
+ *    dans la vie de l'appareil — la marque est en IndexedDB —, parce qu'une question
+ *    reposée à chaque `/sync` n'est plus une question, c'est un obstacle.
  */
-export function PushNotifications() {
+export interface PushNotificationsProps {
+  /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
+  indexedDB?: IDBFactory;
+}
+
+export function PushNotifications({ indexedDB }: PushNotificationsProps = {}) {
   const { etat } = useSession();
   const session = etat.phase === "prete" ? etat.session : null;
+  const base = indexedDB ?? globalThis.indexedDB;
 
+  /** Un message non lu est arrivé : le seul moment où la question a un sens (M-B, M-I). */
+  const [declenche, setDeclenche] = useState(false);
   const [propose, setPropose] = useState(false);
-  const [refuse, setRefuse] = useState(false);
+  const [echec, setEchec] = useState<EtatPush | null>(null);
 
   // Rôle 1 — le pont avec le service worker.
   useEffect(() => {
@@ -45,33 +67,69 @@ export function PushNotifications() {
     return () => navigator.serviceWorker.removeEventListener("message", repondre);
   }, [session]);
 
-  // Rôle 2 — le déclencheur : un message non lu est arrivé.
+  // Rôle 2 — la réparation silencieuse. Idempotente, sans interface : quand tout va
+  // bien, elle lit deux choses et n'écrit rien.
   useEffect(() => {
-    if (!session || permissionPush() !== "default") return;
+    if (!session || etatPushLocal() !== "accordee") return;
+    void brancherPush(session);
+  }, [session]);
+
+  // Rôle 3 — le déclencheur : un message non lu est arrivé.
+  useEffect(() => {
+    if (!session) return;
+    let annule = false;
+    let vu = false;
 
     const verifier = () => {
-      if (listerConversations(session).some((conversation) => conversation.unread > 0)) {
-        setPropose(true);
-      }
+      if (vu || annule) return;
+      if (!listerConversations(session).some((conversation) => conversation.unread > 0)) return;
+      vu = true;
+
+      // L'écran d'éducation iOS se garde tout seul (M-B) : il ne dépend pas de la
+      // permission, qui sur iPhone hors écran d'accueil n'existe même pas.
+      setDeclenche(true);
+
+      // **Relu ici, et pas au montage de l'effet.** C'était le défaut : la permission
+      // était lue une seule fois, donc une permission accordée entre-temps ne coupait
+      // rien, et la feuille revenait à chaque `/sync`.
+      if (etatPushLocal() !== "possible") return;
+
+      void lireDemandePushFaite(base)
+        .then((faite) => {
+          if (annule || faite) return;
+          setPropose(true);
+          // Posée à l'affichage : une feuille montrée est une question posée.
+          return ecrireDemandePushFaite(base);
+        })
+        .catch(() => {});
     };
 
     verifier();
-    return subscribeConversations(session, verifier);
-  }, [session]);
+    const desabonner = subscribeConversations(session, verifier);
+    return () => {
+      annule = true;
+      desabonner();
+    };
+  }, [session, base]);
 
   const accepter = useCallback(async () => {
-    setPropose(false);
     if (!session) return;
-    // Un échec (passerelle injoignable, refus) laisse simplement l'app sans push : les
-    // réglages disent l'état et proposent de réessayer. Rien n'est journalisé.
-    setRefuse(!(await abonnerAuxNotifications(session).catch(() => false)));
+    // `Notification.requestPermission()` n'a d'effet que dans le geste : aucun `await`
+    // avant elle, et `setPropose(false)` seulement après, sinon React démonte la feuille
+    // et le navigateur perd l'activation utilisateur.
+    const diagnostic = await demanderEtBrancher(session);
+    setPropose(false);
+    // `possible` = l'invite système a été fermée sans réponse. Rien à annoncer : la
+    // question reste ouverte, et une feuille d'échec par-dessus serait une insistance.
+    const muet = diagnostic.etat === "abonne" || diagnostic.etat === "possible";
+    setEchec(muet ? null : diagnostic.etat);
   }, [session]);
 
   return (
     <>
       {/* REQ-PSH-05 — sur iPhone hors écran d'accueil, aucun abonnement n'est possible :
           l'éducation (M-B) passe avant la demande de permission, qui échouerait. */}
-      <IosPushEducation declenche={propose} />
+      <IosPushEducation declenche={declenche} indexedDB={indexedDB} />
 
       {/* Rien de monté tant que la question n'a pas lieu d'être : `<dialog>` garde son
           contenu dans le DOM même fermé, et une proposition non pertinente y resterait
@@ -94,14 +152,17 @@ export function PushNotifications() {
         </Sheet>
       )}
 
-      {refuse && (
-        <Sheet ouvert onFermer={() => setRefuse(false)} titre="Notifications non activées">
+      {echec !== null && (
+        <Sheet ouvert onFermer={() => setEchec(null)} titre="Notifications non activées">
           <VStack gap={4}>
             <Text>
-              Elles peuvent être réactivées à tout moment depuis Profil › Réglages ›
-              Notifications.
+              {/* Interdit n°13 : deux causes très différentes, deux phrases. Un refus se
+                  lève dans le navigateur ; une chaîne cassée se réessaie. */}
+              {echec === "refuse"
+                ? "Ce navigateur les a bloquées pour Tacita. Elles peuvent être réactivées depuis ses réglages de site, puis depuis Profil › Réglages › Notifications."
+                : "L'activation n'a pas abouti. Réessayez depuis Profil › Réglages › Notifications : cet écran indique quelle étape a échoué."}
             </Text>
-            <Button label="Compris" variant="primary" onClick={() => setRefuse(false)} />
+            <Button label="Compris" variant="primary" onClick={() => setEchec(null)} />
           </VStack>
         </Sheet>
       )}

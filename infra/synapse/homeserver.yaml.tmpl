@@ -161,15 +161,23 @@ media_storage_providers:
 password_config:
   enabled: false
 
-# REQ-INF-09 — Synapse bloque par défaut ses propres requêtes sortantes vers les
-# plages privées (protection SSRF : `ip_range_blacklist` contient 172.16.0.0/12).
-# Dès que l'issuer OIDC résout vers une adresse privée — le cas quand ${SERVER_NAME}
-# pointe sur le proxy à l'intérieur du réseau Docker — la découverte OIDC expire et
-# **tout login répond 503**, sans que rien ne mentionne le blocage dans les logs.
+# REQ-INF-09 / REQ-INF-14 — Synapse bloque par défaut ses propres requêtes sortantes
+# vers les plages privées (protection SSRF : `ip_range_blacklist` contient
+# 172.16.0.0/12). **Deux clients sortants la traversent, et les deux sont vitaux :**
 #
-# Vide par défaut : la protection reste entière. À ne remplir que si le déploiement
-# résout son propre nom en interne, et alors avec la plage la plus étroite possible.
-# Voir infra/README.md.
+#  1. la découverte OIDC. Dès que l'issuer résout vers une adresse privée — le cas
+#     quand ${SERVER_NAME} pointe sur le proxy à l'intérieur du réseau Docker — elle
+#     expire et **tout login répond 503**, sans que rien ne mentionne le blocage ;
+#  2. l'appel du pusher (REQ-PSH-01). L'URL enregistrée par le client est
+#     `http://push-gateway:8008/_matrix/push/v1/notify` — le nom interne du service,
+#     et c'est voulu (l'endpoint n'a aucune authentification). Elle résout donc vers
+#     une adresse du réseau du compose. Sans cette liste, Synapse **n'appelle jamais
+#     la passerelle** : le pusher est enregistré, l'interface annonce des
+#     notifications actives, et il n'en arrive aucune. Le symptôme se lit dans
+#     `docker compose logs push-gateway` — pas une ligne, jamais.
+#
+# La liste n'est donc pas facultative pour ce déploiement : voir infra/.env.example.
+# La remplir avec la plage la plus étroite possible. Voir infra/README.md.
 #
 # GARDE-FOU : ne pas activer `url_preview_enabled` tant que cette liste n'est pas
 # vide, sans avoir d'abord restreint la plage. Aujourd'hui le seul client HTTP

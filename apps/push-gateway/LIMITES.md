@@ -21,5 +21,20 @@ Documentées, jamais masquées (spec 00 — Honnêteté produit).
   le navigateur, voient l'endpoint sollicité et l'horodatage de chaque push —
   donc la fréquence et les moments d'activité, sans le contenu.
 - **Rotation des clés VAPID = réabonnement de tous les clients.** Changer la
-  paire invalide toutes les subscriptions existantes ; elles remonteront en
-  `rejected` et devront être recréées par chaque navigateur.
+  paire invalide toutes les subscriptions existantes. **Elles ne remontent pas
+  en `rejected`** — corrigé le 24/08/2026 : le push service répond `403`
+  (signature VAPID qui ne correspond pas), et non `404`/`410`. Le pusher reste
+  donc en place sur le compte, définitivement muet, sans que rien ne le signale
+  côté serveur. C'est le client qui s'en sort : il compare la clé de son
+  abonnement à celle servie par `/config` à chaque ouverture, et se réabonne
+  quand elles diffèrent (REQ-UI-18). Sur un navigateur qui n'expose pas
+  `PushSubscription.options.applicationServerKey`, cette comparaison est
+  impossible et l'abonnement est **conservé** : s'y réabonner « dans le doute »
+  changerait d'endpoint à chaque ouverture et laisserait un pusher mort derrière
+  chaque fois. Après une rotation, ces navigateurs-là ne se rattrapent qu'en
+  vidant les données du site.
+- **Durée de vie d'un push : 24 heures** (`TTL`), et non les 28 jours par défaut
+  de `web-push`. Un appareil éteint plus longtemps ne recevra pas les
+  notifications de la période — il retrouvera les messages au `/sync` suivant.
+  C'est un choix : un « nouveau message » remis trois semaines plus tard n'est
+  plus une notification.

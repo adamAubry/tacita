@@ -117,6 +117,26 @@ export const lireRefusEducationIOS = async (indexedDB: IDBFactory) =>
 export const ecrireRefusEducationIOS = (indexedDB: IDBFactory) =>
   ecrirePreference(indexedDB, "education-ios-refusee", true);
 
+/**
+ * REQ-UI-18 — **la proposition d'activer les notifications n'est faite qu'une fois.**
+ *
+ * Elle n'était mémorisée nulle part : l'abonnement de `messaging` rappelait le
+ * déclencheur à chaque `/sync`, et la feuille revenait indéfiniment — y compris après
+ * une activation réussie, l'effet ayant lu la permission une seule fois au montage.
+ * « Plus tard » ne voulait donc rien dire, et il n'existait aucun moyen de s'en
+ * débarrasser.
+ *
+ * La marque est posée **à l'affichage**, pas à la réponse : une feuille montrée est une
+ * question posée, quelle qu'ait été la suite. Le rattrapage existe et il est nommé dans
+ * la feuille elle-même — Profil › Réglages › Notifications, qui est le second point
+ * d'entrée voulu par l'exigence.
+ */
+export const lireDemandePushFaite = async (indexedDB: IDBFactory) =>
+  (await lirePreference(indexedDB, "push-demande-faite")) === true;
+
+export const ecrireDemandePushFaite = (indexedDB: IDBFactory) =>
+  ecrirePreference(indexedDB, "push-demande-faite", true);
+
 /*
  * `recuperation-faite` vivait ici — une trace « cet appareil a déjà mené ce compte au
  * bout de l'étape », posée le 08/08/2026 pour que la porte ne se referme pas hors ligne.

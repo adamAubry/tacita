@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { estIOS, estInstallee } from "../../lib/push";
 import { Button, Text, VStack } from "../foundation/primitives";
 import { Sheet } from "../foundation/Sheet";
 import { ecrireRefusEducationIOS, lireRefusEducationIOS } from "../../lib/preferences";
@@ -11,13 +12,11 @@ import { ecrireRefusEducationIOS, lireRefusEducationIOS } from "../../lib/prefer
  * une PWA installée à l'écran d'accueil. Ce n'est pas une limite de notre passerelle,
  * c'est Safari : hors standalone, aucun abonnement n'est possible.
  *
- * `standalone` sur `navigator` est une extension Safari, absente du type standard.
+ * Les deux prédicats vivent dans `lib/push.ts` : l'état de l'abonnement en dépend autant
+ * que cet écran, et un module de `lib/` ne remonte pas vers un composant. Réexportés ici
+ * parce que c'est le composant qui porte la règle produit.
  */
-export const estIOS = (userAgent: string) => /iPad|iPhone|iPod/.test(userAgent);
-
-export const estInstallee = (): boolean =>
-  globalThis.matchMedia?.("(display-mode: standalone)").matches === true ||
-  (globalThis.navigator as Navigator & { standalone?: boolean }).standalone === true;
+export { estIOS, estInstallee } from "../../lib/push";
 
 export interface IosPushEducationProps {
   /** REQ-UI-18 : **pas au premier lancement** — au premier point de friction pertinent. */
