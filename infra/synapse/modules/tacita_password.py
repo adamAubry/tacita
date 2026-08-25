@@ -1,4 +1,17 @@
-"""D-12 — le changement de mot de passe, gardé par la clé de récupération.
+"""D-12 / D-14 — la clé de récupération, opposée par le serveur.
+
+Deux chemins vivent ici, et le second n'existe que parce que le premier a fermé une porte :
+
+- ``POST /_synapse/client/tacita/password`` (D-12) — changer son mot de passe, la clé à
+  l'appui, depuis une session ouverte ;
+- ``POST /_synapse/client/tacita/login_recovery`` (D-14) — **ouvrir une session avec la
+  clé seule**, quand le mot de passe est perdu. Sans lui, un mot de passe oublié est un
+  compte mort : ce déploiement n'a ni e-mail ni SSO, et l'endpoint standard de changement
+  de mot de passe est fermé au proxy — il n'existait aucune porte de secours.
+
+Ils partagent la vérification de clé, et ce n'est pas une économie de lignes : deux
+implémentations du même contrôle dériveraient, et celle qui dérive est celle qui laisse
+passer.
 
 **Pourquoi ce module existe, et pourquoi ce n'est pas un stage UIA.** Vérifié dans l'image
 déployée (Synapse v1.155.0, ``synapse/config/auth.py``) :
@@ -34,6 +47,7 @@ from typing import Any
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -114,7 +128,7 @@ class _Ressource(DirectServeJsonResource):
             )
             return
 
-        descripteur = await self._descripteur(user_id)
+        descripteur = await _descripteur(self._api, user_id)
         if descripteur is None:
             # Aucune clé de récupération sur ce compte : il n'y a rien à opposer, et
             # laisser passer ferait du garde une option. On refuse, et le message dit quoi
@@ -130,12 +144,7 @@ class _Ressource(DirectServeJsonResource):
             )
             return
 
-        try:
-            cle = b64decode(cle_b64, validate=True)
-        except Exception:
-            cle = b""
-
-        if len(cle) != 32 or not _verifier_cle(cle, descripteur["iv"], descripteur["mac"]):
+        if not _cle_valide(cle_b64, descripteur):
             respond_with_json(
                 request,
                 403,
@@ -155,27 +164,112 @@ class _Ressource(DirectServeJsonResource):
         )
         respond_with_json(request, 200, {}, send_cors=True)
 
-    async def _descripteur(self, user_id: str) -> dict[str, Any] | None:
-        """Le descripteur de la clé de secret storage par défaut du compte, ou ``None``."""
-        manager = self._api.account_data_manager
-        defaut = await manager.get_global(user_id, DEFAUT)
-        if not defaut or not isinstance(defaut.get("key"), str):
-            return None
 
-        description = await manager.get_global(user_id, DESCRIPTION + defaut["key"])
-        if not description or description.get("algorithm") != ALGORITHME:
-            return None
-        if not isinstance(description.get("iv"), str) or not isinstance(
-            description.get("mac"), str
-        ):
-            # Un descripteur sans `iv`/`mac` existe : c'est le cas d'une clé dérivée d'une
-            # passphrase et jamais vérifiée. Rien à opposer, donc on refuse.
-            return None
-        return dict(description)
+async def _descripteur(api: ModuleApi, user_id: str) -> dict[str, Any] | None:
+    """Le descripteur de la clé de secret storage par défaut du compte, ou ``None``."""
+    manager = api.account_data_manager
+    defaut = await manager.get_global(user_id, DEFAUT)
+    if not defaut or not isinstance(defaut.get("key"), str):
+        return None
+
+    description = await manager.get_global(user_id, DESCRIPTION + defaut["key"])
+    if not description or description.get("algorithm") != ALGORITHME:
+        return None
+    if not isinstance(description.get("iv"), str) or not isinstance(
+        description.get("mac"), str
+    ):
+        # Un descripteur sans `iv`/`mac` existe : c'est le cas d'une clé dérivée d'une
+        # passphrase et jamais vérifiée. Rien à opposer, donc on refuse.
+        return None
+    return dict(description)
+
+
+def _cle_valide(cle_b64: Any, descripteur: dict[str, Any]) -> bool:
+    """La clé soumise ouvre-t-elle ce descripteur ? Aucune exception ne sort d'ici."""
+    if not isinstance(cle_b64, str):
+        return False
+    try:
+        cle = b64decode(cle_b64, validate=True)
+    except Exception:
+        return False
+    return len(cle) == 32 and _verifier_cle(cle, descripteur["iv"], descripteur["mac"])
+
+
+class _RessourceConnexion(DirectServeJsonResource):
+    """D-14 — **la porte de secours : la clé de récupération ouvre une session.**
+
+    Elle est **exceptionnelle et le produit le dit** (``apps/web`` — écran de connexion).
+    Ce qu'elle change au modèle de menace est écrit dans D-14 et dans
+    ``infra/LIMITES.md`` : la clé cesse d'être un secret qui *déchiffre* pour devenir un
+    secret qui *ouvre*. Qui la détient prend le compte, sans le mot de passe.
+
+    Elle ne rend pas de jeton d'accès : elle rend un **jeton de connexion** à usage unique
+    et à durée d'une minute, que le client échange sur ``/login`` par le chemin natif
+    ``m.login.token``. Synapse crée alors l'appareil, applique ses propres limites et
+    journalise la connexion comme n'importe quelle autre — un module qui fabriquerait le
+    jeton d'accès lui-même se mettrait hors de tout ça.
+    """
+
+    def __init__(self, api: ModuleApi) -> None:
+        super().__init__()
+        self._api = api
+        # Le limiteur de connexion du serveur, par IP, et non un compteur maison : c'est
+        # celui que REQ-INF-05 dimensionne, et un endpoint d'authentification qui ne
+        # compte pas ses échecs n'a aucun moyen de voir qu'on l'essaie (REQ-INV-09).
+        self._limiteur = Ratelimiter(
+            store=api._store,
+            clock=api._clock,
+            cfg=api._hs.config.ratelimiting.rc_login_address,
+        )
+
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
+        # Avant toute lecture : un échec doit coûter à celui qui le provoque. `ratelimit`
+        # lève une `LimitExceededError`, que la couche HTTP rend en 429 avec son délai.
+        await self._limiteur.ratelimit(None, request.getClientAddress().host)
+
+        corps = parse_json_object_from_request(request)
+        utilisateur = corps.get("user")
+        if not isinstance(utilisateur, str) or not utilisateur:
+            respond_with_json(request, 400, {"errcode": "M_MISSING_PARAM"}, send_cors=True)
+            return
+
+        user_id = self._api.get_qualified_user_id(utilisateur)
+        if not await self._ouvrable(user_id, corps.get("recovery_key")):
+            # **Un seul message pour toutes les causes** — compte inconnu, désactivé, sans
+            # clé, ou clé fausse. Les distinguer donnerait un oracle de comptes à qui veut,
+            # et cet endpoint est ouvert. Même jurisprudence que REQ-INV-08.
+            respond_with_json(
+                request,
+                403,
+                {
+                    "errcode": "M_FORBIDDEN",
+                    "error": "identifiant ou clé de récupération incorrect",
+                },
+                send_cors=True,
+            )
+            return
+
+        # Une minute : ce jeton est consommé dans la seconde par l'appel `/login` qui suit.
+        jeton = await self._api.create_login_token(user_id, duration_in_ms=60_000)
+        respond_with_json(request, 200, {"login_token": jeton}, send_cors=True)
+
+    async def _ouvrable(self, user_id: str, cle_b64: Any) -> bool:
+        info = await self._api._store.get_user_by_id(user_id)
+        if info is None or info.is_deactivated or getattr(info, "is_locked", False):
+            # **Un compte désactivé ne se rouvre pas avec sa clé.** D-13 fait de la
+            # désactivation la réponse à un compte indésirable ; sans cette ligne, cette
+            # réponse-là se contournerait avec un secret que le compte détient déjà.
+            return False
+
+        descripteur = await _descripteur(self._api, user_id)
+        return descripteur is not None and _cle_valide(cle_b64, descripteur)
 
 
 def create_module(config: Any, api: ModuleApi) -> None:  # noqa: ARG001
     api.register_web_resource("/_synapse/client/tacita/password", _Ressource(api))
+    api.register_web_resource(
+        "/_synapse/client/tacita/login_recovery", _RessourceConnexion(api)
+    )
 
 
 class TacitaPassword:

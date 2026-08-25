@@ -274,16 +274,23 @@ describe("REQ-UIX-32 — limites connues : sobre, et complet sur les sept sujets
     expect(screen.getByText(/trouvable par tous les comptes de ce serveur/i)).toBeTruthy();
   });
 
-  it("D-12 — la transmission de la clé au serveur est dite, pas seulement documentée", () => {
+  it("D-12 / D-14 — ce que vaut la clé de récupération est dit, pas seulement documenté", () => {
     /*
      * Interdit n°13, et le cas le plus dur du produit : la promesse E2EE se lit plus large
      * qu'elle ne l'est si on ne dit pas qu'un changement de mot de passe confie au serveur
      * le secret qui déchiffre tout. `infra/LIMITES.md` le porte pour l'opérateur ; cet
      * écran est le seul endroit où l'utilisateur peut le lire.
+     *
+     * **Deux faits depuis D-14, et le second est nouveau** : la clé est transmise, et elle
+     * ouvre le compte à elle seule. « Gardez-la précieusement » a cessé d'être un conseil
+     * de prudence pour devenir la seule chose qui protège le compte — le taire ferait de
+     * l'écran une demi-vérité.
      */
     render(<LimitesConnues />);
-    expect(screen.getByText(/transmet votre clé au serveur/i)).toBeTruthy();
+    expect(screen.getByText(/vaut votre mot de passe/i)).toBeTruthy();
+    expect(screen.getByText(/envoyée au serveur pour être vérifiée/i)).toBeTruthy();
     expect(screen.getByText(/déchiffrerait alors vos conversations/i)).toBeTruthy();
+    expect(screen.getByText(/elle seule suffit à ouvrir le compte/i)).toBeTruthy();
   });
 
   it("le type d'événement vient du paquet, il n'est pas recopié", () => {

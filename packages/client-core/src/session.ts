@@ -729,6 +729,94 @@ export async function initSession(config: SessionConfig): Promise<Session> {
 }
 
 /**
+ * REQ-COR-14 / D-14 — **la porte de secours : ouvrir une session avec la clé de
+ * récupération, quand le mot de passe est perdu.**
+ *
+ * C'est une mesure exceptionnelle et le produit la présente comme telle (spec 11). Elle
+ * existe parce que D-12 a fermé la seule autre issue : sans e-mail, sans SSO, et avec
+ * `POST /account/password` bloqué au proxy, un mot de passe oublié faisait un compte mort
+ * — et la clé de récupération, que l'utilisateur a pourtant en main, n'y pouvait rien.
+ *
+ * **Ce qu'elle coûte, et qui est le fond de D-14** : la clé cesse d'être un secret qui
+ * déchiffre pour devenir un secret qui *ouvre*. Avant, la détenir sans session ne donnait
+ * rien ; désormais elle donne le compte entier. Un facteur, pas deux.
+ *
+ * Le serveur ne rend **pas** un jeton d'accès : il rend un jeton de connexion à usage
+ * unique, échangé ici par le chemin natif `m.login.token`. Synapse crée l'appareil,
+ * applique ses limites et journalise la connexion comme n'importe quelle autre.
+ */
+export async function connexionParCle(
+  config: Omit<SessionConfig, "motDePasse"> & { cleRecuperation: string },
+): Promise<Session> {
+  const auth = createClient({ baseUrl: config.homeserverUrl });
+
+  let privateKey: Uint8Array;
+  try {
+    // Même normalisation qu'`unlockRecovery`. Une clé malformée est refusée ici, sans
+    // aller-retour — et avec le même `errcode` que le refus du serveur : pour la personne
+    // qui tape, « mal recopiée » et « pas celle de ce compte » se corrigent pareil, et
+    // c'est ce qui classe une erreur (règle 2).
+    privateKey = decodeRecoveryKey(config.cleRecuperation.replace(/\s+/g, ""));
+  } catch {
+    throw Object.assign(new Error("clé de récupération invalide"), { errcode: "M_FORBIDDEN" });
+  }
+
+  const reponse = (await auth.http.requestOtherUrl(
+    Method.Post,
+    new URL("/_synapse/client/tacita/login_recovery", config.homeserverUrl).toString(),
+    { user: config.identifiant, recovery_key: encodeBase64(privateKey) },
+  )) as { login_token?: string };
+
+  if (!reponse.login_token) {
+    // Le module ne rend jamais 200 sans jeton ; s'il le faisait, poursuivre donnerait un
+    // `/login` sans jeton et une erreur qui ne dirait pas d'où elle vient.
+    throw new Error("le serveur n'a pas rendu de jeton de connexion");
+  }
+
+  const login = await auth.loginRequest({
+    type: "m.login.token",
+    token: reponse.login_token,
+  });
+
+  if (!login.device_id) {
+    // Même refus qu'`initSession`, même motif : sans identité d'appareil, aucune session
+    // Megolm ne s'établit et le client n'enverra jamais rien de chiffré.
+    throw new Error("le homeserver n'a pas attribué de device_id : session refusée");
+  }
+
+  const credentials: StoredCredentials = {
+    accessToken: login.access_token,
+    userId: login.user_id,
+    deviceId: login.device_id,
+  };
+
+  const saved = await openCredentials(config.indexedDB ?? globalThis.indexedDB);
+  await saved.write(credentials);
+  const session = await buildSession(credentials, config, saved);
+
+  /*
+   * **Et on déverrouille dans la foulée.** Cet appareil est neuf, donc non signé : sans
+   * ce geste, la porte (spec 11) redemanderait aussitôt la clé qu'on vient de taper.
+   * Deux saisies du même secret à trente secondes d'intervalle, ce serait l'écran qui
+   * demande à l'utilisateur de compenser une couture interne.
+   */
+  try {
+    await session.unlockRecovery(config.cleRecuperation);
+  } catch {
+    /*
+     * ponytail: le serveur vient de valider cette clé contre le descripteur du compte —
+     * un échec ici est une anomalie locale, pas une clé fausse. La session est ouverte et
+     * `RecoveryUnlock` sait déjà demander la clé : on ne fait pas échouer une connexion
+     * réussie pour une étape qui a son propre écran. Le jour où ce cas se produit
+     * vraiment, c'est un état à remonter, pas un `throw` à ajouter ici.
+     */
+    createLogger().warn("session ouverte par clé, déverrouillage local à reprendre");
+  }
+
+  return session;
+}
+
+/**
  * REQ-COR-11 — rouvre la session précédente sans réseau : c'est ce qui rend
  * exploitables l'historique hors ligne (REQ-COR-03), la file d'envoi réhydratée
  * (spec 07) et l'index de recherche persisté (spec 09), qui survivent tous à un

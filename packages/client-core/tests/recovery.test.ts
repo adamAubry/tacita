@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeRecoveryKey } from "matrix-js-sdk/lib/crypto-api";
 
 import { resetSdk, type ClientMock, type CryptoMock } from "./mocks";
-import { creerCompte, initSession, type SessionConfig } from "../src";
+import { connexionParCle, creerCompte, initSession, type SessionConfig } from "../src";
 
 vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
 
@@ -340,5 +340,87 @@ describe("REQ-COR-06 — unlockRecovery : la deuxième connexion", () => {
     client.secretStorage.getKey.mockResolvedValue(null);
     const session = await initSession(config);
     await expect(session.unlockRecovery(CLE)).rejects.toThrow(/pas de clé de récupération/);
+  });
+});
+
+describe("REQ-COR-14 — la clé de récupération ouvre une session (D-14)", () => {
+  const CHEMIN = "/_synapse/client/tacita/login_recovery";
+
+  /** Ce que le module rend quand la clé ouvre : un jeton de connexion, rien d'autre. */
+  const serveurAccepte = () =>
+    client.http.requestOtherUrl.mockResolvedValue({ login_token: "syl_secours" });
+
+  it("échange la clé contre un jeton de connexion, puis ouvre la session par `m.login.token`", async () => {
+    serveurAccepte();
+
+    const session = await connexionParCle({ ...config, cleRecuperation: CLE });
+
+    const [, url, corps] = client.http.requestOtherUrl.mock.calls[0]!;
+    expect(url).toContain(CHEMIN);
+    expect(corps).toMatchObject({ user: "adam" });
+    // La clé part en base64 des 32 octets, pas dans sa forme lisible : c'est ce que le
+    // module décode (`b64decode(validate=True)`), et la jonction n'a pas d'autre garde.
+    expect(atob((corps as { recovery_key: string }).recovery_key)).toHaveLength(32);
+
+    // Le module ne rend **pas** de jeton d'accès : c'est Synapse qui ouvre la session, par
+    // son chemin natif, avec tout ce qu'il applique au passage (appareil, limites, trace).
+    expect(client.loginRequest).toHaveBeenCalledWith({
+      type: "m.login.token",
+      token: "syl_secours",
+    });
+    expect(session).toBeTruthy();
+  });
+
+  it("déverrouille dans la foulée : la porte ne redemande pas la clé qu'on vient de taper", async () => {
+    serveurAccepte();
+
+    await connexionParCle({ ...config, cleRecuperation: CLE });
+
+    // `bootstrapCrossSigning` est le geste d'`unlockRecovery` qui signe cet appareil —
+    // sans lui, `recoveryState()` rendrait `deverrouillage` et l'écran redemanderait la
+    // même clé trente secondes plus tard.
+    expect(crypto.bootstrapCrossSigning).toHaveBeenCalled();
+    expect(crypto.loadSessionBackupPrivateKeyFromSecretStorage).toHaveBeenCalled();
+  });
+
+  it("un déverrouillage qui échoue ne perd pas la session ouverte", async () => {
+    serveurAccepte();
+    // Le serveur a déjà validé la clé contre le descripteur du compte : un refus local
+    // est une anomalie, pas une clé fausse. Faire échouer la connexion pour ça renverrait
+    // au formulaire quelqu'un qui est authentifié.
+    crypto.bootstrapCrossSigning.mockRejectedValue(new Error("crypto indisponible"));
+
+    await expect(connexionParCle({ ...config, cleRecuperation: CLE })).resolves.toBeTruthy();
+  });
+
+  it("une clé mal recopiée ne part pas sur le réseau", async () => {
+    /*
+     * `decodeRecoveryKey` vérifie préfixe, longueur et parité. L'échec porte le même
+     * `errcode` que le refus du serveur, et c'est voulu : pour qui tape, « mal recopiée »
+     * et « pas celle de ce compte » se corrigent de la même façon (règle 2).
+     */
+    await expect(
+      connexionParCle({ ...config, cleRecuperation: "pas une clé" }),
+    ).rejects.toMatchObject({ errcode: "M_FORBIDDEN" });
+
+    expect(client.http.requestOtherUrl).not.toHaveBeenCalled();
+  });
+
+  it("le refus du serveur remonte tel quel, sans être traduit en panne", async () => {
+    client.http.requestOtherUrl.mockRejectedValue(
+      Object.assign(new Error("Forbidden"), { httpStatus: 403, errcode: "M_FORBIDDEN" }),
+    );
+
+    await expect(
+      connexionParCle({ ...config, cleRecuperation: CLE }),
+    ).rejects.toMatchObject({ errcode: "M_FORBIDDEN" });
+    expect(client.loginRequest).not.toHaveBeenCalled();
+  });
+
+  it("un 200 sans jeton échoue ici, plutôt que de partir en `/login` sans rien", async () => {
+    client.http.requestOtherUrl.mockResolvedValue({});
+    await expect(connexionParCle({ ...config, cleRecuperation: CLE })).rejects.toThrow(
+      /jeton de connexion/,
+    );
   });
 });

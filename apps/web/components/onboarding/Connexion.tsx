@@ -1,10 +1,10 @@
 "use client";
 
-import { creerCompte, initSession, type Session } from "@tacita/client-core";
+import { connexionParCle, creerCompte, initSession, type Session } from "@tacita/client-core";
 import { useState } from "react";
 
 import { IconeCle } from "../foundation/icons";
-import { Button, Text, TextInput, VStack } from "../foundation/primitives";
+import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitives";
 
 /**
  * REQ-UI-04 / REQ-UIX-06 — **l'écran de connexion**, réécrit le 25/08/2026 (D-12, D-13).
@@ -24,18 +24,25 @@ import { Button, Text, TextInput, VStack } from "../foundation/primitives";
  * été retiré du serveur, donc de l'écran — ce que ça ouvre est assumé et écrit dans
  * `infra/LIMITES.md`, ce n'est pas au formulaire de le compenser.
  *
+ * **Un troisième mode, et c'est une porte de secours** (D-14) : la clé de récupération
+ * ouvre une session quand le mot de passe est perdu. Elle n'est pas offerte à côté des
+ * deux autres — on y arrive par « Mot de passe oublié ? », et l'écran dit ce qu'elle
+ * engage. Sans elle, un mot de passe oublié est un compte mort : ce déploiement n'a ni
+ * e-mail ni SSO, et le changement de mot de passe exige déjà la clé (D-12).
+ *
  * Ce que cet écran ne fait pas, et qui appartient à la porte : décider de ce qui vient
  * après. Il rend une `Session`, `RecoveryGate` s'occupe du reste (clé, parcours d'accueil).
  */
-type Mode = "connexion" | "creation";
+type Mode = "connexion" | "creation" | "cle";
 
 /** Ce qui a échoué, dit dans les mots de la personne et non dans ceux du protocole. */
-type Echec = "identifiants" | "refus" | "pris" | "reseau";
+type Echec = "identifiants" | "refus" | "pris" | "cle" | "reseau";
 
 const MESSAGES: Record<Echec, string> = {
   identifiants: "Identifiant ou mot de passe incorrect.",
   refus: "La création de compte est refusée par ce serveur.",
   pris: "Cet identifiant est déjà pris.",
+  cle: "Identifiant ou clé de récupération incorrect.",
   reseau: "Le serveur n'a pas répondu. Réessayez.",
 };
 
@@ -50,6 +57,13 @@ function classer(erreur: unknown, mode: Mode): Echec {
   const { errcode } = (erreur ?? {}) as { errcode?: string };
   if (errcode === "M_USER_IN_USE") return "pris";
   /*
+   * D-14 — le module refuse d'un seul message pour quatre causes : compte inconnu,
+   * désactivé, sans clé, ou clé fausse. Les distinguer donnerait un oracle de comptes à
+   * qui interroge cette porte ouverte (même jurisprudence que REQ-INV-08), et l'écran ne
+   * peut donc rien dire de plus honnête que « l'un des deux est faux ».
+   */
+  if (mode === "cle" && errcode === "M_FORBIDDEN") return "cle";
+  /*
    * Le serveur exige une étape d'inscription que le client ne sait pas franchir — un code
    * d'invitation remis par exemple (le repli écrit dans D-13). Il a répondu, et vite :
    * « le serveur n'a pas répondu » enverrait réessayer sans fin. Le message dit donc
@@ -57,6 +71,7 @@ function classer(erreur: unknown, mode: Mode): Echec {
    */
   if (errcode === "TACITA_INSCRIPTION_IMPOSSIBLE") return "refus";
   if (errcode === "M_FORBIDDEN") return mode === "creation" ? "refus" : "identifiants";
+  if (mode === "cle") return "reseau";
   if (errcode === "M_UNAUTHORIZED" || errcode === "M_INVALID_PARAM") return "identifiants";
   return "reseau";
 }
@@ -74,11 +89,14 @@ export function Connexion({
   const [mode, setMode] = useState<Mode>("connexion");
   const [identifiant, setIdentifiant] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
+  const [cleRecuperation, setCleRecuperation] = useState("");
   const [echec, setEchec] = useState<Echec>();
   const [enCours, setEnCours] = useState(false);
 
   const creation = mode === "creation";
-  const complet = identifiant.trim() !== "" && motDePasse !== "";
+  const parCle = mode === "cle";
+  const complet =
+    identifiant.trim() !== "" && (parCle ? cleRecuperation.trim() !== "" : motDePasse !== "");
 
   const soumettre = async () => {
     if (!complet || enCours) return;
@@ -86,7 +104,13 @@ export function Connexion({
     setEchec(undefined);
     try {
       const config = { homeserverUrl, identifiant: identifiant.trim(), motDePasse, indexedDB };
-      onSession(creation ? await creerCompte(config) : await initSession(config));
+      if (parCle) {
+        onSession(
+          await connexionParCle({ ...config, cleRecuperation: cleRecuperation.trim() }),
+        );
+      } else {
+        onSession(creation ? await creerCompte(config) : await initSession(config));
+      }
     } catch (erreur) {
       // Rien n'est journalisé : le mot de passe est dans la portée de ce bloc.
       setEchec(classer(erreur, mode));
@@ -118,13 +142,32 @@ export function Connexion({
       <VStack gap={8}>
         <VStack gap={5}>
           <Text type="display-3" as="h1" style={{ textWrap: "balance" }}>
-            {creation ? "Créez votre compte" : "Connectez-vous"}
+            {parCle
+              ? "Entrer avec votre clé"
+              : creation
+                ? "Créez votre compte"
+                : "Connectez-vous"}
           </Text>
           <Text style={{ textWrap: "pretty" }}>
-            {creation
-              ? "Choisissez un identifiant et un mot de passe. Rien d'autre n'est demandé : ni e-mail, ni code d'invitation."
-              : "Votre identifiant est celui que vous avez choisi à la création du compte."}
+            {parCle
+              ? "Votre clé de récupération ouvre une session quand le mot de passe est perdu. Choisissez ensuite un nouveau mot de passe dans Réglages."
+              : creation
+                ? "Choisissez un identifiant et un mot de passe. Rien d'autre n'est demandé : ni e-mail, ni code d'invitation."
+                : "Votre identifiant est celui que vous avez choisi à la création du compte."}
           </Text>
+          {/*
+            D-14 — la contrepartie, dite là où le geste se fait. Même formulation que
+            l'écran de changement de mot de passe : la clé part vers le serveur, et un
+            serveur qui la garderait déchiffrerait tout. En `warning`, pas en `danger` :
+            c'est de quoi décider, pas un acte destructif.
+          */}
+          {parCle && (
+            <Banner
+              status="warning"
+              title="Une mesure exceptionnelle"
+              description="Votre clé est transmise au serveur pour vérifier que c'est bien vous, et elle ouvre alors le compte à elle seule. Ne l'utilisez que si le mot de passe est perdu."
+            />
+          )}
         </VStack>
 
         <VStack gap={4}>
@@ -152,22 +195,42 @@ export function Connexion({
             />
           </div>
 
-          <TextInput
-            label="Mot de passe"
-            type="password"
-            value={motDePasse}
-            onChange={(v) => {
-              setMotDePasse(v);
-              setEchec(undefined);
-            }}
-            onEnter={() => void soumettre()}
-            width="100%"
-            status={
-              echec === "identifiants"
-                ? { type: "error", message: MESSAGES.identifiants }
-                : undefined
-            }
-          />
+          {!parCle && (
+            <TextInput
+              label="Mot de passe"
+              type="password"
+              value={motDePasse}
+              onChange={(v) => {
+                setMotDePasse(v);
+                setEchec(undefined);
+              }}
+              onEnter={() => void soumettre()}
+              width="100%"
+              status={
+                echec === "identifiants"
+                  ? { type: "error", message: MESSAGES.identifiants }
+                  : undefined
+              }
+            />
+          )}
+
+          {/* Le base58 est sensible à la casse : mêmes garde-fous de clavier qu'ailleurs. */}
+          {parCle && (
+            <div autoCapitalize="none" autoCorrect="off" spellCheck={false}>
+              <TextInput
+                label="Clé de récupération"
+                value={cleRecuperation}
+                onChange={(v) => {
+                  setCleRecuperation(v);
+                  setEchec(undefined);
+                }}
+                onEnter={() => void soumettre()}
+                placeholder="EsTb ABCD EFGH …"
+                width="100%"
+                status={echec === "cle" ? { type: "error", message: MESSAGES.cle } : undefined}
+              />
+            </div>
+          )}
 
           {/*
             D-13 — il n'y a pas de troisième champ. Le code d'invitation vivait ici ; le
@@ -182,7 +245,7 @@ export function Connexion({
           )}
 
           <Button
-            label={creation ? "Créer mon compte" : "Se connecter"}
+            label={parCle ? "Ouvrir ma session" : creation ? "Créer mon compte" : "Se connecter"}
             variant="primary"
             isLoading={enCours}
             isDisabled={!complet}
@@ -196,13 +259,35 @@ export function Connexion({
           */}
           <VStack hAlign="center">
             <Button
-              label={creation ? "J'ai déjà un compte" : "Créer un compte"}
+              label={
+                parCle
+                  ? "Revenir à la connexion"
+                  : creation
+                    ? "J'ai déjà un compte"
+                    : "Créer un compte"
+              }
               variant="ghost"
               onClick={() => {
-                setMode(creation ? "connexion" : "creation");
+                setMode(mode === "connexion" ? "creation" : "connexion");
                 setEchec(undefined);
               }}
             />
+            {/*
+              D-14 — la porte de secours ne s'offre pas au même rang que les deux gestes
+              normaux : elle se trouve quand on la cherche. Elle n'apparaît qu'en mode
+              connexion — la proposer à quelqu'un qui crée son compte n'aurait aucun sens,
+              il n'a pas encore de clé.
+            */}
+            {mode === "connexion" && (
+              <Button
+                label="Mot de passe oublié ?"
+                variant="ghost"
+                onClick={() => {
+                  setMode("cle");
+                  setEchec(undefined);
+                }}
+              />
+            )}
           </VStack>
         </VStack>
       </VStack>

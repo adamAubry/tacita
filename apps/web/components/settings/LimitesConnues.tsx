@@ -61,18 +61,20 @@ const LIMITES: Limite[] = [
   },
   {
     /*
-     * D-12 — **la contrepartie du garde de changement de mot de passe**, dite là où elle
-     * se lit avant d'en dépendre. `infra/LIMITES.md` la porte pour l'opérateur ; cet
-     * écran est le seul endroit où l'utilisateur peut la voir.
+     * D-12 puis **D-14** — la contrepartie du garde, dite là où elle se lit avant d'en
+     * dépendre. `infra/LIMITES.md` la porte pour l'opérateur ; cet écran est le seul
+     * endroit où l'utilisateur peut la voir.
      *
      * Elle est ici et pas seulement dans l'écran de changement : quelqu'un qui décide de
      * confier ses conversations à ce produit doit pouvoir le savoir avant, pas au moment
-     * où il tape sa clé.
+     * où il tape sa clé. **La phrase a grossi le 25/08/2026** : depuis D-14, la clé ne
+     * fait plus que déchiffrer, elle ouvre — la garder comme un mot de passe cesse d'être
+     * un conseil de prudence et devient la seule chose qui protège le compte.
      */
     cle: "cle-au-serveur",
-    titre: "Changer votre mot de passe transmet votre clé au serveur",
+    titre: "Votre clé de récupération vaut votre mot de passe",
     texte:
-      "C'est votre clé de récupération, et non votre mot de passe actuel, qui autorise ce changement — quelqu'un qui accède à votre téléphone ne peut donc pas s'approprier votre compte. En échange, la clé est envoyée au serveur pour qu'il la vérifie. Il ne la conserve pas, mais un serveur mal intentionné pourrait le faire, et déchiffrerait alors vos conversations. Le nôtre est auto-hébergé ; si vous n'hébergez pas vous-même, sachez que cette confiance-là est nécessaire.",
+      "C'est elle, et non votre mot de passe actuel, qui autorise un changement de mot de passe — quelqu'un qui accède à votre téléphone ne peut donc pas s'approprier votre compte. C'est elle aussi qui vous laisse entrer si vous perdez ce mot de passe. Deux conséquences : gardez-la comme vous garderiez le mot de passe lui-même, puisqu'elle seule suffit à ouvrir le compte ; et sachez qu'elle est envoyée au serveur pour être vérifiée. Il ne la conserve pas, mais un serveur mal intentionné pourrait le faire, et déchiffrerait alors vos conversations. Le nôtre est auto-hébergé ; si vous n'hébergez pas vous-même, sachez que cette confiance-là est nécessaire.",
   },
   {
     cle: "recherche",

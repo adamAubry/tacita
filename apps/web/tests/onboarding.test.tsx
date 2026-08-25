@@ -68,11 +68,14 @@ const MOI = "@moi:tacita.test";
 const initSession = vi.fn<() => Promise<Session>>();
 const restoreSession = vi.fn<() => Promise<Session | null>>();
 const creerCompte = vi.fn<() => Promise<Session>>();
+const connexionParCle = vi.fn<(config: { identifiant: string; cleRecuperation: string }) => Promise<Session>>();
 vi.mock("@tacita/client-core", async (original) => ({
   ...(await original<typeof import("@tacita/client-core")>()),
   initSession: () => initSession(),
   restoreSession: () => restoreSession(),
   creerCompte: () => creerCompte(),
+  connexionParCle: (config: { identifiant: string; cleRecuperation: string }) =>
+    connexionParCle(config),
 }));
 
 /**
@@ -140,6 +143,7 @@ afterEach(() => {
   initSession.mockReset();
   restoreSession.mockReset();
   creerCompte.mockReset();
+  connexionParCle.mockReset();
   rediriger.mockReset();
   pousser.mockReset();
   listees.mockReturnValue([]);
@@ -824,5 +828,83 @@ describe("REQ-UI-04 — l'écran de connexion dit ce que le serveur a fait, pas 
     await waitFor(() =>
       expect(screen.getByText("Le serveur n'a pas répondu. Réessayez.")).toBeTruthy(),
     );
+  });
+});
+
+describe("REQ-UI-24 — la clé de récupération ouvre une session, en dernier recours (D-14)", () => {
+  /*
+   * D-12 a fermé la seule autre issue : ni e-mail ni SSO sur ce déploiement, et le
+   * changement de mot de passe exige déjà la clé. Sans cette porte, un mot de passe oublié
+   * faisait un compte mort — avec, en poche, la clé qui aurait pu l'ouvrir.
+   */
+  const ouvrirLaPorteDeSecours = async () => {
+    monter(null);
+    await waitFor(() => expect(screen.getByText("Mot de passe oublié ?")).toBeTruthy());
+    fireEvent.click(screen.getByText("Mot de passe oublié ?"));
+  };
+
+  it("elle ne s'offre pas au même rang que les deux gestes normaux", async () => {
+    monter(null);
+    await waitFor(() => expect(screen.getByText("Créer un compte")).toBeTruthy());
+
+    // Visible en connexion — c'est là qu'on la cherche…
+    expect(screen.getByText("Mot de passe oublié ?")).toBeTruthy();
+
+    // …et absente quand on crée son compte : on n'a pas encore de clé à présenter.
+    fireEvent.click(screen.getByText("Créer un compte"));
+    expect(screen.queryByText("Mot de passe oublié ?")).toBeNull();
+  });
+
+  it("l'écran demande la clé, pas le mot de passe, et dit ce que ça engage", async () => {
+    await ouvrirLaPorteDeSecours();
+
+    expect(screen.getByLabelText("Clé de récupération")).toBeTruthy();
+    // Le mot de passe n'est pas grisé, il n'est pas là : c'est le geste qu'on ne peut pas
+    // faire, pas un champ facultatif (interdit n°13).
+    expect(screen.queryByLabelText("Mot de passe")).toBeNull();
+    // La contrepartie est dite ici, où le geste se fait — pas seulement dans un écran de
+    // limites qu'on lit une fois.
+    expect(screen.getByText("Une mesure exceptionnelle")).toBeTruthy();
+  });
+
+  it("la clé ouvre la session", async () => {
+    const { session } = fausseSession();
+    connexionParCle.mockResolvedValue(session);
+    await ouvrirLaPorteDeSecours();
+
+    fireEvent.change(screen.getByLabelText("Identifiant"), { target: { value: "mira" } });
+    fireEvent.change(screen.getByLabelText("Clé de récupération"), {
+      target: { value: "EsTb ABCD EFGH" },
+    });
+    fireEvent.click(screen.getByText("Ouvrir ma session"));
+
+    await waitFor(() =>
+      expect(connexionParCle).toHaveBeenCalledWith(
+        expect.objectContaining({ identifiant: "mira", cleRecuperation: "EsTb ABCD EFGH" }),
+      ),
+    );
+  });
+
+  it("un refus dit que l'un des deux est faux, sans dire lequel", async () => {
+    /*
+     * Le module rend le même 403 pour quatre causes — compte inconnu, désactivé, sans clé,
+     * clé fausse. Deviner laquelle pour l'afficher reconstruirait l'oracle de comptes que
+     * cette réponse unique existe pour refuser.
+     */
+    connexionParCle.mockRejectedValue(
+      Object.assign(new Error("Forbidden"), { errcode: "M_FORBIDDEN" }),
+    );
+    await ouvrirLaPorteDeSecours();
+
+    fireEvent.change(screen.getByLabelText("Identifiant"), { target: { value: "mira" } });
+    fireEvent.change(screen.getByLabelText("Clé de récupération"), {
+      target: { value: "EsTb ABCD EFGH" },
+    });
+    fireEvent.click(screen.getByText("Ouvrir ma session"));
+
+    await waitFor(() =>
+      expect(screen.getByText("Identifiant ou clé de récupération incorrect.")).toBeTruthy(),
+    );
+    expect(screen.queryByText("Le serveur n'a pas répondu. Réessayez.")).toBeNull();
   });
 });

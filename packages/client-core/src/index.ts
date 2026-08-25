@@ -1,5 +1,6 @@
 ﻿export {
   changerMotDePasse,
+  connexionParCle,
   creerCompte,
   initSession,
   onSessionInvalidee,

@@ -29,6 +29,13 @@ const module = lire("../synapse/modules/tacita_password.py");
 const clientCore = readFileSync(ici("../../packages/client-core/src/session.ts"), "utf-8");
 
 const CHEMIN = "/_synapse/client/tacita/password";
+const CHEMIN_SECOURS = "/_synapse/client/tacita/login_recovery";
+
+/** Le corps de la ressource de secours, et rien d'autre du fichier. */
+const ressourceSecours = module.slice(
+  module.indexOf("class _RessourceConnexion"),
+  module.indexOf("def create_module"),
+);
 
 describe("D-12 — l'endpoint standard de changement de mot de passe est fermé", () => {
   it("nginx renvoie 403 sur les deux versions du chemin", () => {
@@ -98,5 +105,56 @@ describe("D-12 — la clé est vérifiée par le serveur, pas seulement par l'é
      * façon dont ce genre de secret finit sur disque.
      */
     expect(module).not.toMatch(/logger|logging|print\(/);
+  });
+});
+
+describe("D-14 — la clé de récupération ouvre une session quand le mot de passe est perdu", () => {
+  it("le module sert le chemin que le client appelle", () => {
+    // Même jonction que celle de D-12, et aussi bête : deux chaînes, deux langages, rien
+    // qui les relie. Un renommage d'un côté donne un 404 que personne n'attribue.
+    expect(module).toContain(`register_web_resource(\n        "${CHEMIN_SECOURS}"`);
+    expect(clientCore).toContain(`"${CHEMIN_SECOURS}"`);
+  });
+
+  it("la porte est ouverte, donc elle est limitée en débit", () => {
+    /*
+     * Cet endpoint est le seul du déploiement qui authentifie **sans** jeton. Une clé de
+     * 256 bits ne s'énumère pas de front, mais un endpoint d'authentification qui ne
+     * compte pas ses échecs n'a aucun moyen de voir qu'on l'essaie (REQ-INV-09). Le
+     * limiteur est celui du serveur, par IP, dimensionné par REQ-INF-05 — pas un compteur
+     * maison qui aurait sa propre idée du débit.
+     */
+    expect(ressourceSecours).toContain("Ratelimiter(");
+    expect(ressourceSecours).toContain("rc_login_address");
+    expect(ressourceSecours).toMatch(/await self\._limiteur\.ratelimit\(/);
+  });
+
+  it("un compte désactivé ne se rouvre pas avec sa clé", () => {
+    /*
+     * D-13 fait de la désactivation la réponse à un compte indésirable. Sans cette
+     * vérification, cette réponse-là se contournerait avec un secret que le compte détient
+     * déjà — et le symptôme serait un compte fermé qui se rouvre tout seul.
+     */
+    expect(ressourceSecours).toContain("is_deactivated");
+  });
+
+  it("un seul message pour toutes les causes de refus", () => {
+    /*
+     * Compte inconnu, désactivé, sans clé, clé fausse : la même réponse. Les distinguer
+     * donnerait un oracle de comptes à qui interroge cette porte ouverte — même
+     * jurisprudence que REQ-INV-08, et l'écran ne peut donc rien dire de plus précis.
+     */
+    expect(ressourceSecours.match(/respond_with_json\(\s*request,\s*403/g)).toHaveLength(1);
+  });
+
+  it("le serveur rend un jeton de connexion, jamais un jeton d'accès", () => {
+    /*
+     * `create_login_token` puis `/login` natif : Synapse crée l'appareil, applique ses
+     * limites et journalise la connexion. Un module qui fabriquerait le jeton d'accès
+     * lui-même se mettrait hors de tout ça, sans que rien ne le dise.
+     */
+    expect(ressourceSecours).toContain("create_login_token");
+    expect(ressourceSecours).not.toContain("register_device");
+    expect(clientCore).toContain('type: "m.login.token"');
   });
 });

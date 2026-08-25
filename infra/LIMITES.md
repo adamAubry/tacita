@@ -67,3 +67,15 @@ Documentées, jamais masquées (spec 00 — Honnêteté produit).
   un compte indésirable se désactive à la main. **Rouvrir la question, c'est remettre
   `registration_requires_token`** — le chemin est intact — plutôt que fermer l'annuaire,
   qui ferme la conséquence et pas la cause.
+- **La clé de récupération ouvre le compte à elle seule** *(ajouté le 25/08/2026, D-14)*.
+  `POST /_synapse/client/tacita/login_recovery` vérifie la clé et rend un jeton de
+  connexion à usage unique : c'est la porte de secours d'un mot de passe perdu, que D-12
+  avait fermée sans le vouloir. Elle déplace ce que vaut la clé — avant, la détenir sans
+  session ne donnait rien ; désormais elle donne le compte, historique compris, puisque
+  c'est aussi elle qui déchiffre. **Un facteur, plus deux.** Ce qui borne la porte :
+  limitation de débit par IP (limiteur de connexion du serveur, REQ-INF-05), refus
+  indifférencié pour toutes les causes, et un compte désactivé qui ne se rouvre pas — sans
+  quoi la désactivation, seule réponse de D-13 à un compte indésirable, se contournerait
+  avec un secret que ce compte détient déjà. **Rouvrir la question**, c'est exiger un
+  second facteur sur cette route ou rétablir un vrai chemin de réinitialisation, ce qui
+  suppose de rouvrir D-12 d'abord.

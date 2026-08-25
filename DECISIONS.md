@@ -2,7 +2,7 @@
 
 Décisions PM fermes. Les specs s'y réfèrent par leur ID. Toute remise en cause passe par le PM, pas par un contournement dans le code.
 
-**D-01 à D-13 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — il n'y en a plus au 20/08/2026, D-11 ayant été tranchée le jour même. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
+**D-01 à D-14 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — il n'y en a plus au 20/08/2026, D-11 ayant été tranchée le jour même. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
 
 ## D-01 — Plafond de l'index de recherche local
 **Décision : plafond en nombre d'événements, 200 000, éviction par ancienneté (FIFO).**
@@ -198,3 +198,27 @@ Si la file reprend un téléversement après redémarrage, le chiffré doit êtr
 **Ce qui rouvre la décision, avant toute autre chose** : la première vague de comptes non désirés, ou l'ouverture du déploiement au-delà du cercle. Deux replis, dans cet ordre de préférence — remettre `registration_requires_token` (le chemin est intact, seul le champ de l'écran est à reposer, et le test de REQ-INF-04 s'en apercevra tout de suite), ou fermer l'annuaire en revenant sur REQ-INF-18. Le second ne remplace pas le premier : il ferme la conséquence, pas la cause.
 
 **Ce que la décision ne change pas.** Le service de liens d'invitation (spec 12) reste ce qu'il est — un lien pour **se relier** à quelqu'un, jamais pour créer un compte. Les deux n'ont jamais été le même objet, et le sont encore moins maintenant : REQ-INV-10 est amendée en conséquence.
+
+
+---
+
+## D-14 — La clé de récupération ouvre une session, quand le mot de passe est perdu
+
+**Décision : oui, et la clé devient donc un facteur d'authentification à elle seule.** *(Tranchée le 25/08/2026, après instruction, le même jour que D-12 et D-13 — et c'est D-12 qui rend celle-ci nécessaire.)*
+
+**Le trou que ça ferme.** D-12 a fait de la clé de récupération le seul garde du changement de mot de passe, et fermé `POST /account/password` au proxy. Ce déploiement n'a ni e-mail, ni SSO, ni question de sécurité. Conséquence non vue au moment de trancher D-12 : **un mot de passe oublié faisait un compte mort**, définitivement, alors que son titulaire avait en poche la clé qui aurait dû le sauver. On lui demandait de garder précieusement un secret qui ne pouvait rien pour lui.
+
+**Ce qui est décidé.** L'écran de connexion porte une troisième voie, sous « Mot de passe oublié ? » : identifiant plus clé de récupération. Le module Synapse de D-12 gagne une seconde route, `POST /_synapse/client/tacita/login_recovery`, **non authentifiée**. Elle vérifie la clé contre le descripteur de secret storage du compte — la même vérification que D-12, le même code — et rend un **jeton de connexion à usage unique**, échangé par le chemin natif `m.login.token`. Le module ne fabrique aucun jeton d'accès : c'est Synapse qui ouvre la session, crée l'appareil, applique ses limites et journalise.
+
+**Ce que ça coûte, et qui est le fond de l'arbitrage.** La clé cesse d'être un secret qui *déchiffre* pour devenir un secret qui *ouvre*.
+
+- **Avant, la clé seule ne donnait rien.** Il fallait déjà une session pour avoir quelque chose à déchiffrer. Deux secrets étaient nécessaires pour prendre un compte : le mot de passe et la clé. **Désormais un seul suffit** — et c'est celui qu'on demande à l'utilisateur d'écrire quelque part.
+- **La porte est ouverte à Internet.** C'est le seul endpoint du déploiement qui authentifie sans jeton. Une clé de 256 bits ne s'énumère pas, mais l'endpoint est limité en débit par IP (le limiteur de connexion du serveur, REQ-INF-05) — un endpoint d'authentification qui ne compte pas ses échecs ne peut pas voir qu'on l'essaie.
+- **Le refus est indifférencié.** Compte inconnu, désactivé, sans clé, clé fausse : une seule réponse. Distinguer donnerait un oracle de comptes à qui interroge, et REQ-INF-18 ouvre déjà bien assez l'annuaire.
+- **Un compte désactivé ne se rouvre pas.** D-13 fait de la désactivation la réponse à un compte indésirable ; sans cette vérification, cette réponse-là se contournerait avec un secret que le compte détient déjà.
+
+**Pourquoi c'est tenable ici.** Le même motif que D-12 et D-13, et il ne s'étend pas plus loin : déploiement auto-hébergé, cercle restreint. Et l'alternative n'en était pas une — un compte mort par mot de passe oublié est une perte certaine de tout l'historique, contre un risque qui suppose que la clé ait fuité.
+
+**Ce que ça oblige à dire, et où c'est dit.** « Gardez votre clé comme votre mot de passe » cesse d'être un conseil de prudence : c'est la seule chose qui protège le compte. L'écran de secours le dit avant le geste (« une mesure exceptionnelle »), et « Limites connues » le dit avant qu'on en dépende — son entrée D-12 a été réécrite pour ça, et non doublée.
+
+**Ce qui rouvre la décision, avant toute autre chose** : héberger pour des tiers, comme pour D-12. Deux replis existent alors, dans cet ordre — exiger un second facteur sur cette route, ou la retirer et rétablir un vrai chemin de réinitialisation (e-mail), ce qui suppose de rouvrir D-12.
