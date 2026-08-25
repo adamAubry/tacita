@@ -39,55 +39,16 @@ export type EtatSession =
    */
   | { phase: "prete"; session: Session; onboarding?: boolean };
 
-/** Le paramètre que Synapse ajoute au retour du fournisseur OIDC. */
-export const PARAM_JETON = "loginToken";
-
-/**
- * REQ-UIX-06 — l'URL de départ vers le fournisseur. C'est Synapse qui redirige : nous
- * n'avons **aucune UI de mot de passe**, et nous n'en aurons pas (REQ-UI-04).
- */
-export function urlConnexion(homeserverUrl: string, retour: string): string {
-  const url = new URL("/_matrix/client/v3/login/sso/redirect", homeserverUrl);
-  /*
-   * **Normalisé, et pas recopié tel quel.** Synapse compare l'URL de retour aux entrées
-   * de `sso.client_whitelist` par **préfixe de chaîne**, sans normaliser quoi que ce soit
-   * (`handlers/auth.py`, v1.155.0). L'entrée rendue par `synapse/entrypoint.sh` se termine
-   * par `/` — et elle doit s'y terminer, sinon `https://tacita.test.evil.com` en serait
-   * un préfixe valide. C'est donc à l'appelant de fournir une URL qui commence par cette
-   * entrée, et `location.origin` n'en est pas une : il ne porte jamais de barre finale.
-   *
-   * Ce qu'un décalage d'un caractère coûtait, avant correction : la comparaison échouait,
-   * Synapse renonçait à rediriger et servait `sso_redirect_confirm.html` — une page à
-   * bouton « Continuer », **à chaque connexion de chaque utilisateur**. Rien ne cassait,
-   * personne ne voyait d'erreur, et le parcours gagnait un clic sur une page qui n'est
-   * pas la nôtre.
-   *
-   * `new URL(...).href` fait la normalisation que la plateforme sait déjà faire : une
-   * origine nue gagne sa barre, un chemin (`/i/<token>`) est laissé intact — et reste
-   * couvert par le même préfixe.
-   */
-  url.searchParams.set("redirectUrl", new URL(retour).href);
-  return url.toString();
-}
-
-/**
- * Le jeton de connexion arrive dans l'URL. Il doit **disparaître de la barre d'adresse
- * et de l'historique** aussitôt consommé (contrainte M-B) : un jeton dans l'historique
- * se retrouve dans une capture d'écran, une synchronisation de navigateur, ou un
- * copier-coller d'URL.
+/*
+ * `PARAM_JETON`, `urlConnexion` et `retirerJetonDeLUrl` vivaient ici. Les trois servaient
+ * le même aller-retour SSO : construire l'URL de redirection vers le fournisseur, puis
+ * retirer de l'historique le `loginToken` qu'il renvoyait dans la barre d'adresse.
  *
- * `replaceState` et non `pushState` : l'entrée d'historique qui portait le jeton est
- * remplacée, pas doublée.
+ * Supprimés le 25/08/2026 (D-12) avec Keycloak. L'identité est portée par Synapse, la
+ * connexion est un formulaire (`Connexion.tsx`), et plus aucun secret ne transite par
+ * l'URL — ce qui retire aussi, au passage, la classe de fuite que `retirerJetonDeLUrl`
+ * existait pour contenir : capture d'écran, synchronisation de navigateur, copier-coller.
  */
-export function retirerJetonDeLUrl(location: Location, history: History): string | null {
-  const url = new URL(location.href);
-  const jeton = url.searchParams.get(PARAM_JETON);
-  if (!jeton) return null;
-
-  url.searchParams.delete(PARAM_JETON);
-  history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-  return jeton;
-}
 
 /**
  * REQ-COR-06 / REQ-UI-04 — la porte. `recoveryState()` est la source ; le shard ne dérive

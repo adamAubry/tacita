@@ -18,16 +18,18 @@ import { Divider, RadioList, RadioListItem, Text, type ThemeMode } from "../foun
 import { useSession } from "../onboarding/SessionProvider";
 import { Confidentialite } from "./Confidentialite";
 import { LimitesConnues } from "./LimitesConnues";
+import { MotDePasse } from "./MotDePasse";
 import { NotificationsPush } from "./NotificationsPush";
 import { libelleNiveau } from "./NotificationsSalon";
 import { StockageLocal } from "./StockageLocal";
 import { routeInfos } from "../../lib/routes";
 
 /** Les cinq options de REQ-UIX-31. Chacune ouvre une modal, aucune ne navigue. */
-type Option = "theme" | "confidentialite" | "notifications" | "stockage" | "limites";
+type Option = "theme" | "motdepasse" | "confidentialite" | "notifications" | "stockage" | "limites";
 
 const TITRES: Record<Option, string> = {
   theme: "Apparence",
+  motdepasse: "Mot de passe",
   confidentialite: "Confidentialité",
   notifications: "Notifications",
   stockage: "Stockage local",
@@ -39,6 +41,9 @@ const TITRES: Record<Option, string> = {
  * `theme` n'y est pas : son état courant est le mode choisi, et il se lit à l'exécution.
  */
 const DETAILS: Record<Exclude<Option, "theme">, string> = {
+  // D-12 — le détail dit ce qui garde le changement, parce que c'est la surprise : on
+  // s'attend à devoir donner son mot de passe actuel, et c'est la clé qu'on demande.
+  motdepasse: "Changer, avec votre clé de récupération",
   confidentialite: "Mode masqué, accusés de lecture",
   notifications: "Cet appareil, et les conversations en silence",
   stockage: "Index de recherche et caches",
@@ -142,6 +147,10 @@ export function Reglages() {
             </RadioList>
           </div>
         )}
+
+        {/* D-12 — la session est requise : sans elle il n'y a ni compte ni clé à
+            vérifier, et l'écran n'aurait rien à changer. */}
+        {option === "motdepasse" && session && <MotDePasse session={session} />}
 
         {option === "confidentialite" && <Confidentialite />}
 

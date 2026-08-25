@@ -117,7 +117,7 @@ let indexedDB: IDBFactory;
 
 const rendreAvecSession = (noeud: React.ReactNode) =>
   render(
-    <SessionProvider homeserverUrl="https://chat.tacita.test" rediriger={vi.fn()}>
+    <SessionProvider homeserverUrl="https://chat.tacita.test">
       {noeud}
     </SessionProvider>,
   );
@@ -260,7 +260,7 @@ describe("REQ-UI-13 — mode masqué : la bascule agit, et l'effet symétrique e
   });
 });
 
-describe("REQ-UIX-32 — limites connues : sobre, et complet sur les six sujets", () => {
+describe("REQ-UIX-32 — limites connues : sobre, et complet sur les sept sujets", () => {
   it("nomme les réactions, les épinglés, « délivré », les métadonnées, l'annuaire et la recherche", () => {
     render(<LimitesConnues />);
 
@@ -272,6 +272,18 @@ describe("REQ-UIX-32 — limites connues : sobre, et complet sur les six sujets"
     // REQ-INF-18 (E-21) : l'annuaire ouvert est une exposition, donc une limite. Elle
     // est écrite dans `infra/LIMITES.md` ; cet écran est l'endroit où l'utilisateur la lit.
     expect(screen.getByText(/trouvable par tous les comptes de ce serveur/i)).toBeTruthy();
+  });
+
+  it("D-12 — la transmission de la clé au serveur est dite, pas seulement documentée", () => {
+    /*
+     * Interdit n°13, et le cas le plus dur du produit : la promesse E2EE se lit plus large
+     * qu'elle ne l'est si on ne dit pas qu'un changement de mot de passe confie au serveur
+     * le secret qui déchiffre tout. `infra/LIMITES.md` le porte pour l'opérateur ; cet
+     * écran est le seul endroit où l'utilisateur peut le lire.
+     */
+    render(<LimitesConnues />);
+    expect(screen.getByText(/transmet votre clé au serveur/i)).toBeTruthy();
+    expect(screen.getByText(/déchiffrerait alors vos conversations/i)).toBeTruthy();
   });
 
   it("le type d'événement vient du paquet, il n'est pas recopié", () => {

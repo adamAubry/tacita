@@ -2,8 +2,10 @@
 
 import type { ReactNode } from "react";
 
-import { Placeholder } from "../foundation/Placeholder";
+import { HOMESERVER } from "../../lib/config";
+
 import { Skeleton, VStack } from "../foundation/primitives";
+import { Connexion } from "./Connexion";
 import { EcranDePorte } from "./EcranDePorte";
 import { Onboarding } from "./Onboarding";
 import { RecoveryUnlock } from "./RecoveryUnlock";
@@ -24,8 +26,15 @@ import { useSession } from "./SessionProvider";
  * sortir par le milieu laisse quelqu'un sur une application vide. Ses étapes, elles,
  * peuvent être facultatives — c'est le parcours qui le dit, pas cette porte.
  */
-export function RecoveryGate({ children }: { children: ReactNode }) {
-  const { etat } = useSession();
+export function RecoveryGate({
+  children,
+  homeserverUrl = HOMESERVER,
+}: {
+  children: ReactNode;
+  /** Injecté en test ; en production, l'adresse du déploiement. */
+  homeserverUrl?: string;
+}) {
+  const { etat, sessionOuverte } = useSession();
 
   if (etat.phase === "chargement") {
     // DESIGN.md : pas de spinner plein écran. Une géométrie d'attente, localisée.
@@ -41,11 +50,16 @@ export function RecoveryGate({ children }: { children: ReactNode }) {
   }
 
   if (etat.phase === "hors-session") {
-    // La redirection vers l'OIDC est déjà partie (REQ-UIX-06 : sans écran intermédiaire).
-    // Ce qui s'affiche entre-temps ne doit ni ressembler à une erreur, ni à un formulaire.
+    /*
+     * REQ-UIX-06 — **le formulaire, et non une redirection** (D-12, 25/08/2026).
+     *
+     * Cet écran affichait « Connexion… / Redirection vers votre fournisseur » : il n'y
+     * avait rien à saisir, l'identité vivant chez Keycloak. Elle est revenue dans le
+     * produit, et cet emplacement est celui où on la demande.
+     */
     return (
       <EcranDePorte>
-        <Placeholder titre="Connexion…" explication="Redirection vers votre fournisseur." />
+        <Connexion homeserverUrl={homeserverUrl} onSession={sessionOuverte} />
       </EcranDePorte>
     );
   }

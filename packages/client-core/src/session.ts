@@ -11,6 +11,7 @@ import {
 // ponytail: casse si le SDK réorganise ses chemins ; repasser à la racine le jour où
 // elle réexporte crypto-api.
 import { decodeRecoveryKey, OnlySignedDevicesIsolationMode } from "matrix-js-sdk/lib/crypto-api";
+import { Method } from "matrix-js-sdk/lib/http-api/method";
 
 import { createLogger } from "./logger";
 
@@ -22,11 +23,20 @@ export interface SessionConfig {
   /** Homeserver Synapse (spec 01), derrière le proxy TLS. */
   homeserverUrl: string;
   /**
-   * REQ-COR-08 — jeton `m.login.token` émis à l'issue du flux OIDC du fournisseur
-   * externe (spec 01). Le module ne connaît aucun secret utilisateur et
-   * n'implémente aucune méthode d'authentification propre.
+   * REQ-COR-08 — **identifiant et mot de passe**, réécrit le 25/08/2026 (D-12).
+   *
+   * Le module recevait ici un `loginToken` émis par un fournisseur OIDC externe, et se
+   * targuait de ne connaître aucun secret utilisateur. Keycloak supprimé, l'identité est
+   * portée par Synapse : le mot de passe traverse donc ce module. Il n'y est **jamais
+   * conservé** — ni en mémoire après l'appel, ni en IndexedDB, où seuls l'`access_token`
+   * et l'identité d'appareil sont écrits (`StoredCredentials`).
+   *
+   * `identifiant` est le localpart (`adam`), pas l'identifiant complet : c'est ce que
+   * l'écran de connexion demande, et `m.login.password` l'accepte tel quel via un
+   * `identifier` de type `m.id.user`.
    */
-  loginToken: string;
+  identifiant: string;
+  motDePasse: string;
   /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }
@@ -315,7 +325,7 @@ function lockSignedDevicesOnly(crypto: CryptoApi): void {
  */
 async function buildSession(
   credentials: StoredCredentials,
-  config: Omit<SessionConfig, "loginToken">,
+  config: Omit<SessionConfig, "identifiant" | "motDePasse">,
   saved: CredentialStore,
 ): Promise<Session> {
   const log = createLogger();
@@ -684,11 +694,22 @@ async function buildSession(
 }
 
 export async function initSession(config: SessionConfig): Promise<Session> {
-  // REQ-COR-08 — `loginWithToken` est déprécié : il ne reporte pas le `device_id`,
-  // indispensable à la crypto. On fait la requête, puis on construit le client
-  // définitif avec les credentials complets.
+  /*
+   * REQ-COR-08 — `loginWithPassword` est déprécié dans le SDK pour la même raison que
+   * `loginWithToken` l'était : il pose les credentials sur un client déjà construit, dont
+   * la crypto n'a pas démarré avec la bonne identité d'appareil. On fait la requête sur un
+   * client jetable, puis on construit le client définitif avec les credentials complets.
+   *
+   * `m.id.user` et non l'identifiant complet : Synapse accepte les deux, mais l'écran de
+   * connexion demande un nom d'utilisateur, et le compléter ici en `@nom:serveur` ferait
+   * échouer quiconque a tapé son identifiant entier.
+   */
   const auth = createClient({ baseUrl: config.homeserverUrl });
-  const login = await auth.loginRequest({ type: "m.login.token", token: config.loginToken });
+  const login = await auth.loginRequest({
+    type: "m.login.password",
+    identifier: { type: "m.id.user", user: config.identifiant },
+    password: config.motDePasse,
+  });
 
   if (!login.device_id) {
     // Sans identité d'appareil, aucune session Megolm ne peut être établie : mieux
@@ -719,7 +740,7 @@ export async function initSession(config: SessionConfig): Promise<Session> {
  * `M_UNKNOWN_TOKEN` au premier appel, que le shard UI route vers l'OIDC.
  */
 export async function restoreSession(
-  config: Omit<SessionConfig, "loginToken">,
+  config: Omit<SessionConfig, "identifiant" | "motDePasse">,
 ): Promise<Session | null> {
   const saved = await openCredentials(config.indexedDB ?? globalThis.indexedDB);
   const credentials = await saved.read();
@@ -801,4 +822,184 @@ export function onSessionInvalidee(session: Session, rappel: () => void): () => 
   return () => {
     session.client.off(HttpApiEvent.SessionLoggedOut, surRefus);
   };
+}
+
+/**
+ * REQ-COR-08 / REQ-INF-04 — **créer un compte**, jeton d'inscription à l'appui.
+ *
+ * `registration_requires_token` est actif côté serveur (D-12) : l'inscription est ouverte
+ * mais gardée, faute de quoi un homeserver sans e-mail ni captcha se fait remplir de
+ * comptes qui peuvent tous énumérer l'annuaire (REQ-INF-18).
+ *
+ * L'UIA se joue en deux temps et c'est le protocole qui l'impose : la première requête part
+ * sans `auth`, prend un 401 qui porte la `session`, et la seconde rejoue avec le jeton. On
+ * ne devine pas la session — on la lit dans le défi, comme `defiSso` le faisait pour le SSO.
+ *
+ * Rend une session ouverte : Synapse connecte le compte qu'il vient de créer, et repasser
+ * par `initSession` demanderait le mot de passe une seconde fois pour rien.
+ */
+export async function creerCompte(
+  config: SessionConfig & { jetonInscription: string },
+): Promise<Session> {
+  const auth = createClient({ baseUrl: config.homeserverUrl });
+
+  const demande = (authDict?: Record<string, unknown>) =>
+    auth.registerRequest({
+      username: config.identifiant,
+      password: config.motDePasse,
+      ...(authDict ? { auth: authDict } : {}),
+    });
+
+  /*
+   * **L'UIA d'inscription a plusieurs étapes, et il faut les franchir toutes.**
+   *
+   * Relu dans l'image déployée (`synapse/rest/client/register.py`,
+   * `_calculate_registration_flows`, v1.155.0) : sans e-mail ni MSISDN configurés, la
+   * liste de base vaut `[[m.login.dummy]]`, et `registration_requires_token` **préfixe**
+   * le jeton à chaque flow. Le flow réel est donc `[m.login.registration_token,
+   * m.login.dummy]`.
+   *
+   * La première version de cette fonction ne franchissait que le jeton et tenait le second
+   * 401 pour une panne : aucune inscription n'aurait abouti. Le défaut n'était visible ni
+   * à la compilation, ni sous Vitest — seule la lecture du serveur le donnait.
+   *
+   * La boucle rejoue tant que le serveur redemande, et s'arrête au premier stage qu'on ne
+   * sait pas franchir plutôt que de boucler : un flow qui exigerait un e-mail doit échouer
+   * franchement, pas tourner.
+   */
+  let etat = await premiereReponse(demande);
+  for (let tour = 0; "defi" in etat && tour < ETAPES_UIA_MAX; tour++) {
+    const { defi, erreur } = etat;
+    const suivant = prochainStage(defi);
+    if (!suivant) throw erreur;
+    etat = await premiereReponse(() =>
+      demande(
+        suivant === "m.login.registration_token"
+          ? { type: suivant, token: config.jetonInscription, session: defi.session }
+          : { type: suivant, session: defi.session },
+      ),
+    );
+  }
+
+  if ("defi" in etat) throw etat.erreur;
+  const inscription = etat;
+
+  if (!inscription.access_token || !inscription.device_id) {
+    // `inhibit_login` n'est pas demandé : sans jeton ni appareil, le compte existe mais
+    // rien ne peut chiffrer, et le taire donnerait une inscription en apparence réussie.
+    throw new Error("le homeserver a créé le compte sans session : connexion refusée");
+  }
+
+  const credentials: StoredCredentials = {
+    accessToken: inscription.access_token,
+    userId: inscription.user_id,
+    deviceId: inscription.device_id,
+  };
+  const saved = await openCredentials(config.indexedDB ?? globalThis.indexedDB);
+  await saved.write(credentials);
+  return buildSession(credentials, config, saved);
+}
+
+/** Garde-fou de boucle : au-delà, c'est un flow qu'on ne sait pas franchir. */
+const ETAPES_UIA_MAX = 4;
+
+/** Les stages que cette fonction sait franchir, dans l'ordre où on les tente. */
+const STAGES_CONNUS = ["m.login.registration_token", "m.login.dummy"] as const;
+
+interface DefiUia {
+  session?: string;
+  flows?: { stages?: string[] }[];
+  completed?: string[];
+}
+
+/**
+ * Le prochain stage à franchir : le premier d'un flow entièrement à notre portée et qui
+ * n'est pas déjà fait.
+ *
+ * « Entièrement à notre portée » et pas « premier stage connu » : un flow qui commence par
+ * un stage qu'on sait faire et finit par un e-mail nous ferait avancer dans un cul-de-sac,
+ * en laissant croire que ça progresse.
+ */
+function prochainStage(defi: DefiUia): string | undefined {
+  const faits = new Set(defi.completed ?? []);
+  for (const flow of defi.flows ?? []) {
+    const stages = flow.stages ?? [];
+    if (!stages.every((stage) => (STAGES_CONNUS as readonly string[]).includes(stage))) continue;
+    const reste = stages.find((stage) => !faits.has(stage));
+    if (reste) return reste;
+  }
+  return undefined;
+}
+
+type EtapeUia =
+  | Awaited<ReturnType<MatrixClient["registerRequest"]>>
+  | { defi: DefiUia; erreur: unknown };
+
+/** Un appel d'inscription : soit il aboutit, soit il rend le défi que le serveur oppose. */
+async function premiereReponse(
+  appel: () => Promise<Awaited<ReturnType<MatrixClient["registerRequest"]>>>,
+): Promise<EtapeUia> {
+  try {
+    return await appel();
+  } catch (erreur) {
+    const { httpStatus, data } = (erreur ?? {}) as { httpStatus?: number; data?: DefiUia };
+    if (httpStatus !== 401 || !data?.session) throw erreur;
+    return { defi: data, erreur };
+  }
+}
+
+
+
+/**
+ * D-12 — **changer son mot de passe, la clé de récupération à l'appui.**
+ *
+ * Le garde est **serveur** : `POST /_matrix/client/v3/account/password` est fermé au proxy,
+ * et `/_synapse/client/tacita/password` est le seul chemin restant. La vérification faite
+ * ici, avant l'appel, ne le remplace pas — elle rend la faute de frappe immédiate, sans
+ * aller-retour ni envoi inutile de la clé.
+ *
+ * **Ce que cet appel expose, et qui est écrit dans D-12** : la clé part en clair vers le
+ * serveur. Elle n'ouvre pas un message, elle ouvre le magasin. C'est la contrepartie
+ * assumée du fait que le garde soit opposable à tout client, et non une règle de notre
+ * seule interface.
+ *
+ * Lève `Error("clé de récupération incorrecte")` — même message que `unlockRecovery`, même
+ * cause — ou remonte l'erreur du serveur telle quelle pour tout le reste.
+ */
+export async function changerMotDePasse(
+  session: Session,
+  options: { cleRecuperation: string; nouveau: string },
+): Promise<void> {
+  const client = session.client;
+
+  // Même normalisation que `unlockRecovery` : `decodeRecoveryKey` ne retire que les
+  // espaces, et une clé collée depuis un gestionnaire traîne souvent un retour à la ligne.
+  const privateKey = decodeRecoveryKey(options.cleRecuperation.replace(/\s+/g, ""));
+
+  const cle = await client.secretStorage.getKey();
+  if (!cle) throw new Error("ce compte n'a pas de clé de récupération");
+  const [, description] = cle;
+  if (!(await client.secretStorage.checkKey(privateKey, description))) {
+    // Refusée localement : la clé ne part pas sur le réseau. Ce n'est pas le garde — le
+    // garde est côté serveur — c'est ce qui évite de l'exposer pour rien.
+    throw new Error("clé de récupération incorrecte");
+  }
+
+  const reponse = await client.http.requestOtherUrl(
+    Method.Post,
+    new URL("/_synapse/client/tacita/password", client.baseUrl).toString(),
+    {
+      recovery_key: encodeBase64(privateKey),
+      new_password: options.nouveau,
+    },
+    { headers: { Authorization: `Bearer ${client.getAccessToken() ?? ""}` } },
+  );
+  void reponse;
+}
+
+/** Base64 standard, padding compris : c'est ce que `b64decode(validate=True)` attend. */
+function encodeBase64(octets: Uint8Array): string {
+  let binaire = "";
+  for (const octet of octets) binaire += String.fromCharCode(octet);
+  return btoa(binaire);
 }

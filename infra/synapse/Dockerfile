@@ -8,6 +8,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir synapse-s3-storage-provider
 
+# D-12 — les modules Synapse sont montés par le compose dans /conf/modules. Sans ce
+# chemin dans le PYTHONPATH, `modules:` lève « ModuleNotFoundError » au démarrage et le
+# homeserver ne boote pas — un service qui a toutes ses REQ vertes et qui ne démarre pas
+# est exactement la règle 4.
+ENV PYTHONPATH=/conf/modules
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

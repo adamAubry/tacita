@@ -391,7 +391,7 @@ describe("REQ-UIX-04 — la liste dit ce qu'elle fait : skeleton, puis vide, pui
  */
 function rendreAccueil() {
   return render(
-    <SessionProvider homeserverUrl="https://chat.tacita.test" rediriger={vi.fn()}>
+    <SessionProvider homeserverUrl="https://chat.tacita.test">
       <Accueil />
     </SessionProvider>,
   );

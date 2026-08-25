@@ -21,12 +21,21 @@ describe("REQ-INF-03 — chiffrement par défaut sur tout salon", () => {
   });
 });
 
-describe("REQ-INF-04 — inscription fermée", () => {
-  it("enable_registration est false", () => {
-    expect(homeserver.enable_registration).toBe(false);
+describe("REQ-INF-04 — inscription ouverte, gardée par un jeton", () => {
+  it("l'inscription est ouverte : le produit fait créer son compte depuis l'app", () => {
+    expect(homeserver.enable_registration).toBe(true);
   });
 
-  it("un registration_shared_secret est défini pour le script d'admin", () => {
+  it("elle exige un jeton, sinon c'est une cible de création de comptes en masse", () => {
+    /*
+     * Le garde n'est pas décoratif : ni e-mail ni captcha ne sont activés sur ce
+     * déploiement, et chaque compte créé peut énumérer l'annuaire (REQ-INF-18). Sans
+     * jeton, ouvrir l'inscription revient à ouvrir l'annuaire à n'importe qui.
+     */
+    expect(homeserver.registration_requires_token).toBe(true);
+  });
+
+  it("un registration_shared_secret reste défini pour le script d'admin", () => {
     expect(homeserver.registration_shared_secret).toBeTruthy();
   });
 });
@@ -111,25 +120,34 @@ describe("REQ-INF-08 — backend média S3", () => {
   });
 });
 
-describe("REQ-INF-09 — OIDC Keycloak seul fournisseur d'auth", () => {
-  it("l'authentification par mot de passe natif est désactivée", () => {
-    expect(homeserver.password_config.enabled).toBe(false);
+describe("REQ-INF-09 — identifiant + mot de passe, portés par Synapse", () => {
+  it("l'authentification par mot de passe native est active", () => {
+    // Réécrite le 25/08/2026 (D-12) : Keycloak supprimé, Matrix porte l'identité.
+    expect(homeserver.password_config.enabled).toBe(true);
   });
 
-  it("un provider OIDC keycloak est configuré", () => {
-    const [provider] = homeserver.oidc_providers;
-    expect(provider.idp_id).toBe("keycloak");
-    expect(provider.issuer).toContain("/auth/realms/tacita");
+  it("aucun fournisseur externe ne subsiste", () => {
+    /*
+     * L'assertion porte sur l'absence, et c'est voulu : un `oidc_providers` oublié
+     * rouvrirait un second chemin d'authentification que rien dans le produit ne sert,
+     * et que rien ne surveillerait.
+     */
+    expect(homeserver.oidc_providers).toBeUndefined();
+    expect(homeserver.sso).toBeUndefined();
   });
 
-  it("Keycloak sert sous le préfixe de l'issuer", () => {
-    // KC_HOSTNAME ne fixe que les URLs annoncées : sans KC_HTTP_RELATIVE_PATH,
-    // Keycloak sert à la racine et l'issuer qu'il publie répond 404.
-    const [provider] = homeserver.oidc_providers;
-    const issuerPath = new URL(provider.issuer.replace("${SERVER_NAME}", "example.org"))
-      .pathname;
-    const [prefix] = issuerPath.split("/realms/");
-    expect(compose.services.keycloak.environment.KC_HTTP_RELATIVE_PATH).toBe(prefix);
+  it("D-12 — la ré-authentification ne se sépare pas de la connexion, et c'est écrit", () => {
+    /*
+     * Le fait qui décide de toute la forme du garde de D-12, vérifié dans l'image
+     * v1.155.0 : `password_enabled_for_login` et `password_enabled_for_reauth` dérivent
+     * du même `enabled`. `true` donne les deux. Un stage UIA maison serait donc offert à
+     * côté de `m.login.password`, qui resterait acceptable — le garde serait décoratif.
+     *
+     * D'où le blocage au proxy plutôt qu'en UIA. Ce test relie la décision à sa raison :
+     * si quelqu'un passe un jour `enabled` à `only_for_reauth` en croyant durcir, il
+     * casse la connexion et laisse le garde intact.
+     */
+    expect(homeserver.password_config.enabled).not.toBe("only_for_reauth");
   });
 });
 

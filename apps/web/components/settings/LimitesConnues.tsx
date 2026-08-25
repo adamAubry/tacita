@@ -60,6 +60,21 @@ const LIMITES: Limite[] = [
       "Pour qu'on puisse vous ajouter sans connaître votre identifiant par cœur, l'annuaire du serveur répond à toutes les recherches : votre nom d'affichage et votre identifiant y apparaissent, même pour quelqu'un à qui vous n'avez jamais parlé. Vos messages, eux, n'y sont pas.",
   },
   {
+    /*
+     * D-12 — **la contrepartie du garde de changement de mot de passe**, dite là où elle
+     * se lit avant d'en dépendre. `infra/LIMITES.md` la porte pour l'opérateur ; cet
+     * écran est le seul endroit où l'utilisateur peut la voir.
+     *
+     * Elle est ici et pas seulement dans l'écran de changement : quelqu'un qui décide de
+     * confier ses conversations à ce produit doit pouvoir le savoir avant, pas au moment
+     * où il tape sa clé.
+     */
+    cle: "cle-au-serveur",
+    titre: "Changer votre mot de passe transmet votre clé au serveur",
+    texte:
+      "C'est votre clé de récupération, et non votre mot de passe actuel, qui autorise ce changement — quelqu'un qui accède à votre téléphone ne peut donc pas s'approprier votre compte. En échange, la clé est envoyée au serveur pour qu'il la vérifie. Il ne la conserve pas, mais un serveur mal intentionné pourrait le faire, et déchiffrerait alors vos conversations. Le nôtre est auto-hébergé ; si vous n'hébergez pas vous-même, sachez que cette confiance-là est nécessaire.",
+  },
+  {
     cle: "recherche",
     titre: "La recherche porte sur cet appareil",
     texte:

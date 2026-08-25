@@ -158,3 +158,23 @@ Si la file reprend un téléversement après redémarrage, le chiffré doit êtr
 **Ce qui manquait pour trancher** : le modèle de menace, et lui seul. La question n'était pas technique — les trois options sont implémentables — mais produit : **inclut-on un opérateur de serveur qui fait de l'analyse de trafic dans ce contre quoi Tacita protège ?** D-09 et REQ-INF-13 concèdent déjà le graphe social et le profil d'activité à cet opérateur. Cette concession tient : c'est la réponse, et elle est en tête de section.
 
 </details>
+
+---
+
+## D-12 — La clé de récupération garde le changement de mot de passe, côté serveur
+
+**Décision : oui, et le serveur voit donc la clé.** *(Tranchée le 25/08/2026, après instruction. Elle amende le principe directeur de `CLAUDE.md`, qui pointe ici.)*
+
+**Ce qui est décidé.** L'authentification passe à Synapse natif (login + mot de passe, Keycloak supprimé — REQ-INF-09 réécrite). Le changement de mot de passe est gardé par la **clé de récupération**, et par elle seule : ni le mot de passe courant, ni aucun autre facteur ne l'autorise. La vérification est **serveur**, donc opposable à tout client.
+
+**Ce que ça coûte, et qui est le fond de l'arbitrage.** La clé transite en clair vers le serveur à chaque changement. Elle n'ouvre pas un message : elle ouvre le magasin. Un serveur qui la capte déchiffre tout l'historique du compte, passé et à venir. Trois précisions qui ne sont pas des détails :
+
+- **Non stocké n'est pas non vu.** Le module vérifie puis jette ; un serveur hostile, compromis ou trop bavard dans ses journaux garde ce qui lui est passé sous les yeux.
+- **L'exposition ne se rattrape pas.** Le seul chemin de remplacement écrit ici — `setupRecoveryKey({ reinitialiser: true })` — remplace aussi la sauvegarde et l'identité, et rend illisible ce qui était chiffré sous l'ancienne clé. Une rotation non destructive est concevable, elle n'existe pas. Après incident : garder une clé exposée, ou perdre son historique.
+- **Le modèle de menace se déplace.** Avant, un serveur compromis voyait les métadonnées et le trafic à venir, jamais l'historique. Désormais, une seule requête captée lui ouvre tout.
+
+**Pourquoi c'est tenable ici.** Déploiement auto-hébergé : l'opérateur est l'auteur du produit ou son cercle. C'est la seule raison pour laquelle la concession passe.
+
+**Pourquoi la forme est celle-là et pas un stage UIA.** Vérifié dans l'image Synapse v1.155.0 : `password_enabled_for_login` et `password_enabled_for_reauth` ne se séparent pas — `enabled: true` donne les deux, `false` aucun, `only_for_reauth` l'inverse de ce qu'on veut. Un stage UIA maison serait donc offert **à côté** de `m.login.password`, qui resterait acceptable : le garde serait décoratif. Un module ne contourne rien, `get_supported_login_types` filtre `m.login.password` par le même drapeau. La forme retenue est donc : `POST /_matrix/client/v3/account/password` bloqué au proxy, et un endpoint de module qui exige la clé.
+
+**Ce qui rouvre la décision, avant toute autre** : héberger pour des tiers. L'opérateur cesse alors d'être celui qui accepte le risque, et c'est lui qui le porte pour d'autres. Le repli est le garde côté client (`secretStorage.checkKey`, local, la clé ne sort pas) — une règle du produit et non du serveur, à écrire comme telle.

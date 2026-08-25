@@ -38,3 +38,23 @@ Documentées, jamais masquées (spec 00 — Honnêteté produit).
 - **MinIO (dev local) : projet dont le rythme de publication a
   significativement ralenti** (dernière image : septembre 2025). Ne pas
   déployer tel quel en production sans revalidation ; voir `README.md`.
+- **Changer son mot de passe transmet la clé de récupération au serveur** *(ajouté le
+  25/08/2026, D-12)*. Le changement est gardé par la clé, et par elle seule : ni le mot de
+  passe courant, ni aucun autre facteur ne l'autorise — une session volée ne peut donc pas
+  s'approprier le compte. Le prix est que la vérification est **serveur**, donc que la clé
+  y transite en clair à chaque changement. Elle n'ouvre pas un message, elle ouvre le
+  magasin : un serveur qui la capte déchiffre tout l'historique du compte, passé et à
+  venir. Trois précisions qui ne sont pas des détails. **Non stocké n'est pas non vu** — le
+  module vérifie puis jette, mais un serveur hostile, compromis ou trop bavard dans ses
+  journaux garde ce qui lui est passé sous les yeux. **L'exposition ne se rattrape pas** :
+  le seul chemin de remplacement écrit ici remplace aussi la sauvegarde et l'identité, et
+  rend illisible ce qui était chiffré sous l'ancienne clé — après incident, c'est garder
+  une clé exposée ou perdre son historique. **Et le modèle de menace se déplace** : avant,
+  un serveur compromis voyait les métadonnées et le trafic à venir, jamais l'historique ;
+  désormais une seule requête captée lui ouvre tout. Ce qui rend l'arbitrage tenable est
+  que ce déploiement est auto-hébergé — l'opérateur est l'auteur du produit ou son cercle.
+  **Rouvrir la question passe par là avant toute autre chose** : héberger pour des tiers,
+  c'est faire porter le risque à quelqu'un qui ne l'a pas accepté. Le repli est le garde
+  côté client (`secretStorage.checkKey`, local, la clé ne sort pas) — une règle du produit
+  et non du serveur, à écrire comme telle.
+

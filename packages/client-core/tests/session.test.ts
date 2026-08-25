@@ -32,7 +32,8 @@ beforeEach(() => {
   ({ crypto, client } = resetSdk());
   config = {
     homeserverUrl: "https://tacita.test",
-    loginToken: "loginToken-emis-par-keycloak",
+    identifiant: "luca",
+    motDePasse: "motdepasse-essai",
     indexedDB: new IDBFactory(),
   };
 });
@@ -238,12 +239,18 @@ describe("REQ-COR-12 — l'état de chiffrement est un prédicat, pas une assert
   });
 });
 
-describe("REQ-COR-08 — authentification déléguée au flux OIDC externe", () => {
-  it("consomme le jeton de connexion et construit le client avec ses credentials", async () => {
+describe("REQ-COR-08 — identifiant et mot de passe, portés par Synapse", () => {
+  it("se connecte par mot de passe et construit le client avec ses credentials", async () => {
     await initSession(config);
+    /*
+     * `m.id.user` et non l'identifiant complet : Synapse accepte les deux, mais l'écran
+     * demande un nom d'utilisateur. Le compléter en `@nom:serveur` ici ferait échouer
+     * quiconque a tapé son identifiant entier.
+     */
     expect(client.loginRequest).toHaveBeenCalledWith({
-      type: "m.login.token",
-      token: config.loginToken,
+      type: "m.login.password",
+      identifier: { type: "m.id.user", user: "luca" },
+      password: "motdepasse-essai",
     });
     expect(clientOpts()).toMatchObject({
       accessToken: "syt_access",
@@ -252,13 +259,23 @@ describe("REQ-COR-08 — authentification déléguée au flux OIDC externe", () 
     });
   });
 
-  it("le module n'implémente ni ne stocke aucun mot de passe", () => {
-    expect(code).not.toMatch(/password/i);
+  it("le mot de passe traverse le module, il n'y est jamais conservé", () => {
+    /*
+     * Réécrit le 25/08/2026 (D-12). L'assertion était `code` sans aucun `password` —
+     * elle ne peut plus tenir, le module portant désormais la connexion. Ce qui reste
+     * vrai et qui compte : rien ne le range. `StoredCredentials` est le seul objet écrit
+     * en IndexedDB, et il ne porte que le jeton et l'identité d'appareil.
+     */
+    expect(code).toMatch(/interface StoredCredentials \{[^}]*\}/);
+    const stocke = /interface StoredCredentials \{([^}]*)\}/.exec(code)![1]!;
+    expect(stocke).not.toMatch(/password|motDePasse/i);
+    // Et aucune trace du mot de passe dans un log : le seul sink est `createLogger`.
+    expect(code).not.toMatch(/log\.[a-z]+\([^)]*motDePasse/);
   });
 });
 
 describe("REQ-COR-11 — reprise de session sans réseau", () => {
-  it("rouvre la session précédente sans repasser par le flux OIDC", async () => {
+  it("rouvre la session précédente sans redemander le mot de passe", async () => {
     await initSession(config);
 
     // Rechargement de page : objets SDK neufs, même IndexedDB. C'est aussi ce qui

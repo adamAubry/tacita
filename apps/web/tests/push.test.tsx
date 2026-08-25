@@ -136,7 +136,7 @@ let base: IDBFactory;
 
 const rendre = (contenu: ReactNode) =>
   render(
-    <SessionProvider homeserverUrl="https://chat.tacita.test" rediriger={vi.fn()}>
+    <SessionProvider homeserverUrl="https://chat.tacita.test">
       {contenu}
     </SessionProvider>,
   );

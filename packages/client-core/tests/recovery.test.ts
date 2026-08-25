@@ -4,13 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeRecoveryKey } from "matrix-js-sdk/lib/crypto-api";
 
 import { resetSdk, type ClientMock, type CryptoMock } from "./mocks";
-import { initSession, type SessionConfig } from "../src";
+import { creerCompte, initSession, type SessionConfig } from "../src";
 
 vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
 
 const config: SessionConfig = {
   homeserverUrl: "https://tacita.test",
-  loginToken: "loginToken",
+  identifiant: "adam",
+  motDePasse: "motdepasse-essai",
   indexedDB: new IDBFactory(),
 };
 
@@ -186,6 +187,72 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
       session.setupRecoveryKey({ reinitialiser: true, confirmerIdentite }),
     ).rejects.toThrow(/Unauthorized/);
     expect(confirmerIdentite).not.toHaveBeenCalled();
+  });
+});
+
+describe("REQ-COR-08 — l'inscription franchit toutes les étapes de l'UIA", () => {
+  /*
+   * **Le défaut trouvé le 25/08/2026 en montant la pile.** `creerCompte` ne franchissait
+   * que `m.login.registration_token` et tenait le 401 suivant pour une panne : aucune
+   * inscription n'aboutissait.
+   *
+   * Mesuré contre le vrai Synapse v1.155.0, et relu dans son code
+   * (`_calculate_registration_flows`) : sans e-mail ni MSISDN configurés, la liste de base
+   * vaut `[[m.login.dummy]]`, et `registration_requires_token` **préfixe** le jeton à
+   * chaque flow. Le flow servi est donc `[m.login.registration_token, m.login.dummy]`.
+   *
+   * Ni la compilation ni la suite ne le voyaient — le mock répondait ce qu'on attendait.
+   */
+  const serveurEnDeuxEtapes = () => {
+    const faits: string[] = [];
+    return vi.fn(async (corps: { auth?: { type: string; token?: string } }) => {
+      const etape = corps.auth?.type;
+      if (etape === "m.login.registration_token" && corps.auth?.token === "JETON") {
+        faits.push(etape);
+      } else if (etape === "m.login.dummy" && faits.includes("m.login.registration_token")) {
+        return { access_token: "syt_access", user_id: "@neuf:tacita.test", device_id: "DEV1" };
+      }
+      throw Object.assign(new Error("Unauthorized"), {
+        httpStatus: 401,
+        data: {
+          session: "sessionUia",
+          completed: [...faits],
+          flows: [{ stages: ["m.login.registration_token", "m.login.dummy"] }],
+        },
+      });
+    });
+  };
+
+  it("le jeton ne suffit pas : le stage suivant est franchi aussi", async () => {
+    const registre = serveurEnDeuxEtapes();
+    client.registerRequest = registre;
+
+    const session = await creerCompte({ ...config, jetonInscription: "JETON" });
+
+    expect(session).toBeTruthy();
+    const types = registre.mock.calls.map((c) => c[0].auth?.type);
+    expect(types).toEqual([undefined, "m.login.registration_token", "m.login.dummy"]);
+  });
+
+  it("un jeton refusé remonte, plutôt que de tourner en boucle", async () => {
+    client.registerRequest = serveurEnDeuxEtapes();
+    await expect(
+      creerCompte({ ...config, jetonInscription: "MAUVAIS" }),
+    ).rejects.toThrow(/Unauthorized/);
+  });
+
+  it("un flow qu'on ne sait pas franchir échoue franchement", async () => {
+    // Un e-mail exigé : avancer dans ce flow ferait croire que ça progresse, et
+    // s'arrêterait dans un cul-de-sac. On refuse au premier regard.
+    client.registerRequest = vi.fn(async () => {
+      throw Object.assign(new Error("Unauthorized"), {
+        httpStatus: 401,
+        data: { session: "s", flows: [{ stages: ["m.login.email.identity"] }] },
+      });
+    });
+    await expect(
+      creerCompte({ ...config, jetonInscription: "JETON" }),
+    ).rejects.toThrow(/Unauthorized/);
   });
 });
 

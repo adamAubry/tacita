@@ -27,3 +27,25 @@ describe("REQ-INF-18 — annuaire énumérable, dit et non masqué", () => {
     expect(limites).toMatch(/énumér/i);
   });
 });
+
+describe("D-12 — la clé transmise au serveur, dite et non masquée", () => {
+  it("LIMITES.md porte la limite pour l'opérateur", () => {
+    /*
+     * La concession la plus lourde du dépôt : elle amende le principe directeur de
+     * `CLAUDE.md`. La documenter n'est pas une politesse — sans elle, la promesse E2EE se
+     * lit plus large qu'elle ne l'est (interdit n°13, règle 5).
+     */
+    const limites = readFileSync(new URL("../LIMITES.md", import.meta.url), "utf-8");
+    expect(limites).toMatch(/clé de récupération au serveur/i);
+    expect(limites).toMatch(/non stocké n'est pas non vu/i);
+    // Et ce qui la rouvrirait, sans quoi une limite assumée devient une limite acquise.
+    expect(limites).toMatch(/héberger pour des tiers/i);
+  });
+
+  it("CLAUDE.md pointe la décision plutôt que de la porter", () => {
+    // Le fichier est chargé à chaque session : il dit la règle et renvoie au motif.
+    const claude = readFileSync(new URL("../../CLAUDE.md", import.meta.url), "utf-8");
+    expect(claude).toMatch(/D-12/);
+    expect(claude).toMatch(/clé de récupération/i);
+  });
+});

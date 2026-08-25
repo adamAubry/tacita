@@ -12,7 +12,6 @@ import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { contactsDeLaSession } from "../lib/contacts";
 import { NOM_NOTES } from "../lib/premiere-conversation";
 import { routeConversation } from "../lib/routes";
-import { retirerJetonDeLUrl, urlConnexion } from "../lib/session";
 import { ecrireOnboardingEnCours, ecrireRefusEducationIOS } from "../lib/preferences";
 
 const pousser = vi.fn();
@@ -112,7 +111,7 @@ const monter = (
 ) => {
   restoreSession.mockResolvedValue(session);
   return render(
-    <SessionProvider homeserverUrl={HOMESERVER} rediriger={rediriger} indexedDB={indexedDB}>
+    <SessionProvider homeserverUrl={HOMESERVER} indexedDB={indexedDB}>
       <RecoveryGate>{enfant}</RecoveryGate>
     </SessionProvider>,
   );
@@ -234,76 +233,59 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
     expect(screen.queryByText(/Vérifiez votre connexion/)).toBeNull();
   });
 
-  it("aucune UI de mot de passe : la connexion part chez le fournisseur", () => {
-    const url = new URL(urlConnexion(HOMESERVER, "https://app.tacita.test"));
-    expect(url.pathname).toBe("/_matrix/client/v3/login/sso/redirect");
+  it("la connexion est un formulaire du produit, plus une redirection", async () => {
     /*
-     * **La barre finale n'est pas cosmétique.** Synapse compare cette valeur aux entrées
-     * de `sso.client_whitelist` par préfixe de chaîne ; l'entrée rendue par
-     * `synapse/entrypoint.sh` vaut `https://${SERVER_NAME}/`. Sans la barre, la
-     * comparaison échoue et Synapse intercale `sso_redirect_confirm.html` — un clic de
-     * plus, sur une page qui n'est pas la nôtre, à chaque connexion.
+     * D-12, 25/08/2026 : Keycloak supprimé, Synapse porte l'identité. Les deux tests qui
+     * vivaient ici gardaient la forme de l'URL de redirection SSO et la barre finale que
+     * `sso.client_whitelist` exigeait — il n'y a plus ni redirection ni whitelist.
      */
-    expect(url.searchParams.get("redirectUrl")).toBe("https://app.tacita.test/");
-  });
+    monter(null);
 
-  it("un chemin est préservé, et reste couvert par la whitelist", () => {
-    const url = new URL(urlConnexion(HOMESERVER, "https://app.tacita.test/i/jeton"));
-    expect(url.searchParams.get("redirectUrl")).toBe("https://app.tacita.test/i/jeton");
-    expect(url.searchParams.get("redirectUrl")?.startsWith("https://app.tacita.test/")).toBe(true);
+    await waitFor(() => expect(screen.getByText("Connectez-vous")).toBeTruthy());
+    expect(screen.getByLabelText("Identifiant")).toBeTruthy();
+    expect(screen.getByLabelText("Mot de passe")).toBeTruthy();
   });
 });
 
-describe("REQ-UIX-06 — reprise de session, retour OIDC, déconnexion", () => {
+describe("REQ-UIX-06 — reprise de session, connexion, déconnexion", () => {
   it("une session valide arrive directement sur le contenu", async () => {
     const { session } = fausseSession();
     monter(session);
 
     await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
-    expect(rediriger).not.toHaveBeenCalled();
+    expect(screen.queryByText("Connectez-vous")).toBeNull();
   });
 
-  it("sans session restaurable, retour à l'OIDC sans écran intermédiaire", async () => {
+  it("sans session restaurable, la porte rend le formulaire", async () => {
     monter(null);
 
-    await waitFor(() => expect(rediriger).toHaveBeenCalledTimes(1));
-    expect(rediriger.mock.calls[0]![0]).toContain("/login/sso/redirect");
-    // Aucun formulaire, aucun bouton « se connecter » : la redirection est déjà partie.
-    expect(screen.queryByRole("button")).toBeNull();
+    await waitFor(() => expect(screen.getByText("Connectez-vous")).toBeTruthy());
+    // Et rien du contenu de l'app derrière : la porte remplace, elle ne superpose pas.
+    expect(screen.queryByText("Conversations")).toBeNull();
   });
 
-  it("un jeton révoqué ou une crypto absente ramènent à l'OIDC, sans rien journaliser", async () => {
+  it("un jeton révoqué ramène au formulaire, sans rien journaliser", async () => {
     restoreSession.mockRejectedValue(new Error("M_UNKNOWN_TOKEN"));
     const journal = vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(
-      <SessionProvider homeserverUrl={HOMESERVER} rediriger={rediriger}>
+      <SessionProvider homeserverUrl={HOMESERVER}>
         <RecoveryGate>
           <p>Conversations</p>
         </RecoveryGate>
       </SessionProvider>,
     );
 
-    await waitFor(() => expect(rediriger).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText("Connectez-vous")).toBeTruthy());
+    // Le message d'erreur du SDK peut porter l'identifiant : il ne sort jamais.
     expect(journal).not.toHaveBeenCalled();
     journal.mockRestore();
-  });
-
-  it("le jeton de connexion est retiré de l'URL, donc de l'historique", () => {
-    globalThis.history.replaceState(null, "", "/?loginToken=syt_secret&autre=1");
-
-    const jeton = retirerJetonDeLUrl(globalThis.location, globalThis.history);
-
-    expect(jeton).toBe("syt_secret");
-    expect(globalThis.location.search).toBe("?autre=1");
-    // `replaceState` et non `pushState` : l'entrée qui portait le jeton est remplacée.
-    expect(globalThis.location.href).not.toContain("syt_secret");
   });
 
   it("la déconnexion n'efface qu'après confirmation, et dit ce qu'elle efface", async () => {
     const { session, logout } = fausseSession();
     render(
-      <SessionProvider homeserverUrl={HOMESERVER} rediriger={rediriger}>
+      <SessionProvider homeserverUrl={HOMESERVER}>
         <LogoutButton session={session} />
       </SessionProvider>,
     );
@@ -318,7 +300,32 @@ describe("REQ-UIX-06 — reprise de session, retour OIDC, déconnexion", () => {
 
     fireEvent.click(screen.getAllByText("Se déconnecter").at(-1)!);
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
-    expect(rediriger).toHaveBeenCalled();
+  });
+
+  it("se déconnecter ne navigue nulle part : il n'y a plus de session ailleurs", async () => {
+    /*
+     * **Le défaut remonté le 25/08/2026, fermé par soustraction.** `logout()` révoquait le
+     * jeton Matrix, mais le cookie de session Keycloak y survivait : le retour vers
+     * `/login/sso/redirect` le présentait à `auth-cookie`, qui rouvrait une session dans la
+     * seconde — sur un `device_id` neuf, donc non signé, donc sur l'écran de clé de
+     * récupération. D-12 supprime le fournisseur : il n'y a plus de session à fermer
+     * ailleurs, et plus de navigation qui puisse en rouvrir une.
+     */
+    // jsdom refuse de redéfinir `location.assign` : on garde l'URL de départ et on
+    // vérifie qu'elle n'a pas bougé. C'est la même chose vue de l'autre côté.
+    const urlAvant = globalThis.location.href;
+    const { session, logout } = fausseSession();
+    monter(session, <LogoutButton session={session} />);
+
+    await waitFor(() => expect(screen.getAllByText("Se déconnecter")[0]).toBeTruthy());
+    fireEvent.click(screen.getAllByText("Se déconnecter")[0]!);
+    await waitFor(() => expect(screen.getByText("Vos messages déjà déchiffrés")).toBeTruthy());
+    fireEvent.click(screen.getAllByText("Se déconnecter").at(-1)!);
+
+    await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
+    // La porte reprend la main sur le formulaire, sans que le navigateur ait bougé.
+    await waitFor(() => expect(screen.getByText("Connectez-vous")).toBeTruthy());
+    expect(globalThis.location.href).toBe(urlAvant);
   });
 });
 
@@ -686,7 +693,7 @@ describe("REQ-UI-22 — le parcours d'accueil, de la clé au premier message", (
     const { Onboarding } = await import("../components/onboarding/Onboarding");
     const { session } = fausseSession();
     render(
-      <SessionProvider homeserverUrl={HOMESERVER} rediriger={rediriger} indexedDB={new IDBFactory()}>
+      <SessionProvider homeserverUrl={HOMESERVER} indexedDB={new IDBFactory()}>
         <Onboarding
           session={session}
           depart={0}

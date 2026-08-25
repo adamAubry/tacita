@@ -6,41 +6,11 @@ server_name: "${SERVER_NAME}"
 pid_file: /data/homeserver.pid
 public_baseurl: "https://${SERVER_NAME}/"
 
-# REQ-INF-09 — **où le client a le droit de revenir après le SSO.**
-#
-# Par défaut, Synapse n'accepte de renvoyer le jeton de connexion que vers l'origine de
-# `public_baseurl`. Or le proxy n'a volontairement aucun `location /` : le shard (spec 11)
-# est servi ailleurs, sur sa propre origine. Sans cette liste, le retour d'OIDC s'arrête
-# sur `/_synapse/client/oidc/callback` et l'utilisateur ne revient jamais dans l'app —
-# alors que `GET /login/sso/redirect` répond bien 302 et que tout paraît correct.
-#
-# Trouvé le 07/08/2026 en pilotant le vrai formulaire Keycloak dans un navigateur : la
-# fumée s'arrêtait à la redirection *vers* Keycloak et ne voyait pas le retour.
-# `SHARD_ORIGIN` vide (défaut) = shard servi sur le domaine du homeserver, rien à ouvrir.
-# Rendu en séquence YAML « flow » sur une seule ligne : le gabarit reste du YAML valide,
-# donc relisible par les tests d'infra. Une entrée vide serait pire qu'absente — Synapse
-# compare la liste **par préfixe**, et `""` est le préfixe de toute URL.
-sso:
-  client_whitelist: ${SSO_CLIENT_WHITELIST}
-
-# REQ-INF-09 — **les pages que Synapse rend lui-même, rendues aux couleurs du produit.**
-#
-# Six gabarits sont atteignables dans ce déploiement (les autres sont éteints par la
-# configuration : ni email, ni account_validity, ni captcha, ni user_consent, et un seul
-# fournisseur OIDC donc pas de sélecteur). Ils vivent dans `synapse/templates/`, monté
-# par le compose. Synapse retombe sur le gabarit d'origine pour tout fichier absent de ce
-# répertoire : l'override est partiel par construction, et n'a pas à être exhaustif.
-#
-# Ce ne sont pas des pages de décor. `sso_redirect_confirm.html` porte le jeton de
-# connexion, `sso_auth_success.html` porte le `postMessage("authDone")` qu'attend
-# `RecoveryStep` : les deux sont sur le chemin critique, et `infra/tests/
-# synapse-templates.test.ts` les garde.
-#
-# Version-dépendant comme le reste d'`infra/` : les noms de variables des gabarits
-# appartiennent à la version de l'image, ici v1.155.0. Relire `res/templates/` au bump,
-# au même titre que le CHANGELOG.
-templates:
-  custom_template_directory: /conf/templates
+# *(Le bloc `templates:` vivait ici. Ses six gabarits étaient tous des pages SSO — et le
+# SSO n'existe plus depuis D-12, 25/08/2026. Ni email, ni account_validity, ni captcha, ni
+# user_consent n'étant activés, plus aucun chemin de ce déploiement ne rend de page
+# Synapse : le répertoire, le montage du compose et ce bloc sont partis ensemble. Le jour
+# où l'un redevient atteignable, il revient avec son gabarit — pas avant.)*
 report_stats: false
 media_store_path: /data/media_store
 
@@ -71,9 +41,18 @@ federation_domain_whitelist: []
 # REQ-INF-03 — chiffrement par défaut sur tout nouveau salon, irréversible mais non rétroactif.
 encryption_enabled_by_default_for_room_type: all
 
-# REQ-INF-04 — pas d'auto-inscription ; comptes créés via le script d'admin documenté
-# dans infra/README.md (register_new_matrix_user, avec ce secret).
-enable_registration: false
+# REQ-INF-04 — **l'inscription est ouverte, et gardée par un jeton** (réécrite le
+# 25/08/2026, D-12). Le produit demande que l'on crée son compte depuis l'app ; c'était
+# déjà le cas de fait, Keycloak ayant `registrationAllowed: true` et Synapse provisionnant
+# à la volée au premier login OIDC.
+#
+# `registration_requires_token` n'est pas une précaution de confort : sans lui, un
+# homeserver à inscription ouverte, sans e-mail ni captcha (ni l'un ni l'autre ne sont
+# activés ici), est une cible de création de comptes en masse — et chaque compte créé peut
+# énumérer l'annuaire (REQ-INF-18). Le jeton se crée par l'API d'admin ; procédure dans
+# infra/README.md.
+enable_registration: true
+registration_requires_token: true
 registration_shared_secret: "${SYNAPSE_REGISTRATION_SHARED_SECRET}"
 
 macaroon_secret_key: "${SYNAPSE_MACAROON_SECRET_KEY}"
@@ -175,18 +154,24 @@ media_storage_providers:
       access_key_id: "${S3_ACCESS_KEY_ID}"
       secret_access_key: "${S3_SECRET_ACCESS_KEY}"
 
-# REQ-INF-09 — seul fournisseur d'authentification : OIDC (Keycloak). Pas de mot de passe
-# natif Synapse ; email/pseudo/WebAuthn gérés dans le realm Keycloak (infra/keycloak/).
+# REQ-INF-09 — **identifiant + mot de passe, portés par Synapse lui-même** (réécrite le
+# 25/08/2026, D-12). Keycloak est supprimé : il n'apportait rien que Matrix ne sache faire,
+# et il coûtait un service, un realm, un thème et tout un ballet SSO.
+#
+# `localdb_enabled` reste au défaut (`true`) : c'est le magasin de Synapse qui porte les
+# empreintes. Aucun module ne les gère, et il ne faut pas qu'un module s'en mêle — voir
+# D-12 sur le fait que `enabled` gouverne connexion **et** ré-authentification d'un seul
+# drapeau, ce qui est la raison pour laquelle le garde de D-12 est au proxy et non en UIA.
 password_config:
-  enabled: false
+  enabled: true
 
 # REQ-INF-09 / REQ-INF-14 — Synapse bloque par défaut ses propres requêtes sortantes
 # vers les plages privées (protection SSRF : `ip_range_blacklist` contient
 # 172.16.0.0/12). **Deux clients sortants la traversent, et les deux sont vitaux :**
 #
-#  1. la découverte OIDC. Dès que l'issuer résout vers une adresse privée — le cas
-#     quand ${SERVER_NAME} pointe sur le proxy à l'intérieur du réseau Docker — elle
-#     expire et **tout login répond 503**, sans que rien ne mentionne le blocage ;
+#  1. *(la découverte OIDC vivait ici jusqu'au 25/08/2026 — elle expirait sur une
+#     adresse privée et faisait répondre 503 à tout login. Keycloak supprimé, ce client
+#     sortant n'existe plus ; la liste reste néanmoins requise pour le suivant.)*
 #  2. l'appel du pusher (REQ-PSH-01). L'URL enregistrée par le client est
 #     `http://push-gateway:8008/_matrix/push/v1/notify` — le nom interne du service,
 #     et c'est voulu (l'endpoint n'a aucune authentification). Elle résout donc vers
@@ -199,23 +184,19 @@ password_config:
 # La remplir avec la plage la plus étroite possible. Voir infra/README.md.
 #
 # GARDE-FOU : ne pas activer `url_preview_enabled` tant que cette liste n'est pas
-# vide, sans avoir d'abord restreint la plage. Aujourd'hui le seul client HTTP
-# sortant de Synapse est la découverte OIDC ; avec l'aperçu d'URL, un utilisateur
-# qui poste un lien ferait requêter l'intérieur du réseau — Postgres, MinIO,
-# Keycloak — par Synapse lui-même. C'est la contrepartie exacte de ce réglage.
+# vide, sans avoir d'abord restreint la plage. Avec l'aperçu d'URL, un utilisateur qui
+# poste un lien ferait requêter l'intérieur du réseau — Postgres, MinIO — par Synapse
+# lui-même. C'est la contrepartie exacte de ce réglage.
 ip_range_whitelist: ${SYNAPSE_IP_RANGE_WHITELIST}
-
-oidc_providers:
-  - idp_id: keycloak
-    idp_name: "Compte"
-    issuer: "https://${SERVER_NAME}/auth/realms/tacita"
-    client_id: synapse
-    client_secret: "${KEYCLOAK_OIDC_CLIENT_SECRET}"
-    scopes: ["openid", "profile"]
-    user_mapping_provider:
-      config:
-        localpart_template: "{{ user.preferred_username }}"
-        display_name_template: "{{ user.preferred_username }}"
 
 # Rétro-compatibilité media non-authentifiée : comportement vérifié pour v1.155.0
 # dans infra/README.md (REQ-INF-12).
+
+# D-12 — le changement de mot de passe, gardé par la clé de récupération.
+#
+# Le module expose `/_synapse/client/tacita/password` ; l'endpoint standard est fermé au
+# proxy (`infra/proxy/nginx.conf`). Les deux vont ensemble : sans le blocage, l'UIA
+# `m.login.password` de `/account/password` contourne le garde sans que rien ne le dise.
+modules:
+  - module: tacita_password.TacitaPassword
+    config: {}

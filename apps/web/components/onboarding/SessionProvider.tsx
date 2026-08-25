@@ -1,15 +1,10 @@
 "use client";
 
-import {
-  initSession,
-  onSessionInvalidee,
-  restoreSession,
-  type Session,
-} from "@tacita/client-core";
+import { onSessionInvalidee, restoreSession, type Session } from "@tacita/client-core";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { ecrireOnboardingEnCours } from "../../lib/preferences";
-import { etatDe, retirerJetonDeLUrl, urlConnexion, type EtatSession } from "../../lib/session";
+import { etatDe, type EtatSession } from "../../lib/session";
 
 interface Contexte {
   etat: EtatSession;
@@ -26,6 +21,11 @@ interface Contexte {
   onboardingTermine: () => void;
   /** REQ-UIX-06 — wipe complet (REQ-COR-10), après confirmation explicite. */
   deconnecter: (session: Session) => Promise<void>;
+  /**
+   * REQ-UIX-06 — une session que l'écran de connexion vient d'ouvrir (D-12). C'est lui qui
+   * parle au réseau ; le provider ne fait que router l'état qui en sort.
+   */
+  sessionOuverte: (session: Session) => void;
 }
 
 const ContexteSession = createContext<Contexte>({
@@ -33,6 +33,7 @@ const ContexteSession = createContext<Contexte>({
   recuperationConfirmee: () => {},
   onboardingTermine: () => {},
   deconnecter: async () => {},
+  sessionOuverte: () => {},
 });
 
 export const useSession = () => useContext(ContexteSession);
@@ -40,71 +41,54 @@ export const useSession = () => useContext(ContexteSession);
 interface SessionProviderProps {
   children: ReactNode;
   homeserverUrl: string;
-  /** Injecté en test ; en production, la vraie redirection du navigateur. */
-  rediriger?: (url: string) => void;
   /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }
 
 /**
- * REQ-UIX-06 — la reprise de session, dans l'ordre où elle se produit :
+ * REQ-UIX-06 — la reprise de session, réduite à deux cas depuis D-12 :
  *
- * 1. un jeton de connexion dans l'URL (retour du fournisseur OIDC) → on ouvre la session
- *    et **on retire le jeton de l'historique** ;
- * 2. sinon, une session restaurable en IndexedDB → arrivée directe sur l'Accueil, sans
- *    réseau ni écran intermédiaire ;
- * 3. sinon → retour à l'OIDC, sans écran intermédiaire non plus. Un écran « connectez-vous »
- *    qui ne fait que rediriger est une étape de plus pour rien.
+ * 1. une session restaurable en IndexedDB → arrivée directe sur l'Accueil, sans réseau ni
+ *    écran intermédiaire ;
+ * 2. sinon → l'écran de connexion, rendu par la porte.
+ *
+ * Le premier cas — un jeton de connexion à lire dans l'URL, puis à retirer de l'historique
+ * — a disparu avec le SSO : il n'y a plus de retour de fournisseur, donc plus de secret qui
+ * transite par la barre d'adresse.
  *
  * Un jeton restauré n'est pas validé (limite assumée de `client-core`) : un
- * `M_UNKNOWN_TOKEN` au premier appel se traduit ici par un retour à l'OIDC.
+ * `M_UNKNOWN_TOKEN` au premier appel se traduit ici par un retour au formulaire.
  */
-export function SessionProvider({
-  children,
-  homeserverUrl,
-  rediriger,
-  indexedDB,
-}: SessionProviderProps) {
+export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionProviderProps) {
   const [etat, setEtat] = useState<EtatSession>({ phase: "chargement" });
   const base = indexedDB ?? globalThis.indexedDB;
-
-  const versOidc = useCallback(() => {
-    const aller = rediriger ?? ((url: string) => globalThis.location.assign(url));
-    aller(urlConnexion(homeserverUrl, globalThis.location.origin));
-  }, [homeserverUrl, rediriger]);
 
   useEffect(() => {
     let annule = false;
 
     void (async () => {
       try {
-        const jeton = retirerJetonDeLUrl(globalThis.location, globalThis.history);
-        const session = jeton
-          ? await initSession({ homeserverUrl, loginToken: jeton })
-          : await restoreSession({ homeserverUrl });
+        const session = await restoreSession({ homeserverUrl, indexedDB: base });
 
         if (annule) return;
         if (!session) {
+          // REQ-UIX-06 — plus de redirection : la porte rend le formulaire (D-12).
           setEtat({ phase: "hors-session" });
-          versOidc();
           return;
         }
         setEtat(await etatDe(session, base));
       } catch {
         // Jeton révoqué, crypto indisponible, réseau absent au premier appel : dans tous
-        // les cas l'entrée passe par l'OIDC. Rien n'est journalisé — un message d'erreur
-        // de connexion peut porter le jeton.
-        if (!annule) {
-          setEtat({ phase: "hors-session" });
-          versOidc();
-        }
+        // les cas l'entrée repasse par le formulaire. Rien n'est journalisé — un message
+        // d'erreur de connexion peut porter l'identifiant.
+        if (!annule) setEtat({ phase: "hors-session" });
       }
     })();
 
     return () => {
       annule = true;
     };
-  }, [homeserverUrl, versOidc, base]);
+  }, [homeserverUrl, base]);
 
   /*
    * REQ-UIX-06 — un jeton que le serveur refuse ne doit pas survivre à l'écran.
@@ -116,11 +100,8 @@ export function SessionProvider({
    */
   useEffect(() => {
     if (etat.phase !== "prete" && etat.phase !== "recuperation-requise") return;
-    return onSessionInvalidee(etat.session, () => {
-      setEtat({ phase: "hors-session" });
-      versOidc();
-    });
-  }, [etat, versOidc]);
+    return onSessionInvalidee(etat.session, () => setEtat({ phase: "hors-session" }));
+  }, [etat]);
 
   const recuperationConfirmee = useCallback(() => {
     if (etat.phase !== "recuperation-requise") return;
@@ -163,18 +144,29 @@ export function SessionProvider({
     setEtat({ phase: "prete", session: etat.session });
   }, [etat, base]);
 
-  const deconnecter = useCallback(
-    async (session: Session) => {
-      await session.logout();
-      setEtat({ phase: "hors-session" });
-      versOidc();
-    },
-    [versOidc],
+  /*
+   * REQ-UIX-06 / REQ-COR-10 — **la déconnexion redevient locale, et c'est tout** (D-12).
+   *
+   * Elle traînait un défaut tant que Keycloak existait : `logout()` révoquait le jeton
+   * Matrix, mais le cookie de session du fournisseur y survivait, et le retour vers
+   * `/login/sso/redirect` rouvrait une session dans la seconde — sur un appareil neuf, donc
+   * sur l'écran de clé de récupération. Sans fournisseur externe, il n'y a plus de session
+   * ailleurs : révoquer et effacer suffit, et la porte rend le formulaire.
+   */
+  const deconnecter = useCallback(async (session: Session) => {
+    await session.logout();
+    setEtat({ phase: "hors-session" });
+  }, []);
+
+  /** L'écran de connexion a ouvert une session : on repart par le même chemin que la reprise. */
+  const sessionOuverte = useCallback(
+    (session: Session) => void etatDe(session, base).then(setEtat),
+    [base],
   );
 
   return (
     <ContexteSession.Provider
-      value={{ etat, recuperationConfirmee, onboardingTermine, deconnecter }}
+      value={{ etat, recuperationConfirmee, onboardingTermine, deconnecter, sessionOuverte }}
     >
       {children}
     </ContexteSession.Provider>

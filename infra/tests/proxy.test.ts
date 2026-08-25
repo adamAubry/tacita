@@ -2,10 +2,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const nginxConf = readFileSync(new URL("../proxy/nginx.conf", import.meta.url), "utf-8");
-const realm = JSON.parse(
-  readFileSync(new URL("../keycloak/realm-export.json", import.meta.url), "utf-8"),
-);
-const synapseClient = realm.clients.find((c: { clientId: string }) => c.clientId === "synapse");
 
 describe("REQ-INF-10 — reverse proxy TLS avec routes /_matrix, /livekit/jwt, /livekit/sfu", () => {
   it("écoute en TLS", () => {
@@ -37,21 +33,25 @@ describe("REQ-INF-10 — reverse proxy TLS avec routes /_matrix, /livekit/jwt, /
   });
 });
 
-describe("REQ-INF-09 — le callback OIDC est réellement joignable", () => {
-  it("le proxy route le chemin de callback déclaré dans le realm", () => {
-    const [redirectUri] = synapseClient.redirectUris;
-    const { pathname } = new URL(redirectUri!.replace("${SERVER_NAME}", "example.org"));
-    expect(pathname).toBe("/_synapse/client/oidc/callback");
-    // Pas de `location /` de repli dans nginx : un préfixe non déclaré = 404.
+describe("REQ-INF-09 — plus aucune route d'authentification externe", () => {
+  it("`/auth` a disparu du proxy avec Keycloak", () => {
+    /*
+     * D-12, 25/08/2026. L'assertion porte sur l'absence : une route laissée derrière un
+     * service supprimé rend 502 plutôt que 404, ce qui se lit comme une panne passagère
+     * et se cherche du mauvais côté. Et si le nom `keycloak` réapparaissait un jour dans
+     * un amont, ce serait un retour en arrière non décidé.
+     */
+    expect(nginxConf).not.toContain("location /auth");
+    expect(nginxConf).not.toMatch(/keycloak/i);
+  });
+
+  it("le callback OIDC de Synapse n'est plus routé non plus", () => {
+    // `/_synapse/client/` reste routé — le service de liens d'invitation et les futurs
+    // endpoints de module en dependent —, mais plus rien ne sert `/oidc/callback`.
     expect(nginxConf).toMatch(
       /location\s+\/_synapse\/client\/\s*{[^}]*set\s+\$synapse_upstream\s+synapse:8008;[^}]*proxy_pass\s+http:\/\/\$synapse_upstream/s,
     );
-  });
-
-  it("defaultClientScopes ne référence que de vrais client scopes Keycloak", () => {
-    // `openid` est un paramètre de requête, pas un client scope : Keycloak
-    // l'ignore avec un WARN à l'import (vérifié sur 26.7.0).
-    expect(synapseClient.defaultClientScopes).not.toContain("openid");
+    expect(nginxConf).not.toContain("oidc/callback");
   });
 });
 

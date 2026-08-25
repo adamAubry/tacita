@@ -126,6 +126,20 @@ function makeClient(crypto: CryptoMock) {
       user_id: "@luca:tacita.test",
       device_id: "DEVICE1",
     })),
+    /**
+     * REQ-COR-08 — l'inscription. Réussit du premier coup par défaut ; les tests qui
+     * veulent l'UIA en deux étapes de Synapse la posent eux-mêmes, parce que c'est
+     * exactement ce que le mock ne doit pas décider à leur place (règle 3).
+     */
+    registerRequest: vi.fn(
+      async (
+        _corps: { username?: string; password?: string; auth?: { type: string; token?: string } },
+      ): Promise<{ access_token?: string; user_id: string; device_id?: string }> => ({
+        access_token: "syt_access",
+        user_id: "@luca:tacita.test",
+        device_id: "DEVICE1",
+      }),
+    ),
     initRustCrypto: vi.fn(async (_opts?: unknown) => {}),
     getCrypto: vi.fn((): CryptoMock | undefined => crypto),
     startClient: vi.fn(async (_opts?: unknown) => {}),

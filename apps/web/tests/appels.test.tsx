@@ -70,7 +70,7 @@ vi.mock("@tacita/calls", () => ({
 
 const rendreAvecSession = (noeud: React.ReactNode) =>
   render(
-    <SessionProvider homeserverUrl="https://chat.tacita.test" rediriger={vi.fn()}>
+    <SessionProvider homeserverUrl="https://chat.tacita.test">
       {noeud}
     </SessionProvider>,
   );
@@ -164,7 +164,7 @@ describe("REQ-UIX-38 — shell minimal : conteneur, sortie de secours, paramètr
     expect(audio.src).toContain("video=false");
 
     rerender(
-      <SessionProvider homeserverUrl="https://chat.tacita.test" rediriger={vi.fn()}>
+      <SessionProvider homeserverUrl="https://chat.tacita.test">
         <EcranAppel roomId={SALON} video />
       </SessionProvider>,
     );

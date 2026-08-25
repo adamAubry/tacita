@@ -32,7 +32,9 @@ describe("REQ-INF-16 — le shard est servi par le proxy, sur le domaine du home
     // nginx choisit le préfixe le plus long, pas l'ordre du fichier — mais si l'un de
     // ces blocs disparaissait, le fourre-tout l'avalerait en silence et le symptôme
     // serait une page du shard là où l'API était attendue.
-    for (const prefixe of ["/_matrix", "/_synapse/client/", "/auth", "/invite/"]) {
+    //
+    // `/auth` a quitté cette liste le 25/08/2026 : il routait Keycloak, supprimé par D-12.
+    for (const prefixe of ["/_matrix", "/_synapse/client/", "/invite/"]) {
       expect(nginxConf).toContain(`location ${prefixe}`);
     }
   });

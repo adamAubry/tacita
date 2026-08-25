@@ -1,4 +1,10 @@
-﻿export { initSession, onSessionInvalidee, restoreSession } from "./session";
+﻿export {
+  changerMotDePasse,
+  creerCompte,
+  initSession,
+  onSessionInvalidee,
+  restoreSession,
+} from "./session";
 export type {
   OrderedTimeline,
   RecoveryKey,
