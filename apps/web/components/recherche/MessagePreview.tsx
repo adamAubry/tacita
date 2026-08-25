@@ -13,7 +13,7 @@ export interface ResultatMessage {
   horodatage: number;
 }
 
-export interface MessagePreviewProps {
+interface MessagePreviewProps {
   resultat: ResultatMessage;
   /** Ce qui est surligné dans l'extrait (composant 18). */
   terme: string;

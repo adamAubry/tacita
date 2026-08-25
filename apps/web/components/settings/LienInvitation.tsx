@@ -12,7 +12,7 @@ import {
 } from "../../lib/liens-invitation";
 import { Banner, Button, List, ListItem, Text } from "../foundation/primitives";
 
-export interface LienInvitationProps {
+interface LienInvitationProps {
   session: Session;
   roomId: string;
   /** Injecté en test : le service est une API HTTP, pas un paquet importable. */

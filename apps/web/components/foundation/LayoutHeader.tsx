@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 import { Button, Icon, Text, Toolbar } from "./primitives";
 
-export interface LayoutHeaderProps {
+interface LayoutHeaderProps {
   titre: string;
   /** Actions de droite, propres à chaque layout. */
   fin?: ReactNode;

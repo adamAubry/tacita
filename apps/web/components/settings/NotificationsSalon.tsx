@@ -32,7 +32,7 @@ export const NIVEAUX: { valeur: RoomNotificationLevel; libelle: string; effet: s
 export const libelleNiveau = (niveau: RoomNotificationLevel) =>
   NIVEAUX.find((entree) => entree.valeur === niveau)!.libelle;
 
-export interface NotificationsSalonProps {
+interface NotificationsSalonProps {
   session: Session;
   roomId: string;
   /** Remonté au parent, qui affiche le niveau courant sous l'option (REQ-UIX-36). */

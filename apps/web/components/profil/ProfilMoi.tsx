@@ -17,7 +17,7 @@ import { ProfileCard } from "./ProfileCard";
  */
 export { AVERTISSEMENT_PHOTO } from "./FormulaireIdentite";
 
-export interface ProfilMoiProps {
+interface ProfilMoiProps {
   profil: Profile;
   /** REQ-UIX-24 — n'écrit que ce qui a changé (REQ-MSG-18). */
   onEnregistrer: (changements: Changements) => Promise<void>;

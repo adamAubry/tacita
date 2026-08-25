@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { effacerFondEcran, ecrireFondEcran, lireFondEcran } from "../../lib/preferences";
 import { Button, Text } from "../foundation/primitives";
 
-export interface ThemeConversationProps {
+interface ThemeConversationProps {
   roomId: string;
   indexedDB?: IDBFactory;
   /** Prévient la conversation qu'elle doit relire son fond. */

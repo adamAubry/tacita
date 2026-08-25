@@ -1,6 +1,6 @@
 import type { SearchFilters, SearchStats } from "@tacita/search";
 
-import { lirePreference, ecrirePreference } from "./preferences";
+import { ecrireCle, lireCle } from "./preferences";
 
 /**
  * REQ-UIX-22 — la fenêtre de débounce. Une frappe ne déclenche pas une requête : on
@@ -149,7 +149,7 @@ const CLE_RECENTS = "recherches-recentes";
 export const MAX_RECENTS = 8;
 
 export async function lireRecents(indexedDB: IDBFactory): Promise<string[]> {
-  const valeur = await lirePreference(indexedDB, CLE_RECENTS);
+  const valeur = await lireCle(indexedDB, CLE_RECENTS);
   return Array.isArray(valeur) ? valeur.filter((id): id is string => typeof id === "string") : [];
 }
 
@@ -159,7 +159,7 @@ export function empiler(recents: readonly string[], userId: string): string[] {
 }
 
 export const ecrireRecents = (indexedDB: IDBFactory, recents: readonly string[]) =>
-  ecrirePreference(indexedDB, CLE_RECENTS, [...recents]);
+  ecrireCle(indexedDB, CLE_RECENTS, [...recents]);
 
 /** « Purgeable » (REQ-UIX-19) : l'utilisateur peut vider la liste, sans détour. */
-export const purgerRecents = (indexedDB: IDBFactory) => ecrirePreference(indexedDB, CLE_RECENTS, []);
+export const purgerRecents = (indexedDB: IDBFactory) => ecrireCle(indexedDB, CLE_RECENTS, []);

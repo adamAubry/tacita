@@ -12,7 +12,7 @@ import { OptionCard } from "../foundation/OptionCard";
  */
 export type OptionConversation = "theme" | "notifications" | "groupe" | "lien" | "membres";
 
-export interface OptionsConversationProps {
+interface OptionsConversationProps {
   direct: boolean;
   /** REQ-UIX-36 — l'état courant se lit sous l'option, sans avoir à l'ouvrir. */
   niveauLibelle: string;

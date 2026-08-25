@@ -8,7 +8,7 @@ import { Text, TextArea } from "../foundation/primitives";
 /** Le délai avant enregistrement. Assez court pour être sûr, assez long pour ne pas écrire par frappe. */
 export const DELAI_ENREGISTREMENT_MS = 500;
 
-export interface NoteProps {
+interface NoteProps {
   userId: string;
   indexedDB: IDBFactory;
 }

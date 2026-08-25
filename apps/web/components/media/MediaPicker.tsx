@@ -19,7 +19,7 @@ import { Button, Text } from "../foundation/primitives";
  */
 export const TYPES_ACCEPTES = "image/*,video/*,application/pdf,application/zip,text/*";
 
-export interface MediaPickerProps {
+interface MediaPickerProps {
   onFichiers: (fichiers: File[]) => void;
   /** Envoi en cours : le pipeline n'expose pas de progression, seulement un état. */
   enCours?: boolean;

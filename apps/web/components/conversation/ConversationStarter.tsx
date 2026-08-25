@@ -2,7 +2,7 @@ import { ButtonsList, type Bouton } from "../foundation/ButtonsList";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Text } from "../foundation/primitives";
 
-export interface ConversationStarterProps {
+interface ConversationStarterProps {
   nom: string;
   /** Identifiant Matrix en DM, nombre de membres en groupe : deux natures, deux rendus. */
   sousTitre: string;

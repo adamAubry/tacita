@@ -30,7 +30,7 @@ const APERCU = {
   display: "block",
 } as const;
 
-export interface PhotoCaptureProps {
+interface PhotoCaptureProps {
   ouvert: boolean;
   onFermer: () => void;
   /**

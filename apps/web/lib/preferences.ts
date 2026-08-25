@@ -90,32 +90,45 @@ export async function viderStore(
   }
 }
 
-export const lirePreference = (indexedDB: IDBFactory, cle: string) => lireCle(indexedDB, cle);
-
-export const ecrirePreference = (indexedDB: IDBFactory, cle: string, valeur: unknown) =>
-  ecrireCle(indexedDB, cle, valeur);
-
 const estMode = (valeur: unknown): valeur is ThemeMode =>
   valeur === "system" || valeur === "light" || valeur === "dark";
 
+/**
+ * Un drapeau booléen d'appareil : sa lecture et son écriture, sur une clé fixe.
+ *
+ * Quatre paires suivaient exactement cette forme, chacune recopiant sa clé en double. La
+ * comparaison à `true` n'est pas une coquetterie : elle absorbe une base vide comme une
+ * valeur abîmée, et c'est elle qui fait que le défaut de chaque drapeau est `false`.
+ *
+ * Les deux drapeaux qui ne se retirent jamais (un refus, une question posée) n'en prennent
+ * que la lecture : leur écriture ne porte pas de booléen, et lui en inventer un pour
+ * rentrer dans le moule aurait offert une remise à zéro qui n'existe pas.
+ */
+const drapeau = (cle: string) =>
+  [
+    async (indexedDB: IDBFactory) => (await lireCle(indexedDB, cle)) === true,
+    (indexedDB: IDBFactory, valeur: boolean) => ecrireCle(indexedDB, cle, valeur),
+  ] as const;
+
 /** REQ-UI-03 — une valeur inattendue est ignorée, pas propagée : on retombe au défaut. */
 export async function lireTheme(indexedDB: IDBFactory): Promise<ThemeMode | undefined> {
-  const valeur = await lirePreference(indexedDB, "theme");
+  const valeur = await lireCle(indexedDB, "theme");
   return estMode(valeur) ? valeur : undefined;
 }
 
 export const ecrireTheme = (indexedDB: IDBFactory, mode: ThemeMode) =>
-  ecrirePreference(indexedDB, "theme", mode);
+  ecrireCle(indexedDB, "theme", mode);
 
 /**
  * REQ-UI-18 — l'écran d'éducation iOS n'est **jamais** re-présenté après un refus
  * explicite. Insister est le plus court chemin vers un utilisateur qui n'écoute plus.
  */
-export const lireRefusEducationIOS = async (indexedDB: IDBFactory) =>
-  (await lirePreference(indexedDB, "education-ios-refusee")) === true;
+const [lireRefusEducationIOS] = drapeau("education-ios-refusee");
+export { lireRefusEducationIOS };
 
+/** Le refus ne se retire pas : l'écrire, c'est le poser — d'où l'absence de paramètre. */
 export const ecrireRefusEducationIOS = (indexedDB: IDBFactory) =>
-  ecrirePreference(indexedDB, "education-ios-refusee", true);
+  ecrireCle(indexedDB, "education-ios-refusee", true);
 
 /**
  * REQ-UI-18 — **la proposition d'activer les notifications n'est faite qu'une fois.**
@@ -131,11 +144,12 @@ export const ecrireRefusEducationIOS = (indexedDB: IDBFactory) =>
  * la feuille elle-même — Profil › Réglages › Notifications, qui est le second point
  * d'entrée voulu par l'exigence.
  */
-export const lireDemandePushFaite = async (indexedDB: IDBFactory) =>
-  (await lirePreference(indexedDB, "push-demande-faite")) === true;
+const [lireDemandePushFaite] = drapeau("push-demande-faite");
+export { lireDemandePushFaite };
 
+/** Une question posée ne se dépose pas : l'écrire, c'est la marquer faite. */
 export const ecrireDemandePushFaite = (indexedDB: IDBFactory) =>
-  ecrirePreference(indexedDB, "push-demande-faite", true);
+  ecrireCle(indexedDB, "push-demande-faite", true);
 
 /*
  * `recuperation-faite` vivait ici — une trace « cet appareil a déjà mené ce compte au
@@ -153,11 +167,7 @@ export const ecrireDemandePushFaite = (indexedDB: IDBFactory) =>
  * Le défaut est `false` : les reçus normaux. Un mode masqué activé par défaut donnerait
  * un produit qui ne montre jamais « lu » sans que personne l'ait demandé.
  */
-export const lireModeMasque = async (indexedDB: IDBFactory) =>
-  (await lirePreference(indexedDB, "mode-masque")) === true;
-
-export const ecrireModeMasque = (indexedDB: IDBFactory, masque: boolean) =>
-  ecrirePreference(indexedDB, "mode-masque", masque);
+export const [lireModeMasque, ecrireModeMasque] = drapeau("mode-masque");
 
 /**
  * REQ-UIX-35 / REQ-UI-20 — le fond d'écran d'une conversation, **sur cet appareil**.
@@ -182,19 +192,19 @@ export async function lireFondEcran(
   indexedDB: IDBFactory,
   roomId: string,
 ): Promise<Blob | undefined> {
-  const valeur = (await lirePreference(indexedDB, cleFond(roomId))) as FondEnregistre | undefined;
+  const valeur = (await lireCle(indexedDB, cleFond(roomId))) as FondEnregistre | undefined;
   return valeur?.octets ? new Blob([valeur.octets], { type: valeur.type }) : undefined;
 }
 
 export const ecrireFondEcran = async (indexedDB: IDBFactory, roomId: string, image: Blob) =>
-  ecrirePreference(indexedDB, cleFond(roomId), {
+  ecrireCle(indexedDB, cleFond(roomId), {
     octets: await image.arrayBuffer(),
     type: image.type,
   } satisfies FondEnregistre);
 
 /** La réinitialisation exigée par REQ-UIX-35 : la clé retombe à `undefined`. */
 export const effacerFondEcran = (indexedDB: IDBFactory, roomId: string) =>
-  ecrirePreference(indexedDB, cleFond(roomId), undefined);
+  ecrireCle(indexedDB, cleFond(roomId), undefined);
 
 /**
  * REQ-UI-22 — **le parcours d'accueil est en cours sur cet appareil.**
@@ -210,8 +220,4 @@ export const effacerFondEcran = (indexedDB: IDBFactory, roomId: string) =>
  * d'accueil est un geste d'appareil — un second appareil ne le rejoue pas, il déverrouille
  * (`RecoveryUnlock`).
  */
-export const lireOnboardingEnCours = async (indexedDB: IDBFactory) =>
-  (await lirePreference(indexedDB, "onboarding-en-cours")) === true;
-
-export const ecrireOnboardingEnCours = (indexedDB: IDBFactory, enCours: boolean) =>
-  ecrirePreference(indexedDB, "onboarding-en-cours", enCours);
+export const [lireOnboardingEnCours, ecrireOnboardingEnCours] = drapeau("onboarding-en-cours");

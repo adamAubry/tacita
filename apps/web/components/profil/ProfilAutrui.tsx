@@ -40,7 +40,7 @@ export const CONFIRMATIONS = {
 
 export type ActionProfil = keyof typeof CONFIRMATIONS;
 
-export interface ProfilAutruiProps {
+interface ProfilAutruiProps {
   profil: Profile;
   /** **Vient de `Contacts`, jamais d'une heuristique locale** (contrainte M-G). */
   estAmi: boolean;

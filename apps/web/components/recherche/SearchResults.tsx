@@ -8,7 +8,7 @@ import { ClickableCard, Skeleton, Text } from "../foundation/primitives";
 import { HighlightedText } from "./HighlightedText";
 import { MessagePreview, type ResultatMessage } from "./MessagePreview";
 
-export interface SearchResultsProps {
+interface SearchResultsProps {
   /** Conversations dont le **nom** correspond — jamais leur contenu. */
   conversations: Conversation[];
   messages: ResultatMessage[];

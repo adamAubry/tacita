@@ -35,8 +35,14 @@ export class MediaIntegrityError extends Error {
   }
 }
 
-/** Base64 non paddé, par tranches : `String.fromCharCode(...)` sature la pile sur un blob. */
-function base64(bytes: Bytes): string {
+/**
+ * Base64 non paddé, par tranches : `String.fromCharCode(...)` sature la pile sur un blob.
+ *
+ * Exporté pour `blocs.ts`, qui en tenait une copie identique — même découpe, même
+ * `0x8000`, même retrait du padding. Deux exemplaires dans le même paquet, dont un seul
+ * aurait été corrigé le jour où il aurait fallu.
+ */
+export function base64(bytes: Bytes): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));

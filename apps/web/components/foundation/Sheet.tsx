@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { Button, Dialog, DialogHeader, Icon } from "./primitives";
 
-export interface SheetProps {
+interface SheetProps {
   ouvert: boolean;
   onFermer: () => void;
   /**

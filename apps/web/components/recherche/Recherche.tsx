@@ -23,7 +23,7 @@ import { SearchBar } from "./SearchBar";
 import { SearchResults } from "./SearchResults";
 import { useResultats } from "./useResultats";
 
-export interface RechercheProps {
+interface RechercheProps {
   /** Le paquet spec 09. Injecté : ce composant ne crée aucun worker. */
   recherche: Search;
   conversations: Conversation[];

@@ -8,7 +8,7 @@ import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { useImageMxc } from "../foundation/useImageMxc";
 import { Badge, Button, Icon, Text } from "../foundation/primitives";
 
-export interface ProfileCardProps {
+interface ProfileCardProps {
   nom: string;
   /** L'identifiant Matrix, affiché sous le nom sur son propre profil (REQ-UIX-24). */
   userId?: string;

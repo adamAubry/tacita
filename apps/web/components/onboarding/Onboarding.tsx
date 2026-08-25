@@ -29,7 +29,7 @@ import { useSession } from "./SessionProvider";
  * appartiennent à l'étape. Le parcours ne rend pas de titre : chaque écran porte le sien,
  * et deux titres empilés donneraient à lire deux fois la même chose.
  */
-export interface OnboardingProps {
+interface OnboardingProps {
   session: Session;
   /**
    * Le rang de départ. `0` sur un compte qui vient d'être créé — l'étape bloquante de la

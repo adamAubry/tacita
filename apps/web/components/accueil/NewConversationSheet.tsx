@@ -10,7 +10,7 @@ import type { Contact } from "../../lib/contacts";
 
 type Etape = "choix" | "conversation" | "groupe";
 
-export interface NewConversationSheetProps {
+interface NewConversationSheetProps {
   ouvert: boolean;
   onFermer: () => void;
   contacts: Contact[];

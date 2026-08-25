@@ -7,7 +7,7 @@ import { identifiantCourt } from "../../lib/identifiants";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Button, ClickableCard, Text } from "../foundation/primitives";
 
-export interface SuggestionsProps {
+interface SuggestionsProps {
   profils: Profile[];
   onOuvrirProfil: (userId: string) => void;
 }
@@ -50,7 +50,7 @@ export function Suggestions({ profils, onOuvrirProfil }: SuggestionsProps) {
   );
 }
 
-export interface DemandesListProps {
+interface DemandesListProps {
   demandes: Demande[];
   onAccepter: (demande: Demande) => void;
   onRefuser: (demande: Demande) => void;

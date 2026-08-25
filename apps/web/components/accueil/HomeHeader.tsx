@@ -11,7 +11,7 @@ import {
 } from "../foundation/primitives";
 import type { Tri } from "./ConversationsList";
 
-export interface HomeHeaderProps {
+interface HomeHeaderProps {
   tri: Tri;
   onTri: (tri: Tri) => void;
   /** Bascule vers le layout add-friends (M-G) : l'accueil ne fait que router. */

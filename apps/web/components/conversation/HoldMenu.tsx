@@ -16,7 +16,7 @@ const REACTIONS_ETENDUES = [
   "🔥", "🎉", "👏", "🤔", "😅", "😍", "🙌", "💯", "✅", "👀", "🤝", "🫡",
 ] as const;
 
-export interface HoldMenuProps {
+interface HoldMenuProps {
   ouvert: boolean;
   onFermer: () => void;
   /** Conditionnés aux droits exposés par le package (REQ-MSG-06). */

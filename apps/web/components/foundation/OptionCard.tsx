@@ -2,7 +2,7 @@
 
 import { ClickableCard, Icon, Text } from "./primitives";
 
-export interface OptionCardProps {
+interface OptionCardProps {
   titre: string;
   /**
    * La ligne d'état sous le titre. **Elle dit où on en est sans avoir à ouvrir** — le

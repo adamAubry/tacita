@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { Avatar } from "./primitives";
 import { useImageMxc } from "./useImageMxc";
 
-export interface ConversationAvatarProps {
+interface ConversationAvatarProps {
   /**
    * Le nom **de la conversation**, pas d'un membre : en DM le SDK y met déjà le nom de
    * l'autre utilisateur, en groupe celui du groupe. C'est toute la règle d'avatar.

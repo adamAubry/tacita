@@ -1,4 +1,10 @@
-import { dechiffrerA, MediaIntegrityError, type Bytes, type FileKeys } from "./attachments";
+import {
+  base64,
+  dechiffrerA,
+  MediaIntegrityError,
+  type Bytes,
+  type FileKeys,
+} from "./attachments";
 
 /**
  * REQ-MED-08, mécanisme (b) — **le hachage par blocs, et la lecture qu'il autorise.**
@@ -27,14 +33,6 @@ export const TAILLE_BLOC = 1024 * 1024;
  * Même discipline que l'accusé « délivré » (interdit n°9).
  */
 export const CHAMP_BLOCS = "org.tacita.media.block_sha256";
-
-const base64 = (octets: Uint8Array): string => {
-  let binaire = "";
-  for (let rang = 0; rang < octets.length; rang += 0x8000) {
-    binaire += String.fromCharCode(...octets.subarray(rang, rang + 0x8000));
-  }
-  return btoa(binaire).replace(/=+$/, "");
-};
 
 /** REQ-MED-08 — une empreinte par bloc de chiffré, dans l'ordre du fichier. */
 export async function hachesParBloc(

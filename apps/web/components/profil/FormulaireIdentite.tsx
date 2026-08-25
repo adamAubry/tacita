@@ -29,7 +29,7 @@ export interface Changements {
   bannerUrl?: string;
 }
 
-export interface FormulaireIdentiteProps {
+interface FormulaireIdentiteProps {
   profil: Profile;
   /**
    * REQ-UIX-24 — reçoit **ce qui a changé, et rien d'autre** (REQ-MSG-18). Un patch vide

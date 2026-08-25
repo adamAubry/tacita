@@ -38,7 +38,7 @@ export function messageFocusManquant(cause: unknown): string {
  */
 export const DELAI_CHARGEMENT_MS = 15_000;
 
-export interface EcranAppelProps {
+interface EcranAppelProps {
   roomId: string;
   /** REQ-UIX-38 — le point d'entrée : « appel vidéo » plutôt qu'« appel audio ». */
   video: boolean;

@@ -13,7 +13,7 @@ import { Button, Text, ToggleButton } from "../foundation/primitives";
 import { TexteMessage } from "./TexteMessage";
 import { texteAffiche, type MessageAffiche } from "./message";
 
-export interface MessageObjectProps {
+interface MessageObjectProps {
   message: MessageAffiche;
   /** REQ-UIX-12 — calculé par `shouldShowHeader`, jamais deviné ici. */
   entete: boolean;

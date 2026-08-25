@@ -10,7 +10,7 @@ import { Badge, ClickableCard, Text } from "../foundation/primitives";
 import { dateApercu } from "../../lib/dates";
 import { useGlissement } from "../../lib/gestes";
 
-export interface ConversationPreviewProps {
+interface ConversationPreviewProps {
   conversation: Conversation;
   onOuvrir: (roomId: string) => void;
   onEpingler: (roomId: string, epingle: boolean) => void;

@@ -19,7 +19,7 @@ import {
   type Telecharger,
 } from "./media";
 
-export interface MediaViewerProps {
+interface MediaViewerProps {
   /** Les médias du salon, dans l'ordre de la timeline : la navigation les suit. */
   medias: Media[];
   /** Index d'ouverture. */

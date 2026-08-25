@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Text } from "../foundation/primitives";
 import { dureeLisible } from "./media";
 
-export interface VoicePlayerProps {
+interface VoicePlayerProps {
   /** URL d'objet du blob **déchiffré**. Jamais une URL serveur. */
   source?: string;
   dureeMs: number;

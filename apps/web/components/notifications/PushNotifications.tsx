@@ -37,7 +37,7 @@ import { useSession } from "../onboarding/SessionProvider";
  *    dans la vie de l'appareil — la marque est en IndexedDB —, parce qu'une question
  *    reposée à chaque `/sync` n'est plus une question, c'est un obstacle.
  */
-export interface PushNotificationsProps {
+interface PushNotificationsProps {
   /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }

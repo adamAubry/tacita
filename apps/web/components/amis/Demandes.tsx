@@ -7,7 +7,7 @@ import { LayoutHeader } from "../foundation/LayoutHeader";
 import { Placeholder } from "../foundation/Placeholder";
 import { DemandesList } from "./FriendsList";
 
-export interface DemandesProps {
+interface DemandesProps {
   demandes: Demande[];
   /** Rend le salon à ouvrir : accepter, c'est entrer dans la conversation. */
   onAccepter: (roomId: string) => Promise<string>;

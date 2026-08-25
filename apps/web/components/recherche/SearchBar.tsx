@@ -28,7 +28,7 @@ const TYPES = [
   { value: "m.file", label: "Fichier" },
 ] as const;
 
-export interface SearchBarProps {
+interface SearchBarProps {
   tokens: readonly Token[];
   onTokens: (tokens: readonly Token[]) => void;
   /** Ce qui alimente les filtres « personne » et « conversation ». */

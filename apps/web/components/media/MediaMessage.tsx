@@ -70,7 +70,7 @@ function useBlob(fichier: EncryptedFile | undefined, telecharger: Telecharger, m
 const LARGEUR_TUILE = 240;
 const HAUTEUR_TUILE_MAX = 320;
 
-export interface MediaMessageProps {
+interface MediaMessageProps {
   media: Media;
   telecharger: Telecharger;
   /** Ouvre le viewer plein écran (REQ-UIX-16). Absent sur audio et fichier. */

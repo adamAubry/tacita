@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { EmptyState } from "./primitives";
 
-export interface PlaceholderProps {
+interface PlaceholderProps {
   /** Pourquoi c'est vide, en une phrase. */
   titre: string;
   /** Ce qui remplira l'écran, ou pourquoi il restera vide. */

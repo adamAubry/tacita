@@ -2,7 +2,7 @@ import { Fragment } from "react";
 
 import { segmenter } from "../../lib/recherche";
 
-export interface HighlightedTextProps {
+interface HighlightedTextProps {
   texte: string;
   /** Les mots à marquer. Vide = rien n'est marqué, le texte passe tel quel. */
   terme: string;

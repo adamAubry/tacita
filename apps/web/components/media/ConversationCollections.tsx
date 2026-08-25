@@ -45,7 +45,7 @@ const GRILLE = {
 /** Épinglés, liens et fichiers restent une liste : ce sont des lignes de texte. */
 const LISTE = { display: "grid", gap: "var(--spacing-2)", listStyle: "none" } as const;
 
-export interface ConversationCollectionsProps {
+interface ConversationCollectionsProps {
   /** L'historique **déjà téléchargé**, tel que le paquet le rend. */
   evenements: EvenementLu[];
   /** REQ-MSG-08 — les identifiants épinglés, lus par le câblage. */

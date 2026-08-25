@@ -8,7 +8,7 @@ import { ConversationPreview } from "./ConversationPreview";
 
 export type Tri = "recentes" | "anciennes";
 
-export interface ConversationsListProps {
+interface ConversationsListProps {
   conversations: Conversation[];
   /** Skeletons tant que le premier /sync n'a rien rendu (REQ-UIX-04). */
   chargement?: boolean;

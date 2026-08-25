@@ -10,7 +10,7 @@ import { Placeholder } from "../foundation/Placeholder";
 import { Button, Skeleton, Text, TextInput } from "../foundation/primitives";
 import { Suggestions } from "./FriendsList";
 
-export interface AjouterAmisProps {
+interface AjouterAmisProps {
   /**
    * REQ-MSG-19 — l'annuaire du homeserver, ouvert à tous les comptes locaux depuis E-21
    * (REQ-INF-18). Rien à voir avec l'interdit n°3, qui vise la recherche de **contenu**.

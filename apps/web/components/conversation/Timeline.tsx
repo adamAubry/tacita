@@ -10,7 +10,7 @@ import { MessageObject } from "./MessageObject";
 import type { Media, Telecharger } from "../media/media";
 import { nouveauJour, shouldShowHeader, type MessageAffiche } from "./message";
 
-export interface TimelineProps {
+interface TimelineProps {
   messages: MessageAffiche[];
   chargement?: boolean;
   /** REQ-UIX-13 — le starter est le premier élément de la timeline, pas un en-tête. */

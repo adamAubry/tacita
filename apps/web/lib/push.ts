@@ -16,12 +16,6 @@ import { PUSH_CONFIG_URL, PUSH_NOTIFY_URL } from "./config";
  */
 export const TYPE_APERCU = "tacita-apercu";
 
-export interface DemandeApercu {
-  type: typeof TYPE_APERCU;
-  roomId: string;
-  eventId?: string;
-}
-
 export interface Apercu {
   expediteur: string;
   texte: string;

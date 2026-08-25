@@ -37,7 +37,7 @@ import { RecoveryStep } from "./RecoveryStep";
  * 4. **la première conversation** — la fin du parcours *est* l'entrée dans le produit :
  *    on n'y explique pas ce que fait l'application, on la fait ouvrir.
  */
-export interface ContenuEtapeProps {
+interface ContenuEtapeProps {
   session: Session;
   /** Passe à l'étape suivante — ou termine le parcours, à la dernière. */
   avancer: () => void;

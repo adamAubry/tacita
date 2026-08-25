@@ -6,7 +6,7 @@ import type { Contact } from "../../lib/contacts";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Button, Text } from "../foundation/primitives";
 
-export interface RecentSearchesProps {
+interface RecentSearchesProps {
   /** Les profils récemment recherchés, du plus récent au plus ancien. */
   profils: Contact[];
   onChoisir: (contact: Contact) => void;

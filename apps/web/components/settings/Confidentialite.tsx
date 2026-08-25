@@ -6,7 +6,7 @@ import { basculerModeMasque } from "../../lib/mode-masque";
 import { lireModeMasque } from "../../lib/preferences";
 import { Banner, Switch, Text } from "../foundation/primitives";
 
-export interface ConfidentialiteProps {
+interface ConfidentialiteProps {
   /** Surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }

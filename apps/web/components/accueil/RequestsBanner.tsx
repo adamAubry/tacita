@@ -3,7 +3,7 @@
 import { ClickableCard, Text } from "../foundation/primitives";
 import { useGlissement } from "../../lib/gestes";
 
-export interface RequestsBannerProps {
+interface RequestsBannerProps {
   /** Nombre de demandes actives. Zéro ⇒ rien n'est rendu. */
   demandes: number;
   onOuvrir: () => void;

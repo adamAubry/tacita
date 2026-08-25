@@ -17,7 +17,7 @@ export interface ContexteComposer {
   onAnnuler: () => void;
 }
 
-export interface ComposerProps {
+interface ComposerProps {
   /** REQ-UI-12 — membres du salon + `@everyone`, tels que le paquet les fournit. */
   mentions: MentionCandidate[];
   contexte?: ContexteComposer;

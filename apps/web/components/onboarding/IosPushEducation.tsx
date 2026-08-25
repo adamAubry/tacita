@@ -18,7 +18,7 @@ import { ecrireRefusEducationIOS, lireRefusEducationIOS } from "../../lib/prefer
  */
 export { estIOS, estInstallee } from "../../lib/push";
 
-export interface IosPushEducationProps {
+interface IosPushEducationProps {
   /** REQ-UI-18 : **pas au premier lancement** — au premier point de friction pertinent. */
   declenche: boolean;
   indexedDB?: IDBFactory;

@@ -23,7 +23,7 @@ type Etat =
   | { phase: "invalide" }
   | { phase: "indisponible" };
 
-export interface ReceptionLienProps {
+interface ReceptionLienProps {
   token: string;
   /** Injectés en test : le service est une API HTTP, les contacts une interface (E-04). */
   liens?: LiensInvitation;

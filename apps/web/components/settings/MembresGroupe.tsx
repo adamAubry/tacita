@@ -8,7 +8,7 @@ import { identifiantCourt } from "../../lib/identifiants";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Button, List, ListItem, Text } from "../foundation/primitives";
 
-export interface MembresGroupeProps {
+interface MembresGroupeProps {
   session: Session;
   roomId: string;
 }
