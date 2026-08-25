@@ -825,22 +825,21 @@ export function onSessionInvalidee(session: Session, rappel: () => void): () => 
 }
 
 /**
- * REQ-COR-08 / REQ-INF-04 — **créer un compte**, jeton d'inscription à l'appui.
+ * REQ-COR-08 / REQ-INF-04 — **créer un compte**, un identifiant et un mot de passe.
  *
- * `registration_requires_token` est actif côté serveur (D-12) : l'inscription est ouverte
- * mais gardée, faute de quoi un homeserver sans e-mail ni captcha se fait remplir de
- * comptes qui peuvent tous énumérer l'annuaire (REQ-INF-18).
+ * `registration_requires_token` a été retiré du serveur (D-13) : il n'y a plus de code
+ * d'invitation à saisir, et donc plus rien à demander hors de l'app. Ce que ça expose est
+ * assumé et écrit dans `infra/LIMITES.md` — le client n'a rien à en compenser.
  *
- * L'UIA se joue en deux temps et c'est le protocole qui l'impose : la première requête part
- * sans `auth`, prend un 401 qui porte la `session`, et la seconde rejoue avec le jeton. On
- * ne devine pas la session — on la lit dans le défi, comme `defiSso` le faisait pour le SSO.
+ * L'UIA reste : le protocole veut une première requête sans `auth`, qui prend un 401
+ * portant la `session`, puis un rejeu par stage. On ne devine pas la session — on la lit
+ * dans le défi, comme `defiSso` le fait pour le SSO. Aujourd'hui le flow servi est
+ * `[[m.login.dummy]]` ; la boucle est écrite pour le flow, pas pour ce cas-là.
  *
  * Rend une session ouverte : Synapse connecte le compte qu'il vient de créer, et repasser
  * par `initSession` demanderait le mot de passe une seconde fois pour rien.
  */
-export async function creerCompte(
-  config: SessionConfig & { jetonInscription: string },
-): Promise<Session> {
+export async function creerCompte(config: SessionConfig): Promise<Session> {
   const auth = createClient({ baseUrl: config.homeserverUrl });
 
   const demande = (authDict?: Record<string, unknown>) =>
@@ -855,16 +854,18 @@ export async function creerCompte(
    *
    * Relu dans l'image déployée (`synapse/rest/client/register.py`,
    * `_calculate_registration_flows`, v1.155.0) : sans e-mail ni MSISDN configurés, la
-   * liste de base vaut `[[m.login.dummy]]`, et `registration_requires_token` **préfixe**
-   * le jeton à chaque flow. Le flow réel est donc `[m.login.registration_token,
-   * m.login.dummy]`.
+   * liste de base vaut `[[m.login.dummy]]`, et `registration_requires_token` la
+   * **préfixait** d'un jeton. Le garde retiré (D-13), il ne reste que `m.login.dummy` —
+   * mais la boucle ne le suppose pas : elle lit les flows que le serveur annonce.
    *
-   * La première version de cette fonction ne franchissait que le jeton et tenait le second
-   * 401 pour une panne : aucune inscription n'aurait abouti. Le défaut n'était visible ni
-   * à la compilation, ni sous Vitest — seule la lecture du serveur le donnait.
+   * Une version antérieure ne franchissait qu'une étape et tenait le 401 suivant pour une
+   * panne : aucune inscription n'aboutissait. Le défaut n'était visible ni à la
+   * compilation, ni sous Vitest — seule la lecture du serveur le donnait. C'est pourquoi
+   * on ne remplace pas cette boucle par un `dummy` en dur : le jour où le serveur ajoute
+   * une étape, elle la franchit au lieu de mentir.
    *
-   * La boucle rejoue tant que le serveur redemande, et s'arrête au premier stage qu'on ne
-   * sait pas franchir plutôt que de boucler : un flow qui exigerait un e-mail doit échouer
+   * Elle rejoue tant que le serveur redemande, et s'arrête au premier stage qu'on ne sait
+   * pas franchir plutôt que de boucler : un flow qui exigerait un e-mail doit échouer
    * franchement, pas tourner.
    */
   let etat = await premiereReponse(demande);
@@ -872,13 +873,7 @@ export async function creerCompte(
     const { defi, erreur } = etat;
     const suivant = prochainStage(defi);
     if (!suivant) throw erreur;
-    etat = await premiereReponse(() =>
-      demande(
-        suivant === "m.login.registration_token"
-          ? { type: suivant, token: config.jetonInscription, session: defi.session }
-          : { type: suivant, session: defi.session },
-      ),
-    );
+    etat = await premiereReponse(() => demande({ type: suivant, session: defi.session }));
   }
 
   if ("defi" in etat) throw etat.erreur;
@@ -903,8 +898,8 @@ export async function creerCompte(
 /** Garde-fou de boucle : au-delà, c'est un flow qu'on ne sait pas franchir. */
 const ETAPES_UIA_MAX = 4;
 
-/** Les stages que cette fonction sait franchir, dans l'ordre où on les tente. */
-const STAGES_CONNUS = ["m.login.registration_token", "m.login.dummy"] as const;
+/** Les stages que cette fonction sait franchir — ceux qui ne demandent rien à saisir. */
+const STAGES_CONNUS = ["m.login.dummy"] as const;
 
 interface DefiUia {
   session?: string;

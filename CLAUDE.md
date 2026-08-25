@@ -8,7 +8,7 @@ Spec-driven development : les specs sont exécutables, le code les implémente, 
 
 - `specs/00-conventions.md` — architecture du monorepo, IDs d'exigence, séquencement. **Les règles de comportement qui y vivaient sont désormais ici** (§ Boucle de développement, § Tests, § Sept règles) : ce fichier-ci est chargé à chaque session, pas lui, et une règle rangée là où personne ne la lit au bon moment n'a jamais rien empêché. Un fait, une maison — si les deux fichiers se contredisent, c'est un bug à corriger, pas une préséance à appliquer.
 - `specs/01..12-*.md` — un contrat par module. Ne travailler que dans le module assigné.
-- `DECISIONS.md` — arbitrages produit tranchés (**D-01 à D-12**). Ne pas les rediscuter dans le code ; escalader au PM. Une entrée peut aussi porter des **notes de conception** non normatives et des **points ouverts** — elle le dit alors en tête. *(Étendu le 20/08/2026 ; D-11 et D-12 tranchées les 20 et 25/08/2026.)*
+- `DECISIONS.md` — arbitrages produit tranchés (**D-01 à D-13**). Ne pas les rediscuter dans le code ; escalader au PM. Une entrée peut aussi porter des **notes de conception** non normatives et des **points ouverts** — elle le dit alors en tête. *(Étendu le 20/08/2026 ; D-11, D-12 et D-13 tranchées les 20 et 25/08/2026.)*
 - `specs/ui/` — découpage frontend du shard UI (modules M-A à M-I, plan, ESCALATIONS.md). Pour tout travail dans `apps/web`, le module M-X assigné est le contrat ; la SPEC 11 reste l'autorité fonctionnelle.
 - `PRODUCT.md` et `DESIGN.md` (racine) — stratégie produit et système visuel (voir section impeccable).
 

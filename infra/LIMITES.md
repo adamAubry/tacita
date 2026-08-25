@@ -57,4 +57,13 @@ Documentées, jamais masquées (spec 00 — Honnêteté produit).
   c'est faire porter le risque à quelqu'un qui ne l'a pas accepté. Le repli est le garde
   côté client (`secretStorage.checkKey`, local, la clé ne sort pas) — une règle du produit
   et non du serveur, à écrire comme telle.
-
+- **N'importe qui peut créer un compte** *(ajouté le 25/08/2026, D-13)*. `enable_registration:
+  true` sans `registration_requires_token`, sans e-mail et sans captcha : la création de
+  comptes en masse n'est bornée que par le rate limiting de REQ-INF-05, lui-même desserré
+  à 10× les défauts. La conséquence qui compte n'est pas le nombre de comptes mais ce
+  qu'un compte donne : l'annuaire énumérable ci-dessus, c'est-à-dire la liste des
+  utilisateurs du serveur, à qui prend trente secondes pour s'inscrire. C'est l'arbitrage
+  de D-13 et il tient au même motif que D-12 — déploiement auto-hébergé, cercle restreint,
+  un compte indésirable se désactive à la main. **Rouvrir la question, c'est remettre
+  `registration_requires_token`** — le chemin est intact — plutôt que fermer l'annuaire,
+  qui ferme la conséquence et pas la cause.

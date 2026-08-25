@@ -2,7 +2,7 @@
 
 Décisions PM fermes. Les specs s'y réfèrent par leur ID. Toute remise en cause passe par le PM, pas par un contournement dans le code.
 
-**D-01 à D-11 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — il n'y en a plus au 20/08/2026, D-11 ayant été tranchée le jour même. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
+**D-01 à D-13 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — il n'y en a plus au 20/08/2026, D-11 ayant été tranchée le jour même. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
 
 ## D-01 — Plafond de l'index de recherche local
 **Décision : plafond en nombre d'événements, 200 000, éviction par ancienneté (FIFO).**
@@ -178,3 +178,23 @@ Si la file reprend un téléversement après redémarrage, le chiffré doit êtr
 **Pourquoi la forme est celle-là et pas un stage UIA.** Vérifié dans l'image Synapse v1.155.0 : `password_enabled_for_login` et `password_enabled_for_reauth` ne se séparent pas — `enabled: true` donne les deux, `false` aucun, `only_for_reauth` l'inverse de ce qu'on veut. Un stage UIA maison serait donc offert **à côté** de `m.login.password`, qui resterait acceptable : le garde serait décoratif. Un module ne contourne rien, `get_supported_login_types` filtre `m.login.password` par le même drapeau. La forme retenue est donc : `POST /_matrix/client/v3/account/password` bloqué au proxy, et un endpoint de module qui exige la clé.
 
 **Ce qui rouvre la décision, avant toute autre** : héberger pour des tiers. L'opérateur cesse alors d'être celui qui accepte le risque, et c'est lui qui le porte pour d'autres. Le repli est le garde côté client (`secretStorage.checkKey`, local, la clé ne sort pas) — une règle du produit et non du serveur, à écrire comme telle.
+
+
+---
+
+## D-13 — L'inscription est ouverte, sans code d'invitation
+
+**Décision : `registration_requires_token` est retiré. N'importe qui peut créer un compte depuis l'app, avec un identifiant et un mot de passe.** *(Tranchée le 25/08/2026, après instruction, quelques heures après D-12 qui avait ouvert l'inscription en la gardant.)*
+
+**Ce qui est décidé.** Créer un compte ne demande plus rien d'autre que les deux champs de l'écran de connexion : plus de code d'invitation, plus d'étape hors de l'app, plus de dépendance à un opérateur qui émet le jeton. `registration_requires_token` disparaît de `homeserver.yaml.tmpl`, le paramètre `jetonInscription` disparaît de `creerCompte`, le troisième champ disparaît de l'écran.
+
+**Ce que ça coûte, et qui est le fond de l'arbitrage.** Le garde n'était pas décoratif, et son retrait ouvre exactement deux choses :
+
+- **La création de comptes en masse.** Ni e-mail ni captcha ne sont activés sur ce déploiement, et aucun ne le sera par cette décision : rien, côté serveur, ne distingue plus un inscrit d'un script. Le seul frein restant est le rate limiting de REQ-INF-05, desserré à 10× les défauts — c'est-à-dire l'inverse d'un frein.
+- **L'annuaire, à qui veut.** REQ-INF-18 laisse tout compte local énumérer les autres par préfixe. Le jeton était ce qui tenait cette porte : sans lui, la liste des utilisateurs du serveur est à la portée de quiconque prend trente secondes pour s'inscrire.
+
+**Pourquoi c'est tenable ici.** Le même motif que D-12, et il n'y en a pas d'autre : déploiement auto-hébergé, cercle restreint, opérateur qui est l'auteur du produit. Le coût d'un compte indésirable est qu'on le désactive à la main ; il n'y a pas de modération à l'échelle à tenir.
+
+**Ce qui rouvre la décision, avant toute autre chose** : la première vague de comptes non désirés, ou l'ouverture du déploiement au-delà du cercle. Deux replis, dans cet ordre de préférence — remettre `registration_requires_token` (le chemin est intact, seul le champ de l'écran est à reposer, et le test de REQ-INF-04 s'en apercevra tout de suite), ou fermer l'annuaire en revenant sur REQ-INF-18. Le second ne remplace pas le premier : il ferme la conséquence, pas la cause.
+
+**Ce que la décision ne change pas.** Le service de liens d'invitation (spec 12) reste ce qu'il est — un lien pour **se relier** à quelqu'un, jamais pour créer un compte. Les deux n'ont jamais été le même objet, et le sont encore moins maintenant : REQ-INV-10 est amendée en conséquence.

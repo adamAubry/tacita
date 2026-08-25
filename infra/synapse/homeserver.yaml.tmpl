@@ -41,18 +41,16 @@ federation_domain_whitelist: []
 # REQ-INF-03 — chiffrement par défaut sur tout nouveau salon, irréversible mais non rétroactif.
 encryption_enabled_by_default_for_room_type: all
 
-# REQ-INF-04 — **l'inscription est ouverte, et gardée par un jeton** (réécrite le
-# 25/08/2026, D-12). Le produit demande que l'on crée son compte depuis l'app ; c'était
-# déjà le cas de fait, Keycloak ayant `registrationAllowed: true` et Synapse provisionnant
-# à la volée au premier login OIDC.
+# REQ-INF-04 — **l'inscription est ouverte, et sans garde** (réécrite le 25/08/2026,
+# D-13). Créer un compte ne demande qu'un identifiant et un mot de passe : plus de code
+# d'invitation, plus d'étape hors de l'app.
 #
-# `registration_requires_token` n'est pas une précaution de confort : sans lui, un
-# homeserver à inscription ouverte, sans e-mail ni captcha (ni l'un ni l'autre ne sont
-# activés ici), est une cible de création de comptes en masse — et chaque compte créé peut
-# énumérer l'annuaire (REQ-INF-18). Le jeton se crée par l'API d'admin ; procédure dans
-# infra/README.md.
+# `registration_requires_token` est **absent volontairement**, et son absence est ce que
+# D-13 assume : sans e-mail ni captcha (ni l'un ni l'autre n'est activé ici), rien
+# n'empêche la création de comptes en masse, et chaque compte créé peut énumérer
+# l'annuaire (REQ-INF-18). Écrit dans infra/LIMITES.md, tenu par un test qui refuse le
+# retour silencieux de la ligne.
 enable_registration: true
-registration_requires_token: true
 registration_shared_secret: "${SYNAPSE_REGISTRATION_SHARED_SECRET}"
 
 macaroon_secret_key: "${SYNAPSE_MACAROON_SECRET_KEY}"

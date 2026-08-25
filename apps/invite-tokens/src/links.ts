@@ -52,12 +52,12 @@ export class LinkError extends Error {
 const invalide = () => new LinkError(404, "TACITA_LINK_INVALID");
 
 /**
- * REQ-INV-10/11 — pas de jeton valide, donc pas de compte utilisable **ou** pas encore
- * authentifié. Le service ne peut pas distinguer les deux, et n'a pas à le faire : il
- * répond avant toute lecture de token, donc aucun usage n'est consommé, et l'UI (spec 11)
- * choisit entre lancer le login OIDC et afficher l'explication « Tacita est sur
- * invitation ». Un formulaire d'inscription n'existe nulle part : `enable_registration`
- * est à `false`.
+ * REQ-INV-10/11 — pas de jeton valide, donc pas de compte **ou** pas encore authentifié.
+ * Le service ne peut pas distinguer les deux, et n'a pas à le faire : il répond avant
+ * toute lecture de token, donc aucun usage n'est consommé, et l'UI (spec 11) mène à
+ * l'écran de connexion, où l'on se connecte ou l'on crée son compte. Ce service, lui,
+ * n'en crée aucun — depuis D-13 c'est le formulaire qui s'en charge, sans code
+ * d'invitation.
  */
 const authRequise = () => new LinkError(401, "TACITA_AUTH_REQUIRED");
 

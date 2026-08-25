@@ -190,55 +190,53 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
   });
 });
 
-describe("REQ-COR-08 — l'inscription franchit toutes les étapes de l'UIA", () => {
+describe("REQ-COR-08 — l'inscription franchit les étapes de l'UIA, et rien d'autre", () => {
   /*
    * **Le défaut trouvé le 25/08/2026 en montant la pile.** `creerCompte` ne franchissait
-   * que `m.login.registration_token` et tenait le 401 suivant pour une panne : aucune
-   * inscription n'aboutissait.
+   * qu'une étape et tenait le 401 suivant pour une panne : aucune inscription n'aboutissait.
    *
-   * Mesuré contre le vrai Synapse v1.155.0, et relu dans son code
-   * (`_calculate_registration_flows`) : sans e-mail ni MSISDN configurés, la liste de base
-   * vaut `[[m.login.dummy]]`, et `registration_requires_token` **préfixe** le jeton à
-   * chaque flow. Le flow servi est donc `[m.login.registration_token, m.login.dummy]`.
+   * Relu dans le code de l'image v1.155.0 (`_calculate_registration_flows`) : sans e-mail
+   * ni MSISDN configurés, la liste de base vaut `[[m.login.dummy]]`. D-13 ayant retiré
+   * `registration_requires_token`, c'est le flow entier — mais la fonction ne le suppose
+   * pas, elle lit ce que le serveur annonce.
    *
-   * Ni la compilation ni la suite ne le voyaient — le mock répondait ce qu'on attendait.
+   * Ni la compilation ni la suite ne voyaient le défaut — le mock répondait ce qu'on
+   * attendait.
    */
-  const serveurEnDeuxEtapes = () => {
+  const serveurUia = (stages: string[]) => {
     const faits: string[] = [];
-    return vi.fn(async (corps: { auth?: { type: string; token?: string } }) => {
+    return vi.fn(async (corps: { auth?: { type: string } }) => {
       const etape = corps.auth?.type;
-      if (etape === "m.login.registration_token" && corps.auth?.token === "JETON") {
-        faits.push(etape);
-      } else if (etape === "m.login.dummy" && faits.includes("m.login.registration_token")) {
+      if (etape && stages.includes(etape)) faits.push(etape);
+      if (stages.every((stage) => faits.includes(stage))) {
         return { access_token: "syt_access", user_id: "@neuf:tacita.test", device_id: "DEV1" };
       }
       throw Object.assign(new Error("Unauthorized"), {
         httpStatus: 401,
-        data: {
-          session: "sessionUia",
-          completed: [...faits],
-          flows: [{ stages: ["m.login.registration_token", "m.login.dummy"] }],
-        },
+        data: { session: "sessionUia", completed: [...faits], flows: [{ stages }] },
       });
     });
   };
 
-  it("le jeton ne suffit pas : le stage suivant est franchi aussi", async () => {
-    const registre = serveurEnDeuxEtapes();
+  it("le défi annoncé est franchi, sans rien demander à saisir", async () => {
+    const registre = serveurUia(["m.login.dummy"]);
     client.registerRequest = registre;
 
-    const session = await creerCompte({ ...config, jetonInscription: "JETON" });
+    const session = await creerCompte(config);
 
     expect(session).toBeTruthy();
     const types = registre.mock.calls.map((c) => c[0].auth?.type);
-    expect(types).toEqual([undefined, "m.login.registration_token", "m.login.dummy"]);
+    expect(types).toEqual([undefined, "m.login.dummy"]);
   });
 
-  it("un jeton refusé remonte, plutôt que de tourner en boucle", async () => {
-    client.registerRequest = serveurEnDeuxEtapes();
-    await expect(
-      creerCompte({ ...config, jetonInscription: "MAUVAIS" }),
-    ).rejects.toThrow(/Unauthorized/);
+  it("D-13 — un serveur qui redemande un jeton d'inscription échoue franchement", async () => {
+    /*
+     * Le garde retiré côté serveur, le client ne sait plus soumettre de jeton : il n'y a
+     * plus de champ pour le saisir. Si `registration_requires_token` revenait, l'échec
+     * doit être immédiat et bruyant — pas une boucle, ni un compte à moitié créé.
+     */
+    client.registerRequest = serveurUia(["m.login.registration_token", "m.login.dummy"]);
+    await expect(creerCompte(config)).rejects.toThrow(/Unauthorized/);
   });
 
   it("un flow qu'on ne sait pas franchir échoue franchement", async () => {
@@ -250,9 +248,7 @@ describe("REQ-COR-08 — l'inscription franchit toutes les étapes de l'UIA", ()
         data: { session: "s", flows: [{ stages: ["m.login.email.identity"] }] },
       });
     });
-    await expect(
-      creerCompte({ ...config, jetonInscription: "JETON" }),
-    ).rejects.toThrow(/Unauthorized/);
+    await expect(creerCompte(config)).rejects.toThrow(/Unauthorized/);
   });
 });
 

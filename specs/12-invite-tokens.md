@@ -8,7 +8,7 @@
 
 Un service Node autonome qui **traduit un token en identifiant**, et rien d'autre. Il émet des liens à durée de vie bornée et les résout pour un appelant authentifié.
 
-**Le cadre de la fonctionnalité, décidé par le PM : un utilisateur existant ajoute un autre utilisateur existant.** Tout ce qui en sort a un comportement défini par cette spec — jamais une erreur technique brute, jamais une inscription en libre-service que `enable_registration: false` interdit.
+**Le cadre de la fonctionnalité, décidé par le PM : un utilisateur existant se relie à un autre utilisateur.** Tout ce qui en sort a un comportement défini par cette spec — jamais une erreur technique brute. *(Le cadre disait « ajoute un autre utilisateur **existant** », et s'appuyait sur `enable_registration: false` pour que le porteur en soit forcément un. D-13 a ouvert l'inscription le 25/08/2026 : le porteur peut désormais créer son compte en chemin. Ce que le service fait est inchangé — il résout un token pour un appelant authentifié —, seul REQ-INV-10 change de réponse.)*
 
 **Le service n'exécute aucune action Matrix.** Il ne détient ni jeton d'administration, ni droit d'inviter, ni droit de créer un salon. Il rend un identifiant au porteur authentifié ; c'est **le client** qui invite ensuite, par le chemin natif de D-09 (invitation de salon DM pour un ami, invitation de salon pour un groupe). Un service compromis peut donc mentir sur un identifiant — il ne peut envoyer, joindre ni lire quoi que ce soit.
 
@@ -31,7 +31,7 @@ Un service Node autonome qui **traduit un token en identifiant**, et rien d'autr
 
 ### Les scénarios hors cadre — chacun a un comportement, aucun n'a une erreur brute
 
-- **REQ-INV-10** — **Porteur sans compte.** `enable_registration: false` : aucune inscription en libre-service. Le lien affiche un écran d'explication — Tacita est sur invitation, voici comment demander un compte — et **jamais** un formulaire d'inscription ni une erreur technique. Le token n'est **pas** consommé.
+- **REQ-INV-10** — **Porteur sans compte.** *(Amendée le 25/08/2026 — D-13 : l'inscription est ouverte et sans code.)* Le lien mène à l'écran de connexion, où « Créer un compte » suffit, et le token **survit à la création** par le même chemin que REQ-INV-11 : il n'est consommé qu'une fois le compte ouvert. Ce que la règle interdisait et interdit toujours : une erreur technique brute, ou un écran qui laisse croire qu'il faut demander quelque chose à quelqu'un. **Ce lien n'est toujours pas ce qui autorise le compte** — il relie deux comptes, il n'en crée aucun ; la différence tient encore, elle a simplement cessé d'avoir une conséquence visible.
 - **REQ-INV-11** — **Porteur déconnecté.** Le lien déclenche le login OIDC et **survit à la redirection** : après authentification, la résolution reprend sans que l'utilisateur ait à rouvrir le lien. Le token n'est consommé qu'après authentification réussie.
 - **REQ-INV-12** — **Le porteur est l'émetteur.** Résolution refusée, message explicite (« ce lien est le vôtre »). Aucun DM avec soi-même, aucun usage consommé.
 - **REQ-INV-13** — **Lien déjà résolu par ce porteur, ou relation déjà établie** (DM existant, déjà membre du salon, **ou `knock` déjà en attente**). Succès **idempotent** : le client ouvre la conversation existante, ou réaffiche l'attente s'il a déjà frappé. Ce n'est pas une erreur, et aucun usage supplémentaire n'est consommé. *(Le cas « déjà membre » supposait un premier passage qui n'existait pas avant E-13 ; il existe maintenant.)*
@@ -54,7 +54,7 @@ Un service Node autonome qui **traduit un token en identifiant**, et rien d'autr
 
 - Service Node autonome, PostgreSQL de la spec 01 (base dédiée, pas de table dans celle de Synapse). Le déploiement — Dockerfile, service compose, route proxy, variables — appartient à la spec 01 : **REQ-INF-15**, par la même jurisprudence que REQ-INF-14 pour la passerelle push. Chaque jonction a un propriétaire nommé.
 - Aucun jeton d'administration Synapse, aucun droit Matrix, dans aucune variable d'environnement de ce service. C'est vérifiable et c'est vérifié (objectif mesurable).
-- Hors scope : l'UI d'émission et de réception des liens (spec 11, modules `M-G` et `M-H`), l'onboarding de comptes nouveaux (il n'y en a pas — `enable_registration: false`), le graphe social (D-09 le refuse).
+- Hors scope : l'UI d'émission et de réception des liens (spec 11, modules `M-G` et `M-H`), l'onboarding de comptes nouveaux (spec 11, REQ-UI-22 — il en existe depuis D-13, il n'appartient pas à ce service), le graphe social (D-09 le refuse).
 
 ## Objectif mesurable
 

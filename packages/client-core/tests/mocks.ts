@@ -133,7 +133,7 @@ function makeClient(crypto: CryptoMock) {
      */
     registerRequest: vi.fn(
       async (
-        _corps: { username?: string; password?: string; auth?: { type: string; token?: string } },
+        _corps: { username?: string; password?: string; auth?: { type: string } },
       ): Promise<{ access_token?: string; user_id: string; device_id?: string }> => ({
         access_token: "syt_access",
         user_id: "@luca:tacita.test",

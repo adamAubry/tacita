@@ -30,7 +30,9 @@ cp .env.example .env        # remplir les secrets
 docker compose up -d
 ```
 
-Création d'un compte (REQ-INF-04 — inscription fermée) :
+Créer un compte se fait **depuis l'app** : identifiant et mot de passe, sans code
+d'invitation (REQ-INF-04, D-13). Le script d'admin reste là pour un compte de service ou
+pour dépanner sans navigateur — il n'est plus le chemin normal :
 
 ```sh
 docker compose exec synapse register_new_matrix_user \

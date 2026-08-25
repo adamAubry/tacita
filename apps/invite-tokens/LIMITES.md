@@ -79,4 +79,6 @@ Le service répond `401` à tout appelant sans jeton d'accès valide, **avant** 
 le token — donc aucun usage n'est consommé, et le lien survit au détour par OIDC. Choisir
 entre lancer le login et afficher « Tacita est sur invitation, voici comment demander un
 compte » revient à l'UI (spec 11) : c'est elle qui sait si le login vient d'échouer.
-Aucun formulaire d'inscription n'existe nulle part — `enable_registration` est à `false`.
+Le porteur sans compte en crée un depuis l'écran de connexion, puis le lien se résout (D-13,
+REQ-INV-10) : ce service n'en émet ni n'en autorise aucun, il résout un token pour un appelant
+déjà authentifié.

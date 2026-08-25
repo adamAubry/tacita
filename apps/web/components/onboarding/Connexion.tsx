@@ -7,7 +7,7 @@ import { IconeCle } from "../foundation/icons";
 import { Button, Text, TextInput, VStack } from "../foundation/primitives";
 
 /**
- * REQ-UI-04 / REQ-UIX-06 — **l'écran de connexion**, réécrit le 25/08/2026 (D-12).
+ * REQ-UI-04 / REQ-UIX-06 — **l'écran de connexion**, réécrit le 25/08/2026 (D-12, D-13).
  *
  * Il n'existait pas : la connexion partait chez un fournisseur OIDC externe, et cet
  * écran-ci était une phrase d'attente pendant la redirection. Keycloak supprimé, l'identité
@@ -19,17 +19,22 @@ import { Button, Text, TextInput, VStack } from "../foundation/primitives";
  * tenir en phase, et obligé à choisir avant de savoir. La bascule ne perd pas la saisie :
  * quelqu'un qui se trompe de mode a déjà tapé son identifiant.
  *
+ * **Deux champs, et deux seulement** (D-13, même jour) : créer un compte demande un
+ * identifiant et un mot de passe. Le code d'invitation qu'exigeait la première version a
+ * été retiré du serveur, donc de l'écran — ce que ça ouvre est assumé et écrit dans
+ * `infra/LIMITES.md`, ce n'est pas au formulaire de le compenser.
+ *
  * Ce que cet écran ne fait pas, et qui appartient à la porte : décider de ce qui vient
  * après. Il rend une `Session`, `RecoveryGate` s'occupe du reste (clé, parcours d'accueil).
  */
 type Mode = "connexion" | "creation";
 
 /** Ce qui a échoué, dit dans les mots de la personne et non dans ceux du protocole. */
-type Echec = "identifiants" | "jeton" | "pris" | "reseau";
+type Echec = "identifiants" | "refus" | "pris" | "reseau";
 
 const MESSAGES: Record<Echec, string> = {
   identifiants: "Identifiant ou mot de passe incorrect.",
-  jeton: "Ce code d'invitation est inconnu ou déjà utilisé.",
+  refus: "La création de compte est refusée par le serveur.",
   pris: "Cet identifiant est déjà pris.",
   reseau: "Le serveur n'a pas répondu. Réessayez.",
 };
@@ -38,13 +43,13 @@ const MESSAGES: Record<Echec, string> = {
  * Classe l'échec par **ce que la personne doit faire**, jamais par son code HTTP (règle 2).
  *
  * Le message du serveur n'est jamais affiché : sur ce chemin il peut porter l'identifiant
- * tapé, et un 401 de mot de passe se dit autrement qu'un 400 de jeton refusé — la même
+ * tapé, et un mot de passe faux se dit autrement qu'un identifiant déjà pris — la même
  * phrase pour les deux enverrait corriger le mauvais champ.
  */
 function classer(erreur: unknown, mode: Mode): Echec {
   const { errcode } = (erreur ?? {}) as { errcode?: string };
   if (errcode === "M_USER_IN_USE") return "pris";
-  if (errcode === "M_FORBIDDEN") return mode === "creation" ? "jeton" : "identifiants";
+  if (errcode === "M_FORBIDDEN") return mode === "creation" ? "refus" : "identifiants";
   if (errcode === "M_UNAUTHORIZED" || errcode === "M_INVALID_PARAM") return "identifiants";
   return "reseau";
 }
@@ -62,13 +67,11 @@ export function Connexion({
   const [mode, setMode] = useState<Mode>("connexion");
   const [identifiant, setIdentifiant] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
-  const [jeton, setJeton] = useState("");
   const [echec, setEchec] = useState<Echec>();
   const [enCours, setEnCours] = useState(false);
 
   const creation = mode === "creation";
-  const complet =
-    identifiant.trim() !== "" && motDePasse !== "" && (!creation || jeton.trim() !== "");
+  const complet = identifiant.trim() !== "" && motDePasse !== "";
 
   const soumettre = async () => {
     if (!complet || enCours) return;
@@ -76,11 +79,7 @@ export function Connexion({
     setEchec(undefined);
     try {
       const config = { homeserverUrl, identifiant: identifiant.trim(), motDePasse, indexedDB };
-      onSession(
-        creation
-          ? await creerCompte({ ...config, jetonInscription: jeton.trim() })
-          : await initSession(config),
-      );
+      onSession(creation ? await creerCompte(config) : await initSession(config));
     } catch (erreur) {
       // Rien n'est journalisé : le mot de passe est dans la portée de ce bloc.
       setEchec(classer(erreur, mode));
@@ -116,7 +115,7 @@ export function Connexion({
           </Text>
           <Text style={{ textWrap: "pretty" }}>
             {creation
-              ? "Choisissez un identifiant et un mot de passe. Le code d'invitation vous a été donné par la personne qui vous invite."
+              ? "Choisissez un identifiant et un mot de passe. Rien d'autre n'est demandé : ni e-mail, ni code d'invitation."
               : "Votre identifiant est celui que vous avez choisi à la création du compte."}
           </Text>
         </VStack>
@@ -163,27 +162,15 @@ export function Connexion({
             }
           />
 
-          {creation && (
-            <div autoCapitalize="none" autoCorrect="off" spellCheck={false}>
-              <TextInput
-                label="Code d'invitation"
-                value={jeton}
-                onChange={(v) => {
-                  setJeton(v);
-                  setEchec(undefined);
-                }}
-                onEnter={() => void soumettre()}
-                width="100%"
-                status={
-                  echec === "jeton" ? { type: "error", message: MESSAGES.jeton } : undefined
-                }
-              />
-            </div>
-          )}
-
-          {echec === "reseau" && (
+          {/*
+            D-13 — il n'y a pas de troisième champ. Le code d'invitation vivait ici ; le
+            serveur ne l'exige plus (`registration_requires_token` retiré), et un champ
+            qui n'est plus lu est pire qu'absent : il fait chercher un code à quelqu'un
+            qui n'en a pas besoin.
+          */}
+          {(echec === "reseau" || echec === "refus") && (
             <Text type="supporting" style={{ color: "var(--color-danger)" }}>
-              {MESSAGES.reseau}
+              {MESSAGES[echec]}
             </Text>
           )}
 

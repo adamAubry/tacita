@@ -259,44 +259,36 @@ Puis, depuis un navigateur : `https://chat.<domaine>` doit servir le shard.
 
 ## 7. Les comptes
 
-### Fermer l'auto-inscription — à faire au premier démarrage
+*(Section réécrite le 25/08/2026 — Keycloak supprimé par D-12, garde d'inscription retiré
+par D-13. Elle décrivait la fermeture de `registrationAllowed` sur un service qui n'existe
+plus.)*
 
-`registrationAllowed` ouvre le formulaire « New user? Register » de Keycloak. C'est
-confortable en local — et **inacceptable sur une machine publique** : n'importe qui se
-crée un compte sur le staging. La valeur de `keycloak/realm-export.json` suit ce dont la
-machine de développement a eu besoin ; ne pas s'y fier, la fermer ici explicitement.
+### L'inscription est ouverte, et il n'y a rien à fermer
 
-```sh
-cd /opt/tacita/infra && source .env
-C="docker compose -f docker-compose.yml -f staging/docker-compose.yml exec keycloak /opt/keycloak/bin/kcadm.sh"
+Créer un compte se fait depuis l'app : « Créer un compte » sur l'écran de connexion, un
+identifiant, un mot de passe. Pas de code d'invitation, pas d'e-mail, pas de captcha
+(REQ-INF-04).
 
-$C config credentials --server http://localhost:8080/auth --realm master \
-  --user "$KEYCLOAK_ADMIN" --password "$KEYCLOAK_ADMIN_PASSWORD"
-$C update realms/tacita -s registrationAllowed=false
-```
+⚠️ **Sur une machine publique, ça veut dire n'importe qui.** Et un compte suffit à
+énumérer l'annuaire (REQ-INF-18). C'est l'arbitrage de D-13, pris pour un déploiement
+auto-hébergé en cercle restreint — il ne tient pas au-delà. Si ce staging devient
+joignable par des inconnus, le repli est écrit dans D-13 : remettre
+`registration_requires_token: true` dans `synapse/homeserver.yaml.tmpl`, redémarrer
+Synapse, et émettre les jetons par l'API d'admin. Le test de REQ-INF-04 échouera alors et
+c'est voulu : il tient la décision, dans un sens comme dans l'autre.
 
-Le `/auth` dans `--server` n'est pas optionnel : `KC_HTTP_RELATIVE_PATH` déplace toute
-l'API, et sans le préfixe `kcadm.sh` répond `404 Not Found` sans dire pourquoi.
+### Créer un compte sans navigateur
 
-⚠️ **Le realm n'est importé qu'au premier démarrage du volume Keycloak.** Modifier
-`keycloak/realm-export.json` plus tard ne change rien à la machine ; il faut passer par
-`kcadm.sh` ou l'admin (`https://chat.<domaine>/auth/admin`).
-
-### Créer un compte de test
+Pour un compte de service, ou pour dépanner :
 
 ```sh
-$C create users -r tacita -s username=adam -s enabled=true \
-  -s email=adam@<domaine> -s emailVerified=true
-$C set-password -r tacita --username adam --new-password '<mot-de-passe>'
+cd /opt/tacita/infra
+docker compose -f docker-compose.yml -f staging/docker-compose.yml exec synapse \
+  register_new_matrix_user -c /data/homeserver.yaml http://localhost:8008
 ```
 
 Le pseudo devient le localpart Matrix tel quel (`adam` → `@adam:chat.<domaine>`) : pas de
-majuscule, pas de `@`, sinon c'est le retour de `/oidc/callback` qui échoue, pas le
-formulaire. Le compte Matrix est provisionné par Synapse au premier login SSO —
-`enable_registration: false` (REQ-INF-04) ne gate que l'inscription par mot de passe.
-
-Ne pas utiliser `register_new_matrix_user` : il crée un compte à mot de passe, qui ne
-pourra jamais se connecter puisque `password_config.enabled` est `false` (REQ-UI-04).
+majuscule, pas de `@`.
 
 Au premier écran après connexion, **la clé de récupération est bloquante et c'est voulu**
 (REQ-COR-06 / D-08) : sans elle le cross-signing n'est pas amorcé et le compte ne peut pas

@@ -5,7 +5,9 @@ bornée et les résout pour un appelant authentifié.
 
 **Le cadre, décidé par le PM : un utilisateur existant ajoute un autre utilisateur
 existant.** Tout ce qui en sort a un comportement défini — jamais une erreur technique
-brute, jamais une inscription en libre-service (`enable_registration: false`).
+brute. *(La phrase disait « jamais une inscription en libre-service (`enable_registration: false`) » :
+D-13 a ouvert l'inscription le 25/08/2026. Le service, lui, n'a pas changé — il ne crée
+aucun compte, il résout un token pour un appelant déjà authentifié.)*
 
 ## Ce qu'il ne fait pas, et c'est le point
 

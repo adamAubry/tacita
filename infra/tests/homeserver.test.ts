@@ -21,18 +21,19 @@ describe("REQ-INF-03 — chiffrement par défaut sur tout salon", () => {
   });
 });
 
-describe("REQ-INF-04 — inscription ouverte, gardée par un jeton", () => {
+describe("REQ-INF-04 — inscription ouverte, sans garde (D-13)", () => {
   it("l'inscription est ouverte : le produit fait créer son compte depuis l'app", () => {
     expect(homeserver.enable_registration).toBe(true);
   });
 
-  it("elle exige un jeton, sinon c'est une cible de création de comptes en masse", () => {
+  it("aucun jeton n'est exigé, et l'absence de la ligne est le contrat", () => {
     /*
-     * Le garde n'est pas décoratif : ni e-mail ni captcha ne sont activés sur ce
-     * déploiement, et chaque compte créé peut énumérer l'annuaire (REQ-INF-18). Sans
-     * jeton, ouvrir l'inscription revient à ouvrir l'annuaire à n'importe qui.
+     * Règle 7 — une valeur retirée est indétectable si rien ne la relit. Remettre
+     * `registration_requires_token` remettrait un code d'invitation dans le parcours sans
+     * qu'aucun écran ne change : ce test est le seul endroit qui s'en apercevrait.
+     * L'exposition assumée en échange est dans infra/LIMITES.md (D-13).
      */
-    expect(homeserver.registration_requires_token).toBe(true);
+    expect(homeserver.registration_requires_token).toBeUndefined();
   });
 
   it("un registration_shared_secret reste défini pour le script d'admin", () => {
