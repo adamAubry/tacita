@@ -53,7 +53,7 @@ const EN_SAVOIR_PLUS =
 const groupesDe4 = (cle: string) =>
   cle.replace(/\s+/g, "").match(/.{1,4}/g) ?? [];
 
-export interface RecoveryStepProps {
+interface RecoveryStepProps {
   session: Session;
   /**
    * REQ-UI-04 — le chemin « je n'ai plus ma clé » (`RecoveryUnlock`). Le même écran, mais
@@ -68,9 +68,14 @@ export interface RecoveryStepProps {
 }
 
 /**
- * REQ-UI-04 — **la ré-authentification que le serveur exige** pour remplacer une identité
- * cross-signing (voir `setupRecoveryKey`). Elle n'a lieu que sur « j'ai perdu ma clé » :
- * l'inscription, elle, dépose sa première identité sans rien demander.
+ * REQ-UI-04 — **la ré-authentification que le serveur exige** pour déposer une identité
+ * cross-signing (voir `setupRecoveryKey`).
+ *
+ * Ce commentaire disait « elle n'a lieu que sur "j'ai perdu ma clé" : l'inscription, elle,
+ * dépose sa première identité sans rien demander ». C'est faux sur ce déploiement —
+ * MSC3967 n'est pas activé, l'UIA tombe aussi à l'inscription (escalade E-22). L'écran
+ * sert donc les deux cas, et son texte doit suivre : promettre un remplacement à quelqu'un
+ * qui crée sa première clé, c'est lui décrire une opération qui n'a pas lieu.
  *
  * Pourquoi un écran et non une fenêtre ouverte toute seule : un `window.open` qui ne part
  * pas d'un clic est bloqué comme pop-up, et l'étape resterait figée sans que rien ne le
@@ -80,10 +85,12 @@ function ConfirmationIdentite({
   url,
   faite,
   abandon,
+  reinitialiser,
 }: {
   url: string;
   faite: () => void;
   abandon: () => void;
+  reinitialiser: boolean;
 }) {
   const [bloquee, setBloquee] = useState(false);
 
@@ -131,13 +138,14 @@ function ConfirmationIdentite({
           </Text>
           <VStack gap={4}>
             <Text style={{ textWrap: "pretty" }}>
-              Remplacer votre clé donne à cet appareil le droit de lire vos futures
-              conversations. Votre compte demande donc une reconnexion avant de
-              l&apos;accorder.
+              {reinitialiser
+                ? "Remplacer votre clé donne à cet appareil le droit de lire vos futures conversations. Votre compte demande donc une reconnexion avant de l'accorder."
+                : "Créer votre clé donne à cet appareil le droit de lire vos futures conversations. Votre compte demande donc une reconnexion avant de l'accorder."}
             </Text>
             <Text style={{ textWrap: "pretty", marginBottom: "var(--spacing-4)" }}>
               Une fenêtre va s&apos;ouvrir sur votre compte. Une fois la confirmation
-              donnée, revenez ici : la nouvelle clé s&apos;affichera.
+              donnée, revenez ici : {reinitialiser ? "la nouvelle clé" : "votre clé"}{" "}
+              s&apos;affichera.
             </Text>
           </VStack>
         </VStack>
@@ -264,7 +272,7 @@ export function RecoveryStep({ session, reinitialiser = false }: RecoveryStepPro
    * parti, il n'y a rien d'autre à faire ici tant qu'elle n'a pas eu lieu. Un dialogue
    * par-dessus aurait laissé un bouton « Créer une nouvelle clé » cliquable derrière.
    */
-  if (confirmation) return <ConfirmationIdentite {...confirmation} />;
+  if (confirmation) return <ConfirmationIdentite {...confirmation} reinitialiser={reinitialiser} />;
 
   if (!cle) {
     return (

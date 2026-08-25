@@ -50,7 +50,15 @@ function makeCrypto() {
         signedByOwner: true,
       }),
     ),
-    /** `null` = ce compte n'a aucune sauvegarde côté serveur, donc une inscription. */
+    /**
+     * REQ-COR-06 — la seconde source de `recoveryState()`. `false` = ce compte n'a aucune
+     * identité cross-signing, donc une inscription.
+     *
+     * C'est cette question-là et pas `getKeyBackupInfo()` : une sauvegarde peut exister
+     * sans identité (inscription interrompue au dépôt), et aucune clé ne déverrouille
+     * alors quoi que ce soit.
+     */
+    userHasCrossSigningKeys: vi.fn(async (): Promise<boolean> => false),
     getKeyBackupInfo: vi.fn(async (): Promise<unknown> => null),
     loadSessionBackupPrivateKeyFromSecretStorage: vi.fn(async () => {}),
     checkKeyBackupAndEnable: vi.fn(async () => null),
@@ -71,11 +79,36 @@ function makeCrypto() {
         ) => Promise<void>;
       }) => {},
     ),
-    bootstrapSecretStorage: vi.fn(
-      async (opts: { createSecretStorageKey?: () => Promise<unknown> }) => {
-        await opts.createSecretStorageKey?.();
+    /**
+     * Un secret storage déjà provisionné sur ce compte. Basculé par
+     * `bootstrapSecretStorage` lui-même, pour qu'une seconde tentative rencontre l'état
+     * que la première a laissé.
+     */
+    secretStorageAUneCle: false,
+    /**
+     * **Reproduit la garde du SDK épinglé**, `rust-crypto.js` v42.0.0 :
+     *
+     *     isNewSecretStorageKeyNeeded = setupNewSecretStorage || !(await hasAESKey())
+     *
+     * et `createSecretStorageKey` n'est appelé que si ce booléen est vrai.
+     *
+     * Le mock appelait la fabrique inconditionnellement. Il ne pouvait donc pas infirmer
+     * l'hypothèse « le chemin de création est rejouable » — il la confirmait par
+     * construction (règle 3), pendant qu'une seconde tentative levait pour de bon contre
+     * le vrai SDK.
+     */
+    bootstrapSecretStorage: vi.fn(async function (
+      this: CryptoMock,
+      opts: {
+        createSecretStorageKey?: () => Promise<unknown>;
+        setupNewSecretStorage?: boolean;
       },
-    ),
+    ) {
+      if (opts.setupNewSecretStorage || !this.secretStorageAUneCle) {
+        await opts.createSecretStorageKey?.();
+        this.secretStorageAUneCle = true;
+      }
+    }),
     // REQ-COR-07 / D-08 — `needsUserApproval` est le signal du SDK pour « cet
     // utilisateur a changé d'identité depuis qu'on l'a vue ». Faux par défaut : le cas
     // normal est qu'il ne se passe rien.

@@ -117,18 +117,59 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
     expect(appels).toEqual([null, { session: "sessionUia" }]);
   });
 
-  it("l'inscription ne demande aucune confirmation : le premier dépôt passe sans UIA", async () => {
-    const envoyer = vi.fn(async (_auth: unknown) => {});
+  /*
+   * Ce test affirmait l'inverse — « l'inscription ne demande aucune confirmation : le
+   * premier dépôt passe sans UIA » — et son `envoyer` ne levait jamais. Il ne prouvait
+   * donc rien de Synapse : il prouvait le mock (règle 3).
+   *
+   * MSC3967 n'est pas activé sur ce déploiement — ni par défaut en v1.155.0, ni dans
+   * `infra/synapse/homeserver.yaml.tmpl`, qui ne porte aucun `experimental_features`.
+   * L'inscription prend donc le 401 comme la réinitialisation, et le rappel d'UIA est
+   * son chemin normal, pas son chemin d'exception. Escalade E-22.
+   */
+  it("l'inscription passe elle aussi par la ré-authentification : MSC3967 n'est pas activé", async () => {
+    const { appels, envoyer } = envoyerQuiDemandeUneUia([{ stages: ["m.login.sso"] }]);
     crypto.bootstrapCrossSigning.mockImplementation(async (opts) => {
       await opts.authUploadDeviceSigningKeys?.(envoyer);
     });
 
+    const vues: string[] = [];
     const session = await initSession(config);
-    const confirmerIdentite = vi.fn(async (_url: string) => {});
-    await session.setupRecoveryKey({ confirmerIdentite });
+    const cle = await session.setupRecoveryKey({
+      confirmerIdentite: async (url) => {
+        vues.push(url);
+      },
+    });
 
-    expect(envoyer).toHaveBeenCalledExactlyOnceWith(null);
-    expect(confirmerIdentite).not.toHaveBeenCalled();
+    expect(vues).toHaveLength(1);
+    expect(appels).toEqual([null, { session: "sessionUia" }]);
+    // Et la clé est bel et bien rendue : l'UIA franchie, l'inscription aboutit.
+    expect(cle.encodedPrivateKey).toBe("EsTb ABCD EFGH");
+  });
+
+  /*
+   * **Le point mort remonté par l'utilisateur, en un test.**
+   *
+   * Première tentative : le secret storage et la sauvegarde sont écrits, puis le dépôt de
+   * l'identité échoue (UIA abandonnée, fenêtre fermée, réseau). Le compte porte désormais
+   * un secret storage et aucune identité.
+   *
+   * Seconde tentative : avec `setupNewSecretStorage: false`, le SDK ne rappelait plus la
+   * fabrique, `generated` restait vide, et la fonction levait « secret storage déjà
+   * initialisé » — à chaque essai, sans issue. La seule sortie était « j'ai perdu ma clé »,
+   * proposée à quelqu'un qui n'en avait jamais eu.
+   */
+  it("une inscription interrompue au dépôt de l'identité se rejoue, sans point mort", async () => {
+    const session = await initSession(config);
+
+    crypto.bootstrapCrossSigning.mockRejectedValueOnce(new Error("dépôt interrompu"));
+    await expect(session.setupRecoveryKey()).rejects.toThrow(/dépôt interrompu/);
+    // La première tentative a bien laissé un secret storage derrière elle.
+    expect(crypto.secretStorageAUneCle).toBe(true);
+
+    // La seconde repart d'une clé neuve plutôt que de buter sur celle qui traîne.
+    const cle = await session.setupRecoveryKey();
+    expect(cle.encodedPrivateKey).toBe("EsTb ABCD EFGH");
   });
 
   it("un défi que le SSO seul n'achève pas remonte, plutôt que d'ouvrir une page inutile", async () => {
@@ -153,28 +194,45 @@ describe("REQ-COR-06 — recoveryState distingue l'inscription de la reconnexion
     const session = await initSession(config);
     await expect(session.recoveryState()).resolves.toBe("prete");
     // Hors ligne, c'est exactement ce qui compte : la réponse ne coûte aucun appel.
-    expect(crypto.getKeyBackupInfo).not.toHaveBeenCalled();
+    expect(crypto.userHasCrossSigningKeys).not.toHaveBeenCalled();
   });
 
-  it("un appareil non signé sur un compte sans sauvegarde : c'est une inscription", async () => {
+  it("un appareil non signé sur un compte sans identité : c'est une inscription", async () => {
     appareilNonSigne();
-    crypto.getKeyBackupInfo.mockResolvedValue(null);
+    crypto.userHasCrossSigningKeys.mockResolvedValue(false);
     const session = await initSession(config);
     await expect(session.recoveryState()).resolves.toBe("creation");
   });
 
-  it("un appareil non signé sur un compte qui a déjà sa clé : déverrouillage, jamais création", async () => {
+  it("un appareil non signé sur un compte qui a déjà son identité : déverrouillage, jamais création", async () => {
     // Le défaut réparé : chaque reconnexion OIDC donne un `device_id` neuf, donc un
-    // appareil non signé. Répondre « création » proposait d'écraser la sauvegarde.
+    // appareil non signé. Répondre « création » proposait d'écraser l'identité.
     appareilNonSigne();
-    crypto.getKeyBackupInfo.mockResolvedValue({ version: "1" });
+    crypto.userHasCrossSigningKeys.mockResolvedValue(true);
     const session = await initSession(config);
     await expect(session.recoveryState()).resolves.toBe("deverrouillage");
   });
 
+  /*
+   * **La sauvegarde ne décide pas.** C'est l'état qu'une inscription interrompue laisse
+   * derrière elle : `setupRecoveryKey` provisionne le secret storage *et la sauvegarde*
+   * avant de déposer l'identité, et seul ce dépôt peut échouer sur une UIA.
+   *
+   * Lu sur la sauvegarde, cet état répondait `deverrouillage` : l'écran proposait de saisir
+   * une clé qui n'ouvre rien — il n'y a aucune identité à redescendre — et le parcours
+   * d'inscription devenait inatteignable. C'est le défaut remonté le 25/08/2026.
+   */
+  it("une sauvegarde sans identité reste une inscription, pas un déverrouillage", async () => {
+    appareilNonSigne();
+    crypto.getKeyBackupInfo.mockResolvedValue({ version: "1" });
+    crypto.userHasCrossSigningKeys.mockResolvedValue(false);
+    const session = await initSession(config);
+    await expect(session.recoveryState()).resolves.toBe("creation");
+  });
+
   it("serveur injoignable : déverrouillage, l'erreur ne penche jamais vers l'écrasement", async () => {
     appareilNonSigne();
-    crypto.getKeyBackupInfo.mockRejectedValue(new Error("réseau"));
+    crypto.userHasCrossSigningKeys.mockRejectedValue(new Error("réseau"));
     const session = await initSession(config);
     await expect(session.recoveryState()).resolves.toBe("deverrouillage");
   });

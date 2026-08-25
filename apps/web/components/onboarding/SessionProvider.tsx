@@ -37,7 +37,7 @@ const ContexteSession = createContext<Contexte>({
 
 export const useSession = () => useContext(ContexteSession);
 
-export interface SessionProviderProps {
+interface SessionProviderProps {
   children: ReactNode;
   homeserverUrl: string;
   /** Injecté en test ; en production, la vraie redirection du navigateur. */
@@ -139,11 +139,18 @@ export function SessionProvider({
      * La marque IndexedDB qui rend le parcours reprenable après un rechargement est posée
      * par le parcours lui-même (`Onboarding`), pas ici : c'est lui qui sait quand il
      * commence et quand il finit.
+     *
+     * **Mais `mode` ne suffit pas à décider seul** (corrigé le 25/08/2026). Il dit d'où
+     * l'on sort, pas où l'on en était : une inscription interrompue au dépôt de l'identité
+     * repart en `deverrouillage`, et le parcours — commencé, marqué, jamais fini — était
+     * alors jeté. Symptôme exact remonté par l'utilisateur : la clé recréée, puis l'accueil
+     * d'une application vide au lieu de l'étape suivante. La marque est la seule chose qui
+     * sache répondre, et `etatDe` l'a déjà lue pour les deux phases.
      */
     setEtat({
       phase: "prete",
       session: etat.session,
-      onboarding: etat.mode === "creation",
+      onboarding: etat.mode === "creation" || etat.onboarding,
     });
   }, [etat]);
 

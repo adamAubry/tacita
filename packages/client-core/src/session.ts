@@ -56,11 +56,18 @@ export type RecoveryState = "prete" | "creation" | "deverrouillage";
 export interface SetupRecoveryOptions {
   reinitialiser?: boolean;
   /**
-   * REQ-COR-06 — **le passage obligé du « j'ai perdu ma clé ».** Synapse laisse déposer
-   * une identité cross-signing sans authentification la *première* fois (MSC3967), mais
-   * exige une UIA pour en **remplacer** une (`rest/client/keys.py`, v1.155.0). Sans mot
-   * de passe natif (REQ-INF-09), le seul flow proposé est `m.login.sso` : il n'a pas de
-   * réponse à calculer, il se termine dans le navigateur, chez Keycloak.
+   * REQ-COR-06 — **le passage obligé de tout dépôt d'identité cross-signing**, celui de
+   * l'inscription compris.
+   *
+   * Ce commentaire disait le contraire jusqu'au 25/08/2026 : « Synapse laisse déposer une
+   * identité sans authentification la *première* fois (MSC3967) ». C'est vrai de Synapse
+   * **quand MSC3967 est activé**, et il ne l'est pas — ni par défaut en v1.155.0, ni dans
+   * `infra/synapse/homeserver.yaml.tmpl`, qui ne porte aucun bloc `experimental_features`.
+   * L'UIA tombe donc aussi à l'inscription. Deux specs correctes séparément, le trou entre
+   * elles : escalade **E-22**, c'est au PM de dire s'il faut activer le MSC.
+   *
+   * Sans mot de passe natif (REQ-INF-09), le seul flow proposé est `m.login.sso` : il n'a
+   * pas de réponse à calculer, il se termine dans le navigateur, chez Keycloak.
    *
    * Le module rend donc l'URL et attend ; ouvrir une fenêtre est un geste d'UI, et il
    * doit partir d'un clic sous peine d'être bloqué comme pop-up. La promesse résolue
@@ -457,16 +464,30 @@ async function buildSession(
 
       /*
        * Non signé. Reste à savoir laquelle des deux étapes il lui faut, et **seul le
-       * serveur le sait** : la sauvegarde du compte ne vit pas ici.
+       * serveur le sait** : l'identité du compte ne vit pas ici.
+       *
+       * **La question est « ce compte a-t-il une identité cross-signing ? », et surtout
+       * pas « a-t-il une sauvegarde ? »** (corrigé le 25/08/2026). Les deux ne vont pas
+       * ensemble : `setupRecoveryKey` provisionne le secret storage *et la sauvegarde*
+       * avant de déposer l'identité, et ce dépôt est la seule requête du flux qui puisse
+       * échouer sur une UIA. Une inscription interrompue à cet endroit laisse donc un
+       * compte avec une sauvegarde et **sans identité** — état qu'`getKeyBackupInfo`
+       * lisait comme `deverrouillage`, en proposant de déverrouiller avec une clé qui
+       * n'ouvre rien : il n'y a aucune identité à redescendre. Le parcours d'inscription
+       * devenait inatteignable pour de bon, et c'est le défaut remonté par l'utilisateur.
+       *
+       * `userHasCrossSigningKeys()` interroge `/keys/query` pour l'utilisateur local :
+       * c'est exactement la chose dont dépend `unlockRecovery`, donc la seule qui puisse
+       * décider entre les deux écrans.
        *
        * Injoignable, on répond `deverrouillage`. Ce n'est pas neutre et c'est délibéré :
        * des deux erreurs possibles, celle-là ne coûte qu'un écran inutile à un compte
-       * neuf, quand `creation` proposerait d'écraser la sauvegarde d'un compte qui en a
+       * neuf, quand `creation` proposerait d'écraser l'identité d'un compte qui en a
        * une. La création reste atteignable depuis l'écran de saisie, elle n'est pas
        * perdue — seulement placée derrière un geste explicite.
        */
       try {
-        return (await crypto.getKeyBackupInfo()) ? "deverrouillage" : "creation";
+        return (await crypto.userHasCrossSigningKeys()) ? "deverrouillage" : "creation";
       } catch {
         return "deverrouillage";
       }
@@ -486,7 +507,27 @@ async function buildSession(
        */
       await crypto.bootstrapSecretStorage({
         setupNewKeyBackup: true,
-        setupNewSecretStorage: reinitialiser,
+        /*
+         * **`true` dans les deux cas, et c'est ce qui rend l'inscription rejouable**
+         * (corrigé le 25/08/2026).
+         *
+         * Relu dans le SDK épinglé (`rust-crypto.js`, v42.0.0) :
+         * `isNewSecretStorageKeyNeeded = setupNewSecretStorage || !hasAESKey()`, et
+         * `createSecretStorageKey` n'est appelé que si ce booléen est vrai. Avec `false`,
+         * une seconde tentative sur un compte qui porte déjà un secret storage — celui
+         * qu'une première tentative interrompue vient d'écrire — ne passait plus par
+         * notre fabrique : `generated` restait vide et la fonction levait « secret storage
+         * déjà initialisé », **à chaque essai, définitivement**. Le seul moyen de sortir
+         * était le chemin « j'ai perdu ma clé », c'est-à-dire une réinitialisation
+         * proposée à quelqu'un qui n'avait jamais eu de clé.
+         *
+         * Le remplacer est sans perte : on n'arrive ici que sur `creation` (aucune
+         * identité cross-signing, cf. `recoveryState`) ou sur une réinitialisation
+         * explicite. Dans les deux cas, un secret storage antérieur ne protège rien
+         * qu'on n'ait déjà décidé de refaire — il ne chiffre que des clés d'identité qui
+         * n'existent pas.
+         */
+        setupNewSecretStorage: true,
         createSecretStorageKey: async () => {
           generated = await crypto.createRecoveryKeyFromPassphrase();
           // Publiée aussitôt pour `getSecretStorageKey` : le SDK la redemande dans
@@ -497,8 +538,9 @@ async function buildSession(
       });
 
       if (!generated) {
-        // Secret storage déjà provisionné sans passer par notre fabrique : on ne peut
-        // pas rendre une clé qu'on n'a pas générée, et en inventer une serait pire.
+        // Le SDK n'a pas appelé notre fabrique. Contractuellement impossible depuis que
+        // `setupNewSecretStorage` vaut `true`, et gardé quand même : on ne peut pas rendre
+        // une clé qu'on n'a pas générée, et en inventer une serait pire.
         throw new Error("aucune clé de récupération générée : secret storage déjà initialisé");
       }
 
@@ -506,9 +548,16 @@ async function buildSession(
         setupNewCrossSigning: reinitialiser,
         /*
          * Le dépôt de l'identité est la seule requête de tout le flux qui puisse demander
-         * une UIA. On tente d'abord sans : c'est le chemin de l'inscription, que Synapse
-         * laisse passer tant qu'aucune identité n'existe (MSC3967). Le 401 n'arrive donc
-         * qu'en réinitialisation, et il n'est pas une panne — c'est la question posée.
+         * une UIA. On tente d'abord sans, puis on rejoue avec la session : c'est le seul
+         * ordre qui marche des deux côtés du MSC3967.
+         *
+         * **Le 401 arrive aussi à l'inscription** — corrigé le 25/08/2026. Le commentaire
+         * qui vivait ici affirmait « le 401 n'arrive donc qu'en réinitialisation », et le
+         * test qui le prouvait donnait un `envoyer` qui ne lève jamais : une hypothèse
+         * validée contre un substitut qui la confirme par construction (règle 3). Contre
+         * le vrai Synapse, MSC3967 étant éteint, l'inscription prend le 401 comme le
+         * reste. Ce n'est pas une panne, c'est la question posée — mais elle est posée
+         * plus tôt que ce que le produit croyait.
          */
         authUploadDeviceSigningKeys: async (envoyer) => {
           try {

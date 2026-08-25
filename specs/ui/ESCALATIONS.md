@@ -57,6 +57,7 @@ contrat gagne.
 | E-14 | La version d'Element Call déployée n'est épinglée nulle part : le paramètre audio/vidéo de REQ-UIX-38 n'a pas pu être relu | **Tranché le 07/08/2026** — on épingle, comme le reste du compose | `specs/02-rtc-backend.md` — **REQ-RTC-08** (nouvelle). REQ-UIX-38 **non modifiée** |
 | E-21 | Trouver quelqu'un par un **fragment** de son identifiant ou de son nom : l'annuaire de Synapse ne répond que pour les comptes avec qui on partage déjà un salon, et l'ouvrir à tout le serveur expose chaque compte à tout autre | **Tranchée par le PM le 21/08/2026** — on ouvre : `search_all_users: true`, énumération assumée et écrite dans `infra/LIMITES.md`. Le domaine cesse d'être exigé en plus (REQ-MSG-19 étendue, REQ-UIX-42) | `specs/01-infra-synapse.md` — **REQ-INF-18** (nouvelle) ; `infra/LIMITES.md` et `infra/README.md` (reconstruction `regenerate_directory`) ; `specs/05-messaging.md` — REQ-MSG-19 étendue ; `specs/ui/M-G.md` — **REQ-UIX-42** (nouvelle), REQ-UIX-28 amendée. **Interdit n°3 inchangé** : l'annuaire n'est pas `/search` |
 | E-16 | `ChatComposer` d'Astryx est un composer d'assistant : son corps est une colonne dont la rangée d'actions est rendue sous le champ, inconditionnellement. Une barre de messagerie est une rangée | **Ouverte le 11/08/2026** — le shard compose la rangée lui-même à partir de `ChatComposerInput` (mentions, Entrée, IME, collage) et de `Button` ; aucune primitive recodée, `ChatComposer` n'est plus réexporté | **DESIGN.md** — Components (barre d'écriture) ; `specs/ui/M-D.md` — REQ-UIX-15 à amender (le contrat dit « sur `Chat` »). Aucune exigence fonctionnelle modifiée |
+| E-22 | **MSC3967 n'est pas activé sur ce déploiement, et `specs/04-client-core.md` affirme qu'il l'est.** Synapse exige donc une UIA `m.login.sso` dès le **premier** dépôt d'identité cross-signing — c'est-à-dire en pleine inscription, là où le produit ne l'attendait pas | **Ouverte le 25/08/2026** — le client est corrigé pour traverser l'UIA à l'inscription comme ailleurs (elle marche, le texte de l'écran suit). Reste au PM : activer `msc3967_enabled` pour retirer cet écran du parcours d'inscription, ou l'assumer | `specs/04-client-core.md` — REQ-COR-06, **la phrase sur MSC3967 est fausse et doit partir** ; `specs/01-infra-synapse.md` — décider d'un bloc `experimental_features` ; `packages/client-core/src/session.ts` et `apps/web/components/onboarding/RecoveryStep.tsx` (déjà corrigés) |
 
 ---
 
@@ -847,6 +848,63 @@ même ligne de `homeserver.yaml.tmpl`, plus la reconstruction de l'annuaire et l
 d'écran, qui repartiraient ensemble.
 
 ---
+
+---
+
+## E-22 — L'inscription prend une UIA que personne n'attendait (spec 01 × spec 04) — **ouverte**
+
+**La question.** `specs/04-client-core.md` (REQ-COR-06) écrit : « Synapse laisse déposer une
+première identité cross-signing sans authentification (MSC3967) mais exige une UIA pour en
+remplacer une ». La seconde moitié est vraie. La première suppose **MSC3967 activé**, et il
+ne l'est pas : ni par défaut en Synapse v1.155.0, ni dans
+`infra/synapse/homeserver.yaml.tmpl`, qui ne porte aucun bloc `experimental_features`.
+
+**Le mode de panne est celui de la règle 1**, une fois de plus : spec 01 n'avait aucune
+raison d'activer un MSC dont elle ignorait qu'on dépendait, spec 04 n'avait aucune raison
+de douter d'une ligne écrite noir sur blanc. Les deux respectées, le trou entre elles.
+
+**Ce que ça a coûté, mesuré sur le compte d'un utilisateur le 25/08/2026** — trois défauts
+en chaîne, dont deux étaient de vrais points morts :
+
+1. l'inscription prend le 401 UIA et affiche « Confirmez que c'est bien vous », un écran
+   dont le texte parlait de **remplacer** une clé à quelqu'un qui créait la sienne ;
+2. l'UIA interrompue (fenêtre fermée, pop-up bloquée, réseau) laisse le compte avec un
+   secret storage et une sauvegarde, **et sans identité**. `recoveryState()` lisait cet
+   état sur `getKeyBackupInfo()` et répondait `deverrouillage` : l'app demandait alors une
+   clé qui n'ouvre rien, puisqu'il n'y a aucune identité à redescendre ;
+3. et la reprise par `creation` était elle-même murée : `bootstrapSecretStorage` n'appelle
+   `createSecretStorageKey` que si `setupNewSecretStorage || !hasAESKey()` (relu dans le
+   SDK épinglé, `rust-crypto.js` v42.0.0). Avec `false` et un secret storage déjà là,
+   `setupRecoveryKey` levait « secret storage déjà initialisé » **à chaque essai**.
+
+La seule sortie était « j'ai perdu ma clé » — une réinitialisation proposée à quelqu'un qui
+n'avait jamais eu de clé — et elle atterrissait sur l'accueil d'une application vide, le
+parcours d'accueil ayant été jeté avec le `mode`.
+
+**Ce qui est déjà fait** (le client marche des deux côtés du MSC, et c'est ce qui ferme le
+bug) :
+
+- `recoveryState()` interroge `userHasCrossSigningKeys()` et non plus la sauvegarde : la
+  question devient celle dont dépend réellement `unlockRecovery` ;
+- `setupRecoveryKey()` passe `setupNewSecretStorage: true` dans les deux cas — le chemin de
+  création redevient rejouable ;
+- le texte de `ConfirmationIdentite` suit le mode : créer n'est pas remplacer ;
+- la marque d'onboarding décide avec `mode`, plus après lui (REQ-UI-22).
+
+**Ce qui reste au PM, et pourquoi ça ne se tranche pas ici.** Activer `msc3967_enabled`
+retirerait l'écran de confirmation du parcours d'inscription — un écran de moins sur le
+chemin d'entrée du produit, et le comportement que la spec décrivait déjà. Mais c'est
+autoriser un dépôt d'identité **sans authentification** quand le compte n'en a pas encore :
+Synapse le borne à ce seul cas, et ça reste une décision de sécurité, pas une ligne de PR.
+
+Les deux issues sont tenables et le produit fonctionne dans les deux. Ce qui n'est pas
+tenable est l'état actuel de la spec, qui décrit un déploiement qui n'existe pas : **la
+phrase part, quelle que soit la décision.**
+
+**Ce qui rouvrirait la question** : un bump de Synapse qui changerait le défaut de MSC3967,
+ou un second fournisseur d'authentification qui rendrait le flow UIA multi-étapes — auquel
+cas `defiSso` refuserait le défi, comme il le fait déjà, et l'inscription se bloquerait
+franchement au lieu d'ouvrir une page inutile.
 
 ## Décisions prises en propre (design owner, pour information)
 

@@ -18,7 +18,21 @@ export type EtatSession =
    * `m.login.token` donne un `device_id` neuf, donc un appareil non signé, et l'écran de
    * création s'ouvrait devant quelqu'un qui avait sa clé depuis longtemps.
    */
-  | { phase: "recuperation-requise"; session: Session; mode: Exclude<RecoveryState, "prete"> }
+  | {
+      phase: "recuperation-requise";
+      session: Session;
+      mode: Exclude<RecoveryState, "prete">;
+      /**
+       * REQ-UI-22 — **un parcours d'accueil resté en plan sur cet appareil**, lu avant de
+       * savoir laquelle des deux étapes de clé s'impose.
+       *
+       * Il est porté ici et pas seulement dans `prete` parce que `mode` ne suffit pas à le
+       * déduire : une inscription interrompue puis reprise par le déverrouillage arrive
+       * avec `mode: "deverrouillage"` et un parcours pourtant inachevé. Le déduire de
+       * `mode` renvoyait ces gens sur l'accueil, au milieu de leur propre inscription.
+       */
+      onboarding: boolean;
+    }
   /**
    * REQ-UI-22 — l'app est atteignable. `onboarding` dit qu'elle ne s'ouvre pas encore :
    * le parcours d'accueil est commencé et n'est pas fini, sur cet appareil.
@@ -91,13 +105,14 @@ export function retirerJetonDeLUrl(location: Location, history: History): string
  * signé, muet et sourd, avec l'application entière derrière.
  */
 export async function etatDe(session: Session, indexedDB?: IDBFactory): Promise<EtatSession> {
-  const etat = await session.recoveryState();
-  if (etat !== "prete") return { phase: "recuperation-requise", session, mode: etat };
-
   /*
    * REQ-UI-22 — la reprise du parcours d'accueil. Elle est lue **ici** et non dans un
    * écran : la porte montre déjà une géométrie d'attente pendant que cette fonction
    * répond, et une lecture faite plus tard ferait clignoter l'accueil avant le parcours.
+   *
+   * Lue **avant** la branche, et portée par les deux phases (corrigé le 25/08/2026) : la
+   * confirmation de la clé décidait sinon du parcours sur le seul `mode`, et perdait la
+   * marque de quiconque avait commencé une inscription puis dû passer par l'autre chemin.
    *
    * Une base absente ou illisible vaut « pas de parcours en cours » : le pire cas est
    * quelqu'un qui reprend la main une étape trop tôt, jamais quelqu'un bloqué dehors.
@@ -105,5 +120,10 @@ export async function etatDe(session: Session, indexedDB?: IDBFactory): Promise<
   const onboarding = indexedDB
     ? await lireOnboardingEnCours(indexedDB).catch(() => false)
     : false;
+
+  const etat = await session.recoveryState();
+  if (etat !== "prete") {
+    return { phase: "recuperation-requise", session, mode: etat, onboarding };
+  }
   return { phase: "prete", session, onboarding };
 }

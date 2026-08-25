@@ -641,6 +641,37 @@ describe("REQ-UI-22 — le parcours d'accueil, de la clé au premier message", (
     expect(screen.queryByText(/Étape 1 sur/)).toBeNull();
   });
 
+  /*
+   * **Le défaut remonté le 25/08/2026, et la raison pour laquelle `mode` ne suffit pas.**
+   *
+   * Une inscription interrompue au dépôt de l'identité laisse la marque posée et repart en
+   * `deverrouillage` : la personne recrée sa clé, et le parcours décidait alors sur le seul
+   * `mode`. Verdict `deverrouillage` ⇒ pas de parcours ⇒ accueil d'une application vide,
+   * au beau milieu de sa propre inscription.
+   *
+   * La marque est la seule chose qui sache où l'on en était. Elle décide donc avec `mode`,
+   * pas après lui.
+   */
+  it("une clé recréée au milieu d'une inscription reprend le parcours, pas l'accueil", async () => {
+    const indexedDB = new IDBFactory();
+    await ecrireOnboardingEnCours(indexedDB, true);
+    const { session } = fausseSession({ recuperation: "deverrouillage" });
+    monter(session, <p>Conversations</p>, indexedDB);
+
+    // « Je n'ai plus ma clé » bascule sur l'écran de création, en réinitialisation —
+    // dont le bouton principal dit ce qu'il détruit, d'où le libellé propre à ce mode.
+    await waitFor(() => expect(screen.getByText("Je n'ai plus ma clé")).toBeTruthy());
+    fireEvent.click(screen.getByText("Je n'ai plus ma clé"));
+    await waitFor(() => expect(screen.getByText("Créer une nouvelle clé")).toBeTruthy());
+    fireEvent.click(screen.getByText("Créer une nouvelle clé"));
+    await waitFor(() => expect(screen.getByText("J'ai sauvegardé ma clé")).toBeTruthy());
+    fireEvent.click(screen.getByText("J'ai sauvegardé ma clé"));
+
+    // On reprend le parcours là où il en était, et surtout pas sur l'app.
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+    expect(screen.queryByText("Conversations")).toBeNull();
+  });
+
   it("la liste des étapes est la seule source : en retirer une retire son écran", async () => {
     // La modularité, prouvée plutôt qu'affirmée : le parcours ne connaît aucune étape en
     // dur, ni pour les afficher, ni pour les compter.
