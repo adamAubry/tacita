@@ -12,6 +12,17 @@ docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
 cd .. && npm run smoke
 ```
 
+## Le parcours d'entrée — `onboarding.smoke.test.ts`
+
+Ajoutée le 25/08/2026, après un défaut que 1039 tests verts n'ont pas vu : une connexion
+par identifiant et mot de passe tombait sur « Entrez votre clé de récupération ». Les deux
+causes étaient invisibles sur mocks — un magasin crypto local qui garde sa vue d'avant la
+signature, et une clé 4S tirée au hasard qu'aucune connexion suivante ne pouvait retrouver.
+
+Elle joue le parcours entier contre la pile réelle : créer un compte, créer sa clé, se
+reconnecter **sur un disque neuf** (donc un `device_id` neuf, donc le cas qui cassait), et
+entrer par la porte de secours de D-14. Chacune des trois étapes doit finir sur `prete`.
+
 ## Connexion sans e-mail
 
 Demande la pile debout (`docker compose up -d postgres keycloak`).

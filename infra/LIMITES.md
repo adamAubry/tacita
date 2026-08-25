@@ -79,3 +79,15 @@ Documentées, jamais masquées (spec 00 — Honnêteté produit).
   avec un secret que ce compte détient déjà. **Rouvrir la question**, c'est exiger un
   second facteur sur cette route ou rétablir un vrai chemin de réinitialisation, ce qui
   suppose de rouvrir D-12 d'abord.
+- **Le mot de passe protège l'historique chiffré** *(ajouté le 25/08/2026, D-15)*. La clé
+  de secret storage est dérivée du mot de passe du compte (`m.pbkdf2`), ce qui permet de
+  se connecter sur un appareil neuf sans rien saisir d'autre. Le descripteur — sel, `iv`,
+  `mac` — est de l'account data, donc lisible par le serveur : **une attaque hors ligne
+  sur le mot de passe devient possible**, et un mot de passe faible rend alors la clé qui
+  déchiffre tout. Le plancher est de 8 caractères. Avant D-15, une clé de 256 bits tirée
+  au hasard fermait cette porte, au prix d'un secret de plus à retenir à chaque connexion.
+  Conséquence à connaître aussi : D-12 change le mot de passe **sans re-dériver la clé** —
+  après un changement, la connexion silencieuse cesse et l'écran de saisie revient une
+  fois par appareil neuf. **Rouvrir la question**, c'est revenir à la clé aléatoire (le
+  code la produit encore quand aucune phrase de passe n'est fournie) ou relever le
+  plancher de mot de passe.

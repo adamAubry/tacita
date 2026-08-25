@@ -2,7 +2,7 @@
 
 Décisions PM fermes. Les specs s'y réfèrent par leur ID. Toute remise en cause passe par le PM, pas par un contournement dans le code.
 
-**D-01 à D-14 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — il n'y en a plus au 20/08/2026, D-11 ayant été tranchée le jour même. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
+**D-01 à D-15 sont fermes.** Une entrée peut aussi porter, **et seulement si elle le dit en tête**, des notes de conception non normatives et des points **ouverts, non tranchés** — il n'y en a plus au 20/08/2026, D-11 ayant été tranchée le jour même. Rien dans le code ne peut se réclamer d'un point ouvert tant qu'il n'est pas tranché : une note de conception n'est pas une exigence, et aucun test ne la nomme. *(Ajouté le 20/08/2026, avec D-10 et D-11.)*
 
 ## D-01 — Plafond de l'index de recherche local
 **Décision : plafond en nombre d'événements, 200 000, éviction par ancienneté (FIFO).**
@@ -222,3 +222,28 @@ Si la file reprend un téléversement après redémarrage, le chiffré doit êtr
 **Ce que ça oblige à dire, et où c'est dit.** « Gardez votre clé comme votre mot de passe » cesse d'être un conseil de prudence : c'est la seule chose qui protège le compte. L'écran de secours le dit avant le geste (« une mesure exceptionnelle »), et « Limites connues » le dit avant qu'on en dépende — son entrée D-12 a été réécrite pour ça, et non doublée.
 
 **Ce qui rouvre la décision, avant toute autre chose** : héberger pour des tiers, comme pour D-12. Deux replis existent alors, dans cet ordre — exiger un second facteur sur cette route, ou la retirer et rétablir un vrai chemin de réinitialisation (e-mail), ce qui suppose de rouvrir D-12.
+
+
+---
+
+## D-15 — La clé de récupération est dérivée du mot de passe
+
+**Décision : oui. Se connecter avec son identifiant et son mot de passe suffit, sur n'importe quel appareil.** *(Tranchée le 25/08/2026, après un défaut vécu : « je me connecte et j'ai un écran "entrez votre clé de récupération" ».)*
+
+**Ce qui n'allait pas, et pourquoi ce n'était pas un défaut d'écran.** Chaque connexion Matrix crée un `device_id` neuf. Un appareil neuf n'est pas signé par l'identité de son propriétaire, n'a aucune clé Megolm et ne peut ni lire l'historique ni envoyer quoi que ce soit (D-08). Le mur était donc **honnête** : il disait vrai. Ce qui n'allait pas, c'est qu'il soit **nécessaire** — le produit demandait de retenir un secret de plus alors qu'il venait d'en recevoir un.
+
+**Ce qui est décidé.** La clé de secret storage (4S) n'est plus tirée au hasard : elle est **dérivée du mot de passe du compte** (`m.pbkdf2`, sel et itérations posés dans le descripteur, spec Matrix « Secret storage »). À chaque connexion, le mot de passe saisi redonne la même clé, le client déverrouille en silence, l'appareil se signe. La clé de récupération continue d'exister, d'être affichée à l'inscription et d'ouvrir le compte (D-14) : c'est la même clé, sous sa forme lisible.
+
+**Ce que ça coûte, et qui est le fond de l'arbitrage.** **Le mot de passe protège désormais l'historique chiffré.** Le descripteur 4S est de l'account data — le serveur le lit, sel, `iv` et `mac` compris. Qui le lit peut donc monter une **attaque hors ligne** sur le mot de passe et, s'il est faible, obtenir la clé qui déchiffre tout. Avant, une clé de 256 bits tirée au hasard fermait cette porte. Le plancher est de 8 caractères (module Synapse, écran de changement) : c'est bas, et c'est dit.
+
+Ce coût est **le même que celui déjà accepté** par D-12 (la clé transite vers le serveur à chaque changement de mot de passe) et par D-14 (la clé seule ouvre le compte). Le modèle de menace de ce déploiement concède l'opérateur ; il ne concède pas un attaquant qui vole l'account data sans être l'opérateur, et c'est cette nuance-là qui se paie ici.
+
+**Ce que ça ne répare pas, et qui reste vrai.** D-12 change le mot de passe **sans re-dériver la clé**. Après un changement, la clé reste celle de l'ancien mot de passe : la connexion silencieuse cesse de fonctionner et l'écran de saisie revient — une fois, sur chaque appareil neuf. Personne n'est enfermé dehors (la clé écrite quelque part continue d'ouvrir, et D-14 aussi), mais la promesse « le mot de passe suffit » a un trou, et il est nommé. **Le boucher demande une re-clé du 4S dans `changerMotDePasse`**, ce qui n'est pas atomique avec le changement côté serveur — c'est pour ça que ce n'est pas fait ici plutôt qu'à moitié.
+
+**Ce qui rouvre la décision** : héberger pour des tiers (comme D-12 et D-14), ou une politique de mot de passe qui resterait à 8 caractères le jour où le déploiement s'ouvre. Le repli est la clé aléatoire — le code la produit encore quand aucune phrase de passe n'est fournie.
+
+---
+
+### Le défaut jumeau, corrigé le même jour
+
+Il n'était pas de la même nature et il aurait suffi à produire le même écran, y compris avec la clé en main : `bootstrapCrossSigning` signe l'appareil, et le magasin crypto local garde la vue qu'il avait **avant**. `getDeviceVerificationStatus` — la source de `recoveryState()` — répondait donc « non signé » sur un appareil qui venait de l'être, et la porte se refermait derrière quelqu'un qui venait de tout faire correctement. Un `/keys/query` forcé après signature (et avant, au déverrouillage) le corrige. Mesuré contre un vrai Synapse ; **aucun test sur mocks ne pouvait le voir**, ce qui a valu au dépôt sa première cible de fumée du parcours d'entrée (`infra/smoke/onboarding.smoke.test.ts`, règle 4).

@@ -10,7 +10,12 @@ import {
 // léger, aucun wasm tiré avec lui.
 // ponytail: casse si le SDK réorganise ses chemins ; repasser à la racine le jour où
 // elle réexporte crypto-api.
-import { decodeRecoveryKey, OnlySignedDevicesIsolationMode } from "matrix-js-sdk/lib/crypto-api";
+import {
+  decodeRecoveryKey,
+  deriveRecoveryKeyFromPassphrase,
+  encodeRecoveryKey,
+  OnlySignedDevicesIsolationMode,
+} from "matrix-js-sdk/lib/crypto-api";
 import { Method } from "matrix-js-sdk/lib/http-api/method";
 
 import { createLogger } from "./logger";
@@ -327,6 +332,16 @@ async function buildSession(
   credentials: StoredCredentials,
   config: Omit<SessionConfig, "identifiant" | "motDePasse">,
   saved: CredentialStore,
+  /**
+   * D-15 — **le mot de passe du compte, s'il vient d'être saisi**, et rien d'autre n'en
+   * est fait : il sert de phrase de passe à la clé de récupération (`setupRecoveryKey`).
+   *
+   * Il vit dans cette fermeture le temps de la session et **n'est jamais écrit** — ni en
+   * IndexedDB, où `StoredCredentials` ne porte que le jeton et l'appareil, ni dans un
+   * log. `restoreSession` n'en a pas et n'en a pas besoin : au rechargement, l'appareil
+   * est déjà signé.
+   */
+  phraseDePasse?: string,
 ): Promise<Session> {
   const log = createLogger();
 
@@ -539,7 +554,18 @@ async function buildSession(
          */
         setupNewSecretStorage: true,
         createSecretStorageKey: async () => {
-          generated = await crypto.createRecoveryKeyFromPassphrase();
+          /*
+           * **D-15 — la clé est dérivée du mot de passe du compte**, et c'est ce qui rend
+           * une deuxième connexion possible sans rien redemander : au prochain login, le
+           * mot de passe qu'on vient de taper redonne la même clé (le descripteur porte
+           * le sel et le nombre d'itérations, spec Matrix « Secret storage »).
+           *
+           * Sans phrase de passe — `restoreSession`, ou un compte réinitialisé sans que
+           * le mot de passe soit en main — la clé reste aléatoire : c'est le comportement
+           * d'avant, et il n'ouvre aucune connexion silencieuse. La clé rendue est la
+           * même dans les deux cas, et c'est celle qu'on affiche.
+           */
+          generated = await crypto.createRecoveryKeyFromPassphrase(phraseDePasse);
           // Publiée aussitôt pour `getSecretStorageKey` : le SDK la redemande dans
           // la foulée, à l'intérieur de ce même `bootstrapSecretStorage`.
           recoveryKey = generated;
@@ -582,6 +608,8 @@ async function buildSession(
           }
         },
       });
+
+      await relireIdentite(crypto);
       return generated;
     },
 
@@ -607,10 +635,31 @@ async function buildSession(
       // Publiée pour `getSecretStorageKey` : tout ce qui suit relit le secret storage.
       recoveryKey = { privateKey, encodedPrivateKey: encodedKey };
 
+      /*
+       * **L'identité publique d'abord, la signature ensuite** (corrigé le 25/08/2026,
+       * mesuré contre un vrai Synapse).
+       *
+       * Sans ça, `bootstrapCrossSigning` importe les clés privées du secret storage,
+       * ne trouve **aucune identité publique** en magasin local et ne signe rien :
+       * « No public identity found while importing cross-signing keys, a /keys/query
+       * needs to be done » (matrix-sdk-crypto). L'appel *réussit*, l'appareil reste non
+       * signé, et la porte se rouvre juste derrière — un déverrouillage qui ne
+       * déverrouille pas, et qui ne le dit pas.
+       *
+       * Le second paramètre `true` est exactement ce `/keys/query` : il force le
+       * téléchargement pour l'utilisateur local au lieu d'attendre qu'un tour de `/sync`
+       * l'amène. C'est une course qui ne se voyait pas depuis un écran — quelqu'un qui
+       * tape sa clé met plus de temps que le premier sync — et qui devient systématique
+       * dès qu'un appel enchaîne (`connexionParCle`, D-14).
+       */
+      await crypto.userHasCrossSigningKeys(undefined, true);
+
       // Importe l'identité cross-signing depuis le secret storage **et signe cet
       // appareil** : c'est ce geste-là qui le sort du silence de D-08. Aucune UIA en jeu,
       // les clés d'identité existent déjà côté serveur — on ne fait que les redescendre.
       await crypto.bootstrapCrossSigning({});
+
+      await relireIdentite(crypto);
 
       await crypto.loadSessionBackupPrivateKeyFromSecretStorage();
       await crypto.checkKeyBackupAndEnable();
@@ -693,6 +742,24 @@ async function buildSession(
   };
 }
 
+/**
+ * **Relit l'identité de l'utilisateur au serveur, et c'est ce qui rend `recoveryState()`
+ * juste** (ajouté le 25/08/2026, mesuré contre un vrai Synapse).
+ *
+ * `bootstrapCrossSigning` dépose ou importe l'identité et signe l'appareil ; le magasin
+ * crypto local, lui, garde la vue qu'il avait avant. `getDeviceVerificationStatus` — la
+ * source de `recoveryState` — répond alors « non signé » sur un appareil qui vient de
+ * l'être, et la porte se referme derrière quelqu'un qui vient de tout faire correctement.
+ * C'est le défaut remonté le 25/08/2026 : « je me connecte et on me demande ma clé ».
+ *
+ * Le second paramètre `true` force le `/keys/query` au lieu d'attendre qu'un tour de
+ * `/sync` l'amène. Le booléen rendu ne nous intéresse pas — c'est l'effet de bord qui est
+ * demandé, et le nommer ici évite qu'on le prenne un jour pour un appel superflu.
+ */
+async function relireIdentite(crypto: CryptoApi): Promise<void> {
+  await crypto.userHasCrossSigningKeys(undefined, true);
+}
+
 export async function initSession(config: SessionConfig): Promise<Session> {
   /*
    * REQ-COR-08 — `loginWithPassword` est déprécié dans le SDK pour la même raison que
@@ -725,7 +792,60 @@ export async function initSession(config: SessionConfig): Promise<Session> {
 
   const saved = await openCredentials(config.indexedDB ?? globalThis.indexedDB);
   await saved.write(credentials);
-  return buildSession(credentials, config, saved);
+  const session = await buildSession(credentials, config, saved, config.motDePasse);
+
+  /*
+   * **D-15 — la deuxième connexion entre, elle ne bute pas sur un mur.**
+   *
+   * Chaque connexion donne un `device_id` neuf, donc un appareil non signé, donc — avant
+   * ce jour — l'écran « Entrez votre clé de récupération » à quelqu'un qui venait de
+   * donner son mot de passe. C'est le défaut remonté le 25/08/2026, et ce n'était pas un
+   * défaut d'écran : sans la clé, cet appareil ne peut réellement rien déchiffrer ni
+   * rien envoyer (D-08). Le mur était honnête, c'est sa nécessité qui ne l'était pas.
+   *
+   * La clé étant dérivée du mot de passe (D-15), le mot de passe qu'on vient d'utiliser
+   * la redonne. `unlockRecovery` fait le reste — exactement le même chemin que l'écran
+   * de saisie, pour ne pas tenir deux déverrouillages en phase.
+   */
+  await deverrouillerAvecMotDePasse(session, config.motDePasse);
+  return session;
+}
+
+/**
+ * D-15 — rejoue la dérivation de la clé de récupération à partir du mot de passe.
+ *
+ * Silencieux dans les deux sens : il ne demande rien, et **il ne fait échouer aucune
+ * connexion**. Trois cas normaux n'aboutissent pas, et aucun n'est une erreur — un compte
+ * qui n'a pas encore de clé (l'inscription va la créer), une clé aléatoire d'avant D-15,
+ * et un mot de passe changé depuis (D-12 ne re-dérive pas la clé). Dans les trois,
+ * l'écran de saisie reste le chemin, et il marche.
+ */
+async function deverrouillerAvecMotDePasse(session: Session, motDePasse: string): Promise<void> {
+  try {
+    const cle = await session.client.secretStorage.getKey();
+    if (!cle) return;
+
+    const [, description] = cle;
+    const phrase = description?.passphrase;
+    if (!phrase?.salt || !phrase.iterations) return;
+
+    const derivee = await deriveRecoveryKeyFromPassphrase(
+      motDePasse,
+      phrase.salt,
+      phrase.iterations,
+    );
+    // Ré-encodée pour repasser par `unlockRecovery` : il vérifie la clé contre le
+    // descripteur, signe l'appareil et rebranche la sauvegarde. Refaire ces trois gestes
+    // ici ferait un second chemin de déverrouillage à tenir en phase.
+    const encodee = encodeRecoveryKey(derivee);
+    // `encodeRecoveryKey` rend `undefined` si l'entrée n'a pas la bonne taille. Ça ne
+    // devrait pas arriver après une dérivation, et on ne devine pas : sans clé lisible,
+    // on laisse l'écran de saisie faire son travail.
+    if (!encodee) return;
+    await session.unlockRecovery(encodee);
+  } catch {
+    createLogger().warn("déverrouillage par mot de passe impossible, la clé sera demandée");
+  }
 }
 
 /**
@@ -980,7 +1100,9 @@ export async function creerCompte(config: SessionConfig): Promise<Session> {
   };
   const saved = await openCredentials(config.indexedDB ?? globalThis.indexedDB);
   await saved.write(credentials);
-  return buildSession(credentials, config, saved);
+  // D-15 — le mot de passe accompagne la session : c'est de lui que `setupRecoveryKey`
+  // dérivera la clé, à l'étape suivante du parcours d'accueil.
+  return buildSession(credentials, config, saved, config.motDePasse);
 }
 
 /**

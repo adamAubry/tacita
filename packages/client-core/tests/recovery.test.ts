@@ -424,3 +424,80 @@ describe("REQ-COR-14 — la clé de récupération ouvre une session (D-14)", ()
     );
   });
 });
+
+describe("D-15 — se connecter avec son mot de passe suffit, sur un appareil neuf", () => {
+  /*
+   * **Le défaut du 25/08/2026, remonté par l'utilisateur** : « je me connecte et j'ai un
+   * écran "entrez votre clé de récupération" ». Chaque connexion donne un `device_id`
+   * neuf, donc un appareil non signé, donc un mur — devant quelqu'un qui venait de donner
+   * le seul secret que le produit lui demande de retenir.
+   *
+   * La clé est désormais **dérivée du mot de passe** : le même mot de passe la redonne à
+   * chaque connexion. Ce que ces tests ne prouvent pas, et qui se joue dans
+   * `infra/smoke/onboarding.smoke.test.ts` contre un vrai Synapse : que l'appareil
+   * ressorte réellement signé (règle 4).
+   */
+  const descripteurAvecPhrase = () =>
+    client.secretStorage.getKey.mockResolvedValue([
+      "cleId",
+      {
+        algorithm: "m.secret_storage.v1.aes-hmac-sha2",
+        // 1 000 itérations et non les 500 000 du SDK : on éprouve le branchement, pas
+        // PBKDF2, et une suite qui coûte une seconde par test finit par ne plus être lancée.
+        passphrase: { algorithm: "m.pbkdf2", salt: "selDeTest", iterations: 1000 },
+      },
+    ]);
+
+  it("l'inscription dérive la clé du mot de passe, elle ne la tire pas au hasard", async () => {
+    const session = await creerCompte(config);
+    await session.setupRecoveryKey();
+
+    // Sans cet argument, la clé est aléatoire et aucune connexion suivante ne peut la
+    // retrouver : c'est toute la différence entre un mur et une porte.
+    expect(crypto.createRecoveryKeyFromPassphrase).toHaveBeenCalledWith(config.motDePasse);
+  });
+
+  it("la connexion déverrouille sans rien demander quand la clé vient du mot de passe", async () => {
+    descripteurAvecPhrase();
+
+    await initSession(config);
+
+    // `bootstrapCrossSigning` est le geste d'`unlockRecovery` qui signe l'appareil.
+    expect(crypto.bootstrapCrossSigning).toHaveBeenCalled();
+    expect(crypto.loadSessionBackupPrivateKeyFromSecretStorage).toHaveBeenCalled();
+  });
+
+  it("une clé aléatoire d'avant D-15 ne déclenche aucune tentative", async () => {
+    // Le descripteur par défaut du mock n'a pas de `passphrase` : rien à dériver, et
+    // essayer quand même enverrait une clé fausse à `checkKey` à chaque connexion.
+    await initSession(config);
+    expect(crypto.bootstrapCrossSigning).not.toHaveBeenCalled();
+  });
+
+  it("un déverrouillage impossible ne fait pas échouer la connexion", async () => {
+    /*
+     * Le cas normal, et il arrivera : un mot de passe changé depuis (D-12 ne re-dérive
+     * pas la clé). La connexion doit aboutir — l'écran de saisie de la clé existe et il
+     * marche. Échouer ici enfermerait dehors quelqu'un dont le mot de passe est juste.
+     */
+    descripteurAvecPhrase();
+    client.secretStorage.checkKey.mockResolvedValue(false);
+
+    await expect(initSession(config)).resolves.toBeTruthy();
+  });
+
+  it("l'identité est relue après signature, sinon la porte se referme derrière", async () => {
+    /*
+     * Mesuré contre un vrai Synapse le 25/08/2026 : `bootstrapCrossSigning` signe
+     * l'appareil, et `getDeviceVerificationStatus` — la source de `recoveryState` —
+     * continue de répondre « non signé » tant qu'aucun `/keys/query` n'a eu lieu. Le
+     * `true` force ce téléchargement ; sans lui, l'écran de clé revient juste après avoir
+     * été franchi, et c'est exactement ce que l'utilisateur a vu.
+     */
+    const session = await initSession(config);
+    crypto.userHasCrossSigningKeys.mockClear();
+    await session.unlockRecovery(CLE);
+
+    expect(crypto.userHasCrossSigningKeys).toHaveBeenCalledWith(undefined, true);
+  });
+});

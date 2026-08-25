@@ -78,7 +78,14 @@ export function MotDePasse({ session }: { session: Session }) {
         <Banner
           status="success"
           title="Mot de passe changé"
-          description="Vos autres appareils restent connectés."
+          /*
+           * D-15 — **le trou nommé, dit là où il se produit.** La clé de récupération est
+           * dérivée du mot de passe ; ce changement ne la re-dérive pas, donc la prochaine
+           * connexion sur un appareil neuf redemandera la clé une fois. Personne n'est
+           * enfermé dehors — la clé écrite quelque part ouvre toujours —, mais le taire
+           * ferait de « votre mot de passe suffit » une promesse à moitié tenue.
+           */
+          description="Vos autres appareils restent connectés. Gardez votre clé de récupération : après ce changement, une connexion sur un nouvel appareil vous la demandera une fois."
         />
         <Button label="Changer à nouveau" variant="ghost" onClick={() => setFait(false)} />
       </VStack>
