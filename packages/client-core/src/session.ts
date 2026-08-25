@@ -872,11 +872,11 @@ export async function creerCompte(config: SessionConfig): Promise<Session> {
   for (let tour = 0; "defi" in etat && tour < ETAPES_UIA_MAX; tour++) {
     const { defi, erreur } = etat;
     const suivant = prochainStage(defi);
-    if (!suivant) throw erreur;
+    if (!suivant) throw inscriptionImpossible(erreur);
     etat = await premiereReponse(() => demande({ type: suivant, session: defi.session }));
   }
 
-  if ("defi" in etat) throw etat.erreur;
+  if ("defi" in etat) throw inscriptionImpossible(etat.erreur);
   const inscription = etat;
 
   if (!inscription.access_token || !inscription.device_id) {
@@ -893,6 +893,27 @@ export async function creerCompte(config: SessionConfig): Promise<Session> {
   const saved = await openCredentials(config.indexedDB ?? globalThis.indexedDB);
   await saved.write(credentials);
   return buildSession(credentials, config, saved);
+}
+
+/**
+ * Règle 2 — **un défi qu'on ne sait pas franchir n'est pas une panne de réseau.**
+ *
+ * Trouvé en montant la pile le 25/08/2026, juste après D-13 : le serveur tournait encore
+ * sur la configuration d'avant, redemandait `m.login.registration_token`, et l'écran
+ * affichait « Le serveur n'a pas répondu. Réessayez. » — il avait répondu, très
+ * précisément, et réessayer ne pouvait rien donner. La cause : le 401 d'une UIA ne porte
+ * pas d'`errcode` (son corps est le dictionnaire de flows), donc il tombait dans le
+ * fourre-tout réseau de l'écran.
+ *
+ * L'`errcode` est ici parce que c'est la forme que l'écran sait déjà classer, et il est
+ * relu là-bas (`Connexion.tsx`) : une valeur posée à une jonction que personne ne relit
+ * est indétectable (règle 7).
+ */
+function inscriptionImpossible(cause: unknown): Error {
+  return Object.assign(
+    new Error("inscription : le serveur exige une étape que ce client ne sait pas franchir"),
+    { errcode: "TACITA_INSCRIPTION_IMPOSSIBLE", cause },
+  );
 }
 
 /** Garde-fou de boucle : au-delà, c'est un flow qu'on ne sait pas franchir. */

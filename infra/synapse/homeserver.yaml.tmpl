@@ -50,7 +50,15 @@ encryption_enabled_by_default_for_room_type: all
 # n'empêche la création de comptes en masse, et chaque compte créé peut énumérer
 # l'annuaire (REQ-INF-18). Écrit dans infra/LIMITES.md, tenu par un test qui refuse le
 # retour silencieux de la ligne.
+#
+# `enable_registration_without_verification` n'est pas un réglage de plus : **Synapse
+# refuse de démarrer sans lui** dès que l'inscription est ouverte sans e-mail, captcha ni
+# jeton (« Error in configuration: You have enabled open registration without any
+# verification », mesuré sur v1.155.0 le 25/08/2026). Le serveur exige que l'opérateur
+# écrive noir sur blanc qu'il accepte le risque ; c'est D-13, et cette ligne en est la
+# signature.
 enable_registration: true
+enable_registration_without_verification: true
 registration_shared_secret: "${SYNAPSE_REGISTRATION_SHARED_SECRET}"
 
 macaroon_secret_key: "${SYNAPSE_MACAROON_SECRET_KEY}"

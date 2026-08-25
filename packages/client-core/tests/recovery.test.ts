@@ -236,7 +236,9 @@ describe("REQ-COR-08 — l'inscription franchit les étapes de l'UIA, et rien d'
      * doit être immédiat et bruyant — pas une boucle, ni un compte à moitié créé.
      */
     client.registerRequest = serveurUia(["m.login.registration_token", "m.login.dummy"]);
-    await expect(creerCompte(config)).rejects.toThrow(/Unauthorized/);
+    await expect(creerCompte(config)).rejects.toMatchObject({
+      errcode: "TACITA_INSCRIPTION_IMPOSSIBLE",
+    });
   });
 
   it("un flow qu'on ne sait pas franchir échoue franchement", async () => {
@@ -248,7 +250,9 @@ describe("REQ-COR-08 — l'inscription franchit les étapes de l'UIA, et rien d'
         data: { session: "s", flows: [{ stages: ["m.login.email.identity"] }] },
       });
     });
-    await expect(creerCompte(config)).rejects.toThrow(/Unauthorized/);
+    await expect(creerCompte(config)).rejects.toMatchObject({
+      errcode: "TACITA_INSCRIPTION_IMPOSSIBLE",
+    });
   });
 });
 

@@ -34,7 +34,7 @@ type Echec = "identifiants" | "refus" | "pris" | "reseau";
 
 const MESSAGES: Record<Echec, string> = {
   identifiants: "Identifiant ou mot de passe incorrect.",
-  refus: "La création de compte est refusée par le serveur.",
+  refus: "La création de compte est refusée par ce serveur.",
   pris: "Cet identifiant est déjà pris.",
   reseau: "Le serveur n'a pas répondu. Réessayez.",
 };
@@ -49,6 +49,13 @@ const MESSAGES: Record<Echec, string> = {
 function classer(erreur: unknown, mode: Mode): Echec {
   const { errcode } = (erreur ?? {}) as { errcode?: string };
   if (errcode === "M_USER_IN_USE") return "pris";
+  /*
+   * Le serveur exige une étape d'inscription que le client ne sait pas franchir — un code
+   * d'invitation remis par exemple (le repli écrit dans D-13). Il a répondu, et vite :
+   * « le serveur n'a pas répondu » enverrait réessayer sans fin. Le message dit donc
+   * refus, parce que c'en est un, et parce que rien dans cet écran ne peut le lever.
+   */
+  if (errcode === "TACITA_INSCRIPTION_IMPOSSIBLE") return "refus";
   if (errcode === "M_FORBIDDEN") return mode === "creation" ? "refus" : "identifiants";
   if (errcode === "M_UNAUTHORIZED" || errcode === "M_INVALID_PARAM") return "identifiants";
   return "reseau";

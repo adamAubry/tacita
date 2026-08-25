@@ -36,6 +36,20 @@ describe("REQ-INF-04 — inscription ouverte, sans garde (D-13)", () => {
     expect(homeserver.registration_requires_token).toBeUndefined();
   });
 
+  it("le risque est signé explicitement, sinon Synapse refuse de démarrer", () => {
+    /*
+     * **Règle 4, prise en flagrant délit le 25/08/2026.** Les deux assertions ci-dessus
+     * étaient vertes et le homeserver bootait en boucle : « Error in configuration: You
+     * have enabled open registration without any verification » (v1.155.0). Ouvrir
+     * l'inscription sans e-mail, captcha ni jeton **exige** ce drapeau — Synapse veut que
+     * l'opérateur écrive qu'il accepte le risque plutôt que de le subir par défaut.
+     *
+     * Le test ne prouve toujours pas que le serveur démarre : il empêche seulement la
+     * ligne de repartir avec la prochaine passe sur ce fichier.
+     */
+    expect(homeserver.enable_registration_without_verification).toBe(true);
+  });
+
   it("un registration_shared_secret reste défini pour le script d'admin", () => {
     expect(homeserver.registration_shared_secret).toBeTruthy();
   });

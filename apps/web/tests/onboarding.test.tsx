@@ -67,10 +67,12 @@ const MOI = "@moi:tacita.test";
 
 const initSession = vi.fn<() => Promise<Session>>();
 const restoreSession = vi.fn<() => Promise<Session | null>>();
+const creerCompte = vi.fn<() => Promise<Session>>();
 vi.mock("@tacita/client-core", async (original) => ({
   ...(await original<typeof import("@tacita/client-core")>()),
   initSession: () => initSession(),
   restoreSession: () => restoreSession(),
+  creerCompte: () => creerCompte(),
 }));
 
 /**
@@ -137,6 +139,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   initSession.mockReset();
   restoreSession.mockReset();
+  creerCompte.mockReset();
   rediriger.mockReset();
   pousser.mockReset();
   listees.mockReturnValue([]);
@@ -768,5 +771,58 @@ describe("REQ-UI-23 — la première conversation, pour que l'application ne s'o
     expect(contactsDeLaSession(session).lister()).toEqual([
       { userId: "@mira:tacita.test", nom: "Mira" },
     ]);
+  });
+});
+
+describe("REQ-UI-04 — l'écran de connexion dit ce que le serveur a fait, pas autre chose", () => {
+  /*
+   * **Défaut vécu le 25/08/2026, juste après D-13.** Le serveur tournait encore sur sa
+   * configuration d'avant et redemandait un code d'invitation ; l'écran affichait « Le
+   * serveur n'a pas répondu. Réessayez. » Il avait répondu, et réessayer ne pouvait rien
+   * donner. La cause était à la jonction : le 401 d'une UIA n'a pas d'`errcode`, donc il
+   * tombait dans le fourre-tout réseau.
+   *
+   * Ce test est le site de lecture de l'`errcode` que `creerCompte` pose (règle 7) : sans
+   * lui, les deux moitiés du correctif peuvent se désaccorder en silence.
+   */
+  const remplirEtCreer = async () => {
+    monter(null);
+    await waitFor(() => expect(screen.getByText("Créer un compte")).toBeTruthy());
+    fireEvent.click(screen.getByText("Créer un compte"));
+
+    fireEvent.change(screen.getByLabelText("Identifiant"), { target: { value: "mira" } });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByText("Créer mon compte"));
+  };
+
+  it("aucun code d'invitation n'est demandé (D-13)", async () => {
+    monter(null);
+    await waitFor(() => expect(screen.getByText("Créer un compte")).toBeTruthy());
+    fireEvent.click(screen.getByText("Créer un compte"));
+
+    expect(screen.queryByLabelText("Code d'invitation")).toBeNull();
+  });
+
+  it("un serveur qui exige une étape infranchissable n'est pas un serveur muet", async () => {
+    creerCompte.mockRejectedValue(
+      Object.assign(new Error("inscription impossible"), {
+        errcode: "TACITA_INSCRIPTION_IMPOSSIBLE",
+      }),
+    );
+    await remplirEtCreer();
+
+    await waitFor(() =>
+      expect(screen.getByText("La création de compte est refusée par ce serveur.")).toBeTruthy(),
+    );
+    expect(screen.queryByText("Le serveur n'a pas répondu. Réessayez.")).toBeNull();
+  });
+
+  it("une vraie panne de réseau, elle, se dit comme telle", async () => {
+    creerCompte.mockRejectedValue(new Error("fetch failed"));
+    await remplirEtCreer();
+
+    await waitFor(() =>
+      expect(screen.getByText("Le serveur n'a pas répondu. Réessayez.")).toBeTruthy(),
+    );
   });
 });
