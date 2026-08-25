@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeRecoveryKey } from "matrix-js-sdk/lib/crypto-api";
 
 import { resetSdk, type ClientMock, type CryptoMock } from "./mocks";
-import { connexionParCle, creerCompte, initSession, type SessionConfig } from "../src";
+import {
+  connexionParCle,
+  creerCompte,
+  initSession,
+  restoreSession,
+  type SessionConfig,
+} from "../src";
 
 vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
 
@@ -73,12 +79,14 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
   });
 
   /*
-   * L'UIA du remplacement d'identité. Synapse v1.155.0 laisse passer le **premier** dépôt
-   * de clés de signature sans authentification (MSC3967) et exige une ré-authentification
-   * pour en remplacer une : le 401 n'arrive donc qu'ici, et il n'est pas une panne.
+   * L'UIA du remplacement d'identité. Relu dans le servlet de la v1.155.0 : un **premier**
+   * dépôt de clés de signature passe sans authentification, remplacer une identité
+   * existante en demande une. Le 401 n'arrive donc qu'ici, et il n'est pas une panne.
    *
-   * Le faux `envoyer` reproduit la forme exacte de la réponse de Synapse — un flow
-   * `m.login.sso` à une seule étape, sans mot de passe natif (REQ-INF-09).
+   * Le faux `envoyer` reproduit la forme exacte de la réponse mesurée contre le serveur
+   * le 25/08/2026 : un flow **`m.login.password`** à une seule étape. Il disait
+   * `m.login.sso` — hérité de Keycloak, supprimé le matin même par D-12 — et c'est ce
+   * décalage qui fermait le chemin « j'ai perdu ma clé » sans que rien ne le dise.
    */
   const envoyerQuiDemandeUneUia = (flows: { stages: string[] }[]) => {
     const appels: unknown[] = [];
@@ -95,27 +103,58 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
     };
   };
 
-  it("le remplacement d'identité passe par la ré-authentification que le serveur exige", async () => {
-    const { appels, envoyer } = envoyerQuiDemandeUneUia([{ stages: ["m.login.sso"] }]);
+  it("le remplacement d'identité franchit l'épreuve avec le mot de passe de la session", async () => {
+    const { appels, envoyer } = envoyerQuiDemandeUneUia([{ stages: ["m.login.password"] }]);
     crypto.bootstrapCrossSigning.mockImplementation(async (opts) => {
       await opts.authUploadDeviceSigningKeys?.(envoyer);
     });
 
-    const vues: string[] = [];
     const session = await initSession(config);
-    await session.setupRecoveryKey({
-      reinitialiser: true,
-      confirmerIdentite: async (url) => {
-        vues.push(url);
+    const demanderMotDePasse = vi.fn(async () => "jamais-demandé");
+    await session.setupRecoveryKey({ reinitialiser: true, demanderMotDePasse });
+
+    // Premier essai sans auth — le chemin de l'inscription —, puis rejeu avec le mot de
+    // passe de *cette* session UIA.
+    expect(appels).toEqual([
+      null,
+      {
+        type: "m.login.password",
+        identifier: { type: "m.id.user", user: "@luca:tacita.test" },
+        password: config.motDePasse,
+        session: "sessionUia",
       },
+    ]);
+    // **Et l'écran n'a pas été montré** : redemander à quelqu'un le mot de passe qu'il
+    // vient de taper est un geste que rien ne justifie (D-15).
+    expect(demanderMotDePasse).not.toHaveBeenCalled();
+  });
+
+  it("après un rechargement, il demande le mot de passe — personne ne l'a plus", async () => {
+    /*
+     * `restoreSession` rouvre une session depuis le disque : le mot de passe n'y est pas,
+     * et il n'a aucune raison d'y être. C'est le seul cas où l'écran de confirmation
+     * s'affiche, et sans lui la réinitialisation serait impossible après un F5.
+     */
+    const { appels, envoyer } = envoyerQuiDemandeUneUia([{ stages: ["m.login.password"] }]);
+    crypto.bootstrapCrossSigning.mockImplementation(async (opts) => {
+      await opts.authUploadDeviceSigningKeys?.(envoyer);
     });
 
-    // L'utilisateur a été envoyé sur la page de repli du serveur, pour *cette* session.
-    expect(vues).toEqual([
-      "https://tacita.test/_matrix/client/v3/auth/m.login.sso/fallback/web?session=sessionUia",
-    ]);
-    // Premier essai sans auth (le chemin de l'inscription), puis rejeu avec la session.
-    expect(appels).toEqual([null, { session: "sessionUia" }]);
+    await initSession(config);
+    ({ crypto, client } = resetSdk());
+    crypto.bootstrapCrossSigning.mockImplementation(async (opts) => {
+      await opts.authUploadDeviceSigningKeys?.(envoyer);
+    });
+    const rouverte = await restoreSession({
+      homeserverUrl: config.homeserverUrl,
+      indexedDB: config.indexedDB,
+    });
+
+    const demanderMotDePasse = vi.fn(async () => "tapé-à-l-écran");
+    await rouverte!.setupRecoveryKey({ reinitialiser: true, demanderMotDePasse });
+
+    expect(demanderMotDePasse).toHaveBeenCalledOnce();
+    expect(appels.at(-1)).toMatchObject({ password: "tapé-à-l-écran" });
   });
 
   /*
@@ -128,23 +167,24 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
    * L'inscription prend donc le 401 comme la réinitialisation, et le rappel d'UIA est
    * son chemin normal, pas son chemin d'exception. Escalade E-22.
    */
-  it("l'inscription passe elle aussi par la ré-authentification : MSC3967 n'est pas activé", async () => {
-    const { appels, envoyer } = envoyerQuiDemandeUneUia([{ stages: ["m.login.sso"] }]);
+  it("l'inscription franchit l'épreuve aussi, si le serveur en pose une", async () => {
+    /*
+     * Le premier dépôt d'identité passe sans épreuve sur la version déployée — mesuré le
+     * 25/08/2026 — mais la fonction ne le suppose pas : elle tente sans, et franchit ce
+     * que le serveur oppose. Deviner lequel des deux cas on vit coûterait une requête de
+     * plus pour une réponse que le serveur donne de toute façon.
+     */
+    const { appels, envoyer } = envoyerQuiDemandeUneUia([{ stages: ["m.login.password"] }]);
     crypto.bootstrapCrossSigning.mockImplementation(async (opts) => {
       await opts.authUploadDeviceSigningKeys?.(envoyer);
     });
 
-    const vues: string[] = [];
     const session = await initSession(config);
-    const cle = await session.setupRecoveryKey({
-      confirmerIdentite: async (url) => {
-        vues.push(url);
-      },
-    });
+    const cle = await session.setupRecoveryKey();
 
-    expect(vues).toHaveLength(1);
-    expect(appels).toEqual([null, { session: "sessionUia" }]);
-    // Et la clé est bel et bien rendue : l'UIA franchie, l'inscription aboutit.
+    expect(appels).toHaveLength(2);
+    expect(appels.at(-1)).toMatchObject({ type: "m.login.password" });
+    // Et la clé est bel et bien rendue : l'épreuve franchie, l'inscription aboutit.
     expect(cle.encodedPrivateKey).toBe("EsTb ABCD EFGH");
   });
 
@@ -173,20 +213,22 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
     expect(cle.encodedPrivateKey).toBe("EsTb ABCD EFGH");
   });
 
-  it("un défi que le SSO seul n'achève pas remonte, plutôt que d'ouvrir une page inutile", async () => {
-    // Deux étapes : rejouer la session après le seul SSO ne terminerait pas l'UIA.
-    // Faire comme si serait exactement ce que l'interdit n°13 refuse.
-    const { envoyer } = envoyerQuiDemandeUneUia([{ stages: ["m.login.sso", "m.login.terms"] }]);
+  it("un défi que le mot de passe seul n'achève pas remonte, plutôt que de le demander pour rien", async () => {
+    // Deux étapes : rejouer la session après le seul mot de passe ne terminerait pas
+    // l'UIA. Faire comme si serait exactement ce que l'interdit n°13 refuse.
+    const { envoyer } = envoyerQuiDemandeUneUia([
+      { stages: ["m.login.password", "m.login.terms"] },
+    ]);
     crypto.bootstrapCrossSigning.mockImplementation(async (opts) => {
       await opts.authUploadDeviceSigningKeys?.(envoyer);
     });
 
     const session = await initSession(config);
-    const confirmerIdentite = vi.fn(async (_url: string) => {});
+    const demanderMotDePasse = vi.fn(async () => "jamais-demandé");
     await expect(
-      session.setupRecoveryKey({ reinitialiser: true, confirmerIdentite }),
+      session.setupRecoveryKey({ reinitialiser: true, demanderMotDePasse }),
     ).rejects.toThrow(/Unauthorized/);
-    expect(confirmerIdentite).not.toHaveBeenCalled();
+    expect(demanderMotDePasse).not.toHaveBeenCalled();
   });
 });
 
@@ -499,5 +541,103 @@ describe("D-15 — se connecter avec son mot de passe suffit, sur un appareil ne
     await session.unlockRecovery(CLE);
 
     expect(crypto.userHasCrossSigningKeys).toHaveBeenCalledWith(undefined, true);
+  });
+});
+
+describe("REQ-COR-15 — voir ses appareils, et pouvoir les déconnecter", () => {
+  /*
+   * L'audit du 25/08/2026 : les jetons de ce déploiement n'expirent pas, le changement de
+   * mot de passe ne déconnecte personne (D-12), et la clé ouvre une session à elle seule
+   * (D-14). Sans ces deux membres, une fuite de jeton n'avait **aucune** réponse.
+   */
+  const uiaPuisSucces = () => {
+    let demande = false;
+    client.deleteMultipleDevices.mockImplementation(async (_ids, auth) => {
+      if (!demande) {
+        demande = true;
+        throw Object.assign(new Error("Unauthorized"), {
+          httpStatus: 401,
+          data: { session: "sessionUia", flows: [{ stages: ["m.login.password"] }] },
+        });
+      }
+      return { auth } as never;
+    });
+  };
+
+  it("la liste distingue l'appareil d'où l'on regarde", async () => {
+    const session = await initSession(config);
+    const appareils = await session.appareils();
+
+    // Sans ce drapeau, l'écran offrirait de se déconnecter soi-même par le même bouton
+    // que les autres — et le geste ne veut pas dire la même chose.
+    expect(appareils).toEqual([
+      {
+        id: "DEVICE1",
+        nom: "Ce téléphone",
+        derniereActivite: 1_700_000_000_000,
+        courant: true,
+      },
+      { id: "AUTRE", nom: "Portable", derniereActivite: undefined, courant: false },
+    ]);
+  });
+
+  it("la révocation franchit l'épreuve avec le mot de passe de la session", async () => {
+    uiaPuisSucces();
+    const session = await initSession(config);
+
+    await session.revoquerAppareils(["AUTRE"]);
+
+    // Tentée sans auth d'abord : envoyer le mot de passe d'emblée l'exposerait sur un
+    // chemin qui ne le demande pas forcément.
+    expect(client.deleteMultipleDevices.mock.calls[0]).toEqual([["AUTRE"]]);
+    expect(client.deleteMultipleDevices.mock.calls[1]).toEqual([
+      ["AUTRE"],
+      {
+        type: "m.login.password",
+        identifier: { type: "m.id.user", user: "@luca:tacita.test" },
+        password: config.motDePasse,
+        session: "sessionUia",
+      },
+    ]);
+  });
+
+  it("après un rechargement, c'est celui que l'écran a demandé qui sert", async () => {
+    await initSession(config);
+    // Rechargement de page : objets SDK neufs sur le même disque. C'est ce qui fait
+    // qu'aucun mot de passe ne survit — et donc que l'écran doit le demander.
+    ({ crypto, client } = resetSdk());
+    uiaPuisSucces();
+    const rouverte = await restoreSession({
+      homeserverUrl: config.homeserverUrl,
+      indexedDB: config.indexedDB,
+    });
+
+    await rouverte!.revoquerAppareils(["AUTRE"], "tapé-à-l-écran");
+
+    expect(client.deleteMultipleDevices.mock.calls.at(-1)?.[1]).toMatchObject({
+      password: "tapé-à-l-écran",
+    });
+  });
+
+  it("sans mot de passe à opposer, l'échec remonte — il ne se tait pas", async () => {
+    /*
+     * Interdit n°13 : une révocation qu'on croit faite et qui ne l'est pas est pire que
+     * pas de bouton du tout. L'écran doit pouvoir dire que rien n'a été déconnecté.
+     */
+    await initSession(config);
+    ({ crypto, client } = resetSdk());
+    uiaPuisSucces();
+    const rouverte = await restoreSession({
+      homeserverUrl: config.homeserverUrl,
+      indexedDB: config.indexedDB,
+    });
+
+    await expect(rouverte!.revoquerAppareils(["AUTRE"])).rejects.toThrow(/Unauthorized/);
+  });
+
+  it("une liste vide n'appelle rien", async () => {
+    const session = await initSession(config);
+    await session.revoquerAppareils([]);
+    expect(client.deleteMultipleDevices).not.toHaveBeenCalled();
   });
 });

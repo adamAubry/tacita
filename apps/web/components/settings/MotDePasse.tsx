@@ -1,6 +1,10 @@
 "use client";
 
-import { changerMotDePasse, type Session } from "@tacita/client-core";
+import {
+  changerMotDePasse,
+  LONGUEUR_MINIMALE_MOT_DE_PASSE,
+  type Session,
+} from "@tacita/client-core";
 import { useState } from "react";
 
 import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitives";
@@ -26,13 +30,17 @@ type Echec = "cle" | "court" | "differents" | "reseau";
 
 const MESSAGES: Record<Echec, string> = {
   cle: "Cette clé ne correspond pas à ce compte. Vérifiez la recopie.",
-  court: "Choisissez un mot de passe d'au moins 8 caractères.",
+  court: `Choisissez un mot de passe d'au moins ${LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères.`,
   differents: "Les deux mots de passe ne sont pas identiques.",
   reseau: "Le serveur n'a pas répondu. Réessayez.",
 };
 
-/** La même longueur minimale que le module Synapse. Un garde d'écran n'en est pas un. */
-const LONGUEUR_MINIMALE = 8;
+/**
+ * La même longueur minimale que le module Synapse et que l'écran de création — le nombre
+ * vient du paquet, il ne se recopie pas. Un garde d'écran n'en est pas un : celui qui
+ * compte est `password_config.policy`, côté serveur.
+ */
+const LONGUEUR_MINIMALE = LONGUEUR_MINIMALE_MOT_DE_PASSE;
 
 export function MotDePasse({ session }: { session: Session }) {
   const [cle, setCle] = useState("");

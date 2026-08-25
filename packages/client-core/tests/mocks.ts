@@ -178,6 +178,22 @@ function makeClient(crypto: CryptoMock) {
       ),
     },
     getAccessToken: vi.fn((): string | null => "syt_access"),
+    /**
+     * REQ-COR-15 — les appareils du compte. Deux par défaut, dont celui de la session :
+     * un compte à un seul appareil ne dirait rien de la distinction « le mien / les
+     * autres », qui est tout ce que l'écran a à trancher.
+     */
+    getDevices: vi.fn(async () => ({
+      devices: [
+        { device_id: "DEVICE1", display_name: "Ce téléphone", last_seen_ts: 1_700_000_000_000 },
+        { device_id: "AUTRE", display_name: "Portable", last_seen_ts: undefined },
+      ] as { device_id: string; display_name?: string; last_seen_ts?: number }[],
+    })),
+    /**
+     * REQ-COR-15 — la révocation. Elle exige une UIA côté serveur ; par défaut le mock
+     * accepte, et les tests qui veulent le 401 le posent eux-mêmes (règle 3).
+     */
+    deleteMultipleDevices: vi.fn(async (_ids: string[], _auth?: unknown) => ({})),
     getRoom: vi.fn((_roomId: string): unknown => null),
     /**
      * REQ-COR-13 — la pagination arrière du SDK. Elle rend le salon, et c'est

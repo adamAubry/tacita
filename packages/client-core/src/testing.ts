@@ -38,6 +38,8 @@ export function asSession(mock: { client: unknown } & Partial<Omit<Session, "cli
     recoveryState: absent("recoveryState"),
     setupRecoveryKey: absent("setupRecoveryKey"),
     unlockRecovery: absent("unlockRecovery"),
+    appareils: absent("appareils"),
+    revoquerAppareils: absent("revoquerAppareils"),
     identityResetOf: absent("identityResetOf"),
     confirmIdentityOf: absent("confirmIdentityOf"),
     registerWipe: absent("registerWipe"),

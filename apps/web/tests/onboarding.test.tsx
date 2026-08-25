@@ -87,7 +87,7 @@ function fausseSession(options: { recuperation?: RecoveryState } = {}) {
   const setupRecoveryKey = vi.fn(
     async (_options?: {
       reinitialiser?: boolean;
-      confirmerIdentite?: (url: string) => Promise<void>;
+      demanderMotDePasse?: () => Promise<string>;
     }) => ({
       encodedPrivateKey: "EsTb ABCD EFGH IJKL",
       privateKey: new Uint8Array(32),
@@ -480,7 +480,20 @@ describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé,
    * en pleine figure et affichait « vérifiez votre connexion » — alors que la connexion
    * n'y était pour rien et que la sauvegarde venait d'être remplacée.
    */
-  const URL_SSO = `${HOMESERVER}/_matrix/client/v3/auth/m.login.sso/fallback/web?session=s1`;
+  /**
+   * Le rappel de ré-authentification, tel que `setupRecoveryKey` l'appelle quand le
+   * serveur redemande le mot de passe — c'est-à-dire après un rechargement de page, la
+   * session n'ayant alors plus le mot de passe en mémoire (D-15).
+   */
+  const exigeLeMotDePasse = (
+    setupRecoveryKey: ReturnType<typeof fausseSession>["setupRecoveryKey"],
+    recu: string[],
+  ) =>
+    setupRecoveryKey.mockImplementation(async (options) => {
+      const motDePasse = await options?.demanderMotDePasse?.();
+      if (motDePasse) recu.push(motDePasse);
+      return { encodedPrivateKey: "EsTb ABCD EFGH IJKL", privateKey: new Uint8Array(32) };
+    });
 
   const jusquAuRemplacement = async (setupRecoveryKey: ReturnType<typeof fausseSession>["setupRecoveryKey"]) => {
     await waitFor(() => expect(screen.getByText("Je n'ai plus ma clé")).toBeTruthy());
@@ -490,42 +503,35 @@ describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé,
     await waitFor(() => expect(setupRecoveryKey).toHaveBeenCalled());
   };
 
-  it("quand le compte exige une reconnexion, elle est demandée — et n'aboutit que sur le bon émetteur", async () => {
+  it("quand le compte exige une reconnexion, le mot de passe est demandé sur place", async () => {
+    /*
+     * **L'écran servait une page de repli SSO jusqu'au 25/08/2026**, et le SSO a été
+     * supprimé le matin même (D-12) : le chemin « j'ai perdu ma clé » échouait donc sur
+     * un 401 brut. Le serveur demande maintenant un mot de passe, et il se saisit ici —
+     * plus de fenêtre à ouvrir, donc plus de pop-up à faire bloquer.
+     */
     const { session, setupRecoveryKey } = fausseSession({ recuperation: "deverrouillage" });
-    setupRecoveryKey.mockImplementation(async (options) => {
-      await options?.confirmerIdentite?.(URL_SSO);
-      return { encodedPrivateKey: "EsTb ABCD EFGH IJKL", privateKey: new Uint8Array(32) };
-    });
-    const ouvrir = vi.spyOn(window, "open").mockReturnValue({} as Window);
+    const recu: string[] = [];
+    exigeLeMotDePasse(setupRecoveryKey, recu);
 
     monter(session);
     await jusquAuRemplacement(setupRecoveryKey);
 
     await waitFor(() => expect(screen.getByText("Confirmez que c'est bien vous")).toBeTruthy());
-    fireEvent.click(screen.getByText("Confirmer avec mon compte"));
-    // Sans `noopener` : la page de repli a besoin de `window.opener` pour annoncer la fin,
-    // et un `target="_blank"` le lui retirerait d'office.
-    expect(ouvrir).toHaveBeenCalledWith(URL_SSO, "_blank");
+    fireEvent.change(screen.getByLabelText("Mot de passe"), {
+      target: { value: "mon-mot-de-passe" },
+    });
+    fireEvent.click(screen.getByText("Confirmer"));
 
-    // Une fenêtre étrangère qui crie « c'est bon » ne franchit rien : `postMessage` accepte
-    // n'importe quel émetteur, l'origine est donc vérifiée avant tout.
-    window.dispatchEvent(
-      new MessageEvent("message", { data: "authDone", origin: "https://ailleurs.test" }),
-    );
-    expect(screen.getByText("Confirmez que c'est bien vous")).toBeTruthy();
-
-    window.dispatchEvent(new MessageEvent("message", { data: "authDone", origin: HOMESERVER }));
     await waitFor(() => expect(screen.getByText("Notez cette clé maintenant")).toBeTruthy());
+    expect(recu).toEqual(["mon-mot-de-passe"]);
   });
 
   it("annuler la reconnexion le dit sans mentir sur ce qui reste à faire", async () => {
     // À cet instant la sauvegarde a déjà été remplacée côté serveur, mais pas l'identité :
     // « réessayez plus tard » laisserait croire à une session utilisable (interdit n°13).
     const { session, setupRecoveryKey } = fausseSession({ recuperation: "deverrouillage" });
-    setupRecoveryKey.mockImplementation(async (options) => {
-      await options?.confirmerIdentite?.(URL_SSO);
-      return { encodedPrivateKey: "EsTb ABCD EFGH IJKL", privateKey: new Uint8Array(32) };
-    });
+    exigeLeMotDePasse(setupRecoveryKey, []);
 
     monter(session);
     await jusquAuRemplacement(setupRecoveryKey);
@@ -795,9 +801,39 @@ describe("REQ-UI-04 — l'écran de connexion dit ce que le serveur a fait, pas 
     fireEvent.click(screen.getByText("Créer un compte"));
 
     fireEvent.change(screen.getByLabelText("Identifiant"), { target: { value: "mira" } });
-    fireEvent.change(screen.getByLabelText("Mot de passe"), { target: { value: "secret" } });
+    // Douze caractères au moins : le plancher de REQ-INF-20 vaut aussi pour les tests,
+    // sinon ils prouvent le refus du garde et rien du chemin qu'ils visent.
+    fireEvent.change(screen.getByLabelText("Mot de passe"), {
+      target: { value: "un-mot-de-passe-assez-long" },
+    });
     fireEvent.click(screen.getByText("Créer mon compte"));
   };
+
+  it("REQ-INF-20 — un mot de passe trop court est refusé avant d'être envoyé", async () => {
+    /*
+     * **Mesuré le 25/08/2026 : un compte s'était créé avec le mot de passe « a ».** Le
+     * plancher existait dans le module de changement et dans son écran — c'est-à-dire
+     * partout sauf là où le compte naît. Depuis D-15, ce mot de passe *est* la clé qui
+     * déchiffre l'historique.
+     *
+     * Le garde opposable est celui de Synapse ; celui-ci rend la faute immédiate et
+     * évite d'envoyer un mot de passe pour se faire refuser.
+     */
+    monter(null);
+    await waitFor(() => expect(screen.getByText("Créer un compte")).toBeTruthy());
+    fireEvent.click(screen.getByText("Créer un compte"));
+
+    fireEvent.change(screen.getByLabelText("Identifiant"), { target: { value: "mira" } });
+    fireEvent.change(screen.getByLabelText("Mot de passe"), { target: { value: "court" } });
+    fireEvent.click(screen.getByText("Créer mon compte"));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Choisissez un mot de passe d'au moins 12 caractères."),
+      ).toBeTruthy(),
+    );
+    expect(creerCompte).not.toHaveBeenCalled();
+  });
 
   it("aucun code d'invitation n'est demandé (D-13)", async () => {
     monter(null);

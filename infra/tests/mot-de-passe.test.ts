@@ -158,3 +158,40 @@ describe("D-14 — la clé de récupération ouvre une session quand le mot de p
     expect(clientCore).toContain('type: "m.login.token"');
   });
 });
+
+describe("REQ-INF-20 — le plancher de mot de passe est dit au même nombre partout", () => {
+  /*
+   * **Mesuré le 25/08/2026 : un compte s'est créé avec le mot de passe « a ».** Le
+   * plancher existait à deux endroits — le module et l'écran de changement — et à aucun
+   * des deux qui compte : rien ne gardait la création. Depuis D-15, ce mot de passe est
+   * la clé qui déchiffre l'historique.
+   *
+   * Trois fichiers portent le nombre, dans trois langages, et rien ne les compile
+   * ensemble. C'est la règle 7 : ce test est le seul endroit où ils se rencontrent. Deux
+   * nombres différents ne casseraient rien — l'écran refuserait ce que le serveur accepte,
+   * ou pire, promettrait ce qu'il refuse.
+   */
+  const PLANCHER = 12;
+
+  it("Synapse l'impose, et c'est le seul garde opposable", () => {
+    // Sans `policy.enabled`, la politique de Synapse est éteinte et `minimum_length` ne
+    // vaut rien : les deux lignes ne se séparent pas.
+    expect(homeserver.password_config.policy.enabled).toBe(true);
+    expect(homeserver.password_config.policy.minimum_length).toBe(PLANCHER);
+  });
+
+  it("le module de changement dit le même nombre", () => {
+    expect(module).toMatch(new RegExp(`LONGUEUR_MINIMALE = ${PLANCHER}\\b`));
+  });
+
+  it("le shard aussi, et il ne le recopie pas — il le lit du paquet", () => {
+    /*
+     * Le nombre du shard vient de `client-core`, pas d'une constante d'écran : deux écrans
+     * en parlent (création et changement) et une troisième copie était l'occasion de la
+     * divergence suivante.
+     */
+    expect(clientCore).toMatch(
+      new RegExp(`LONGUEUR_MINIMALE_MOT_DE_PASSE = ${PLANCHER}\\b`),
+    );
+  });
+});

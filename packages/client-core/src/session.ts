@@ -68,55 +68,101 @@ interface StoredCredentials {
 export type RecoveryState = "prete" | "creation" | "deverrouillage";
 
 /** Les deux cas de `setupRecoveryKey`. Voir le membre de `Session` pour le contrat. */
+/**
+ * REQ-COR-15 — un appareil connecté au compte, tel que l'écran de réglages le montre.
+ *
+ * `derniereActivite` est en millisecondes, et **peut manquer** : Synapse ne la connaît
+ * que si l'appareil a parlé depuis qu'il la retient. L'écran doit donc savoir ne rien
+ * afficher plutôt qu'inventer une date — un « jamais vu » lu comme « inactif » ferait
+ * révoquer le mauvais appareil.
+ */
+export interface Appareil {
+  id: string;
+  nom?: string;
+  derniereActivite?: number;
+  /** Celui d'où l'on regarde. Il ne se révoque pas ici : c'est la déconnexion. */
+  courant: boolean;
+}
+
 export interface SetupRecoveryOptions {
   reinitialiser?: boolean;
   /**
-   * REQ-COR-06 — **le passage obligé de tout dépôt d'identité cross-signing**, celui de
-   * l'inscription compris.
+   * REQ-COR-06 — **le mot de passe, quand le serveur le redemande pour remplacer une
+   * identité** (réécrit le 25/08/2026).
    *
-   * Ce commentaire disait le contraire jusqu'au 25/08/2026 : « Synapse laisse déposer une
-   * identité sans authentification la *première* fois (MSC3967) ». C'est vrai de Synapse
-   * **quand MSC3967 est activé**, et il ne l'est pas — ni par défaut en v1.155.0, ni dans
-   * `infra/synapse/homeserver.yaml.tmpl`, qui ne porte aucun bloc `experimental_features`.
-   * L'UIA tombe donc aussi à l'inscription. Deux specs correctes séparément, le trou entre
-   * elles : escalade **E-22**, c'est au PM de dire s'il faut activer le MSC.
+   * Deux choses ont changé le même jour, et il faut les tenir séparées. **Le premier
+   * dépôt d'identité ne demande plus rien** : relu dans le servlet de la v1.155.0, une
+   * mise en place initiale passe sans UIA — E-22 est éteinte, l'inscription ne rencontre
+   * aucune épreuve. **Le remplacement, lui, en demande une**, et c'est désormais
+   * `m.login.password` puisque Keycloak est parti (D-12).
    *
-   * Sans mot de passe natif (REQ-INF-09), le seul flow proposé est `m.login.sso` : il n'a
-   * pas de réponse à calculer, il se termine dans le navigateur, chez Keycloak.
+   * Ce rappel n'est appelé que dans ce second cas, et **seulement si le module n'a pas
+   * déjà le mot de passe** : une session ouverte par identifiant et mot de passe le porte
+   * en mémoire (D-15), et redemander ce qu'on vient de recevoir serait un geste de plus
+   * pour rien. Il ne sert donc qu'après un rechargement de page, où la session est
+   * restaurée depuis le disque et où plus personne ne connaît le mot de passe.
    *
-   * Le module rend donc l'URL et attend ; ouvrir une fenêtre est un geste d'UI, et il
-   * doit partir d'un clic sous peine d'être bloqué comme pop-up. La promesse résolue
-   * signifie « l'utilisateur a confirmé » ; rejetée, l'opération s'arrête là.
-   *
-   * Absent, un 401 remonte tel quel à l'appelant — c'était le défaut du 09/08/2026 :
-   * `bootstrapCrossSigning` partait sans rappel, prenait le 401, et l'écran de
-   * réinitialisation échouait après avoir déjà remplacé le secret storage.
+   * Absent quand il est nécessaire, un 401 remonte tel quel à l'appelant.
    */
-  confirmerIdentite?: (url: string) => Promise<void>;
+  demanderMotDePasse?: () => Promise<string>;
 }
 
 /**
- * Le défi UIA `m.login.sso` d'une erreur, s'il y en a un — l'identifiant de session à
- * rejouer une fois l'utilisateur revenu.
+ * Le défi UIA `m.login.password` d'une erreur, s'il y en a un — l'identifiant de session
+ * à rejouer avec le mot de passe.
+ *
+ * **Réécrit le 25/08/2026.** Cette fonction cherchait `m.login.sso`, et c'était juste tant
+ * que Keycloak portait l'identité. D-12 l'a supprimé le matin même ; Synapse propose
+ * désormais `m.login.password`, que ce client ne reconnaissait pas. Conséquence mesurée :
+ * la réinitialisation de clé — le seul recours d'une clé perdue — remontait un 401 brut
+ * sans même appeler l'écran de confirmation. Une porte de secours fermée en silence.
  *
  * Lu en canard plutôt que par `instanceof MatrixError` : la suite mocke `matrix-js-sdk`
  * (spec 04) et n'exporte que ce que le module utilise vraiment. On ne fait ici que lire
  * la forme documentée de la réponse 401.
  *
  * Un flow à plusieurs étapes est ignoré volontairement : rejouer la session après le seul
- * SSO ne l'achèverait pas, et faire comme si serait une garantie qu'on n'offre pas.
+ * mot de passe ne l'achèverait pas, et faire comme si serait une garantie qu'on n'offre pas.
  */
-function defiSso(erreur: unknown): string | undefined {
+function defiMotDePasse(erreur: unknown): string | undefined {
   const { httpStatus, data } = (erreur ?? {}) as {
     httpStatus?: number;
     data?: { session?: string; flows?: { stages?: string[] }[] };
   };
   if (httpStatus !== 401) return undefined;
-  const sso = data?.flows?.some(
-    (flow) => flow.stages?.length === 1 && flow.stages[0] === "m.login.sso",
+  const parMotDePasse = data?.flows?.some(
+    (flow) => flow.stages?.length === 1 && flow.stages[0] === "m.login.password",
   );
-  return sso ? data?.session : undefined;
+  return parMotDePasse ? data?.session : undefined;
 }
+
+/**
+ * Le dictionnaire d'authentification que Synapse attend pour franchir un stage
+ * `m.login.password`. Écrit une fois : trois appels le rejouent (dépôt d'identité,
+ * révocation d'appareil, et ce qui viendra), et trois copies dériveraient.
+ */
+function authMotDePasse(userId: string, motDePasse: string, session: string) {
+  return {
+    type: "m.login.password",
+    identifier: { type: "m.id.user", user: userId },
+    password: motDePasse,
+    session,
+  };
+}
+
+/**
+ * **Le plancher de longueur du mot de passe, écrit une seule fois pour tout le dépôt.**
+ *
+ * Il vivait à deux endroits qui ne se lisaient pas — le module Synapse et l'écran de
+ * changement — et à aucun des deux qui compte : la création de compte n'en avait aucun.
+ * Mesuré le 25/08/2026, un compte s'est créé avec le mot de passe « a ». Depuis D-15, ce
+ * mot de passe **est** la clé qui déchiffre tout l'historique.
+ *
+ * Le garde opposable est celui de Synapse (`password_config.policy`) ; cette constante-ci
+ * rend la faute immédiate à l'écran, et un test d'infra vérifie que les deux disent le
+ * même nombre — sans quoi l'un des deux mentirait à l'utilisateur.
+ */
+export const LONGUEUR_MINIMALE_MOT_DE_PASSE = 12;
 
 export interface OrderedTimeline {
   /**
@@ -190,6 +236,28 @@ export interface Session {
    * silence débloquerait l'UI devant un client qui ne déchiffrera rien (interdit n°13).
    */
   unlockRecovery(encodedKey: string): Promise<void>;
+  /**
+   * REQ-COR-15 — **les appareils connectés au compte**, celui d'où l'on regarde compris.
+   *
+   * Sans cette liste, une fuite de jeton n'a aucune réponse : les jetons de ce
+   * déploiement n'expirent pas, et le changement de mot de passe ne déconnecte
+   * volontairement personne (D-12, pour ne pas faire perdre leur historique aux autres
+   * appareils). Voir sans pouvoir agir ne servirait à rien non plus — d'où
+   * {@link Session.revoquerAppareils}, qui vient avec.
+   */
+  appareils(): Promise<Appareil[]>;
+  /**
+   * REQ-COR-15 — **révoque des appareils**, donc leurs jetons d'accès.
+   *
+   * Le serveur exige une ré-authentification, et c'est heureux : c'est le geste qu'un
+   * intrus retournerait contre le titulaire. Le mot de passe de la session courante est
+   * utilisé s'il est connu (D-15) ; sinon l'appelant le fournit — après un rechargement
+   * de page, plus personne ne l'a.
+   *
+   * Lève si le serveur refuse : une révocation qu'on croit faite et qui ne l'est pas est
+   * pire que pas de bouton du tout (interdit n°13).
+   */
+  revoquerAppareils(ids: string[], motDePasse?: string): Promise<void>;
   /**
    * REQ-COR-07 / D-08 — `true` quand cet utilisateur a **changé d'identité** depuis
    * qu'on l'a vue pour la première fois. Ses anciennes signatures ne valent alors plus
@@ -518,7 +586,7 @@ async function buildSession(
       }
     },
 
-    async setupRecoveryKey({ reinitialiser = false, confirmerIdentite }: SetupRecoveryOptions = {}) {
+    async setupRecoveryKey({ reinitialiser = false, demanderMotDePasse }: SetupRecoveryOptions = {}) {
       const crypto = requireCrypto(client);
       let generated: RecoveryKey | undefined;
 
@@ -599,12 +667,21 @@ async function buildSession(
           try {
             return await envoyer(null);
           } catch (erreur) {
-            const sessionUia = defiSso(erreur);
-            if (sessionUia === undefined || !confirmerIdentite) throw erreur;
-            await confirmerIdentite(client.getFallbackAuthUrl("m.login.sso", sessionUia));
-            // Rien d'autre que la session : le SSO se prouve côté serveur, la page de
-            // repli l'a déjà marquée franchie. Le client ne transporte aucun secret ici.
-            return await envoyer({ session: sessionUia });
+            /*
+             * **On tente d'abord sans, et c'est le seul ordre qui marche des deux côtés.**
+             * Un premier dépôt d'identité passe sans épreuve (v1.155.0) ; un remplacement
+             * en prend une. Deviner lequel des deux cas on est en train de vivre coûterait
+             * une requête de plus pour une réponse que le serveur donne de toute façon.
+             */
+            const sessionUia = defiMotDePasse(erreur);
+            if (sessionUia === undefined) throw erreur;
+
+            // Le mot de passe de la session courante d'abord (D-15) : le redemander à
+            // quelqu'un qui vient de le taper serait un geste que rien ne justifie.
+            const motDePasse = phraseDePasse ?? (await demanderMotDePasse?.());
+            if (!motDePasse) throw erreur;
+
+            return await envoyer(authMotDePasse(credentials.userId, motDePasse, sessionUia));
           }
         },
       });
@@ -669,6 +746,41 @@ async function buildSession(
       // va rechercher les clés manquantes message par message, à la première non-déchiffre.
       // Le jour où une restauration en tâche de fond est demandée, c'est un écran avec une
       // progression qu'il faut, pas un `await` de plus ici.
+    },
+
+    async appareils() {
+      const { devices } = await client.getDevices();
+      return devices.map((appareil) => ({
+        id: appareil.device_id,
+        nom: appareil.display_name ?? undefined,
+        derniereActivite: appareil.last_seen_ts ?? undefined,
+        courant: appareil.device_id === credentials.deviceId,
+      }));
+    },
+
+    async revoquerAppareils(ids, motDePasse) {
+      if (ids.length === 0) return;
+
+      /*
+       * Même patron que le dépôt d'identité : on tente sans, et le serveur dit ce qu'il
+       * veut. Envoyer le mot de passe d'emblée l'exposerait sur un chemin qui ne le
+       * demande pas forcément — un compte d'appli, un serveur configuré autrement.
+       */
+      try {
+        await client.deleteMultipleDevices(ids);
+        return;
+      } catch (erreur) {
+        const sessionUia = defiMotDePasse(erreur);
+        if (sessionUia === undefined) throw erreur;
+
+        const secret = motDePasse ?? phraseDePasse;
+        if (!secret) throw erreur;
+
+        await client.deleteMultipleDevices(
+          ids,
+          authMotDePasse(credentials.userId, secret, sessionUia),
+        );
+      }
     },
 
     async identityResetOf(userId) {

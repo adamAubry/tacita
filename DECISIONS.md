@@ -240,7 +240,13 @@ Ce coût est **le même que celui déjà accepté** par D-12 (la clé transite v
 
 **Ce que ça ne répare pas, et qui reste vrai.** D-12 change le mot de passe **sans re-dériver la clé**. Après un changement, la clé reste celle de l'ancien mot de passe : la connexion silencieuse cesse de fonctionner et l'écran de saisie revient — une fois, sur chaque appareil neuf. Personne n'est enfermé dehors (la clé écrite quelque part continue d'ouvrir, et D-14 aussi), mais la promesse « le mot de passe suffit » a un trou, et il est nommé. **Le boucher demande une re-clé du 4S dans `changerMotDePasse`**, ce qui n'est pas atomique avec le changement côté serveur — c'est pour ça que ce n'est pas fait ici plutôt qu'à moitié.
 
-**Ce qui rouvre la décision** : héberger pour des tiers (comme D-12 et D-14), ou une politique de mot de passe qui resterait à 8 caractères le jour où le déploiement s'ouvre. Le repli est la clé aléatoire — le code la produit encore quand aucune phrase de passe n'est fournie.
+**Ce qui rouvre la décision** : héberger pour des tiers (comme D-12 et D-14). Le repli est la clé aléatoire — le code la produit encore quand aucune phrase de passe n'est fournie.
+
+**Conséquences tirées le 25/08/2026, après audit.** Trois corrections que D-15 rendait nécessaires et que la décision seule ne portait pas :
+
+- **Un plancher de mot de passe existe enfin** (REQ-INF-20, `minimum_length: 12` côté Synapse). Il n'y en avait aucun à la création de compte — un compte s'est créé avec le mot de passe « a » — alors que D-15 fait de ce mot de passe la clé qui déchiffre l'historique.
+- **La réinitialisation de clé est rouverte.** Elle passait par une page de repli SSO que D-12 avait supprimée le matin même : le seul recours d'une clé perdue remontait un 401 brut. Le remplacement d'identité franchit désormais `m.login.password`. C'est ce chemin-là qui rattrape le trou nommé ci-dessus — un mot de passe changé fait cesser la connexion silencieuse, et il faut alors pouvoir refaire une clé.
+- **Les appareils se voient et se ferment** (REQ-COR-15, REQ-UI-25). Sans cet écran, la concentration de pouvoir sur le mot de passe n'avait aucune contrepartie : jetons sans expiration, changement de mot de passe qui ne déconnecte rien (D-12), clé qui ouvre une session (D-14). **Ce qui reste ouvert et n'est pas corrigé** : la portée de D-12 telle qu'elle est écrite (« ni le mot de passe courant… n'autorise ») est plus large que ce qu'elle tient depuis D-15, et `rc_login` reste desserré à dix fois les défauts pour un secret qui a changé de valeur.
 
 ---
 

@@ -1,6 +1,12 @@
 "use client";
 
-import { connexionParCle, creerCompte, initSession, type Session } from "@tacita/client-core";
+import {
+  connexionParCle,
+  creerCompte,
+  initSession,
+  LONGUEUR_MINIMALE_MOT_DE_PASSE,
+  type Session,
+} from "@tacita/client-core";
 import { useState } from "react";
 
 import { IconeCle } from "../foundation/icons";
@@ -36,10 +42,11 @@ import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitive
 type Mode = "connexion" | "creation" | "cle";
 
 /** Ce qui a échoué, dit dans les mots de la personne et non dans ceux du protocole. */
-type Echec = "identifiants" | "refus" | "pris" | "cle" | "reseau";
+type Echec = "identifiants" | "court" | "refus" | "pris" | "cle" | "reseau";
 
 const MESSAGES: Record<Echec, string> = {
   identifiants: "Identifiant ou mot de passe incorrect.",
+  court: `Choisissez un mot de passe d'au moins ${LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères.`,
   refus: "La création de compte est refusée par ce serveur.",
   pris: "Cet identifiant est déjà pris.",
   cle: "Identifiant ou clé de récupération incorrect.",
@@ -100,6 +107,15 @@ export function Connexion({
 
   const soumettre = async () => {
     if (!complet || enCours) return;
+    /*
+     * Le plancher est **serveur** (`password_config.policy`) : ce contrôle-ci ne le
+     * remplace pas, il évite d'envoyer un mot de passe pour se faire refuser. Le nombre
+     * vient du paquet, pas d'une constante d'écran — trois copies avaient déjà divergé.
+     */
+    if (creation && motDePasse.length < LONGUEUR_MINIMALE_MOT_DE_PASSE) {
+      setEchec("court");
+      return;
+    }
     setEnCours(true);
     setEchec(undefined);
     try {
@@ -152,7 +168,7 @@ export function Connexion({
             {parCle
               ? "Votre clé de récupération ouvre une session quand le mot de passe est perdu. Choisissez ensuite un nouveau mot de passe dans Réglages."
               : creation
-                ? "Choisissez un identifiant et un mot de passe. Rien d'autre n'est demandé : ni e-mail, ni code d'invitation."
+                ? `Choisissez un identifiant et un mot de passe d'au moins ${LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères. Rien d'autre n'est demandé : ni e-mail, ni code d'invitation.`
                 : "Votre identifiant est celui que vous avez choisi à la création du compte."}
           </Text>
           {/*
@@ -207,8 +223,8 @@ export function Connexion({
               onEnter={() => void soumettre()}
               width="100%"
               status={
-                echec === "identifiants"
-                  ? { type: "error", message: MESSAGES.identifiants }
+                echec === "identifiants" || echec === "court"
+                  ? { type: "error", message: MESSAGES[echec] }
                   : undefined
               }
             />

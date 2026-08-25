@@ -16,6 +16,7 @@ import { Placeholder } from "../foundation/Placeholder";
 import { Sheet } from "../foundation/Sheet";
 import { Divider, RadioList, RadioListItem, Text, type ThemeMode } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
+import { Appareils } from "./Appareils";
 import { Confidentialite } from "./Confidentialite";
 import { LimitesConnues } from "./LimitesConnues";
 import { MotDePasse } from "./MotDePasse";
@@ -24,12 +25,27 @@ import { libelleNiveau } from "./NotificationsSalon";
 import { StockageLocal } from "./StockageLocal";
 import { routeInfos } from "../../lib/routes";
 
-/** Les cinq options de REQ-UIX-31. Chacune ouvre une modal, aucune ne navigue. */
-type Option = "theme" | "motdepasse" | "confidentialite" | "notifications" | "stockage" | "limites";
+/**
+ * Les options de REQ-UIX-31. Chacune ouvre une modal, aucune ne navigue.
+ *
+ * « Appareils » est arrivée le 25/08/2026 (REQ-UI-25), juste sous le mot de passe : les
+ * deux sont les gestes qu'on cherche au même moment, quand on soupçonne que quelqu'un
+ * d'autre est entré. Changer son mot de passe sans pouvoir fermer les sessions ouvertes
+ * ne reprend rien.
+ */
+type Option =
+  | "theme"
+  | "motdepasse"
+  | "appareils"
+  | "confidentialite"
+  | "notifications"
+  | "stockage"
+  | "limites";
 
 const TITRES: Record<Option, string> = {
   theme: "Apparence",
   motdepasse: "Mot de passe",
+  appareils: "Appareils",
   confidentialite: "Confidentialité",
   notifications: "Notifications",
   stockage: "Stockage local",
@@ -44,6 +60,7 @@ const DETAILS: Record<Exclude<Option, "theme">, string> = {
   // D-12 — le détail dit ce qui garde le changement, parce que c'est la surprise : on
   // s'attend à devoir donner son mot de passe actuel, et c'est la clé qu'on demande.
   motdepasse: "Changer, avec votre clé de récupération",
+  appareils: "Voir et déconnecter vos sessions",
   confidentialite: "Mode masqué, accusés de lecture",
   notifications: "Cet appareil, et les conversations en silence",
   stockage: "Index de recherche et caches",
@@ -151,6 +168,10 @@ export function Reglages() {
         {/* D-12 — la session est requise : sans elle il n'y a ni compte ni clé à
             vérifier, et l'écran n'aurait rien à changer. */}
         {option === "motdepasse" && session && <MotDePasse session={session} />}
+
+        {/* REQ-UI-25 — la session est requise : la liste et la révocation sont des
+            appels authentifiés, il n'y a rien à montrer sans compte. */}
+        {option === "appareils" && session && <Appareils session={session} />}
 
         {option === "confidentialite" && <Confidentialite />}
 

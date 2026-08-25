@@ -6,7 +6,9 @@
   onSessionInvalidee,
   restoreSession,
 } from "./session";
+export { LONGUEUR_MINIMALE_MOT_DE_PASSE } from "./session";
 export type {
+  Appareil,
   OrderedTimeline,
   RecoveryKey,
   RecoveryState,

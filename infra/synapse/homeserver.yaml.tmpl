@@ -168,8 +168,26 @@ media_storage_providers:
 # empreintes. Aucun module ne les gère, et il ne faut pas qu'un module s'en mêle — voir
 # D-12 sur le fait que `enabled` gouverne connexion **et** ré-authentification d'un seul
 # drapeau, ce qui est la raison pour laquelle le garde de D-12 est au proxy et non en UIA.
+# REQ-INF-20 — **un plancher de mot de passe, et il est ici** (ajouté le 25/08/2026).
+#
+# Il n'y en avait aucun : un compte s'est créé avec le mot de passe « a ». Le plancher de
+# huit caractères vivait dans le module de changement et dans l'écran — c'est-à-dire
+# partout sauf à l'endroit où le compte naît.
+#
+# Depuis D-15, ce mot de passe **est** la clé qui déchiffre l'historique : la dérivation
+# PBKDF2 fait 500 000 tours, ce qui borne le coût d'une attaque hors ligne, mais aucun
+# nombre de tours ne rattrape un mot de passe d'un caractère.
+#
+# `minimum_length` et rien d'autre. Exiger un chiffre et un symbole produit
+# « Motdepasse1! », qui est plus court à casser et plus dur à retenir : la longueur est la
+# seule contrainte qui achète vraiment quelque chose. Le nombre est répété dans
+# `tacita_password.py` et dans le shard ; `infra/tests/mot-de-passe.test.ts` vérifie que
+# les trois disent le même, sans quoi l'un des trois mentirait à l'utilisateur.
 password_config:
   enabled: true
+  policy:
+    enabled: true
+    minimum_length: 12
 
 # REQ-INF-09 / REQ-INF-14 — Synapse bloque par défaut ses propres requêtes sortantes
 # vers les plages privées (protection SSRF : `ip_range_blacklist` contient

@@ -11,6 +11,7 @@ import {
   Divider,
   Icon,
   Text,
+  TextInput,
   VStack,
 } from "../foundation/primitives";
 import { useSession } from "./SessionProvider";
@@ -68,48 +69,27 @@ interface RecoveryStepProps {
 }
 
 /**
- * REQ-UI-04 — **la ré-authentification que le serveur exige** pour déposer une identité
- * cross-signing (voir `setupRecoveryKey`).
+ * REQ-UI-04 — **la ré-authentification que le serveur exige** pour *remplacer* une
+ * identité cross-signing (réécrit le 25/08/2026).
  *
- * Ce commentaire disait « elle n'a lieu que sur "j'ai perdu ma clé" : l'inscription, elle,
- * dépose sa première identité sans rien demander ». C'est faux sur ce déploiement —
- * MSC3967 n'est pas activé, l'UIA tombe aussi à l'inscription (escalade E-22). L'écran
- * sert donc les deux cas, et son texte doit suivre : promettre un remplacement à quelqu'un
- * qui crée sa première clé, c'est lui décrire une opération qui n'a pas lieu.
+ * Deux choses à ne pas confondre, et elles ont changé le même jour. **L'inscription ne
+ * rencontre plus rien** : un premier dépôt d'identité passe sans épreuve sur la version
+ * déployée, E-22 est éteinte. **Le remplacement, lui, en demande une**, et c'est un mot
+ * de passe depuis que Keycloak est parti (D-12) — cet écran servait une page de repli SSO
+ * qui n'existe plus, et le chemin « j'ai perdu ma clé » échouait donc sur un 401 brut.
  *
- * Pourquoi un écran et non une fenêtre ouverte toute seule : un `window.open` qui ne part
- * pas d'un clic est bloqué comme pop-up, et l'étape resterait figée sans que rien ne le
- * dise. Le clic est donc ici, et il est celui de la personne.
+ * Il n'apparaît que quand le module n'a pas déjà le mot de passe, c'est-à-dire après un
+ * rechargement de page. Quelqu'un qui vient de se connecter ne le voit jamais : le
+ * redemander dans la minute serait un geste que rien ne justifie.
  */
-function ConfirmationIdentite({
-  url,
-  faite,
+function ConfirmationMotDePasse({
+  valider,
   abandon,
-  reinitialiser,
 }: {
-  url: string;
-  faite: () => void;
+  valider: (motDePasse: string) => void;
   abandon: () => void;
-  reinitialiser: boolean;
 }) {
-  const [bloquee, setBloquee] = useState(false);
-
-  /*
-   * Synapse termine sa page de repli par `window.opener.postMessage("authDone", "*")`
-   * (template `sso_auth_success.html`, v1.155.0). C'est le seul signal de fin : l'onglet
-   * se ferme parfois tout seul, et rien ne revient par l'URL de cette page-ci.
-   *
-   * L'origine est vérifiée avant tout : `postMessage` accepte n'importe quel émetteur, et
-   * on ne franchit pas une étape de sécurité sur la parole d'une fenêtre inconnue.
-   */
-  useEffect(() => {
-    const origine = new URL(url).origin;
-    const ecouter = (evenement: MessageEvent) => {
-      if (evenement.origin === origine && evenement.data === "authDone") faite();
-    };
-    window.addEventListener("message", ecouter);
-    return () => window.removeEventListener("message", ecouter);
-  }, [url, faite]);
+  const [motDePasse, setMotDePasse] = useState("");
 
   return (
     <VStack style={{ gap: "var(--spacing-12)" }}>
@@ -136,41 +116,29 @@ function ConfirmationIdentite({
           <Text type="display-3" as="h1" style={{ textWrap: "balance" }}>
             Confirmez que c&apos;est bien vous
           </Text>
-          <VStack gap={4}>
-            <Text style={{ textWrap: "pretty" }}>
-              {reinitialiser
-                ? "Remplacer votre clé donne à cet appareil le droit de lire vos futures conversations. Votre compte demande donc une reconnexion avant de l'accorder."
-                : "Créer votre clé donne à cet appareil le droit de lire vos futures conversations. Votre compte demande donc une reconnexion avant de l'accorder."}
-            </Text>
-            <Text style={{ textWrap: "pretty", marginBottom: "var(--spacing-4)" }}>
-              Une fenêtre va s&apos;ouvrir sur votre compte. Une fois la confirmation
-              donnée, revenez ici : {reinitialiser ? "la nouvelle clé" : "votre clé"}{" "}
-              s&apos;affichera.
-            </Text>
-          </VStack>
+          <Text style={{ textWrap: "pretty" }}>
+            Remplacer votre clé rend illisible ce qui était chiffré avec l&apos;ancienne.
+            Votre mot de passe est demandé une fois, pour que personne d&apos;autre ne
+            puisse le faire depuis cet appareil.
+          </Text>
         </VStack>
 
-        {bloquee ? (
-          <Banner
-            status="error"
-            title="La fenêtre a été bloquée"
-            description="Votre navigateur a empêché son ouverture. Autorisez les fenêtres pour ce site, puis réessayez."
-          />
-        ) : null}
-
         <VStack gap={4}>
+          <TextInput
+            label="Mot de passe"
+            type="password"
+            value={motDePasse}
+            onChange={setMotDePasse}
+            onEnter={() => motDePasse !== "" && valider(motDePasse)}
+            hasAutoFocus
+            width="100%"
+          />
+
           <Button
-            label="Confirmer avec mon compte"
+            label="Confirmer"
             variant="primary"
-            onClick={() => {
-              /*
-               * `window.open` et non un lien : depuis 2021, `target="_blank"` implique
-               * `rel="noopener"`, et la page de repli n'aurait plus de `window.opener` à
-               * qui annoncer la fin. C'est l'exception exacte à la règle qu'on applique
-               * partout ailleurs — ici la fenêtre ouverte est notre propre serveur.
-               */
-              setBloquee(window.open(url, "_blank") === null);
-            }}
+            isDisabled={motDePasse === ""}
+            onClick={() => valider(motDePasse)}
           />
           <VStack hAlign="center">
             <Button label="Annuler" variant="ghost" onClick={abandon} />
@@ -193,8 +161,7 @@ export function RecoveryStep({ session, reinitialiser = false }: RecoveryStepPro
   const [enCours, setEnCours] = useState(false);
   /** La ré-authentification en cours, quand le serveur l'a demandée. */
   const [confirmation, setConfirmation] = useState<{
-    url: string;
-    faite: () => void;
+    valider: (motDePasse: string) => void;
     abandon: () => void;
   }>();
   const titre = useRef<HTMLElement>(null);
@@ -228,13 +195,12 @@ export function RecoveryStep({ session, reinitialiser = false }: RecoveryStepPro
     try {
       const generee = await session.setupRecoveryKey({
         reinitialiser,
-        confirmerIdentite: (url) =>
-          new Promise<void>((resoudre, rejeter) => {
+        demanderMotDePasse: () =>
+          new Promise<string>((resoudre, rejeter) => {
             setConfirmation({
-              url,
-              faite: () => {
+              valider: (motDePasse) => {
                 setConfirmation(undefined);
-                resoudre();
+                resoudre(motDePasse);
               },
               abandon: () => {
                 setConfirmation(undefined);
@@ -272,7 +238,7 @@ export function RecoveryStep({ session, reinitialiser = false }: RecoveryStepPro
    * parti, il n'y a rien d'autre à faire ici tant qu'elle n'a pas eu lieu. Un dialogue
    * par-dessus aurait laissé un bouton « Créer une nouvelle clé » cliquable derrière.
    */
-  if (confirmation) return <ConfirmationIdentite {...confirmation} reinitialiser={reinitialiser} />;
+  if (confirmation) return <ConfirmationMotDePasse {...confirmation} />;
 
   if (!cle) {
     return (

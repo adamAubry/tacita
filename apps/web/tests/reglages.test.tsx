@@ -14,6 +14,7 @@ import { LimitesConnues } from "../components/settings/LimitesConnues";
 import { MembresGroupe } from "../components/settings/MembresGroupe";
 import { NotificationsSalon } from "../components/settings/NotificationsSalon";
 import { OptionsConversation } from "../components/settings/OptionsConversation";
+import { Appareils } from "../components/settings/Appareils";
 import { Reglages } from "../components/settings/Reglages";
 import { ThemeConversation } from "../components/settings/ThemeConversation";
 import { brancherModeMasque } from "../lib/mode-masque";
@@ -598,5 +599,92 @@ describe("REQ-MSG-20 / REQ-INV-15 — le sas d'un groupe suit ses liens, et se r
   it("aucune demande : aucune section — pas de titre qui annonce du vide", async () => {
     render(<MembresGroupe session={session()} roomId="!g:t" />);
     expect(screen.queryByText("Demandes d'entrée")).toBeNull();
+  });
+});
+
+describe("REQ-UI-25 — voir ses appareils, et pouvoir en fermer un", () => {
+  /*
+   * **Ce que l'audit du 25/08/2026 a nommé** : les jetons de ce déploiement n'expirent
+   * pas, le changement de mot de passe ne déconnecte personne (D-12) et la clé ouvre une
+   * session à elle seule (D-14). Sans cet écran, une fuite n'avait aucune réponse — et un
+   * produit qui promet la confidentialité doit offrir le geste de la reprendre.
+   */
+  const deuxAppareils = [
+    { id: "ICI", nom: "Ce téléphone", derniereActivite: 1_700_000_000_000, courant: true },
+    { id: "AILLEURS", nom: "Portable", derniereActivite: undefined, courant: false },
+  ];
+
+  const avecAppareils = (revoquer = vi.fn(async () => {})) => {
+    const appareils = vi.fn(async () => deuxAppareils);
+    return {
+      revoquer,
+      appareils,
+      session: asSession({
+        client: { getUserId: () => "@luca:t", on: vi.fn(), off: vi.fn() },
+        appareils,
+        revoquerAppareils: revoquer,
+      } as never),
+    };
+  };
+
+  it("montre les sessions ouvertes, et dit laquelle est celle-ci", async () => {
+    const { session } = avecAppareils();
+    render(<Appareils session={session} />);
+
+    await waitFor(() => expect(screen.getByText(/Ce téléphone/)).toBeTruthy());
+    // « celui-ci » n'est pas cosmétique : c'est ce qui empêche de fermer sa propre
+    // session en croyant fermer celle de l'intrus.
+    expect(screen.getByText("Ce téléphone · celui-ci")).toBeTruthy();
+    // Une activité inconnue se dit, elle ne s'invente pas : une date fausse ferait
+    // révoquer le mauvais appareil.
+    expect(screen.getByText("Dernière activité inconnue")).toBeTruthy();
+  });
+
+  it("déconnecter demande le mot de passe, puis relit la liste", async () => {
+    const revoquer = vi.fn(async () => {});
+    const { session, appareils } = avecAppareils(revoquer);
+    render(<Appareils session={session} />);
+
+    await waitFor(() => expect(screen.getByText("Déconnecter")).toBeTruthy());
+    fireEvent.click(screen.getByText("Déconnecter"));
+
+    await waitFor(() => expect(screen.getByText("Déconnecter cet appareil ?")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Votre mot de passe"), {
+      target: { value: "mon-mot-de-passe" },
+    });
+    fireEvent.click(screen.getByText("Déconnecter"));
+
+    await waitFor(() => expect(revoquer).toHaveBeenCalledWith(["AILLEURS"], "mon-mot-de-passe"));
+    // La liste est relue : laisser l'appareil révoqué à l'écran ferait douter que le
+    // geste ait eu lieu.
+    await waitFor(() => expect(appareils).toHaveBeenCalledTimes(2));
+  });
+
+  it("un refus du serveur se dit, la liste ne prétend pas que c'est fait", async () => {
+    // Interdit n°13 : une révocation qu'on croit faite et qui ne l'est pas est pire que
+    // pas de bouton du tout.
+    const revoquer = vi.fn(async () => {
+      throw Object.assign(new Error("Forbidden"), { errcode: "M_FORBIDDEN" });
+    });
+    const { session } = avecAppareils(revoquer);
+    render(<Appareils session={session} />);
+
+    await waitFor(() => expect(screen.getByText("Déconnecter")).toBeTruthy());
+    fireEvent.click(screen.getByText("Déconnecter"));
+    await waitFor(() => expect(screen.getByText("Déconnecter cet appareil ?")).toBeTruthy());
+    fireEvent.click(screen.getByText("Déconnecter"));
+
+    await waitFor(() => expect(screen.getByText("Mot de passe incorrect.")).toBeTruthy());
+  });
+
+  it("le réglage est atteignable depuis les réglages, à côté du mot de passe", async () => {
+    /*
+     * Les deux gestes se cherchent au même moment — quand on soupçonne que quelqu'un
+     * d'autre est entré. Changer son mot de passe sans pouvoir fermer les sessions
+     * ouvertes ne reprend rien du tout.
+     */
+    rendreAvecSession(<Reglages />);
+    await waitFor(() => expect(screen.getByText("Appareils")).toBeTruthy());
+    expect(screen.getByText("Voir et déconnecter vos sessions")).toBeTruthy();
   });
 });

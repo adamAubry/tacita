@@ -63,9 +63,12 @@ DESCRIPTION = "m.secret_storage.key."
 # vérifier : on refuse plutôt que de laisser passer.
 ALGORITHME = "m.secret_storage.v1.aes-hmac-sha2"
 
-# 8 caractères minimum : c'est la politique la plus basse qu'on puisse tenir sans mentir.
-# Elle est ici et pas seulement dans l'UI — un garde côté écran n'en est pas un.
-LONGUEUR_MINIMALE = 8
+# Le plancher de longueur, **le même que `password_config.policy` du homeserver** et que
+# celui du shard. Porté à 12 le 25/08/2026 : depuis D-15 ce mot de passe est la clé qui
+# déchiffre l'historique, et il n'avait aucun plancher du tout à la création de compte.
+# Il est ici et pas seulement dans l'UI — un garde côté écran n'en est pas un — et un test
+# d'infra relie les trois endroits qui le disent.
+LONGUEUR_MINIMALE = 12
 
 
 def _verifier_cle(cle: bytes, iv_b64: str, mac_b64: str) -> bool:
