@@ -119,6 +119,8 @@ Options
   --dev              machine de développement : le nom d'exemple et le certificat
                      auto-signé y sont attendus, pas des défauts à corriger
   --oui              ne pas demander confirmation (certificat)
+  --sans-suite       taire la liste « ce qui reste à faire » (init, quand c'est
+                     l'assistant d'installation qui enchaîne lui-même)
   --force            réémettre un certificat encore valide (certificat)
 
 Sans --domaine ni --email, init les demande — à condition d'être dans un
@@ -126,7 +128,7 @@ terminal. Le code de sortie de doctor vaut 1 si une vérification bloque.
 `;
 
 const COMMANDES = ["init", "dns", "certificat", "doctor"];
-const OPTIONS = ["--domaine", "--email", "--dev", "--oui", "--force", "--help", "-h"];
+const OPTIONS = ["--domaine", "--email", "--dev", "--oui", "--force", "--sans-suite", "--help", "-h"];
 
 const argv = process.argv.slice(2);
 
@@ -257,10 +259,17 @@ async function init(): Promise<never> {
       ({ cle, action, apercu }) => `  ${cle.padEnd(largeur)}${action.padEnd(14)}${apercu}`,
     ),
     "",
-    "Ce qui reste, et que cet outil ne peut pas faire à ta place :",
-    "",
-    ...resteAFaire(reponses.domaine, dev).map((etape, index) => `  ${index + 1}. ${etape}`),
-    "",
+    // L'assistant d'installation enchaîne lui-même sur ces étapes : les annoncer
+    // comme « restant à faire » les ferait passer pour un travail à la charge du
+    // lecteur, juste avant que le script ne les exécute sous ses yeux.
+    ...(argv.includes("--sans-suite")
+      ? []
+      : [
+          "Ce qui reste, et que cet outil ne peut pas faire à ta place :",
+          "",
+          ...resteAFaire(reponses.domaine, dev).map((etape, index) => `  ${index + 1}. ${etape}`),
+          "",
+        ]),
   ];
   process.stdout.write(lignes.join("\n"));
   process.exit(0);

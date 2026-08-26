@@ -1,43 +1,82 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const bootstrap = readFileSync(new URL("../bootstrap.sh", import.meta.url), "utf-8");
-const machine = readFileSync(new URL("../../apps/admin/src/machine.ts", import.meta.url), "utf-8");
+const DEPOT = new URL("../../", import.meta.url).pathname;
+const bootstrap = readFileSync(join(DEPOT, "infra/bootstrap.sh"), "utf-8");
+const machine = readFileSync(join(DEPOT, "apps/admin/src/machine.ts"), "utf-8");
 
+/**
+ * Un dépôt jetable où l'assistant se déroule en entier sans rien installer, sans réseau
+ * et sans Docker. L'outil d'administration y est **doublé** : il a ses propres tests, et
+ * ce sont les décisions du script qu'on éprouve ici — quelles étapes il saute, dans quel
+ * ordre il enchaîne, ce qu'il fait d'un échec.
+ */
+const bacASable = (
+  options: { readonly env?: string; readonly cert?: boolean; readonly adminEchoue?: readonly string[] } = {},
+) => {
+  const racine = mkdtempSync(join(tmpdir(), "tacita-wizard-"));
+  mkdirSync(join(racine, "apps/admin/src"), { recursive: true });
+  mkdirSync(join(racine, "infra/proxy/certs"), { recursive: true });
+  mkdirSync(join(racine, "bin"), { recursive: true });
 
-const doublures = (versionNode: string, presents: readonly string[] = []) => {
-  const bac = mkdtempSync(join(tmpdir(), "tacita-bootstrap-"));
+  cpSync(join(DEPOT, "infra/bootstrap.sh"), join(racine, "infra/bootstrap.sh"));
+  cpSync(join(DEPOT, "infra/.env.example"), join(racine, "infra/.env.example"));
+  cpSync(join(DEPOT, "package.json"), join(racine, "package.json"));
+  if (options.env !== undefined) writeFileSync(join(racine, "infra/.env"), options.env);
+  if (options.cert === true) writeFileSync(join(racine, "infra/proxy/certs/fullchain.pem"), "x");
+
+  // L'outil d'administration, réduit à ce que le script attend de lui : une trace et un
+  // code de sortie. Les commandes nommées dans `adminEchoue` rendent 1.
+  writeFileSync(
+    join(racine, "apps/admin/src/index.ts"),
+    [
+      `const echoue = new Set(${JSON.stringify(options.adminEchoue ?? [])});`,
+      "const args = process.argv.slice(2);",
+      'console.log("ADMIN " + args.join(" "));',
+      "process.exit(args.some((a) => echoue.has(a)) ? 1 : 0);",
+      "",
+    ].join("\n"),
+  );
+
   const poser = (nom: string, corps: string) => {
-    const chemin = join(bac, nom);
+    const chemin = join(racine, "bin", nom);
     writeFileSync(chemin, `#!/bin/sh\n${corps}\n`);
     chmodSync(chemin, 0o755);
   };
-  poser("id", '[ "$1" = "-u" ] && { echo 0; exit 0; }\n[ "$1" = "-un" ] && { echo root; exit 0; }\nexec /usr/bin/id "$@"');
-  poser("node", `echo ${versionNode}`);
-  poser("docker", '[ "$1" = "compose" ] && { echo "Docker Compose version v2.40.3"; exit 0; }\necho "Docker version 27.3.1"');
-  poser("curl", 'echo "# script simulé"');
+  poser(
+    "id",
+    '[ "$1" = "-u" ] && { echo 0; exit 0; }\n[ "$1" = "-un" ] && { echo root; exit 0; }\nexec /usr/bin/id "$@"',
+  );
+  poser("docker", 'case "$*" in *"compose version"*) echo v2 ;; *"ps -q"*) ;; *) echo ok ;; esac');
+  poser("pnpm", "echo 11.18.0");
+  poser("certbot", "echo certbot");
+  poser("curl", 'echo "# simulé"');
   poser("bash", 'echo "BASH_APPELE $*"');
   poser("apt-get", 'echo "APT_APPELE $*"');
   poser("corepack", 'echo "COREPACK_APPELE $*"');
-  for (const outil of presents) poser(outil, `echo "${outil} présent"`);
-  return bac;
+  return racine;
 };
 
 /** Rend le code et la sortie plutôt que de lever : un échec est ici un cas à éprouver. */
-const lancer = (bac: string, args: readonly string[] = []) => {
-  const resultat = spawnSync("sh", [new URL("../bootstrap.sh", import.meta.url).pathname, ...args], {
+const lancer = (racine: string, args: readonly string[] = []) => {
+  const resultat = spawnSync("sh", [join(racine, "infra/bootstrap.sh"), ...args], {
     // PATH délibérément restreint : hériter de celui de la machine ferait dépendre le
     // test de ce qui y est installé — un `pnpm` réel masquerait l'étape qu'on éprouve.
-    env: { PATH: `${bac}:/usr/bin:/bin` },
+    // `node` reste le vrai : c'est lui qui exécute la doublure de l'outil admin.
+    env: { PATH: `${join(racine, "bin")}:${process.env["PATH"] ?? ""}` },
     encoding: "utf-8",
   });
   return { code: resultat.status ?? -1, sortie: `${resultat.stdout ?? ""}${resultat.stderr ?? ""}` };
 };
 
+const ENV_COMPLET = readFileSync(join(DEPOT, "infra/.env.example"), "utf-8")
+  .replace(/change-me/g, "pose")
+  .replace("SERVER_NAME=chat.example.org", "SERVER_NAME=chat.tacita.fr");
 
+const POSE = ["--domaine=chat.tacita.fr", "--email=a@b.fr", "--oui"];
 
 describe("le script d'amorçage tourne là où rien n'est encore installé", () => {
   it("c'est du shell POSIX, pas du bash", () => {
@@ -53,222 +92,8 @@ describe("le script d'amorçage tourne là où rien n'est encore installé", () 
   });
 
   it("il n'exige pas sudo quand il tourne déjà en root", () => {
-    // Sur une image sans sudo — fréquent en conteneur — le supposer ferait échouer
-    // un script qui n'en avait aucun besoin.
     expect(bootstrap).toMatch(/id -u.*-eq 0/);
     expect(bootstrap).toMatch(/command -v sudo/);
-  });
-});
-
-describe("il est rejouable : ce qui est là n'est pas réinstallé", () => {
-  it.each(["docker", "node"])("l'installation de %s est gardée par une détection", (outil) => {
-    const bloc = new RegExp(`command -v ${outil} >/dev/null`);
-    expect(bootstrap).toMatch(bloc);
-  });
-
-  it("le plugin compose est testé par son propre appel, pas déduit de Docker", () => {
-    // Le paquet `docker.io` d'Ubuntu installe Docker sans le plugin v2 : déduire l'un
-    // de l'autre laisserait une machine où `docker compose` n'existe pas.
-    expect(bootstrap).toMatch(/docker compose version >\/dev\/null/);
-  });
-});
-
-describe("il installe les versions que le reste du dépôt exige", () => {
-  /**
-   * La jonction que rien d'autre ne tient : le script installe une version, le
-   * diagnostic en exige une autre, et les deux sont écrites à des endroits différents.
-   * Ce test est le seul lien entre elles — sans lui, relever l'une laisserait l'autre
-   * derrière, et la panne n'apparaîtrait que sur une machine neuve.
-   */
-  it("la version de Node installée est celle que le diagnostic réclame", () => {
-    const [, installee] = /^NODE_MAJEUR_MINIMAL=(\d+)$/m.exec(bootstrap) ?? [];
-    const [, exigee] = /^export const NODE_MINIMAL = (\d+);$/m.exec(machine) ?? [];
-    expect(installee).toBeDefined();
-    expect(exigee).toBeDefined();
-    expect(installee).toBe(exigee);
-  });
-
-  it("Docker vient du script officiel, jamais du paquet Ubuntu", () => {
-    // `apt install docker.io` pose une version ancienne et sans plugin compose v2.
-    expect(bootstrap).toContain("get.docker.com");
-    expect(bootstrap).not.toMatch(/apt-get install[^\n]*\bdocker\.io\b/);
-  });
-
-  it("Node vient de NodeSource, parce qu'Ubuntu 24.04 livre Node 18", () => {
-    expect(bootstrap).toContain("deb.nodesource.com/setup_");
-  });
-});
-
-describe("il ne laisse pas l'administrateur devant une panne qu'il vient de créer", () => {
-  it("il dit que le groupe docker ne prend effet qu'à la reconnexion", () => {
-    // Sans cet avertissement, `docker info` échoue encore juste après la correction,
-    // et on cherche ailleurs une panne qui n'existe plus.
-    expect(bootstrap).toMatch(/usermod -aG docker/);
-    expect(bootstrap).toMatch(/reconnecter/);
-  });
-
-  it("il se termine en nommant la commande suivante", () => {
-    expect(bootstrap).toMatch(/pnpm admin init/);
-  });
-});
-
-describe("tout ce qui se demande, se demande avant", () => {
-  it("le mot de passe sudo est réclamé avant la première étape, pas au milieu", () => {
-    // Une invite qui surgit entre deux lignes du compte rendu casse l'affichage et
-    // laisse devant un écran qui n'avance plus, sans dire qu'il attend quelque chose.
-    const preAutorisation = bootstrap.indexOf("sudo -v");
-    expect(preAutorisation).toBeGreaterThan(-1);
-    expect(preAutorisation).toBeLessThan(bootstrap.indexOf("titre \"Installation\""));
-  });
-
-  it("sans terminal pour saisir le mot de passe, il le dit au lieu de bloquer", () => {
-    expect(bootstrap).toMatch(/sudo réclame un mot de passe/);
-  });
-});
-
-describe("il annonce avant d'agir, et demande une fois", () => {
-  /**
-   * Un script d'amorçage tourne en root sur une machine que son auteur ne voit pas, et
-   * la première version enchaînait `curl … | sudo sh` sans rien demander. Annoncer le
-   * plan puis demander une seule fois est le minimum ; `--oui` reste pour les scripts.
-   */
-  it("il constate tout avant de modifier quoi que ce soit", () => {
-    const constat = bootstrap.indexOf("BESOIN_APT=0");
-    const premiereAction = bootstrap.indexOf("curl -fsSL https://get.docker.com");
-    expect(constat).toBeGreaterThan(-1);
-    expect(constat).toBeLessThan(premiereAction);
-  });
-
-  it("il énumère ce qu'il va faire, en tant que root, avant de demander", () => {
-    const annonce = bootstrap.indexOf("Ce script va installer, en tant que root");
-    expect(annonce).toBeGreaterThan(-1);
-    expect(annonce).toBeLessThan(bootstrap.indexOf("Continuer ?"));
-  });
-
-  it("il attend une réponse, et n'accepte que « o » ou « oui »", () => {
-    expect(bootstrap).toMatch(/read -r reponse/);
-    expect(bootstrap).toMatch(/o \| O \| oui/);
-  });
-
-  it("`--oui` saute la question, pour l'automatisation", () => {
-    expect(bootstrap).toMatch(/--oui/);
-    expect(bootstrap).toMatch(/SANS_DEMANDER=1/);
-  });
-
-  it("hors terminal et sans --oui, il refuse plutôt que de supposer un accord", () => {
-    // Un `read` sans terminal rendrait une chaîne vide, donc « non » — mais en silence.
-    expect(bootstrap).toMatch(/\[ ! -t 0 \]/);
-    expect(bootstrap).toMatch(/relancer avec --oui/);
-  });
-
-  it("quand tout est déjà en place, il sort sans rien demander", () => {
-    expect(bootstrap).toMatch(/Rien à faire — tout est déjà en place/);
-  });
-});
-
-describe("il ne laisse pas la machine à moitié installée", () => {
-  it("l'absence d'apt-get est constatée avant la première installation", () => {
-    // Sur Fedora ou Alpine, la version précédente installait Docker puis échouait sur
-    // `apt-get` — dans un état intermédiaire que personne n'avait demandé.
-    const garde = bootstrap.indexOf("apt-get est introuvable");
-    expect(garde).toBeGreaterThan(-1);
-    expect(garde).toBeLessThan(bootstrap.indexOf("curl -fsSL https://get.docker.com"));
-  });
-
-  it("il dit quoi faire sur une distribution qu'il ne sait pas servir", () => {
-    expect(bootstrap).toMatch(/Installer à la main Node/);
-  });
-});
-
-describe("le script s'exécute vraiment, y compris en root", () => {
-  /**
-   * Le seul chemin qui comptait n'était couvert par aucun test, et il était cassé :
-   * `$SUDO -E bash -` devenait `-E bash -` quand la variable était vide — donc à chaque
-   * exécution en root, celle de tout serveur neuf. Le shell cherchait un programme nommé
-   * « -E », `set -e` arrêtait tout, et Node n'était jamais installé.
-   *
-   * Les vérifications de forme ne pouvaient pas le voir. Celle-ci lance le script pour
-   * de bon, avec des doublures qui n'installent rien : c'est la différence entre « le
-   * fichier contient les bonnes lignes » et « le programme fait ce qu'il annonce ».
-   */
-  it("en root, avec un Node trop vieux, il installe sans se casser sur sudo", () => {
-    const bac = doublures("v18.19.1", ["pnpm", "certbot"]);
-    const { code, sortie } = lancer(bac, ["--oui"]);
-    expect(code).toBe(0);
-
-    // Le détail vit désormais dans le journal, plus à l'écran : c'est là qu'on vérifie
-    // que le script NodeSource a bien atteint `bash`, et non un programme nommé « -E ».
-    const [, journal] = /Journal détaillé : (\S+)/.exec(sortie) ?? [];
-    expect(journal).toBeDefined();
-    const detail = readFileSync(journal!, "utf-8");
-    expect(detail).toContain("BASH_APPELE -");
-    expect(detail).toContain("APT_APPELE install -y nodejs");
-    expect(detail).not.toContain("-E:");
-
-    expect(sortie).toMatch(/\[1\/1] Node 22 +ok/);
-    rmSync(bac, { recursive: true, force: true });
-    rmSync(journal!, { force: true });
-  });
-
-  it("en root avec tout en place, il sort sans rien faire", () => {
-    const bac = doublures("v22.14.0", ["pnpm", "certbot"]);
-    const { code, sortie } = lancer(bac);
-    expect(code).toBe(0);
-    expect(sortie).toContain("Rien à faire");
-    expect(sortie).not.toContain("APT_APPELE");
-    rmSync(bac, { recursive: true, force: true });
-  });
-
-  it("sans --oui et hors terminal, il refuse après avoir annoncé son plan", () => {
-    const bac = doublures("v18.19.1", ["pnpm", "certbot"]);
-    const { code, sortie } = lancer(bac);
-    expect(code).toBe(1);
-    expect(sortie).toContain("Ce script va installer");
-    expect(sortie).toContain("relancer avec --oui");
-    rmSync(bac, { recursive: true, force: true });
-  });
-});
-
-describe("l'écran ne porte qu'une ligne par étape, le détail va au journal", () => {
-  /**
-   * La demande est explicite : une installation crache des centaines de lignes, dont
-   * aucune ne dit où l'on en est. L'écran porte « [3/6] Node 22 … ok », et le détail
-   * n'apparaît que là où il sert — quand ça casse.
-   */
-  it("chaque étape tient sur une ligne numérotée, et le bruit n'y est pas", () => {
-    const bac = doublures("v18.19.1");
-    const { code, sortie } = lancer(bac, ["--oui"]);
-    expect(code).toBe(0);
-    const etapes = sortie.split("\n").filter((l) => /^ {2}\[\d+\/\d+]/.test(l));
-    expect(etapes.length).toBeGreaterThanOrEqual(3);
-    for (const ligne of etapes) expect(ligne).toMatch(/ (ok|ÉCHEC)$/);
-    // La sortie des installations elle-même n'a rien à faire à l'écran.
-    expect(sortie).not.toContain("APT_APPELE install -y certbot");
-    rmSync(bac, { recursive: true, force: true });
-  });
-
-  it("le compteur va bien jusqu'au total annoncé", () => {
-    const bac = doublures("v18.19.1");
-    const { code, sortie } = lancer(bac, ["--oui"]);
-    expect(code).toBe(0);
-    const [, dernier, total] = /\[(\d+)\/(\d+)] (?!.*\[)/s.exec(sortie) ?? [];
-    void dernier;
-    expect(sortie).toContain(`[${total}/${total}]`);
-    rmSync(bac, { recursive: true, force: true });
-  });
-
-  it("une étape en échec affiche les dernières lignes du journal, et s'arrête là", () => {
-    const bac = doublures("v18.19.1", ["certbot"]);
-    writeFileSync(join(bac, "corepack"), '#!/bin/sh\necho "E: dépôt injoignable" >&2\nexit 100\n');
-    chmodSync(join(bac, "corepack"), 0o755);
-    const { code, sortie } = lancer(bac, ["--oui"]);
-    expect(code).toBe(1);
-    expect(sortie).toContain("ÉCHEC");
-    expect(sortie).toContain("E: dépôt injoignable");
-    expect(sortie).toContain("Relancer le script reprendra où il en est");
-    // Le court-circuit : la seconde commande de l'étape ne doit pas s'exécuter.
-    expect(sortie.match(/dépôt injoignable/g)).toHaveLength(1);
-    rmSync(bac, { recursive: true, force: true });
   });
 });
 
@@ -280,35 +105,172 @@ describe("les prérequis couverts", () => {
     },
   );
 
+  it("la version de Node installée est celle que le diagnostic réclame", () => {
+    // La jonction que rien d'autre ne tient : le script installe une version, le
+    // diagnostic en exige une autre, et les deux vivent dans des fichiers différents.
+    const [, installee] = /^NODE_MAJEUR_MINIMAL=(\d+)$/m.exec(bootstrap) ?? [];
+    const [, exigee] = /^export const NODE_MINIMAL = (\d+);$/m.exec(machine) ?? [];
+    expect(installee).toBeDefined();
+    expect(installee).toBe(exigee);
+  });
+
   it("pnpm vient de corepack, à la version que déclare package.json", () => {
-    // La jonction : une version recopiée dans le script finirait par diverger de celle
-    // du dépôt, et personne ne le verrait avant qu'un serveur neuf pose la mauvaise.
     expect(bootstrap).toMatch(/packageManager/);
     expect(bootstrap).toMatch(/corepack prepare "\$PNPM_VOULU" --activate/);
     expect(bootstrap).not.toMatch(/pnpm@\d+\.\d+\.\d+/);
   });
+
+  it("Docker vient du script officiel, jamais du paquet Ubuntu", () => {
+    expect(bootstrap).toContain("get.docker.com");
+    expect(bootstrap).not.toMatch(/apt-get install[^\n]*\bdocker\.io\b/);
+  });
+
+  it("Node vient de NodeSource, parce qu'Ubuntu 24.04 livre Node 18", () => {
+    expect(bootstrap).toContain("deb.nodesource.com/setup_");
+  });
+
+  it("l'absence d'apt-get est constatée avant la première installation", () => {
+    // Sur Fedora ou Alpine, installer Docker puis échouer sur `apt-get` laisserait la
+    // machine dans un état intermédiaire que personne n'avait demandé.
+    const garde = bootstrap.indexOf("apt-get est introuvable");
+    expect(garde).toBeGreaterThan(-1);
+    expect(garde).toBeLessThan(bootstrap.indexOf("curl -fsSL https://get.docker.com |"));
+  });
 });
 
-describe("les scripts du dépôt restent exécutables", () => {
-  /**
-   * Une perte de bit exécutable est **silencieuse** : le hook de pré-commit cesse de
-   * tourner sans que rien ne le dise, et la porte du dépôt disparaît. C'est arrivé — un
-   * outil qui régénérait des fichiers depuis `git show` a effacé le mode de quatre
-   * scripts d'un coup. Git suit ce mode, mais rien ne le vérifiait.
-   *
-   * `staging/certs-deploy-hook.sh` n'est **pas** de la liste, et c'est volontaire : il
-   * n'est jamais lancé depuis le dépôt, mais posé par `install -D -m 755`, qui fixe son
-   * mode à destination. L'exiger ici ferait échouer le test sur un fichier correct.
-   */
-  it.each([
-    "../bootstrap.sh",
-    "../proxy/generate-dev-certs.sh",
-    "../postgres/10-invite-tokens.sh",
-    "../rtc/firewall/host-ufw.sh",
-    "../../.husky/pre-commit",
-  ])("%s porte le bit exécutable", (chemin) => {
-    const { mode } = statSync(new URL(chemin, import.meta.url));
-    expect(mode & 0o111, `${chemin} n'est plus exécutable`).not.toBe(0);
+describe("tout ce qui se demande, se demande avant", () => {
+  const premiereEtape = bootstrap.indexOf('etape 1 "Prérequis"');
+
+  it("le mot de passe sudo est réclamé avant la première étape", () => {
+    // Une invite qui surgit entre deux lignes du compte rendu casse l'affichage et
+    // laisse devant un écran qui n'avance plus, sans dire qu'il attend quelque chose.
+    const preAutorisation = bootstrap.indexOf("sudo -v");
+    expect(preAutorisation).toBeGreaterThan(-1);
+    expect(preAutorisation).toBeLessThan(premiereEtape);
+  });
+
+  it("le domaine et l'e-mail aussi", () => {
+    const questions = bootstrap.indexOf("Nom du serveur");
+    expect(questions).toBeGreaterThan(-1);
+    expect(questions).toBeLessThan(premiereEtape);
+  });
+
+  it("il annonce le parcours entier avant de demander à continuer", () => {
+    const annonce = bootstrap.indexOf("Ce qui sera fait");
+    expect(annonce).toBeGreaterThan(-1);
+    expect(annonce).toBeLessThan(bootstrap.indexOf("Continuer ?"));
+  });
+
+  it("hors terminal et sans --oui, il refuse plutôt que de supposer un accord", () => {
+    const { code, sortie } = lancer(bacASable());
+    expect(code).toBe(1);
+    expect(sortie).toContain("Ce qui sera fait");
+    expect(sortie).toContain("relancer avec --oui");
+  });
+});
+
+describe("le parcours enchaîne les six étapes", () => {
+  // Un seul déroulé pour les trois assertions : chacun lance un shell et plusieurs
+  // processus Node, et les multiplier rendait la suite instable sous charge.
+  const { sortie } = lancer(bacASable(), POSE);
+
+  it("configuration, DNS, certificat, pile puis vérification, dans cet ordre", () => {
+    const rang = (texte: string) => sortie.indexOf(texte);
+    for (const n of [1, 2, 3, 4, 5]) {
+      expect(rang(`Étape ${n} sur 6`)).toBeGreaterThan(-1);
+      expect(rang(`Étape ${n} sur 6`)).toBeLessThan(rang(`Étape ${n + 1} sur 6`));
+    }
+  });
+
+  it("il appelle l'outil d'administration, il ne réimplémente rien", () => {
+    for (const commande of ["init", "certificat", "doctor"]) {
+      expect(sortie).toContain(`ADMIN ${commande}`);
+    }
+    // `dns` est interrogé en silence tant qu'il répond : ce qui se voit alors est son
+    // verdict, pas son appel. C'est bien lui qui décide — le cas d'échec le montre.
+    expect(sortie).toContain("les deux noms résolvent");
+  });
+
+  it("init est appelé sans sa liste « ce qui reste à faire »", () => {
+    // Cette liste énumère précisément ce que le script s'apprête à faire sous les yeux
+    // du lecteur. L'afficher la ferait passer pour un travail à sa charge.
+    expect(sortie).toMatch(/ADMIN init[^\n]*--sans-suite/);
+  });
+});
+
+describe("il reprend où il en était, sans rien refaire", () => {
+  const configSeule = lancer(bacASable({ env: ENV_COMPLET }), ["--oui"]).sortie;
+  const toutPose = lancer(bacASable({ env: ENV_COMPLET, cert: true }), ["--oui"]).sortie;
+
+  it("une configuration déjà posée n'est pas rejouée, ni le domaine redemandé", () => {
+    expect(configSeule).toContain("infra/.env est déjà renseigné");
+    expect(configSeule).toContain("domaine : chat.tacita.fr");
+    expect(configSeule).not.toContain("ADMIN init");
+  });
+
+  it("un certificat déjà en place n'est pas réémis — le quota Let's Encrypt est fini", () => {
+    expect(toutPose).toContain("un certificat est déjà en place");
+    expect(toutPose).not.toContain("ADMIN certificat");
+  });
+
+  it("le plan annoncé dit d'emblée ce qui est déjà fait", () => {
+    expect(toutPose).toMatch(/2\. Configuration +déjà faite/);
+    expect(toutPose).toMatch(/4\. Certificat +déjà en place/);
+  });
+});
+
+describe("l'attente et l'échec se gèrent, ils ne se renvoient pas à plus tard", () => {
+  it("un DNS qui ne résout pas arrête le parcours, personne ne pouvant répondre", () => {
+    // En mode non interactif il n'y a pas de choix à offrir : poursuivre ferait brûler
+    // une tentative du quota Let's Encrypt sur un nom qui ne mène nulle part.
+    const { code, sortie } = lancer(bacASable({ env: ENV_COMPLET, adminEchoue: ["dns"] }), ["--oui"]);
+    expect(code).toBe(1);
+    expect(sortie).toContain("le DNS n'est pas prêt");
+    expect(sortie).not.toContain("ADMIN certificat");
+  });
+
+  it("en interactif, il propose de réessayer, de passer outre ou d'abandonner", () => {
+    expect(bootstrap).toContain("[r] réessayer");
+    expect(bootstrap).toContain("[p] passer outre");
+    expect(bootstrap).toContain("[a] abandonner");
+  });
+
+  it("un certificat qui échoue n'arrête pas le parcours, mais le dit", () => {
+    // La pile peut démarrer sans : ce qui manquera, c'est le HTTPS, et le diagnostic
+    // final le dira. Bloquer ici priverait de tout le reste pour une étape rattrapable.
+    const { sortie } = lancer(bacASable({ env: ENV_COMPLET, adminEchoue: ["certificat"] }), ["--oui"]);
+    expect(sortie).toContain("l'émission n'a pas abouti");
+    expect(sortie).toContain("Étape 5 sur 6");
+  });
+
+  it("la conclusion suit le verdict du diagnostic, et le code de sortie avec", () => {
+    // Se féliciter juste sous les lignes ✗ qu'on vient d'afficher serait le pire des
+    // deux mondes — et un déploiement automatisé doit pouvoir se fier au code.
+    const bac = bacASable({ env: ENV_COMPLET, cert: true, adminEchoue: ["doctor"] });
+    const { code, sortie } = lancer(bac, ["--oui"]);
+    expect(code).toBe(1);
+    expect(sortie).toContain("Il reste des lignes ✗");
+    expect(sortie).not.toContain("Terminé.");
+  });
+
+  it("tout au vert, il conclut et donne l'adresse à ouvrir", () => {
+    const { code, sortie } = lancer(bacASable({ env: ENV_COMPLET, cert: true }), ["--oui"]);
+    expect(code).toBe(0);
+    expect(sortie).toContain("Terminé.");
+    expect(sortie).toContain("https://chat.tacita.fr");
+  });
+});
+
+describe("le groupe docker interrompt le parcours, et c'est le bon comportement", () => {
+  it("le script s'arrête et dit de se reconnecter avant de reprendre", () => {
+    // Poursuivre mènerait droit à un « permission denied » au démarrage de la pile,
+    // qu'on prendrait pour une autre panne.
+    expect(bootstrap).toMatch(/usermod -aG docker/);
+    const bloc = bootstrap.slice(bootstrap.lastIndexOf('if [ "$BESOIN_GROUPE" -eq 1 ]'));
+    expect(bloc).toMatch(/se reconnecter/);
+    expect(bloc).toMatch(/reprendra à l'étape 2/);
+    // Il sort en 0 : ce n'est pas une panne, c'est une pause que le système impose.
+    expect(bloc.slice(0, bloc.indexOf('etape 2'))).toMatch(/exit 0/);
   });
 });
 
@@ -320,4 +282,27 @@ describe("il ne détruit rien", () => {
       expect(bootstrap).not.toMatch(motif);
     },
   );
+});
+
+describe("les scripts du dépôt restent exécutables", () => {
+  /**
+   * Une perte de bit exécutable est silencieuse : le hook de pré-commit cesse de tourner
+   * sans que rien ne le dise, et la porte du dépôt disparaît. C'est arrivé — un outil qui
+   * régénérait des fichiers depuis `git show` a effacé le mode de quatre scripts d'un
+   * coup. Git suit ce mode, mais rien ne le vérifiait.
+   *
+   * `staging/certs-deploy-hook.sh` n'est pas de la liste, et c'est volontaire : il n'est
+   * jamais lancé depuis le dépôt, mais posé par `install -D -m 755`, qui fixe son mode à
+   * destination.
+   */
+  it.each([
+    "infra/bootstrap.sh",
+    "infra/proxy/generate-dev-certs.sh",
+    "infra/postgres/10-invite-tokens.sh",
+    "infra/rtc/firewall/host-ufw.sh",
+    ".husky/pre-commit",
+  ])("%s porte le bit exécutable", (chemin) => {
+    const { mode } = statSync(join(DEPOT, chemin));
+    expect(mode & 0o111, `${chemin} n'est plus exécutable`).not.toBe(0);
+  });
 });

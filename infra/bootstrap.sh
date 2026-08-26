@@ -1,51 +1,109 @@
 #!/bin/sh
-# Amorçage d'une Ubuntu nue : installer ce sans quoi rien du reste ne peut tourner.
+# Assistant d'installation : d'une Ubuntu nue à une pile joignable.
 #
-# Pourquoi du shell POSIX et pas du TypeScript comme le reste de l'outil d'administration :
-# c'est le problème de l'œuf et de la poule. `pnpm admin` a besoin de Node 22 et de pnpm,
-# et Ubuntu 24.04 livre Node 18 dans apt. Ce script est donc le seul artefact qui doive
-# tourner AVANT que quoi que ce soit d'autre existe — d'où l'absence totale de
-# dépendances, `sh` et non `bash`, et rien qui suppose un shell interactif.
+# Un seul point d'entrée, six étapes, et rien à retenir entre elles. Le script est le
+# parcours ; les commandes `pnpm admin` qu'il enchaîne restent utilisables séparément
+# pour qui sait déjà ce qu'il fait.
 #
-#   sh infra/bootstrap.sh          # annonce, demande une fois, puis travaille en silence
-#   sh infra/bootstrap.sh --oui    # sans demander, pour l'automatisation
+#   sh infra/bootstrap.sh
+#   sh infra/bootstrap.sh --domaine=chat.mon-domaine.fr --email=moi@mon-domaine.fr --oui
+#   sh infra/bootstrap.sh --dev        # machine de développement, certificat auto-signé
 #
-# Il est **rejouable** : ce qui est déjà installé n'est pas réinstallé. Il n'installe que
-# des prérequis, ne touche à aucune configuration du projet, et ne démarre rien.
+# Pourquoi du shell POSIX alors que tout le reste est en TypeScript : c'est l'œuf et la
+# poule. Ce script doit tourner AVANT Node — d'où `sh` et non `bash`, aucune dépendance,
+# et rien qui suppose un shell interactif.
 #
-# Trois principes gouvernent son déroulé :
+# Quatre principes, tirés de ce qui fait tenir un assistant (clig.dev, `gh auth login`,
+# `flutter doctor`) :
 #
-#  1. **Tout se demande avant.** La confirmation et le mot de passe sudo sont réclamés
-#     d'emblée, jamais au milieu du travail : une invite qui surgit entre deux étapes
-#     casse le compte rendu et laisse l'utilisateur devant un écran qui n'avance plus.
-#  2. **Une ligne par étape, pas mille.** La sortie des installations part dans un
-#     journal ; l'écran ne porte que « [3/6] Node 22 … ok ». En cas d'échec, les
-#     dernières lignes du journal sont affichées — c'est là, et seulement là, qu'on a
-#     besoin du détail.
-#  3. **Constater d'abord, agir ensuite.** Rien n'est modifié avant que le plan entier
-#     soit établi et accepté.
+#  1. Reprenable. Chaque étape détecte si elle est déjà faite et le dit. Relancer le
+#     script après une interruption — ou après la reconnexion qu'exige le groupe docker —
+#     repart exactement d'où l'on en était, sans rien refaire.
+#  2. Tout se demande avant. Confirmation, domaine, e-mail et mot de passe sudo sont
+#     réclamés d'emblée. Une question qui surgit au milieu du travail casse le compte
+#     rendu et laisse devant un écran qui n'avance plus.
+#  3. Détecter plutôt que demander. Rien n'est réclamé qui puisse être lu — le domaine
+#     déjà posé dans `infra/.env` ne sera pas redemandé.
+#  4. L'attente se gère. La propagation DNS ne renvoie pas à plus tard : elle boucle,
+#     avec le choix de réessayer, de passer outre ou d'abandonner.
 
 set -eu
 
 NODE_MAJEUR_MINIMAL=22
+TOTAL_ETAPES=6
 
 RACINE="$(cd "$(dirname "$0")/.." && pwd)"
-JOURNAL="$(mktemp -t tacita-bootstrap-XXXXXX.log)"
+JOURNAL="$(mktemp -t tacita-install-XXXXXX.log)"
 
 SANS_DEMANDER=0
-[ "${1:-}" = "--oui" ] && SANS_DEMANDER=1
+DEV=0
+DOMAINE=""
+COURRIEL=""
+for argument in "$@"; do
+  case "$argument" in
+    --oui) SANS_DEMANDER=1 ;;
+    --dev) DEV=1 ;;
+    --domaine=*) DOMAINE="${argument#--domaine=}" ;;
+    --email=*) COURRIEL="${argument#--email=}" ;;
+    -h | --help)
+      sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      printf 'option inconnue : %s\n' "$argument"
+      exit 2
+      ;;
+  esac
+done
 
 dire() { printf '%s\n' "$*"; }
 titre() { printf '\n%s\n' "$*"; }
+deja() { printf '  ✓ %s\n' "$*"; }
+souci() { printf '  ✗ %s\n' "$*"; }
 
-# La version de pnpm est lue dans `package.json` plutôt que recopiée : deux endroits qui
-# doivent s'accorder finissent toujours par diverger, et personne ne le verrait avant
-# qu'un serveur neuf installe la mauvaise.
-PNPM_VOULU="$(sed -n 's/.*"packageManager": *"\(pnpm@[^"]*\)".*/\1/p' "$RACINE/package.json")"
-[ -n "$PNPM_VOULU" ] || PNPM_VOULU="pnpm@latest"
+etape() {
+  printf '\n  Étape %s sur %s · %s\n' "$1" "$TOTAL_ETAPES" "$2"
+  printf '  %s\n' "$(printf '%*s' 46 '' | tr ' ' '-')"
+}
 
-# On n'élève les privilèges que si on ne les a pas déjà : sur une image sans sudo — c'est
-# fréquent en conteneur — le supposer ferait échouer un script qui n'en avait pas besoin.
+# Rend une commande silencieuse — sa sortie part au journal — tout en montrant qu'elle
+# travaille. Sans ce battement, un build de dix minutes passe pour un écran figé, et
+# c'est à ce moment-là qu'on l'interrompt.
+avec_battement() {
+  "$@" >>"$JOURNAL" 2>&1 &
+  attendu=$!
+  # Sonder finement, afficher lentement. Dormir trois secondes entre deux sondages
+  # faisait payer trois secondes à toute étape, même instantanée ; ne battre qu'un
+  # quart de seconde noierait un build de dix minutes sous les points.
+  battement=0
+  while kill -0 "$attendu" 2>/dev/null; do
+    battement=$((battement + 1))
+    [ "$((battement % 12))" -eq 1 ] && printf '.'
+    sleep 0.25 2>/dev/null || sleep 1
+  done
+  wait "$attendu"
+}
+
+echouer() {
+  dire " ÉCHEC"
+  titre "  Dernières lignes du journal ($JOURNAL) :"
+  tail -20 "$JOURNAL" | sed 's/^/    /'
+  titre "  Le journal est conservé. Corriger, puis relancer :"
+  dire "    sh infra/bootstrap.sh"
+  dire "  Le script reprendra à cette étape."
+  exit 1
+}
+
+# L'outil d'administration s'appelle par Node plutôt que par `pnpm admin` : un pnpm
+# installé à l'instant même n'est pas toujours visible du shell en cours, et la
+# transmission des options à travers `pnpm run` réserve des surprises.
+admin() {
+  (cd "$RACINE" && node --disable-warning=ExperimentalWarning --experimental-strip-types \
+    apps/admin/src/index.ts "$@")
+}
+
+# ════════ Ce qu'on doit savoir avant de commencer ════════
+
 EST_ROOT=0
 [ "$(id -u)" -eq 0 ] && EST_ROOT=1
 if [ "$EST_ROOT" -eq 0 ] && ! command -v sudo >/dev/null 2>&1; then
@@ -53,131 +111,152 @@ if [ "$EST_ROOT" -eq 0 ] && ! command -v sudo >/dev/null 2>&1; then
   exit 1
 fi
 
-# Exécute une commande avec les droits root, en préservant l'environnement (les variables
-# de proxy, notamment, sans lesquelles rien ne se télécharge derrière un pare-feu
-# d'entreprise).
-#
-# Une fonction et non un préfixe `$SUDO` : `-E` est une option de **sudo**, pas de la
-# commande appelée. Écrit `$SUDO -E bash -`, il devenait `-E bash -` quand la variable
-# était vide — donc à chaque exécution en root, celle de tout serveur neuf. Le shell
-# cherchait alors un programme nommé « -E ». Un préfixe qui change de sens selon qu'il
-# est vide ou non n'est pas un préfixe.
+# `-E` est une option de sudo, pas de la commande appelée. Écrit `$SUDO -E bash -`, il
+# devenait `-E bash -` quand la variable était vide — donc à chaque exécution en root,
+# celle de tout serveur neuf. Un préfixe qui change de sens selon qu'il est vide ou non
+# n'est pas un préfixe.
 en_root() {
-  if [ "$EST_ROOT" -eq 1 ]; then
-    "$@"
-  else
-    sudo -E "$@"
-  fi
+  if [ "$EST_ROOT" -eq 1 ]; then "$@"; else sudo -E "$@"; fi
 }
+
+PNPM_VOULU="$(sed -n 's/.*"packageManager": *"\(pnpm@[^"]*\)".*/\1/p' "$RACINE/package.json")"
+[ -n "$PNPM_VOULU" ] || PNPM_VOULU="pnpm@latest"
 
 node_majeur() {
   command -v node >/dev/null 2>&1 || { echo 0; return; }
   node --version | sed 's/^v//; s/\..*//'
 }
 
-# --- 1. Constater, sans rien modifier -----------------------------------------------
+# --- Ce qui manque, constaté sans rien modifier ---
 
-# Une étape par ligne, « identifiant|libellé ». Pas de tableaux en shell POSIX ; une
-# liste à séparateur en tient lieu et se parcourt sans surprise.
 ETAPES=""
 ajouter() { ETAPES="${ETAPES}$1|$2
 "; }
-
 BESOIN_APT=0
 
 command -v curl >/dev/null 2>&1 || { ajouter curl "curl et les certificats racine"; BESOIN_APT=1; }
 command -v git >/dev/null 2>&1 || { ajouter git "git"; BESOIN_APT=1; }
-
 if ! command -v docker >/dev/null 2>&1; then
   ajouter docker "Docker"
 elif ! docker compose version >/dev/null 2>&1; then
-  # Docker posé par le script officiel apporte déjà le plugin ; ce cas ne concerne
-  # qu'un Docker installé autrement, typiquement le paquet `docker.io` d'Ubuntu.
   ajouter compose "Plugin compose v2"
   BESOIN_APT=1
 fi
-
 if [ "$(node_majeur)" -lt "$NODE_MAJEUR_MINIMAL" ] 2>/dev/null; then
   ajouter node "Node ${NODE_MAJEUR_MINIMAL}"
   BESOIN_APT=1
 fi
-
-# pnpm vient de corepack, livré avec Node : rien à télécharger d'un autre dépôt, et la
-# version est celle que le dépôt déclare. Sans lui, `pnpm admin` n'existe pas — et c'est
-# tout l'outil d'administration qui manque à l'appel.
 command -v pnpm >/dev/null 2>&1 || ajouter pnpm "pnpm (${PNPM_VOULU#pnpm@})"
-
-# certbot ne sert qu'à `pnpm admin certificat`, mais l'installer maintenant évite un
-# aller-retour au moment précis où l'on veut émettre.
 command -v certbot >/dev/null 2>&1 || { ajouter certbot "certbot"; BESOIN_APT=1; }
-
+BESOIN_GROUPE=0
 if [ "$EST_ROOT" -eq 0 ] && ! id -nG "$(id -un)" | grep -qw docker; then
   ajouter groupe "Ajouter $(id -un) au groupe docker"
+  BESOIN_GROUPE=1
 fi
+NOMBRE_PREREQUIS="$(printf '%s' "$ETAPES" | grep -c . || true)"
 
-NOMBRE="$(printf '%s' "$ETAPES" | grep -c . || true)"
-
-if [ "$NOMBRE" -eq 0 ]; then
-  titre "Rien à faire — tout est déjà en place."
-  dire "  Docker  $(docker --version)"
-  dire "  Compose $(docker compose version)"
-  dire "  Node    $(node --version)"
-  dire "  pnpm    $(pnpm --version)"
-  titre "La suite :"
-  dire "  pnpm admin init --domaine=chat.ton-domaine.fr --email=toi@ton-domaine.fr"
-  dire "  pnpm admin doctor"
-  rm -f "$JOURNAL"
-  exit 0
-fi
-
-# `apt-get` n'est requis que pour ce que le script officiel de Docker ne pose pas. Le
-# vérifier maintenant évite un demi-échec : Docker installé, puis un `apt-get` introuvable.
 if [ "$BESOIN_APT" -eq 1 ] && ! command -v apt-get >/dev/null 2>&1; then
   dire "apt-get est introuvable : cette distribution n'est pas Debian ni Ubuntu."
   dire "Installer à la main Node ${NODE_MAJEUR_MINIMAL}+, pnpm, le plugin docker compose v2"
-  dire "et certbot, puis relancer ce script — il constatera qu'il n'a plus rien à faire."
+  dire "et certbot, puis relancer — le script constatera qu'il n'a plus rien à faire."
   rm -f "$JOURNAL"
   exit 1
 fi
 
-# --- 2. Tout demander maintenant, rien plus tard ------------------------------------
+# --- Ce qui est déjà fait, pour ne pas le redemander ---
 
-titre "Ce script va installer, en tant que root :"
-while IFS='|' read -r _id libelle; do
-  [ -n "$libelle" ] && dire "  • $libelle"
-done <<FIN
+ENV="$RACINE/infra/.env"
+CONFIG_FAITE=0
+if [ -f "$ENV" ] && ! grep -q 'change-me' "$ENV"; then CONFIG_FAITE=1; fi
+DOMAINE_POSE=""
+[ -f "$ENV" ] && DOMAINE_POSE="$(sed -n 's/^SERVER_NAME=\(.*\)$/\1/p' "$ENV")"
+case "$DOMAINE_POSE" in *example.org | *example.com | "") DOMAINE_POSE="" ;; esac
+[ -n "$DOMAINE_POSE" ] && [ -z "$DOMAINE" ] && DOMAINE="$DOMAINE_POSE"
+
+CERT_FAIT=0
+[ -f "$RACINE/infra/proxy/certs/fullchain.pem" ] && CERT_FAIT=1
+
+# ════════ Annoncer, puis tout demander d'un coup ════════
+
+titre "Installation de Tacita"
+dire ""
+dire "  Six étapes. Le script les enchaîne, et reprend où il en était si tu l'arrêtes."
+dire "  Journal détaillé : $JOURNAL"
+titre "  Ce qui sera fait :"
+if [ "$NOMBRE_PREREQUIS" -eq 0 ]; then
+  dire "    1. Prérequis         déjà en place"
+else
+  dire "    1. Prérequis         $NOMBRE_PREREQUIS à installer, en tant que root"
+  while IFS='|' read -r _id libelle; do
+    [ -n "$libelle" ] && dire "                          • $libelle"
+  done <<FIN
 $ETAPES
 FIN
-dire ""
-dire "Il ne touche à aucune configuration du projet et ne démarre rien."
-dire "Journal détaillé : $JOURNAL"
+fi
+if [ "$CONFIG_FAITE" -eq 1 ]; then
+  dire "    2. Configuration     déjà faite"
+else
+  dire "    2. Configuration     secrets, clés VAPID, domaine"
+fi
+dire "    3. DNS               vérification des deux enregistrements"
+if [ "$CERT_FAIT" -eq 1 ]; then
+  dire "    4. Certificat        déjà en place"
+else
+  dire "    4. Certificat        émission TLS"
+fi
+dire "    5. Pile              démarrage des conteneurs"
+dire "    6. Vérification      diagnostic complet"
 
 if [ "$SANS_DEMANDER" -eq 0 ]; then
   if [ ! -t 0 ]; then
-    dire ""
-    dire "Hors terminal : relancer avec --oui pour accepter sans qu'on demande."
+    titre "Hors terminal : relancer avec --oui, et --domaine= --email= si besoin."
     rm -f "$JOURNAL"
     exit 1
   fi
-  printf '\nContinuer ? [o/N] '
+  printf '\n  Continuer ? [o/N] '
   read -r reponse
   case "$reponse" in
     o | O | oui | Oui | y | Y | yes) ;;
     *)
-      dire "Abandon — rien n'a été modifié."
+      dire "  Abandon — rien n'a été modifié."
       rm -f "$JOURNAL"
       exit 1
       ;;
   esac
 fi
 
-# Le mot de passe se demande ici, pas au milieu du compte rendu. Une invite sudo qui
-# surgit entre deux étapes casse l'affichage et laisse devant un écran qui n'avance plus,
-# sans dire qu'il attend quelque chose.
-if [ "$EST_ROOT" -eq 0 ] && ! sudo -n -v >/dev/null 2>&1; then
+# Le domaine et l'e-mail ne servent qu'à la configuration — mais ils se demandent ici,
+# avec le reste, plutôt qu'au milieu du parcours.
+demander() {
+  printf '  %s : ' "$1"
+  read -r saisie
+  printf '%s' "$saisie"
+}
+if [ "$CONFIG_FAITE" -eq 0 ]; then
+  if [ -z "$DOMAINE" ]; then
+    if [ ! -t 0 ]; then
+      dire "  Le domaine manque : le passer en --domaine=chat.mon-domaine.fr"
+      rm -f "$JOURNAL"
+      exit 2
+    fi
+    dire ""
+    DOMAINE="$(demander 'Nom du serveur (ex. chat.mon-domaine.fr)')"
+  fi
+  if [ -z "$COURRIEL" ]; then
+    if [ ! -t 0 ]; then
+      dire "  L'e-mail manque : le passer en --email=moi@mon-domaine.fr"
+      rm -f "$JOURNAL"
+      exit 2
+    fi
+    COURRIEL="$(demander 'Adresse e-mail de contact')"
+  fi
+fi
+
+# Le mot de passe sudo se demande ici, pas entre deux étapes.
+if [ "$EST_ROOT" -eq 0 ] && [ "$NOMBRE_PREREQUIS" -gt 0 ] && ! sudo -n -v >/dev/null 2>&1; then
   if [ ! -t 0 ]; then
-    dire "sudo réclame un mot de passe et il n'y a pas de terminal pour le saisir."
-    dire "Relancer en root, ou autoriser sudo sans mot de passe pour cet utilisateur."
+    dire "  sudo réclame un mot de passe et il n'y a pas de terminal pour le saisir."
+    dire "  Relancer en root, ou autoriser sudo sans mot de passe pour cet utilisateur."
     rm -f "$JOURNAL"
     exit 1
   fi
@@ -185,7 +264,9 @@ if [ "$EST_ROOT" -eq 0 ] && ! sudo -n -v >/dev/null 2>&1; then
   sudo -v
 fi
 
-# --- 3. Exécuter, une ligne par étape ------------------------------------------------
+# ════════ 1. Prérequis ════════
+
+etape 1 "Prérequis"
 
 faire() {
   case "$1" in
@@ -198,69 +279,177 @@ faire() {
       # types dont dépendent les services de ce dépôt. NodeSource est le chemin documenté.
       #
       # Le `&&` n'est pas décoratif : `set -e` ne s'applique pas dans une fonction
-      # appelée en condition d'un `if`. Enchaînées par un simple retour à la ligne, ces
-      # deux commandes s'exécutaient toutes les deux — donc si NodeSource échouait,
-      # `apt-get` posait quand même le Node 18 d'Ubuntu, et l'étape se disait en échec
-      # après avoir installé la mauvaise version.
+      # appelée en condition d'un `if`. Sans lui, `apt-get` posait le Node 18 d'Ubuntu
+      # même quand NodeSource avait échoué.
       curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJEUR_MINIMAL}.x" | en_root bash - &&
         en_root apt-get install -y nodejs
       ;;
-    pnpm)
-      en_root corepack enable && en_root corepack prepare "$PNPM_VOULU" --activate
-      ;;
+    pnpm) en_root corepack enable && en_root corepack prepare "$PNPM_VOULU" --activate ;;
     certbot) en_root apt-get install -y certbot ;;
     groupe) en_root usermod -aG docker "$(id -un)" ;;
-    *)
-      dire "étape inconnue : $1"
-      return 1
-      ;;
+    *) return 1 ;;
   esac
 }
 
-titre "Installation"
-
-if [ "$BESOIN_APT" -eq 1 ]; then
-  printf '  [0/%s] %-34s' "$NOMBRE" "Index des paquets"
-  if en_root apt-get update >>"$JOURNAL" 2>&1; then dire " ok"; else
-    dire " ÉCHEC"
-    titre "Dernières lignes du journal ($JOURNAL) :"
-    tail -20 "$JOURNAL"
-    exit 1
-  fi
-fi
-
-# Redirection et non tube : derrière un tube, la boucle tournerait dans un sous-shell,
-# le compteur y resterait et `exit` n'y sortirait que du sous-shell — le script
-# poursuivrait allègrement après une étape en échec.
-RANG=0
-while IFS='|' read -r id libelle; do
-  [ -n "$id" ] || continue
-  RANG=$((RANG + 1))
-  printf '  [%s/%s] %-34s' "$RANG" "$NOMBRE" "$libelle"
-  if faire "$id" >>"$JOURNAL" 2>&1; then
+if [ "$NOMBRE_PREREQUIS" -eq 0 ]; then
+  deja "tout est déjà en place"
+else
+  if [ "$BESOIN_APT" -eq 1 ]; then
+    printf '  [0/%s] %-30s' "$NOMBRE_PREREQUIS" "Index des paquets"
+    avec_battement en_root apt-get update || echouer
     dire " ok"
-  else
-    dire " ÉCHEC"
-    titre "Dernières lignes du journal ($JOURNAL) :"
-    tail -20 "$JOURNAL"
-    dire ""
-    dire "Le journal complet est conservé. Relancer le script reprendra où il en est."
-    exit 1
   fi
-done <<FIN
+  RANG=0
+  while IFS='|' read -r id libelle; do
+    [ -n "$id" ] || continue
+    RANG=$((RANG + 1))
+    printf '  [%s/%s] %-30s' "$RANG" "$NOMBRE_PREREQUIS" "$libelle"
+    avec_battement faire "$id" || echouer
+    dire " ok"
+  done <<FIN
 $ETAPES
 FIN
-
-if printf '%s' "$ETAPES" | grep -q '^groupe|'; then
-  titre "⚠ Se déconnecter puis se reconnecter"
-  dire "  Le groupe docker ne prend effet qu'à la session suivante. Sans ça, la prochaine"
-  dire "  commande Docker répondra « permission denied », et ce n'est pas une autre panne."
+  # Le shell garde en cache l'emplacement des commandes : sans ça, `node` fraîchement
+  # installé resterait introuvable pour le reste du script.
+  hash -r 2>/dev/null || true
 fi
 
-titre "Prêt. La suite :"
-dire "  pnpm admin init --domaine=chat.ton-domaine.fr --email=toi@ton-domaine.fr"
-dire "  pnpm admin dns"
-dire "  pnpm admin certificat"
-dire "  pnpm admin doctor"
-dire ""
-dire "Journal de cette exécution : $JOURNAL"
+# Le groupe docker ne prend effet qu'à la session suivante. Poursuivre mènerait droit à
+# un « permission denied » à l'étape 5, qu'on prendrait pour une autre panne.
+if [ "$BESOIN_GROUPE" -eq 1 ]; then
+  titre "  Il faut se reconnecter avant de continuer."
+  dire "    Le groupe docker vient d'être ajouté et ne prend effet qu'à la prochaine"
+  dire "    session. Sans ça, le démarrage de la pile répondrait « permission denied »,"
+  dire "    et ce ne serait pas une autre panne."
+  titre "    exit          # puis se reconnecter en SSH"
+  dire "    cd $RACINE && sh infra/bootstrap.sh"
+  dire ""
+  dire "  Le script reprendra à l'étape 2."
+  exit 0
+fi
+
+# ════════ 2. Configuration ════════
+
+etape 2 "Configuration"
+
+if [ "$CONFIG_FAITE" -eq 1 ]; then
+  deja "infra/.env est déjà renseigné"
+  deja "domaine : $DOMAINE"
+else
+  if [ "$DEV" -eq 1 ]; then
+    admin init --domaine="$DOMAINE" --email="$COURRIEL" --sans-suite --dev | sed 's/^/  /'
+  else
+    admin init --domaine="$DOMAINE" --email="$COURRIEL" --sans-suite | sed 's/^/  /'
+  fi
+fi
+
+# ════════ 3. DNS ════════
+
+etape 3 "DNS"
+
+if [ "$DEV" -eq 1 ]; then
+  deja "développement : le fichier hosts tient lieu de DNS"
+  dire "    Ajouter « 127.0.0.1 $DOMAINE call.$DOMAINE » s'il n'y est pas déjà."
+else
+  # L'attente se gère ici, elle ne se renvoie pas à plus tard. La propagation prend de
+  # quelques minutes à quelques heures ; le script montre l'état et laisse le choix.
+  while :; do
+    if admin dns >/dev/null 2>&1; then
+      deja "les deux noms résolvent vers cette machine"
+      break
+    fi
+    admin dns 2>&1 | sed 's/^/  /' || true
+    if [ "$SANS_DEMANDER" -eq 1 ] || [ ! -t 0 ]; then
+      souci "le DNS n'est pas prêt, et personne ne peut répondre — arrêt ici"
+      dire "    Créer les enregistrements, puis relancer : sh infra/bootstrap.sh"
+      exit 1
+    fi
+    printf '  [r] réessayer   [p] passer outre   [a] abandonner : '
+    read -r choix
+    case "$choix" in
+      r | R | "") continue ;;
+      p | P)
+        souci "on passe outre — l'émission du certificat échouera probablement"
+        break
+        ;;
+      *)
+        dire "  Abandon. Relancer plus tard : sh infra/bootstrap.sh"
+        exit 1
+        ;;
+    esac
+  done
+fi
+
+# ════════ 4. Certificat ════════
+
+etape 4 "Certificat"
+
+if [ "$CERT_FAIT" -eq 1 ]; then
+  deja "un certificat est déjà en place"
+  dire "    Renouvellement automatique ; --force pour réémettre malgré tout."
+else
+  # Le certificat reste au premier plan : certbot prend du temps, parle, et consomme un
+  # quota. C'est exactement ce qu'on ne masque pas derrière un point qui clignote.
+  CERT_ARGS=""
+  [ "$SANS_DEMANDER" -eq 1 ] && CERT_ARGS="--oui"
+  [ "$DEV" -eq 1 ] && CERT_ARGS="$CERT_ARGS --dev"
+  # shellcheck disable=SC2086
+  if admin certificat --email="$COURRIEL" $CERT_ARGS; then
+    deja "certificat en place"
+  else
+    souci "l'émission n'a pas abouti"
+    dire "    La pile peut démarrer sans, mais rien ne répondra en HTTPS."
+    dire "    Reprendre ensuite : pnpm admin certificat"
+  fi
+fi
+
+# ════════ 5. Pile ════════
+
+etape 5 "Pile"
+
+if [ "$DEV" -eq 1 ]; then
+  COMPOSE="-f docker-compose.yml -f smoke/docker-compose.yml"
+else
+  COMPOSE="-f docker-compose.yml -f staging/docker-compose.yml"
+fi
+
+[ -n "$(docker compose -p tacita ps -q 2>/dev/null)" ] && deja "des conteneurs tournent déjà, ils seront mis à jour"
+printf '  %-38s' "Construction et démarrage"
+avec_battement sh -c "cd '$RACINE/infra' && docker compose $COMPOSE up -d --build" || echouer
+dire " ok"
+
+# ════════ 6. Vérification ════════
+
+etape 6 "Vérification"
+
+VERDICT=0
+if [ "$DEV" -eq 1 ]; then
+  admin doctor --dev || VERDICT=$?
+else
+  admin doctor || VERDICT=$?
+fi
+
+# Conclure « terminé » sur un diagnostic qui bloque serait le pire des deux mondes : le
+# script se féliciterait juste sous les lignes ✗ qu'il vient d'afficher. La fin suit le
+# verdict, et le code de sortie avec — un déploiement automatisé doit pouvoir s'y fier.
+if [ "$VERDICT" -eq 0 ]; then
+  titre "Terminé."
+  if [ "$DEV" -eq 1 ]; then
+    dire "  Ouvrir https://$DOMAINE, après avoir importé infra/proxy/certs/fullchain.pem"
+    dire "  comme autorité de confiance du navigateur."
+  else
+    dire "  Ouvrir https://$DOMAINE et créer le premier compte depuis l'application :"
+    dire "  identifiant et mot de passe, sans code d'invitation."
+  fi
+  dire ""
+  dire "  Journal de cette installation : $JOURNAL"
+else
+  titre "Il reste des lignes ✗ ci-dessus."
+  dire "  Chacune porte son remède. Les corriger, puis relancer :"
+  dire ""
+  dire "    sh infra/bootstrap.sh        # reprend le parcours là où il en est"
+  dire "    pnpm admin doctor            # vérifie seulement, sans rien toucher"
+  dire ""
+  dire "  Journal de cette installation : $JOURNAL"
+  exit 1
+fi

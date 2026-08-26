@@ -24,49 +24,60 @@ tourne immédiatement après `git clone`, sans `pnpm install`. Sa seule exigence
 — et c'est la première chose que `doctor` vérifie, parce qu'Ubuntu 24.04 livre Node 18
 dans apt.
 
-## `infra/bootstrap.sh` — le problème de l'œuf et de la poule
+## `infra/bootstrap.sh` — l'assistant d'installation
 
-Le seul artefact du lot écrit en shell, et il n'y a qu'une raison à ça : `pnpm admin` a
-besoin de Node 22 et de pnpm, et Ubuntu 24.04 livre Node 18 dans apt. Ce script doit donc
-tourner **avant** que quoi que ce soit d'autre existe — d'où `sh` et non `bash`, aucune
-dépendance, et rien qui suppose un shell interactif.
-
-**Ce qu'il couvre** : `curl` et les certificats racine, `git`, Docker, le plugin compose
-v2, Node 22, **pnpm**, `certbot`, et l'appartenance au groupe `docker`. Sans pnpm, la
-commande `pnpm admin` n'existe pas — c'est tout l'outil d'administration qui manque à
-l'appel, et c'était le trou.
-
-La version de pnpm est **lue dans `package.json`**, jamais recopiée : deux endroits qui
-doivent s'accorder finissent par diverger, et personne ne le verrait avant qu'un serveur
-neuf pose la mauvaise.
-
-Trois principes gouvernent son déroulé.
-
-**Tout se demande avant.** La confirmation et le mot de passe sudo sont réclamés d'emblée
-— ce dernier par un `sudo -v` avant la première étape. Une invite qui surgit au milieu du
-travail casse le compte rendu et laisse devant un écran qui n'avance plus, sans dire
-qu'il attend quelque chose.
-
-**Une ligne par étape, pas mille.** La sortie des installations part dans un journal ;
-l'écran ne porte que le compteur :
+Un seul point d'entrée, six étapes, rien à retenir entre elles. Le script **est** le
+parcours ; les commandes `pnpm admin` qu'il enchaîne restent utilisables séparément pour
+qui sait déjà ce qu'il fait.
 
 ```
-Installation
-  [0/3] Index des paquets                  ok
-  [1/3] Node 22                            ok
-  [2/3] pnpm (11.18.0)                     ok
-  [3/3] certbot                            ok
+  Étape 1 sur 6 · Prérequis        curl, git, Docker, compose, Node 22, pnpm, certbot
+  Étape 2 sur 6 · Configuration    pnpm admin init
+  Étape 3 sur 6 · DNS              pnpm admin dns, avec attente gérée
+  Étape 4 sur 6 · Certificat       pnpm admin certificat
+  Étape 5 sur 6 · Pile             docker compose up -d --build
+  Étape 6 sur 6 · Vérification     pnpm admin doctor
 ```
 
-En cas d'échec, les vingt dernières lignes du journal s'affichent et le script s'arrête
-là — c'est le seul endroit où le détail sert. Le journal complet est conservé, et
-relancer reprend où l'on en était.
+Il reste en shell POSIX parce que c'est l'œuf et la poule : il doit tourner **avant**
+Node. D'où `sh` et non `bash`, aucune dépendance, rien qui suppose un shell interactif.
 
-**Constater d'abord, agir ensuite.** Rien n'est modifié avant que le plan entier soit
-établi et accepté. `--oui` saute la question pour l'automatisation ; hors terminal et
-sans `--oui`, il refuse plutôt que de supposer un accord. L'absence d'`apt-get` est
-constatée **avant** la première installation : sinon, sur une distribution non-Debian, il
-posait Docker puis échouait — dans un état intermédiaire que personne n'avait demandé.
+**Reprenable.** Chaque étape détecte si elle est déjà faite et le dit. Relancer après une
+interruption repart exactement d'où l'on en était : le domaine déjà posé dans `.env`
+n'est pas redemandé, un certificat en place n'est pas réémis — le quota Let's Encrypt
+n'est pas infini.
+
+**Tout se demande avant.** Confirmation, domaine, e-mail et mot de passe sudo — ce
+dernier par un `sudo -v` avant la première étape. Une question qui surgit au milieu du
+travail casse le compte rendu et laisse devant un écran qui n'avance plus.
+
+**Une ligne par étape.** La sortie des installations part dans un journal, l'écran ne
+porte que `[2/3] pnpm (11.18.0) … ok`. Les longues opérations montrent un battement,
+faute de quoi un build de dix minutes passe pour un écran figé — et c'est là qu'on
+l'interrompt. En cas d'échec, les vingt dernières lignes du journal s'affichent : c'est
+le seul endroit où le détail sert.
+
+**L'attente se gère.** La propagation DNS ne renvoie pas à demain : elle boucle, montre
+l'état, et offre de réessayer, de passer outre ou d'abandonner. En mode `--oui` elle
+s'arrête net plutôt que de brûler une tentative de certificat sur un nom muet.
+
+**Le groupe docker interrompt le parcours, et c'est correct.** Il ne prend effet qu'à la
+session suivante ; poursuivre mènerait droit à un « permission denied » au démarrage de
+la pile, qu'on prendrait pour une autre panne. Le script s'arrête, dit de se reconnecter,
+et reprendra à l'étape 2.
+
+**La conclusion suit le verdict.** Si le diagnostic final bloque, le script ne se félicite
+pas sous les lignes ✗ qu'il vient d'afficher : il dit ce qui reste et sort en 1, pour
+qu'un déploiement automatisé puisse s'y fier.
+
+```sh
+sh infra/bootstrap.sh
+sh infra/bootstrap.sh --domaine=chat.mon-domaine.fr --email=moi@mon-domaine.fr --oui
+sh infra/bootstrap.sh --dev
+```
+
+La version de pnpm est **lue dans `package.json`**, jamais recopiée ; celle de Node est
+tenue avec `machine.ts` par `infra/tests/bootstrap.test.ts`.
 
 ## Pourquoi un outil et pas un runbook
 
