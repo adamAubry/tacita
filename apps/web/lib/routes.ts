@@ -22,6 +22,14 @@ export const routeConversation = (roomId: string, eventId?: string) =>
 
 export const routeInfos = (roomId: string) => avecSalon("/c/infos", roomId);
 
+/**
+ * Le chemin de l'écran d'appel, nommé plutôt que recopié : la bannière d'appel entrant a
+ * besoin de savoir si on y est déjà — elle ne doit pas se rallumer par-dessus l'appel
+ * qu'on vient de décrocher —, et le reconnaître par un littéral à elle serait un
+ * deuxième gabarit de route, à diverger au premier changement.
+ */
+export const CHEMIN_APPEL = "/c/appel";
+
 /** l'écran d'appel (M-I). `video=1` distingue vidéo de voix. */
 export const routeAppel = (roomId: string, video = false) =>
-  avecSalon("/c/appel", roomId, video ? "&video=1" : "");
+  avecSalon(CHEMIN_APPEL, roomId, video ? "&video=1" : "");

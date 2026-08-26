@@ -36,3 +36,18 @@ export function dateApercu(horodatage: number, maintenant: number = Date.now()):
     ? heure(horodatage)
     : new Intl.DateTimeFormat(undefined, { dateStyle: "short" }).format(horodatage);
 }
+
+/**
+ * Une durée d'appel, telle qu'un journal la lit. Jamais de secondes au-delà d'une minute :
+ * « 4 min 07 » n'apprend rien de plus que « 4 min » et se lit deux fois moins vite.
+ *
+ * Aux chiffres tabulaires du rendu (DESIGN.md) revient de garder la ligne stable quand la
+ * durée change ; ce formateur ne fait que le texte.
+ */
+export function dureeAppel(millisecondes: number): string {
+  const secondes = Math.max(0, Math.round(millisecondes / 1000));
+  if (secondes < 60) return `${secondes} s`;
+  const minutes = Math.round(secondes / 60);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`;
+}

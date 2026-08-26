@@ -1,10 +1,12 @@
 "use client";
 
+import type { CallLogEntry } from "@tacita/calls";
 import type { ReactionTally } from "@tacita/messaging";
 import type { ReceiptStatus } from "@tacita/receipts";
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Skeleton } from "../foundation/primitives";
+import { AppelObjet } from "./AppelObjet";
 import { DateSeparator } from "./DateSeparator";
 import { MessageObject } from "./MessageObject";
 import type { Media, Telecharger } from "../media/media";
@@ -57,6 +59,35 @@ interface TimelineProps {
    * autorise à laisser l'utilisateur choisir n'importe quelle image.
    */
   fondEcran?: string;
+  /**
+   * Les appels passés du salon, appels manqués compris.
+   *
+   * **Chaque entrée porte son ancre** (`apres`), l'identifiant du message qu'elle suit
+   * dans le flux `/sync` — et c'est elle qui la place, pas son horodatage. Fusionner les
+   * deux listes par date serait le tri que l'interdit n°6 refuse, et pour la raison qu'il
+   * donne : `origin_server_ts` n'est pas l'ordre du salon. Une entrée sans ancre ouvre la
+   * fenêtre chargée et se rend en tête.
+   */
+  appels?: CallLogEntry[];
+  /** Rappeler après un appel manqué : le seul geste qu'on veut faire en le lisant. */
+  onRappeler?: () => void;
+}
+
+/**
+ * Les appels rangés par le message qu'ils suivent. La clé `""` porte ceux qui ouvrent la
+ * fenêtre — un salon dont l'historique chargé commence par un appel.
+ *
+ * Les appels **en cours** n'y entrent pas : le bandeau du salon les porte déjà, et deux
+ * surfaces pour le même appel se contrediraient au premier décalage.
+ */
+export function appelsParAncre(appels: readonly CallLogEntry[]): Map<string, CallLogEntry[]> {
+  const parAncre = new Map<string, CallLogEntry[]>();
+  for (const appel of appels) {
+    if (appel.enCours) continue;
+    const cle = appel.apres ?? "";
+    parAncre.set(cle, [...(parAncre.get(cle) ?? []), appel]);
+  }
+  return parAncre;
 }
 
 /**
@@ -88,10 +119,13 @@ export function Timeline({
   ancre,
   onRemonter,
   fondEcran,
+  appels,
+  onRappeler,
 }: TimelineProps) {
   // l'état vit ici : le geste porte sur un message, la révélation porte sur
   // la colonne entière. C'est ce que fait Instagram, et c'est ce qu'on attend.
   const [heuresVisibles, setHeuresVisibles] = useState(false);
+  const journalParAncre = useMemo(() => appelsParAncre(appels ?? []), [appels]);
   const cible = useRef<HTMLDivElement>(null);
   const zone = useRef<HTMLDivElement>(null);
 
@@ -232,9 +266,16 @@ export function Timeline({
     >
       {starter}
 
+      {/* Les appels antérieurs au premier message chargé : ils n'ont aucun message à
+          suivre, et les rendre à la fin les daterait de maintenant. */}
+      {(journalParAncre.get("") ?? []).map((appel) => (
+        <AppelObjet key={appel.id} appel={appel} onRappeler={() => onRappeler?.()} />
+      ))}
+
       {messages.map((message, rang) => {
         const precedent = messages[rang - 1];
         const vise = ancre !== undefined && message.eventId === ancre;
+        const apres = message.eventId ? (journalParAncre.get(message.eventId) ?? []) : [];
         return (
           <Fragment key={message.cle}>
             {nouveauJour(precedent, message) && <DateSeparator horodatage={message.horodatage} />}
@@ -257,6 +298,9 @@ export function Timeline({
               onOuvrirMedia={onOuvrirMedia ? () => onOuvrirMedia(message) : undefined}
               onSauvegarderMedia={onSauvegarderMedia}
             />
+            {apres.map((appel) => (
+              <AppelObjet key={appel.id} appel={appel} onRappeler={() => onRappeler?.()} />
+            ))}
           </Fragment>
         );
       })}

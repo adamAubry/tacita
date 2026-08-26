@@ -11,9 +11,34 @@ const focus = await discoverFocus(homeserverUrl); // lève RtcFociMissingError
 const { url } = buildCallWidget(session, roomId, { elementCallUrl, parentUrl, widgetId, video });
 const driver = new CallWidgetDriver(session, roomId); // à passer à ClientWidgetApi
 const detacher = attachCallWidget(session, roomId, iframe, options); // le pont postMessage
-const call = activeCall(session, roomId); // idle → active → ended
+const call = activeCall(session, roomId); // idle → active → ended, dans **un** salon
+const entrants = incomingCalls(session); // les appels qui nous attendent, **tous salons**
+const journal = callHistory(session, roomId); // les appels passés, manqués compris
 await hangupLocal(session, roomId);
 ```
+
+## Trois lectures, trois questions différentes
+
+Elles se ressemblent et ne répondent pas à la même chose. Les confondre est ce qui avait
+laissé le chemin d'appel avec un trou béant : `activeCall` était la seule, et il fallait
+avoir le bon salon ouvert pour l'interroger.
+
+| | Question | Périmètre | Ce qui la rend nécessaire |
+|---|---|---|---|
+| `activeCall` | « y a-t-il un appel **ici** ? » | un salon | le bandeau « appel en cours — rejoindre » |
+| `incomingCalls` | « quelqu'un m'appelle-t-il, **où que je sois** ? » | tous les salons | la sonnerie ; un appel qui n'arrive pas est le seul défaut irrattrapable |
+| `callHistory` | « que s'est-il passé **avant** ? » | un salon, sa fenêtre chargée | l'appel manqué, et le geste pour rappeler |
+
+`incomingCalls` distingue **sonner** de **être joignable** (`ringing`, fenêtre de
+`RINGING_WINDOW_MS`). Un appel commencé il y a quarante minutes reste rejoignable et ne
+sonne plus : la sonnerie dit « décroche maintenant », et ouvrir l'application au milieu
+d'un appel de groupe ne dit pas ça.
+
+`callHistory` **n'écrit rien** : pas d'événement inventé pour marquer un appel. Le journal
+se dérive des appartenances déjà présentes dans la timeline — une appartenance non vide
+ouvre, une vide referme. Chaque entrée porte `apres`, l'identifiant du message qu'elle
+suit dans `/sync` : c'est ce qui permet au shard de la placer parmi les messages **sans
+trier par horodatage** (interdit n°6).
 
 ## ⚠️ Les littéraux MatrixRTC ne sont pas stables
 
@@ -80,5 +105,20 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
 - **Métadonnées d'appel visibles côté serveur** : qui appelle qui, quand, combien de temps.
   Le média est chiffré par participant (`perParticipantE2EE`), le SFU relaie sans
   déchiffrer. Voir `infra/rtc/README.md`.
-- **Pas de sonnerie, de refus ni d'appel manqué en V1** (YAGNI) : l'état
-  d'appartenance dit déjà qui est là et depuis quand.
+- **Il n'y a pas de refus, et l'interface ne prétend pas le contraire.** MatrixRTC ne
+  définit aucun événement de rejet : ne pas décrocher n'envoie rien à l'appelant, qui voit
+  seulement que personne n'a rejoint. Le shard nomme donc son bouton « Ignorer » et non
+  « Refuser » — il fait taire la sonnerie ici, rien de plus (interdit n°13). L'appel reste
+  rejoignable depuis le salon tant qu'il dure.
+- **Un appel manqué ne remonte pas dans l'aperçu de la liste des conversations.** Il est
+  dans le salon (`callHistory`) et il sonne à l'instant où il arrive (`incomingCalls`),
+  mais l'aperçu vient du dernier **message** — et le porter jusque-là demanderait à
+  `@tacita/messaging` de connaître les littéraux MatrixRTC, dont `src/matrixrtc.ts` est
+  le seul dépositaire. Limite assumée plutôt qu'un deuxième foyer pour la même valeur.
+- **Le journal ne voit que la fenêtre de timeline chargée.** Remonter l'historique en
+  révèle davantage, exactement comme pour les messages ; un appel plus ancien que ce qui
+  est chargé n'apparaît pas encore.
+- **Une fin d'appel inconnue reste inconnue.** Quand le dernier participant part sans
+  refermer, son appartenance expire en silence : `fin` est absent et aucune durée n'est
+  rendue. Déduire la fin de l'expiration afficherait « appel de 4 h » pour un appel de
+  trois minutes.

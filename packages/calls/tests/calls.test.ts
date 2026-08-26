@@ -31,11 +31,18 @@ const WIDGET = {
 };
 
 /** Un événement d'état réduit à ce que le module en lit. */
-function membership(stateKey: string, content: Record<string, unknown>, ts = Date.now()) {
+function membership(
+  stateKey: string,
+  content: Record<string, unknown>,
+  ts = Date.now(),
+  sender = MOI,
+) {
   return {
     getType: () => CALL_MEMBER_EVENT_TYPE,
     getRoomId: () => SALON,
     getStateKey: () => stateKey,
+    // L'émetteur, et non la state key découpée : `activeCall` nomme des personnes.
+    getSender: () => sender,
     getContent: () => content,
     getTs: () => ts,
     getEffectiveEvent: () => ({
@@ -197,15 +204,17 @@ describe("détection d'appel en cours par les événements d'état", () => {
 
     expect(call.current().status).toBe("idle");
 
-    const key = callMemberStateKey("@ana:tacita.chat", "D2");
-    const joined = membership(key, { application: "m.call", created_ts: Date.now() });
+    const ana = "@ana:tacita.chat";
+    const key = callMemberStateKey(ana, "D2");
+    const joined = membership(key, { application: "m.call", created_ts: Date.now() }, Date.now(), ana);
     fake.events.push(joined);
     fake.emit(joined);
-    expect(call.current()).toEqual({ status: "active", participants: [key] });
+    // Une personne, pas une state key : c'est ce que le bandeau du salon affiche.
+    expect(call.current()).toEqual({ status: "active", participants: [ana] });
 
     fake.events.length = 0;
-    fake.events.push(membership(key, {}));
-    fake.emit(membership(key, {}));
+    fake.events.push(membership(key, {}, Date.now(), ana));
+    fake.emit(membership(key, {}, Date.now(), ana));
     expect(call.current()).toEqual({ status: "ended", participants: [] });
 
     expect(seen).toEqual(["active", "ended"]);
@@ -336,5 +345,21 @@ describe("aucune donnée d'appel dans les logs", () => {
 
     expect(error.message).not.toContain(HOMESERVER);
     expect(error.message).toContain("well-known-unreachable");
+  });
+});
+
+describe("une personne connectée sur deux appareils reste une personne", () => {
+  it("les appartenances sont dédoublonnées par identifiant d'utilisateur", () => {
+    // Avant, `participants` portait les state keys — appareil compris. Le bandeau du
+    // salon annonçait donc « 2 personnes y participent » pour quelqu'un qui avait laissé
+    // son ordinateur allumé en décrochant sur son téléphone.
+    const ana = "@ana:tacita.chat";
+    const contenu = { application: "m.call", created_ts: Date.now() };
+    fake.events.push(
+      membership(callMemberStateKey(ana, "TELEPHONE"), contenu, Date.now(), ana),
+      membership(callMemberStateKey(ana, "ORDINATEUR"), contenu, Date.now(), ana),
+    );
+
+    expect(activeCall(session, SALON).current().participants).toEqual([ana]);
   });
 });

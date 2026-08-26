@@ -26,6 +26,7 @@ import {
   typingUsers,
   type MentionCandidate,
 } from "@tacita/messaging";
+import { callHistory } from "@tacita/calls";
 import { prepareAttachment, refusePourTaille, saveOriginal } from "@tacita/media-pipeline";
 import { useOutbox } from "./OutboxProvider";
 import { createReceipts, type Receipts, type ReceiptStatus } from "@tacita/receipts";
@@ -241,6 +242,16 @@ export function Conversation({ roomId }: { roomId: string }) {
 
   const salon = useMemo(
     () => (session ? conversations(session).find((c) => c.roomId === roomId) : undefined),
+    [session, roomId, version],
+  );
+
+  /**
+   * Le journal des appels du salon — appels manqués compris. Même dépendance `version`
+   * que les messages : les deux viennent de la même timeline, et les recalculer au même
+   * moment est ce qui les garde d'accord.
+   */
+  const appels = useMemo(
+    () => (session ? callHistory(session, roomId) : []),
     [session, roomId, version],
   );
 
@@ -520,6 +531,10 @@ export function Conversation({ roomId }: { roomId: string }) {
 
         <Timeline
           messages={messages}
+          appels={appels}
+          // Rappeler après un appel manqué mène au même écran que le bouton du header :
+          // un seul chemin d'appel, un seul comportement à tenir.
+          onRappeler={() => router.push(routeAppel(roomId))}
           chargement={!pret}
           ancre={ancre ?? undefined}
           onRemonter={remonter}

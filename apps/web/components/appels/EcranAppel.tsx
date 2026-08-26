@@ -11,8 +11,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ELEMENT_CALL_URL, HOMESERVER } from "../../lib/config";
+import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { Placeholder } from "../foundation/Placeholder";
-import { Button } from "../foundation/primitives";
+import { Button, Text } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
 
 /**
@@ -119,6 +120,16 @@ export function EcranAppel({ roomId, video }: EcranAppelProps) {
   const sortir = () => router.back();
   const panne = erreur ?? (expire ? "Le service d'appel n'a pas répondu." : undefined);
 
+  /**
+   * **Qui on appelle, pendant qu'on l'appelle.** Le nom du salon vient du SDK, comme
+   * partout ailleurs dans le shard ; rien n'est dérivé ici. Absent — salon pas encore
+   * connu du client —, l'écran d'attente se réduit à sa ligne d'état, ce qui reste très
+   * au-dessus de ce qu'il montrait avant : une iframe vide.
+   */
+  const salon = session?.client.getRoom(roomId) ?? null;
+  const nom = salon?.name ?? "";
+  const direct = (salon?.getJoinedMemberCount() ?? 2) <= 2;
+
   return (
     <div
       style={{
@@ -147,18 +158,56 @@ export function EcranAppel({ roomId, video }: EcranAppelProps) {
             style={{ border: 0, width: "100%", height: "100%" }}
           />
 
-          {/* La sortie de secours de. Elle disparaît dès qu'Element Call est
-              là : c'est lui qui porte le raccrochage, et deux boutons de sortie
-              concurrents dans le même écran est exactement ce que E-07 refuse. */}
+          {/*
+            **L'écran d'attente, et pas une iframe vide.** Le widget met une à trois
+            secondes à parler, et pendant ce temps l'écran ne montrait rien : ni qui on
+            appelait, ni que quelque chose se passait. C'est le moment où l'on se demande
+            si on a touché le bon bouton, et c'est exactement le moment où les appels se
+            raccrochent avant d'avoir commencé.
+
+            Un avatar, un nom, une ligne d'état — la forme qu'a prise cet écran partout,
+            et pour une raison : elle répond aux deux questions qu'on se pose. Pas de
+            spinner : DESIGN.md n'en veut pas en plein écran, et il ne dirait de toute
+            façon ni qui ni quoi.
+
+            Il disparaît dès qu'Element Call est là : c'est lui qui porte le raccrochage,
+            et deux boutons de sortie concurrents dans le même écran est exactement ce
+            que E-07 refuse.
+          */}
           {!charge && (
             <div
+              aria-live="polite"
               style={{
                 position: "absolute",
-                top: "calc(var(--spacing-3) + env(safe-area-inset-top, 0px))",
-                left: "var(--spacing-3)",
+                inset: 0,
+                display: "grid",
+                gridTemplateRows: "1fr auto",
+                justifyItems: "center",
+                background: "var(--color-background-body)",
+                paddingTop: "env(safe-area-inset-top, 0px)",
+                paddingBottom: "calc(var(--spacing-5) + env(safe-area-inset-bottom, 0px))",
               }}
             >
-              <Button label="Quitter" variant="secondary" onClick={sortir} />
+              <div
+                style={{
+                  alignSelf: "center",
+                  display: "grid",
+                  justifyItems: "center",
+                  gap: "var(--spacing-3)",
+                  padding: "var(--spacing-3)",
+                  textAlign: "center",
+                }}
+              >
+                {nom !== "" && <ConversationAvatar nom={nom} direct={direct} taille={96} />}
+                {nom !== "" && <Text type="display-3">{nom}</Text>}
+                <Text type="supporting" color="secondary">
+                  {video ? "Appel vidéo · connexion…" : "Appel audio · connexion…"}
+                </Text>
+              </div>
+
+              {/* « Annuler » et non « Quitter » : rien n'a commencé, il n'y a rien à
+                  quitter — et le mot juste évite d'hésiter avant de le toucher. */}
+              <Button label="Annuler" variant="secondary" onClick={sortir} />
             </div>
           )}
         </>

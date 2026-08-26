@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { AppelEntrant } from "../components/appels/AppelEntrant";
 import { OutboxProvider } from "../components/conversation/OutboxProvider";
 import { ConnectionBannerLive } from "../components/foundation/ConnectionBanner";
 import { Theme, type ThemeMode } from "../components/foundation/primitives";
@@ -104,6 +105,10 @@ export function Providers({ children }: { children: ReactNode }) {
               ne rend rien tant qu'un message n'est pas arrivé, et elle doit pouvoir
               répondre au service worker quel que soit l'écran affiché. */}
             <PushNotifications />
+            {/* Et pour la même raison, l'appel entrant : il doit sonner quel que soit
+              l'écran ouvert. Monté dans un écran, il n'aurait sonné que là — c'est
+              exactement le défaut qu'il corrige. */}
+            <AppelEntrant />
           </SessionProvider>
         </div>
       </Theme>

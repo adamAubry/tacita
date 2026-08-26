@@ -14,6 +14,10 @@ import {
 } from "./matrixrtc";
 
 export { CallWidgetDriver } from "./driver";
+export { callHistory } from "./history";
+export type { CallLogEntry } from "./history";
+export { incomingCalls, RINGING_WINDOW_MS } from "./incoming";
+export type { IncomingCall, IncomingCalls } from "./incoming";
 export {
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
@@ -40,7 +44,14 @@ export type CallStatus = "idle" | "active" | "ended";
 
 export interface CallState {
   status: CallStatus;
-  /** Identifiants des participants dont l'appartenance est vivante. */
+  /**
+   * Les **personnes** dont l'appartenance est vivante, dédoublonnées.
+   *
+   * Des identifiants d'utilisateur, et non les state keys : celles-ci portent l'appareil,
+   * si bien qu'une seule personne connectée depuis son téléphone et son ordinateur
+   * comptait double — « 2 personnes y participent » pour une. Et une state key ne se
+   * montre pas : c'est un identifiant collé à un identifiant d'appareil.
+   */
   participants: string[];
 }
 
@@ -82,8 +93,12 @@ export interface CallWidgetOptions {
  *
  * `start_call` et `start_call_voice` posent tous deux `skipLobby: false` : le lobby
  * reste, et avec lui le rattrapage si l'intention envoyée n'est pas celle qu'on voulait.
- * Les variantes `_dm` ne sont volontairement pas utilisées — elles activent sonnerie et
- * attente de décrochage, ce que `@tacita/calls` a écarté en V1 (YAGNI).
+ *
+ * Les variantes `_dm` ne sont toujours pas utilisées, et pour une raison qui a changé :
+ * la sonnerie qu'elles activent vit **dans le widget**, donc seulement une fois l'écran
+ * d'appel ouvert — c'est-à-dire précisément là où on n'a pas besoin d'être prévenu.
+ * `incomingCalls` fait sonner depuis n'importe quel écran, ce qu'aucune intention
+ * d'Element Call ne peut faire de l'intérieur d'une iframe qui n'est pas montée.
  */
 const INTENT_AUDIO = "start_call_voice";
 const INTENT_VIDEO = "start_call";
@@ -198,9 +213,13 @@ export function attachCallWidget(
 }
 
 /**
- * état d'appel d'un salon, dérivé des seuls événements d'état MatrixRTC.
- * YAGNI assumé : ni sonnerie, ni refus, ni appel manqué — l'état d'appartenance dit déjà
- * qui est là et depuis quand.
+ * état d'appel d'**un** salon, dérivé des seuls événements d'état MatrixRTC.
+ *
+ * Le pendant multi-salons est `incomingCalls` : c'est lui qui porte la sonnerie, parce
+ * qu'un appel entrant doit se voir sans avoir le bon salon ouvert. Le journal des appels
+ * passés, appels manqués compris, est dans `callHistory`. Reste hors périmètre, et le
+ * reste : le **refus**, que MatrixRTC ne définit pas — rien n'est envoyé à l'appelant
+ * quand on n'y va pas, et l'interface ne prétend pas le contraire.
  */
 export function activeCall(session: Session, roomId: string): ActiveCall {
   const client = session.client;
@@ -210,10 +229,14 @@ export function activeCall(session: Session, roomId: string): ActiveCall {
     const events =
       room?.getLiveTimeline().getState(Direction.Forward)?.getStateEvents(CALL_MEMBER_EVENT_TYPE) ??
       [];
-    const participants = events
-      .filter((event) => isLiveMembership(event.getContent(), event.getTs()))
-      .map((event) => event.getStateKey() ?? "")
-      .filter(Boolean);
+    const participants = [
+      ...new Set(
+        events
+          .filter((event) => isLiveMembership(event.getContent(), event.getTs()))
+          .map((event) => event.getSender() ?? "")
+          .filter(Boolean),
+      ),
+    ];
     // `ended` n'existe que par contraste : un salon qui n'a jamais eu d'appel est `idle`.
     const status: CallStatus =
       participants.length > 0 ? "active" : previous === "active" ? "ended" : "idle";
