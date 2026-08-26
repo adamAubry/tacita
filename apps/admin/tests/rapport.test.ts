@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { codeDeSortie, couleursActives, rendre } from "../src/rapport.ts";
+import { codeDeSortie, couleursActives, rendre, replier } from "../src/rapport.ts";
 import type { Constat, Verification } from "../src/contrat.ts";
 
 const verification = (nom: string, phase: string): Verification => ({
@@ -95,6 +95,56 @@ describe("la couleur est une amélioration, jamais un prérequis", () => {
     ["terminal ordinaire", { TERM: "xterm-256color" }, true, true],
   ])("%s → %s", (_cas, env, terminal, attendu) => {
     expect(couleursActives(env as NodeJS.ProcessEnv, terminal)).toBe(attendu);
+  });
+});
+
+describe("le repli, sans lequel un SSH de 80 colonnes rend le rapport illisible", () => {
+  it("coupe entre les mots, jamais au milieu", () => {
+    expect(replier("un deux trois quatre cinq", 30, 0)).toEqual(["un deux trois quatre cinq"]);
+    expect(replier("un deux trois quatre cinq six sept huit", 25, 0)).toEqual([
+      "un deux trois quatre cinq",
+      "six sept huit",
+    ]);
+  });
+
+  it("laisse intact un mot plus long que la place restante", () => {
+    // Tronquer mutilerait exactement ce qu'on veut lire : un chemin de fichier ou une
+    // commande à recopier.
+    expect(replier("/etc/letsencrypt/renewal-hooks/deploy/tacita.sh", 30, 0)).toEqual([
+      "/etc/letsencrypt/renewal-hooks/deploy/tacita.sh",
+    ]);
+  });
+
+  it("les lignes de continuation s'alignent sur la colonne du texte", () => {
+    // Constaté à 80 colonnes : la continuation repartait en colonne 0 et l'œil perdait
+    // la colonne. Le nom du constat cesse alors d'être repérable.
+    const long: Constat = {
+      nom: "mémoire",
+      etat: "attention",
+      constat:
+        "7,7 Go de RAM, 2,0 Go de swap — 8 Go sont recommandés ; en dessous, le swap est un filet, pas un remplacement",
+    };
+    const lignes = rendre([long], [verification("mémoire", "Machine")], false, 80).split("\n");
+    const suites = lignes.filter((l) => l.trim() !== "" && l.startsWith("      "));
+    expect(suites.length).toBeGreaterThan(0);
+    const marge = lignes.find((l) => l.includes("7,7 Go"))!.indexOf("7,7 Go");
+    for (const suite of suites) expect(suite.search(/\S/)).toBe(marge);
+  });
+
+  it("aucune ligne ne dépasse la largeur donnée", () => {
+    const constats: Constat[] = [
+      {
+        nom: "SYNAPSE_IP_RANGE_WHITELIST",
+        etat: "casse",
+        constat: "vide — Synapse n'appellera jamais la passerelle push, et rien ne le signalera",
+        remede:
+          'SYNAPSE_IP_RANGE_WHITELIST=["172.16.0.0/12"] dans infra/.env (la plage du réseau Docker)',
+      },
+    ];
+    const verifs = [verification("SYNAPSE_IP_RANGE_WHITELIST", "Configuration")];
+    for (const ligne of rendre(constats, verifs, false, 80).split("\n")) {
+      expect(ligne.length, ligne).toBeLessThanOrEqual(80);
+    }
   });
 });
 

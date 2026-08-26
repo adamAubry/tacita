@@ -4,12 +4,16 @@ Le produit de l'administrateur, comme la PWA est celui de l'utilisateur. Il l'ac
 de « j'ai cloné le dépôt » à « ça tourne ».
 
 ```sh
-sh infra/bootstrap.sh          # sur une Ubuntu nue, une seule fois
+sh infra/bootstrap.sh      # sur une Ubuntu nue, une seule fois
 pnpm admin init --domaine=chat.ton-domaine.fr --email=toi@ton-domaine.fr
-pnpm admin doctor
-pnpm admin doctor --dev     # sur une machine de développement
-pnpm admin --help
+pnpm admin dns             # les deux enregistrements A à créer, et leur état
+pnpm admin certificat      # émet le certificat, une fois le DNS en place
+pnpm admin doctor          # --dev sur une machine de développement
 ```
+
+Les cinq étapes sont dans l'ordre, et chacune nomme la suivante. Une option inconnue
+arrête la commande au lieu d'être ignorée : `--domain` répond « voulais-tu dire
+`--domaine` ? » plutôt que de faire semblant de n'avoir rien reçu.
 
 Sans `--domaine` ni `--email`, `init` les demande — à condition d'être dans un terminal ;
 hors terminal il refuse et dit quelles options passer, plutôt que de bloquer sur une
@@ -32,6 +36,12 @@ sans plugin compose v2), Node 22 depuis NodeSource, et ajoute l'utilisateur au g
 `docker` — en disant que ce groupe ne prend effet qu'à la reconnexion, faute de quoi on
 cherche ailleurs une panne qu'on vient de corriger. Il est rejouable, ne touche à aucune
 configuration du projet, et ne démarre rien.
+
+**Il constate tout, annonce ce qu'il va faire en tant que root, puis demande une fois.**
+`--oui` saute la question pour l'automatisation ; hors terminal et sans `--oui`, il
+refuse plutôt que de supposer un accord. L'absence d'`apt-get` est constatée **avant** la
+première installation : sinon, sur une distribution non-Debian, il posait Docker puis
+échouait — dans un état intermédiaire que personne n'avait demandé.
 
 La version de Node qu'il installe et celle que `doctor` exige sont écrites à deux
 endroits : `infra/tests/bootstrap.test.ts` est le seul lien entre elles. Sans ce test,
@@ -76,6 +86,49 @@ La paire VAPID est produite par `node:crypto` seul : point P-256 non compressé,
 87 caractères en base64url, et sa clé privée de 32 octets sur 43 caractères. Plus de
 conteneur jetable, plus de copier-coller — c'est le copier-coller qui produisait la panne.
 
+## `dns` — rediriger le nom de domaine
+
+La seule étape que l'outil ne peut pas faire à la place de l'administrateur : elle se
+passe chez son registrar. La moindre des choses est donc de lui donner les deux lignes
+exactes à recopier, adresse déjà remplie, plutôt qu'une phrase décrivant ce qu'il devrait
+deviner.
+
+```
+  Type  Nom                  Valeur
+  A     chat.tacita.fr       203.0.113.10
+  A     call.chat.tacita.fr  203.0.113.10
+```
+
+L'adresse est celle des interfaces de la machine, filtrée des plages privées — boucle
+locale, réseau Docker, RFC 1918 et CGNAT. Derrière un NAT il n'y en a aucune, et l'outil
+le dit au lieu de proposer une adresse privée qui produirait un domaine ne résolvant que
+pour son propriétaire.
+
+Il affiche ensuite l'état constaté des deux noms, rappelle que la propagation prend le
+temps qu'elle prend, et donne le `dig` qui tranche. Code de sortie 1 tant qu'un des deux
+noms ne répond pas — pour qu'un script puisse attendre.
+
+## `certificat` — émettre le certificat TLS
+
+La seule commande qui appelle un service externe, prend des droits root et consomme un
+quota : Let's Encrypt limite à **cinq certificats identiques par semaine, échecs
+compris**. Elle annonce donc son plan entier — les commandes exactes, leur motif, les
+avertissements — puis demande confirmation. `--oui` pour l'automatisation.
+
+Quatre choses l'arrêtent avant qu'elle ne brûle une tentative : certbot absent, un nom
+qui ne résout pas encore, le port 80 occupé, ou un certificat valide encore plus de
+trente jours (`--force` passe outre).
+
+L'ordre des deux étapes n'est pas indifférent : le **hook de renouvellement est posé
+avant l'émission**, parce que certbot exécute ses hooks de déploiement dès la première
+fois. Posé après, il ne servirait qu'au renouvellement suivant, et les fichiers ne
+seraient pas en place pour le proxy le jour même.
+
+`--standalone` et non `--nginx` : notre nginx tourne en conteneur, avec une configuration
+montée en lecture seule, et il n'écoute pas sur le 80. En `--dev`, aucun appel à Let's
+Encrypt — un auto-signé, et l'avertissement qu'il faudra l'importer comme autorité de
+confiance sans quoi le service worker ne s'installera pas.
+
 ## `doctor` — vérifier avant de démarrer
 
 **Machine** — les prémisses, dans l'ordre où elles bloquent : Linux, Node ≥ 22, mémoire et
@@ -119,6 +172,10 @@ l'API Synapse sur l'hôte. Tout port publié en plus du 443 bloque hors dévelop
 `ufw` n'y change rien, puisque Docker écrit ses règles de redirection en amont de la
 chaîne qu'`ufw` contrôle.
 
+Le rapport se replie sur la largeur du terminal, en alignant les continuations sur la
+colonne du texte. Mesuré : des constats à 159 caractères contre un SSH par défaut à 80,
+où la continuation repartait à gauche et coupait les mots en deux.
+
 Une vérification qui dépend d'un fichier absent ou d'une pile arrêtée est **en attente**
 (`·`), pas en échec. Sans cet état, l'absence d'`infra/.env` produisait huit rouges pour
 une seule cause.
@@ -159,9 +216,14 @@ parler sans en casser un.
 - **Les ports ne sont pas vérifiables sans privilèges.** Se lier au 443 en simple
   utilisateur rend `EACCES`, ce qui ne permet pas de conclure. L'outil le dit au lieu de
   prétendre savoir.
-- **`init` n'installe rien.** Il prépare la configuration ; le DNS et le certificat
-  restent à la charge de l'administrateur, et il les énumère à la fin. Docker et Node
-  relèvent de `infra/bootstrap.sh`.
+- **`init` n'installe rien.** Il prépare la configuration ; le DNS reste à la charge de
+  l'administrateur (`pnpm admin dns` lui donne les enregistrements exacts), le certificat
+  revient à `pnpm admin certificat`, Docker et Node à `infra/bootstrap.sh`.
+- **L'adresse publique est déduite des interfaces, jamais demandée à un service tiers.**
+  Sur un VPS c'est la bonne ; derrière un NAT il n'y en a aucune, et l'outil le dit plutôt
+  que d'appeler un service extérieur pour la découvrir.
+- **`certificat` ne rejoue pas ce que fait `certbot renew`.** Il émet ; le renouvellement
+  reste au minuteur de certbot, avec le hook que la commande a posé.
 - **La boucle de redémarrage se constate au présent, pas dans l'historique.** Un service
   est signalé s'il est en train de relancer, ou s'il cumule des relances *et* vient de
   démarrer. `RestartCount` seul ne suffit pas : il est cumulatif sur toute la vie du

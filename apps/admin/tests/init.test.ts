@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { genererVapid, planifier, resteAFaire, valider } from "../src/init.ts";
@@ -171,5 +175,60 @@ describe("ce que l'outil dit ne pas pouvoir faire", () => {
     expect(etapes).toContain("hosts");
     expect(etapes).toContain("generate-dev-certs.sh");
     expect(etapes).not.toContain("certbot");
+  });
+});
+
+describe("le fichier écrit ne laisse pas ses secrets lisibles par la machine", () => {
+  /**
+   * Éprouvé en lançant réellement la commande, parce que la propriété tient à un appel
+   * système et non à une valeur calculable : `writeFileSync` n'applique son `mode` qu'à
+   * la **création**. Un `.env` déjà présent en 644 le restait, et ses six secrets, sa
+   * clé privée VAPID et son mot de passe PostgreSQL demeuraient lisibles par tout
+   * compte de la machine.
+   */
+  const depotJetable = () => {
+    const racine = mkdtempSync(join(tmpdir(), "tacita-init-"));
+    mkdirSync(join(racine, "apps", "admin"), { recursive: true });
+    mkdirSync(join(racine, "infra"), { recursive: true });
+    cpSync(new URL("../src", import.meta.url), join(racine, "apps", "admin", "src"), {
+      recursive: true,
+    });
+    writeFileSync(join(racine, "infra", ".env.example"), EXEMPLE);
+    return racine;
+  };
+
+  const lancerInit = (racine: string) =>
+    execFileSync(
+      process.execPath,
+      [
+        "--disable-warning=ExperimentalWarning",
+        "--experimental-strip-types",
+        join(racine, "apps", "admin", "src", "index.ts"),
+        "init",
+        "--domaine=chat.tacita.fr",
+        "--email=adam@tacita.fr",
+      ],
+      { stdio: "pipe", encoding: "utf-8" },
+    );
+
+  const mode = (chemin: string) => (statSync(chemin).mode & 0o777).toString(8);
+
+  it("un .env créé de zéro naît en 600", () => {
+    const racine = depotJetable();
+    lancerInit(racine);
+    expect(mode(join(racine, "infra", ".env"))).toBe("600");
+    rmSync(racine, { recursive: true, force: true });
+  });
+
+  it("un .env existant trop ouvert est resserré, et l'outil le dit", () => {
+    const racine = depotJetable();
+    lancerInit(racine);
+    const chemin = join(racine, "infra", ".env");
+    chmodSync(chemin, 0o644);
+
+    const sortie = lancerInit(racine);
+    expect(mode(chemin)).toBe("600");
+    expect(sortie).toContain("permissions resserrées de 644 à 600");
+    rmSync(racine, { recursive: true, force: true });
   });
 });

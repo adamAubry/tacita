@@ -1,13 +1,21 @@
 import { execFile } from "node:child_process";
-import { readFileSync, statfsSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { resolve4 } from "node:dns/promises";
 import { createServer } from "node:net";
 import { networkInterfaces, platform, totalmem } from "node:os";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 
+import { spawn } from "node:child_process";
+
+import {
+  apresEmission,
+  planifier as planifierCertificat,
+} from "./certificat.ts";
 import { diagnostiquer, type Contexte, type EtatPort, type Execution } from "./contrat.ts";
+import { adressePublique, guideDns } from "./dns.ts";
 import { planifier, resteAFaire, valider, type Reponses } from "./init.ts";
+import { certificat as verifCertificat } from "./verifications.ts";
 import { VERIFICATIONS_MACHINE } from "./machine.ts";
 import { VERIFICATIONS_PILE } from "./pile.ts";
 import { VERIFICATIONS_RESEAU } from "./reseau.ts";
@@ -99,22 +107,50 @@ const adressesLocales = (): readonly string[] =>
 
 const USAGE = `Usage : pnpm admin <commande> [options]
 
-  init      prépare infra/.env : génère les secrets et la paire VAPID, pose le
-            domaine, puis dit ce qui reste à faire à la main
-  doctor    vérifie que la machine et la configuration permettent de démarrer
+  init        prépare infra/.env : génère les secrets et la paire VAPID, pose le
+              domaine, puis dit ce qui reste à faire à la main
+  dns         les deux enregistrements A à créer, et leur état à l'instant
+  certificat  émet le certificat TLS, après avoir vérifié ce qui le ferait échouer
+  doctor      vérifie que la machine et la configuration permettent de démarrer
 
 Options
   --domaine=<nom>    le nom du serveur, ex. chat.ton-domaine.fr (init)
-  --email=<adresse>  contact déclaré aux services de push (init)
+  --email=<adresse>  contact déclaré aux services de push (init, certificat)
   --dev              machine de développement : le nom d'exemple et le certificat
                      auto-signé y sont attendus, pas des défauts à corriger
+  --oui              ne pas demander confirmation (certificat)
+  --force            réémettre un certificat encore valide (certificat)
 
 Sans --domaine ni --email, init les demande — à condition d'être dans un
 terminal. Le code de sortie de doctor vaut 1 si une vérification bloque.
 `;
 
+const COMMANDES = ["init", "dns", "certificat", "doctor"];
+const OPTIONS = ["--domaine", "--email", "--dev", "--oui", "--force", "--help", "-h"];
+
 const argv = process.argv.slice(2);
+
+/**
+ * Une option inconnue s'arrête ici plutôt que d'être ignorée. `--domain` au lieu de
+ * `--domaine` produisait « passe les options en ligne de commande » à quelqu'un qui
+ * venait de le faire — le pire message possible, puisqu'il envoie chercher au mauvais
+ * endroit.
+ */
+const inconnue = argv.find(
+  (a) => a.startsWith("-") && !OPTIONS.some((o) => a === o || a.startsWith(`${o}=`)),
+);
+if (inconnue !== undefined) {
+  const nom = inconnue.split("=")[0] ?? inconnue;
+  const proche = OPTIONS.find((o) => o.startsWith(nom) || nom.startsWith(o));
+  process.stderr.write(
+    `option inconnue : ${nom}${proche === undefined ? "" : ` — voulais-tu dire ${proche} ?`}\n\n${USAGE}`,
+  );
+  process.exit(2);
+}
+
 const dev = argv.includes("--dev");
+const sansDemander = argv.includes("--oui");
+const force = argv.includes("--force");
 const option = (nom: string): string | undefined =>
   argv.find((argument) => argument.startsWith(`--${nom}=`))?.slice(nom.length + 3);
 const commande = argv.find((argument) => !argument.startsWith("-")) ?? "doctor";
@@ -155,7 +191,7 @@ async function doctor(): Promise<never> {
   ];
   const constats = await diagnostiquer(contexteCourant(), verifications);
   const couleurs = couleursActives(process.env, process.stdout.isTTY === true);
-  process.stdout.write(rendre(constats, verifications, couleurs));
+  process.stdout.write(rendre(constats, verifications, couleurs, process.stdout.columns));
   process.exit(codeDeSortie(constats));
 }
 
@@ -194,7 +230,18 @@ async function init(): Promise<never> {
   }
 
   const { contenu, modifications } = planifier(source, reponses);
-  writeFileSync(resolve(RACINE, FICHIER_ENV), contenu, { mode: 0o600 });
+  const chemin = resolve(RACINE, FICHIER_ENV);
+
+  /**
+   * `writeFileSync` n'applique son `mode` qu'à la **création** : un `.env` déjà présent
+   * en 644 le restait, et ses six secrets, sa clé privée VAPID et son mot de passe
+   * PostgreSQL demeuraient lisibles par tout compte de la machine. Le `chmod` explicite
+   * est ce qui resserre le fichier quel que soit son état d'avant.
+   */
+  const modeAvant =
+    existant === undefined ? undefined : (statSync(chemin).mode & 0o777).toString(8);
+  writeFileSync(chemin, contenu, { mode: 0o600 });
+  chmodSync(chemin, 0o600);
 
   const largeur = Math.max(...modifications.map((m) => m.cle.length)) + 2;
   const lignes: string[] = [
@@ -202,6 +249,9 @@ async function init(): Promise<never> {
     existant === undefined
       ? "infra/.env créé depuis .env.example, en permissions 600"
       : "infra/.env mis à jour — aucune valeur déjà posée n'a été touchée",
+    ...(modeAvant !== undefined && modeAvant !== "600"
+      ? [`permissions resserrées de ${modeAvant} à 600 — il portait des secrets lisibles par tous`]
+      : []),
     "",
     ...modifications.map(
       ({ cle, action, apercu }) => `  ${cle.padEnd(largeur)}${action.padEnd(14)}${apercu}`,
@@ -216,9 +266,115 @@ async function init(): Promise<never> {
   process.exit(0);
 }
 
-if (commande === "doctor") await doctor();
-else if (commande === "init") await init();
-else {
+function nomDuServeur(): string {
+  const ctx = contexteCourant();
+  const nom = ctx.env?.get("SERVER_NAME") ?? "";
+  if (nom === "") {
+    process.stderr.write(
+      "SERVER_NAME est absent d'infra/.env — lancer d'abord : pnpm admin init\n",
+    );
+    process.exit(2);
+  }
+  return nom;
+}
+
+async function dns(): Promise<never> {
+  const domaine = nomDuServeur();
+  const noms = [domaine, `call.${domaine}`];
+  const etats = await Promise.all(
+    noms.map(async (nom) => ({ nom, adresses: await resoudre(nom) })),
+  );
+  const publique = adressePublique(adressesLocales());
+  process.stdout.write(`${guideDns(domaine, publique, etats).join("\n")}\n`);
+  process.exit(etats.every((e) => e.adresses.length > 0) ? 0 : 1);
+}
+
+/** Exécute en laissant passer la sortie : certbot pose des questions et fait attendre. */
+const executerVisible = (commande: string, args: readonly string[]): Promise<number> =>
+  new Promise((tenir) => {
+    const enfant = spawn(commande, [...args], { stdio: "inherit", cwd: RACINE });
+    enfant.on("close", (code) => tenir(code ?? 1));
+    enfant.on("error", () => tenir(127));
+  });
+
+async function confirmer(question: string): Promise<boolean> {
+  if (sansDemander) return true;
+  if (process.stdin.isTTY !== true) {
+    process.stderr.write("Hors terminal : relancer avec --oui pour accepter sans qu'on demande.\n");
+    return false;
+  }
+  const lecteur = createInterface({ input: process.stdin, output: process.stdout });
+  const reponse = (await lecteur.question(`${question} [o/N] `)).trim().toLowerCase();
+  lecteur.close();
+  return ["o", "oui", "y", "yes"].includes(reponse);
+}
+
+async function certificat(): Promise<never> {
+  const ctx = contexteCourant();
+  const domaine = nomDuServeur();
+  const email = option("email") ?? (ctx.env?.get("VAPID_SUBJECT") ?? "").replace(/^mailto:/, "");
+
+  const noms = [domaine, `call.${domaine}`];
+  const resolutions = await Promise.all(
+    noms.map(async (nom) => ({ nom, vides: (await resoudre(nom)).length === 0 })),
+  );
+  const constatCert = await verifCertificat.verifier(ctx);
+  const [, jours] = /expire dans (\d+) jours/.exec(constatCert.constat) ?? [];
+
+  const plan = planifierCertificat({
+    domaine,
+    email,
+    dev,
+    certbotPresent: dev || (await executer("certbot", ["--version"])).code === 0,
+    nomsMuets: resolutions.filter((r) => r.vides).map((r) => r.nom),
+    port80: await sonderPort(80),
+    certificatExistant:
+      jours === undefined ? undefined : { joursRestants: Number(jours) },
+    force,
+  });
+
+  const lignes = ["", dev ? "Certificat de développement" : `Certificat pour ${domaine}`, ""];
+  if (plan.obstacles.length > 0) {
+    lignes.push("Ce qui empêche l'émission :", "");
+    for (const { quoi, remede } of plan.obstacles) lignes.push(`  ✗ ${quoi}`, `    └ ${remede}`);
+    lignes.push("");
+    process.stdout.write(`${lignes.join("\n")}\n`);
+    process.exit(1);
+  }
+
+  for (const { titre, commande: c, args, motif } of plan.etapes) {
+    lignes.push(`  ${titre}`, `    ${[c, ...args].join(" ")}`, `    ${motif}`, "");
+  }
+  if (plan.avertissements.length > 0) lignes.push(...plan.avertissements, "");
+  process.stdout.write(`${lignes.join("\n")}\n`);
+
+  if (!(await confirmer("Émettre le certificat ?"))) {
+    process.stdout.write("Abandon — rien n'a été fait.\n");
+    process.exit(1);
+  }
+
+  for (const { titre, commande: c, args } of plan.etapes) {
+    process.stdout.write(`\n→ ${titre}\n`);
+    const code = await executerVisible(c, args);
+    if (code !== 0) {
+      process.stderr.write(`\n« ${titre} » a échoué (code ${code}). Rien de plus n'est tenté.\n`);
+      process.exit(code);
+    }
+  }
+
+  process.stdout.write(
+    `\nCertificat en place. La suite :\n\n${apresEmission(dev)
+      .map((etape, index) => `  ${index + 1}. ${etape}`)
+      .join("\n")}\n\n`,
+  );
+  process.exit(0);
+}
+
+if (!COMMANDES.includes(commande)) {
   process.stderr.write(`commande inconnue : ${commande}\n\n${USAGE}`);
   process.exit(2);
 }
+if (commande === "doctor") await doctor();
+else if (commande === "init") await init();
+else if (commande === "dns") await dns();
+else await certificat();

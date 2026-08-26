@@ -77,6 +77,60 @@ describe("il ne laisse pas l'administrateur devant une panne qu'il vient de cré
   });
 });
 
+describe("il annonce avant d'agir, et demande une fois", () => {
+  /**
+   * Un script d'amorçage tourne en root sur une machine que son auteur ne voit pas, et
+   * la première version enchaînait `curl … | sudo sh` sans rien demander. Annoncer le
+   * plan puis demander une seule fois est le minimum ; `--oui` reste pour les scripts.
+   */
+  it("il constate tout avant de modifier quoi que ce soit", () => {
+    const constat = bootstrap.indexOf("BESOIN_DOCKER=0");
+    const premiereAction = bootstrap.indexOf("curl -fsSL https://get.docker.com");
+    expect(constat).toBeGreaterThan(-1);
+    expect(constat).toBeLessThan(premiereAction);
+  });
+
+  it("il énumère ce qu'il va faire, en tant que root, avant de demander", () => {
+    const annonce = bootstrap.indexOf("Ce script va, en tant que root");
+    expect(annonce).toBeGreaterThan(-1);
+    expect(annonce).toBeLessThan(bootstrap.indexOf("Continuer ?"));
+  });
+
+  it("il attend une réponse, et n'accepte que « o » ou « oui »", () => {
+    expect(bootstrap).toMatch(/read -r reponse/);
+    expect(bootstrap).toMatch(/o \| O \| oui/);
+  });
+
+  it("`--oui` saute la question, pour l'automatisation", () => {
+    expect(bootstrap).toMatch(/--oui/);
+    expect(bootstrap).toMatch(/SANS_DEMANDER=1/);
+  });
+
+  it("hors terminal et sans --oui, il refuse plutôt que de supposer un accord", () => {
+    // Un `read` sans terminal rendrait une chaîne vide, donc « non » — mais en silence.
+    expect(bootstrap).toMatch(/\[ ! -t 0 \]/);
+    expect(bootstrap).toMatch(/relancer avec --oui/);
+  });
+
+  it("quand tout est déjà en place, il sort sans rien demander", () => {
+    expect(bootstrap).toMatch(/Rien à faire — tout est déjà en place/);
+  });
+});
+
+describe("il ne laisse pas la machine à moitié installée", () => {
+  it("l'absence d'apt-get est constatée avant la première installation", () => {
+    // Sur Fedora ou Alpine, la version précédente installait Docker puis échouait sur
+    // `apt-get` — dans un état intermédiaire que personne n'avait demandé.
+    const garde = bootstrap.indexOf("apt-get est introuvable");
+    expect(garde).toBeGreaterThan(-1);
+    expect(garde).toBeLessThan(bootstrap.indexOf("curl -fsSL https://get.docker.com"));
+  });
+
+  it("il dit quoi faire sur une distribution qu'il ne sait pas servir", () => {
+    expect(bootstrap).toMatch(/Installer à la main Node/);
+  });
+});
+
 describe("les scripts du dépôt restent exécutables", () => {
   /**
    * Une perte de bit exécutable est **silencieuse** : le hook de pré-commit cesse de

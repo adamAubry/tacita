@@ -26,10 +26,37 @@ export function couleursActives(env: NodeJS.ProcessEnv, estUnTerminal: boolean):
   return estUnTerminal && env["NO_COLOR"] === undefined && env["TERM"] !== "dumb";
 }
 
+/** Un terminal SSH sans réglage fait 80 colonnes ; c'est la valeur à supposer, pas 120. */
+export const COLONNES_PAR_DEFAUT = 80;
+
+/**
+ * Replie un texte sans couper de mot, en alignant les lignes suivantes sur la colonne du
+ * texte. Sans ça, la continuation repart à gauche et l'œil perd la colonne — constaté à
+ * 80 colonnes, la largeur d'un SSH par défaut, sur des constats qui montent à 159
+ * caractères. Un mot plus long que la place restante est laissé tel quel : le tronquer
+ * mutilerait justement le nom de fichier ou la commande qu'on veut lire.
+ */
+export function replier(texte: string, largeur: number, indentation: number): string[] {
+  const utile = Math.max(largeur - indentation, 20);
+  const lignes: string[] = [];
+  let courante = "";
+  for (const mot of texte.split(" ")) {
+    if (courante === "") courante = mot;
+    else if (`${courante} ${mot}`.length <= utile) courante += ` ${mot}`;
+    else {
+      lignes.push(courante);
+      courante = mot;
+    }
+  }
+  if (courante !== "") lignes.push(courante);
+  return lignes.length === 0 ? [""] : lignes;
+}
+
 export function rendre(
   constats: readonly Constat[],
   verifications: readonly Verification[],
   couleurs: boolean,
+  colonnes: number = COLONNES_PAR_DEFAUT,
 ): string {
   const phaseDe = new Map(verifications.map((v) => [v.nom, v.phase]));
   const teinter = (etat: Etat, texte: string) =>
@@ -59,10 +86,16 @@ export function rendre(
     premiere = false;
     lignes.push(phase);
     for (const constat of duGroupe) {
+      const marge = 5 + largeur;
+      const [premierMorceau = "", ...suite] = replier(constat.constat, colonnes, marge);
       const nom = constat.nom.padEnd(largeur);
-      lignes.push(`  ${teinter(constat.etat, SYMBOLE[constat.etat])}  ${nom}${constat.constat}`);
+      lignes.push(`  ${teinter(constat.etat, SYMBOLE[constat.etat])}  ${nom}${premierMorceau}`);
+      for (const morceau of suite) lignes.push(`${" ".repeat(marge)}${morceau}`);
+
       if (constat.remede !== undefined && constat.etat !== "ok") {
-        lignes.push(estomper(`     └ ${constat.remede}`));
+        const [premier = "", ...reste] = replier(constat.remede, colonnes, 7);
+        lignes.push(estomper(`     └ ${premier}`));
+        for (const morceau of reste) lignes.push(estomper(`       ${morceau}`));
       }
     }
   }
