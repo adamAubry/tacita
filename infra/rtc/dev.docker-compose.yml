@@ -1,0 +1,24 @@
+# Écart dev/prod du chemin RTC — D-07 : aucun besoin de développement ne modifie un
+# artefact de production, il vit dans un overlay chargé volontairement.
+#
+#   docker compose -f docker-compose.yml -f smoke/docker-compose.yml \
+#                  -f rtc/docker-compose.yml -f rtc/dev.docker-compose.yml up -d
+#
+# Une seule ligne utile, et elle corrige une panne muette : `use_external_ip: true`
+# fait interroger un STUN public au démarrage pour découvrir l'IP publique de l'hôte,
+# et c'est le bon réglage sur un serveur derrière le NAT de Docker. Sur une machine de
+# développement, le SFU annonce alors une adresse publique — celle de la box, ou rien —
+# qu'aucun navigateur local ne peut joindre : l'appel se connecte, affiche les
+# participants, et le média n'arrive jamais. Exactement le symptôme d'un pare-feu
+# fermé, pour une cause opposée.
+#
+# `NODE_IP` est l'environnement du drapeau `--node-ip` de livekit-server (vérifié dans
+# `--help` de la v1.13.5, l'image épinglée) : renseigné, il coupe court à la découverte
+# et fait annoncer la boucle locale, celle que Docker publie et que WSL2 fait suivre
+# jusqu'au navigateur Windows.
+name: tacita
+
+services:
+  livekit-sfu:
+    environment:
+      NODE_IP: 127.0.0.1

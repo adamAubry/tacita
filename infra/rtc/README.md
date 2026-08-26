@@ -13,8 +13,22 @@ Overlay du compose de `infra`, même projet donc même réseau :
 docker compose -f docker-compose.yml -f rtc/docker-compose.yml up -d
 ```
 
-Variables à remplir dans `.env` en plus de celles de `infra` :
-`WEB_BIND_IP`, `TURN_BIND_IP`, `TURN_DOMAIN`, `LIVEKIT_KEY`, `LIVEKIT_SECRET`.
+Variables à remplir dans `.env` en plus de celles de `infra` : `LIVEKIT_KEY` et
+`LIVEKIT_SECRET`, que `pnpm admin init` génère. **Rien d'autre** — pas d'IP à déclarer,
+pas de domaine pour le TURN. C'est ce qui permet à `infra/bootstrap.sh` de monter cet
+overlay à chaque installation, sans question de plus à poser à l'administrateur.
+
+Sur une machine de développement, un overlay de plus (D-07) :
+
+```sh
+docker compose -f docker-compose.yml -f smoke/docker-compose.yml \
+               -f rtc/docker-compose.yml -f rtc/dev.docker-compose.yml up -d
+```
+
+Il ne fait qu'une chose, et elle corrige une panne muette : `NODE_IP=127.0.0.1` coupe la
+découverte STUN de l'IP publique. Sans lui, le SFU annonce une adresse que le navigateur
+de la machine ne joindra jamais — l'appel se connecte, affiche les participants, et le
+média n'arrive pas. Le symptôme d'un pare-feu fermé, pour la cause opposée.
 
 | Service | Version | Digest |
 |---|---|---|
@@ -64,8 +78,14 @@ annonce ne doit pas survivre au déploiement qu'elle décrit.
 
 `firewall/host-ufw.sh` (pare-feu de l'hôte) **et**
 `firewall/security-group.tf` (groupe de sécurité cloud) déclarent la même plage
-`50000-50100/udp`, alignée sur `rtc.port_range_start/end` de `livekit.yaml`. Les
-tests échouent si les trois divergent.
+`50000-50100/udp`, alignée sur `rtc.port_range_start/end` de `livekit.yaml` — de même
+pour le `5349/tcp` du TURN-TLS et `turn.tls_port`. Les tests échouent si les trois
+divergent, et `pnpm admin doctor` lit la même source pour décider quels ports publiés
+sont légitimes.
+
+`infra/bootstrap.sh` lance `host-ufw.sh` lui-même, en root, avant de démarrer la pile —
+mais seulement là où `ufw` existe. Sur une machine protégée autrement, ces règles
+restent à reporter à la main : le script le dit alors au lieu de se taire.
 
 **Symptôme d'un oubli** : l'appel se connecte normalement — signalisation,
 jetons, affichage des participants, tout a l'air correct — puis **coupe au bout
@@ -78,23 +98,29 @@ l'autre. Vérifier les deux couches avant de chercher ailleurs.
 forme de référence, à transposer si le déploiement part sur un autre
 fournisseur. Les ports, eux, ne changent pas.
 
-## TURN-TLS sur 443 et deuxième IP publique
+## TURN-TLS sur 5349, et une seule IPv4
 
-Le TURN de dernier recours doit écouter en TLS sur 443 : pour un client derrière
-un NAT symétrique ou un pare-feu sortant strict, c'est souvent le seul port
-ouvert. Mais le reverse proxy occupe déjà 443.
+Le TURN de dernier recours écoute en TLS sur **5349**, le port `turns` de l'IANA, sur
+l'adresse de l'hôte — celle du proxy. Il n'y a rien à réserver, rien à déclarer.
 
-**Il faut donc deux IP publiques sur l'hôte** : `WEB_BIND_IP` pour le proxy,
-`TURN_BIND_IP` pour le TURN. L'overlay épingle chaque service sur la sienne (les
-deux variables sont obligatoires, le compose refuse de démarrer sinon). À
-défaut, déployer LiveKit sur un hôte dédié et faire pointer les upstreams du
-proxy vers lui.
+**Ce n'était pas le cas avant le 26/08/2026**, et le motif d'alors était bon : pour un
+client derrière un pare-feu sortant strict, le 443 est souvent le seul port ouvert, donc
+le seul par lequel un relais puisse passer. Mais le reverse proxy occupe déjà le 443, ce
+qui imposait **deux IPv4 publiques sur l'hôte** — `WEB_BIND_IP` et `TURN_BIND_IP`, toutes
+deux obligatoires, l'overlay refusant de démarrer sans elles.
 
-`TURN_DOMAIN` doit correspondre à un SAN du certificat monté depuis
-`proxy/certs`. Le script de certs de dev (`proxy/generate-dev-certs.sh`) n'émet
-qu'un CN : pour tester le chemin TURN en local, lui ajouter le SAN
-correspondant, sinon la négociation TLS du TURN échoue silencieusement et le
-client retombe sur les candidats directs.
+Ce qu'on gagnait sur ce cas de client, on le perdait sur tous les autres : un hôte
+auto-hébergé a une adresse, et les appels y étaient tout simplement indéployables. Une
+seconde IP se loue, mais elle se loue **avant** de savoir qu'on en a besoin, et personne
+ne le découvrait avant le premier appel raté. Le port a donc bougé, et la limite est
+maintenant assumée et écrite plus bas.
+
+`turn.domain` vaut `SERVER_NAME` — pas un sous-domaine à lui. Le certificat monté depuis
+`proxy/certs` le porte par construction, ce qui retire du chemin d'installation un
+enregistrement DNS, un SAN, et le certificat à réémettre le jour où on l'a oublié.
+
+Reste l'alternative de toujours quand la charge le justifie : déployer LiveKit sur un hôte
+dédié et faire pointer les upstreams du proxy vers lui.
 
 ## Element Call est à nous, donc épinglé
 
@@ -131,9 +157,11 @@ foi et ne faisaient rien du tout.
 3. mettre à jour version, digest et date ci-dessus. Un digest non consigné est une
    jonction non relue, quelle que soit la qualité du reste.
 
-Le certificat monté depuis `proxy/certs` doit porter un **SAN pour `call.<SERVER_NAME>`**,
-au même titre que `TURN_DOMAIN`. Sans lui, l'iframe échoue au TLS et le shard n'affiche
-que son délai de chargement, sans pouvoir en donner la cause.
+Le certificat monté depuis `proxy/certs` doit porter un **SAN pour `call.<SERVER_NAME>`**.
+Sans lui, l'iframe échoue au TLS et le shard n'affiche que son délai de chargement, sans
+pouvoir en donner la cause. C'est le seul nom que le RTC ajoute au certificat, et il y est
+depuis l'émission : `pnpm admin certificat` le passe à certbot, `generate-dev-certs.sh` le
+met en SAN.
 
 ## Limites assumées
 
@@ -141,5 +169,10 @@ que son délai de chargement, sans pouvoir en donner la cause.
   (SFU en relais aveugle), mais le SFU et `lk-jwt-service` voient qui appelle
   qui, quand et combien de temps — même limite que le reste du serveur, voir
   `../README.md`.
+- **Un client à la fois derrière un NAT symétrique et un pare-feu sortant qui ne laisse
+  passer que le 443 ne joint pas le TURN**, qui écoute sur 5349. Il lui reste l'UDP
+  50000-50100 et le repli ICE/TCP 7881 ; c'est la conjonction des deux qui perd le relais,
+  pas l'un des deux. Contrepartie assumée du fait que les appels se déploient partout
+  ailleurs — motif complet ci-dessus.
 - **TURN relayé = bande passante serveur.** Les clients en NAT symétrique font
   transiter tout leur média par l'hôte. Aucun quota n'est posé en V1.

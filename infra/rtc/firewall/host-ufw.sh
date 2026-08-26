@@ -11,7 +11,9 @@ ufw allow 50000:50100/udp comment 'LiveKit media'
 # repli ICE/TCP quand l'UDP sortant du client est bloqué
 ufw allow 7881/tcp comment 'LiveKit ICE/TCP'
 
-# TURN : UDP standard, et TLS sur 443 pour les réseaux qui ne
-# laissent sortir que du HTTPS
+# TURN : UDP standard, et TLS sur 5349 (le port `turns` de l'IANA)
 ufw allow 3478/udp comment 'LiveKit TURN'
-ufw allow 443/tcp comment 'HTTPS + TURN-TLS (`infra`/02)'
+ufw allow 5349/tcp comment 'LiveKit TURN-TLS'
+
+# le proxy, seul sur le 443 depuis que le TURN-TLS a pris le 5349
+ufw allow 443/tcp comment 'HTTPS (`infra`/02)'

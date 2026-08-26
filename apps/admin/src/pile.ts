@@ -1,4 +1,4 @@
-import { attente, casse, ok, type Contexte, type Verification } from "./contrat.ts";
+import { attente, attention, casse, ok, type Contexte, type Verification } from "./contrat.ts";
 
 /**
  * L'état réel des conteneurs, par opposition à ce que `docker compose ps` laisse croire.
@@ -162,6 +162,60 @@ export const servicesQuiBouclent: Verification = {
 };
 
 /**
+ * Les trois services de l'overlay RTC, tel que `docker compose ps` les nomme. Sans eux,
+ * le `.well-known` servi est celui de la pile de base — aucun focus annoncé — et l'écran
+ * d'appel affiche `RtcFociMissing`. C'est le bon diagnostic, pas une panne à chercher :
+ * d'où un avertissement et non un blocage, une pile sans appels restant un déploiement
+ * légitime. Ce qui ne serait pas légitime, c'est de le découvrir au premier appel.
+ */
+export const SERVICES_RTC = ["livekit-sfu", "lk-jwt-service", "element-call"];
+
+export const appelsAudioVideo: Verification = {
+  nom: "appels audio/vidéo",
+  phase: PHASE,
+  verifier: async (ctx) => {
+    const conteneurs = await conteneursDe(ctx);
+    if (conteneurs === undefined || conteneurs.length === 0)
+      return attente("appels audio/vidéo", "en attente du démarrage de la pile");
+
+    const presents = new Set(conteneurs.map((c) => c.Service));
+    const absents = SERVICES_RTC.filter((service) => !presents.has(service));
+    return absents.length === 0
+      ? ok("appels audio/vidéo", "SFU, service de jetons et Element Call en place")
+      : attention(
+          "appels audio/vidéo",
+          `${absents.join(", ")} absent${absents.length > 1 ? "s" : ""} — aucun focus annoncé, l'app affichera RtcFociMissing`,
+          "relancer en ajoutant -f rtc/docker-compose.yml, ou sh infra/bootstrap.sh qui le fait",
+        );
+  },
+};
+
+/**
+ * Les ports que l'overlay RTC publie, lus dans `rtc/livekit.yaml` plutôt que recopiés :
+ * c'est le même fichier qui arme le SFU et le pare-feu, et une liste figée ici dériverait
+ * en silence le jour où la plage change. Fichier absent — donc pas de RTC dans ce dépôt —
+ * on retombe sur le 443 seul, qui est exactement la pile de base.
+ */
+const portsRtcAutorises = (lire: Contexte["lire"]): ReadonlySet<number> => {
+  const yaml = lire("infra/rtc/livekit.yaml");
+  if (yaml === undefined) return new Set();
+  const valeur = (cle: string): number | undefined => {
+    const [, brut] = new RegExp(`^\\s*${cle}:\\s*(\\d+)`, "m").exec(yaml) ?? [];
+    return brut === undefined ? undefined : Number(brut);
+  };
+  const debut = valeur("port_range_start");
+  const fin = valeur("port_range_end");
+  const ports = new Set<number>();
+  for (const cle of ["tcp_port", "tls_port", "udp_port"]) {
+    const port = valeur(cle);
+    if (port !== undefined) ports.add(port);
+  }
+  if (debut !== undefined && fin !== undefined)
+    for (let port = debut; port <= fin; port += 1) ports.add(port);
+  return ports;
+};
+
+/**
  * L'overlay de fumée publie PostgreSQL et l'API Synapse sur l'hôte, et installe un CA de
  * développement dans le magasin de confiance de Synapse. Trois choses qui n'ont rien à
  * faire sur une machine publique — et `ufw` n'y change rien, puisqu'il ne protège pas ce
@@ -186,8 +240,12 @@ export const overlayDeFumee: Verification = {
       ),
     ].sort((a, b) => a - b);
 
-    const indus = publies.filter((port) => port !== 443);
-    if (indus.length === 0) return ok("ports publiés", "443 seulement");
+    // Le 443 du proxy, plus les ports du média RTC — qui sont publics par nature : le
+    // navigateur d'un correspondant s'y connecte en direct, c'est tout l'intérêt.
+    const autorises = portsRtcAutorises(ctx.lire);
+    const indus = publies.filter((port) => port !== 443 && !autorises.has(port));
+    if (indus.length === 0)
+      return ok("ports publiés", autorises.size === 0 ? "443 seulement" : "443 et les ports RTC");
     if (ctx.dev)
       return ok("ports publiés", `443 et ${indus.join(", ")} — l'overlay de fumée, attendu ici`);
 
@@ -203,5 +261,6 @@ export const VERIFICATIONS_PILE: readonly Verification[] = [
   pileDemarree,
   servicesEnBonneSante,
   servicesQuiBouclent,
+  appelsAudioVideo,
   overlayDeFumee,
 ];

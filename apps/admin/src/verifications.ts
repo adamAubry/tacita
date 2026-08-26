@@ -48,6 +48,12 @@ export const SECRETS_REQUIS = [
   "SYNAPSE_FORM_SECRET",
   "S3_ACCESS_KEY_ID",
   "S3_SECRET_ACCESS_KEY",
+  // Les appels font partie de la pile depuis le 26/08/2026 : le SFU ne fait confiance
+  // qu'aux jetons que `lk-jwt-service` signe avec cette paire. Laissée sur `change-me`,
+  // les deux la partagent quand même et rien n'échoue au démarrage — le premier appel
+  // seul découvre que n'importe qui pouvait forger un jeton.
+  "LIVEKIT_KEY",
+  "LIVEKIT_SECRET",
 ];
 
 export const fichierEnv: Verification = {
@@ -193,27 +199,6 @@ export const cleKmsMinio: Verification = {
 };
 
 /**
- * Une absence annoncée, jamais un défaut. L'overlay RTC exige deux IPv4 publiques
- * distinctes — le proxy et le TURN-TLS veulent tous les deux le 443. Sans elles, la pile
- * de base tourne très bien et n'annonce simplement aucun focus : l'écran d'appel affiche
- * `RtcFociMissing`, ce qui est le bon diagnostic, pas une panne à chercher.
- */
-export const appelsAudioVideo: Verification = {
-  nom: "appels audio/vidéo",
-  phase: "Configuration",
-  verifier: dependDeEnv("appels audio/vidéo", (env) => {
-    const manquantes = ["WEB_BIND_IP", "TURN_BIND_IP"].filter((cle) => (env.get(cle) ?? "") === "");
-    return manquantes.length === 0
-      ? ok("appels audio/vidéo", "deux IP de liaison définies, l'overlay rtc/ peut démarrer")
-      : attention(
-          "appels audio/vidéo",
-          `${manquantes.join(" et ")} ${manquantes.length > 1 ? "vides" : "vide"} — pas d'appels, et l'app le dira correctement`,
-          "attendu si tu ne déploies pas les appels ; sinon il faut deux IPv4 publiques (infra/rtc/README.md)",
-        );
-  }),
-};
-
-/**
  * Quatre choses peuvent clocher, et une seule était visible avant qu'on la cherche :
  * l'absence de `subjectAltName`. `service_identity` — donc Twisted, donc Synapse — refuse
  * un certificat sans SAN, et tout navigateur depuis 2017 aussi. Un certificat au seul
@@ -292,6 +277,5 @@ export const VERIFICATIONS_CONFIG: readonly Verification[] = [
   sujetVapid,
   plagesAutorisees,
   cleKmsMinio,
-  appelsAudioVideo,
   certificat,
 ];

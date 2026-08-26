@@ -1,3 +1,5 @@
+import { COMPOSE_DEV, COMPOSE_PROD } from "./init.ts";
+
 /**
  * L'émission du certificat. C'est la seule commande de l'outil qui appelle un service
  * externe, prend des droits root et consomme un quota : Let's Encrypt limite à cinq
@@ -145,10 +147,11 @@ export function apresEmission(dev: boolean): readonly string[] {
   return dev
     ? [
         "importer infra/proxy/certs/fullchain.pem comme autorité de confiance du navigateur",
-        "cd infra && docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d",
+        `cd infra && docker compose ${COMPOSE_DEV} up -d`,
       ]
     : [
-        "cd infra && docker compose -f docker-compose.yml -f staging/docker-compose.yml up -d",
+        "sudo sh infra/rtc/firewall/host-ufw.sh — les ports du média RTC",
+        `cd infra && docker compose ${COMPOSE_PROD} up -d`,
         "pnpm admin doctor — il relit le certificat et confirme les subjectAltName",
       ];
 }

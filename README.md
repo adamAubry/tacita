@@ -100,6 +100,14 @@ démonstration. Ce qu'ils racontaient vit dans `git log`, où un document daté 
 
 ## Démarrer
 
+D'une machine nue à une pile joignable, appels compris :
+
+```sh
+sh infra/bootstrap.sh --dev      # ou sans --dev pour un vrai domaine
+```
+
+À la main, si l'on préfère voir chaque geste :
+
 ```sh
 corepack pnpm install
 npm test
@@ -107,14 +115,17 @@ npm test
 cd infra
 cp .env.example .env                       # remplir les secrets
 ./proxy/generate-dev-certs.sh
-docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
+docker compose -f docker-compose.yml -f smoke/docker-compose.yml \
+               -f rtc/docker-compose.yml -f rtc/dev.docker-compose.yml up -d
 cd .. && npm run smoke
 ```
 
-Cette pile **ne monte pas le RTC** : l'overlay `infra/rtc/docker-compose.yml` est séparé et
-demande deux IP publiques. Son `.well-known` n'annonce donc aucun focus (décision E-08) :
-`discoverFocus()` rend `RtcFociMissing`, ce que l'UI sait afficher, au lieu d'un 502 en
-pleine connexion d'appel.
+**Le RTC est de la pile, pas d'une option**, depuis qu'il tient sur une seule IPv4
+(`infra/rtc/README.md`). Une pile montée sans son overlay reste parfaitement valide : son
+`.well-known` n'annonce alors aucun focus (décision E-08), `discoverFocus()` rend
+`RtcFociMissing`, ce que l'UI sait afficher — au lieu d'un 502 en pleine connexion
+d'appel. `pnpm admin doctor` le signale plutôt que de laisser le découvrir au premier
+appel.
 
 Détail du socle serveur, y compris la vérification de pré-vol à faire avant toute création
 de compte : `infra/README.md`.

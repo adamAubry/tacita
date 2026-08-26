@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { diagnostiquer, type Contexte } from "../src/contrat.ts";
 import {
-  appelsAudioVideo,
   certificat,
   CHEMIN_CERT,
   cleKmsMinio,
@@ -36,8 +35,8 @@ const ENV_SAIN: Record<string, string> = {
   VAPID_PRIVATE_KEY: "p".repeat(43),
   SYNAPSE_IP_RANGE_WHITELIST: '["172.16.0.0/12"]',
   MINIO_KMS_SECRET_KEY: `tacita:${Buffer.alloc(32, 7).toString("base64")}`,
-  WEB_BIND_IP: "203.0.113.10",
-  TURN_BIND_IP: "203.0.113.11",
+  LIVEKIT_KEY: "tacita",
+  LIVEKIT_SECRET: "e1b8a4",
 };
 
 const contexte = (modifications: Partial<Contexte> = {}): Contexte =>
@@ -177,24 +176,14 @@ describe("la clé de chiffrement du stockage objet", () => {
   });
 });
 
-describe("l'absence d'appels est annoncée, jamais présentée comme une panne", () => {
-  it("sans IP de liaison, c'est un avertissement et non un blocage", async () => {
-    // La pile de base tourne parfaitement sans SFU et l'app affiche le bon diagnostic.
-    // Classer ça en « cassé » enverrait l'administrateur réparer ce qui va bien.
-    const constat = await appelsAudioVideo.verifier(avec({ WEB_BIND_IP: "", TURN_BIND_IP: "" }));
-    expect(constat.etat).toBe("attention");
-    expect(constat.remede).toContain("attendu si tu ne déploies pas les appels");
-  });
-
-  it("le pluriel suit le nombre de variables manquantes", async () => {
-    const deux = await appelsAudioVideo.verifier(avec({ WEB_BIND_IP: "", TURN_BIND_IP: "" }));
-    expect(deux.constat).toContain("vides");
-    const une = await appelsAudioVideo.verifier(avec({ WEB_BIND_IP: "" }));
-    expect(une.constat).toContain("vide —");
-  });
-
-  it("avec les deux IP, la vérification passe", async () => {
-    expect((await appelsAudioVideo.verifier(contexte())).etat).toBe("ok");
+describe("la paire LiveKit est un secret requis, comme ceux de Synapse", () => {
+  it("laissée sur change-me, elle bloque au même titre que les autres", async () => {
+    // Les appels font partie de la pile : le SFU ne fait confiance qu'aux jetons signés
+    // avec cette paire. Partagée entre tous les déploiements, elle laisse n'importe qui
+    // forger un jeton — et rien n'échoue au démarrage pour le dire.
+    const constat = await secretsRemplis.verifier(avec({ LIVEKIT_SECRET: "change-me" }));
+    expect(constat.etat).toBe("casse");
+    expect(constat.constat).toContain("LIVEKIT_SECRET");
   });
 });
 
@@ -278,7 +267,9 @@ describe("le diagnostic complet", () => {
     const constats = await diagnostiquer(contexte({ env: undefined }), VERIFICATIONS_CONFIG);
     const bloquantes = constats.filter((c) => c.etat === "casse").map((c) => c.nom);
     expect(bloquantes).toEqual(["infra/.env", "certificat TLS"]);
-    expect(constats.filter((c) => c.etat === "attente")).toHaveLength(7);
+    expect(constats.filter((c) => c.etat === "attente")).toHaveLength(
+      VERIFICATIONS_CONFIG.length - 2,
+    );
   });
 });
 

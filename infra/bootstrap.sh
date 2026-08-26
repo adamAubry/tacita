@@ -148,6 +148,13 @@ if [ "$(node_majeur)" -lt "$NODE_MAJEUR_MINIMAL" ] 2>/dev/null; then
 fi
 command -v pnpm >/dev/null 2>&1 || ajouter pnpm "pnpm (${PNPM_VOULU#pnpm@})"
 command -v certbot >/dev/null 2>&1 || { ajouter certbot "certbot"; BESOIN_APT=1; }
+# Les ports du média RTC s'ouvrent sur l'hôte, sinon l'appel se connecte puis coupe à
+# 15-20 s sans que rien ne le dise. On ne demande pas si ufw est *actif* : le savoir
+# exigerait déjà root, alors qu'`ufw allow` est idempotent et sans effet tant que le
+# pare-feu est éteint. Sa seule présence suffit donc à décider.
+BESOIN_PARE_FEU=0
+command -v ufw >/dev/null 2>&1 && BESOIN_PARE_FEU=1
+
 BESOIN_GROUPE=0
 if [ "$EST_ROOT" -eq 0 ] && ! id -nG "$(id -un)" | grep -qw docker; then
   ajouter groupe "Ajouter $(id -un) au groupe docker"
@@ -204,7 +211,11 @@ if [ "$CERT_FAIT" -eq 1 ]; then
 else
   dire "    4. Certificat        émission TLS"
 fi
-dire "    5. Pile              démarrage des conteneurs"
+if [ "$BESOIN_PARE_FEU" -eq 1 ]; then
+  dire "    5. Pile              ports RTC ouverts sur ufw, puis démarrage des conteneurs"
+else
+  dire "    5. Pile              démarrage des conteneurs"
+fi
 dire "    6. Vérification      diagnostic complet"
 
 if [ "$SANS_DEMANDER" -eq 0 ]; then
@@ -257,7 +268,9 @@ if [ "$CONFIG_FAITE" -eq 0 ]; then
 fi
 
 # Le mot de passe sudo se demande ici, pas entre deux étapes.
-if [ "$EST_ROOT" -eq 0 ] && [ "$NOMBRE_PREREQUIS" -gt 0 ] && ! sudo -n -v >/dev/null 2>&1; then
+if [ "$EST_ROOT" -eq 0 ] &&
+  { [ "$NOMBRE_PREREQUIS" -gt 0 ] || [ "$BESOIN_PARE_FEU" -eq 1 ]; } &&
+  ! sudo -n -v >/dev/null 2>&1; then
   if [ ! -t 0 ]; then
     dire "  sudo réclame un mot de passe et il n'y a pas de terminal pour le saisir."
     dire "  Relancer en root, ou autoriser sudo sans mot de passe pour cet utilisateur."
@@ -411,10 +424,29 @@ fi
 
 etape 5 "Pile"
 
-if [ "$DEV" -eq 1 ]; then
-  COMPOSE="-f docker-compose.yml -f smoke/docker-compose.yml"
+# Le pare-feu avant le démarrage, pour que la plage UDP du média soit ouverte quand le
+# premier appel arrive. Un oubli ne se voit pas : l'appel se connecte, affiche les
+# participants, et coupe à 15-20 s (infra/rtc/README.md). Le script est le seul endroit
+# du dépôt qui porte ces règles, et il est idempotent.
+if [ "$BESOIN_PARE_FEU" -eq 1 ]; then
+  printf '  %-38s' "Ports RTC ouverts sur ufw"
+  avec_battement en_root sh "$RACINE/infra/rtc/firewall/host-ufw.sh" || echouer
+  dire " ok"
 else
-  COMPOSE="-f docker-compose.yml -f staging/docker-compose.yml"
+  deja "pas d'ufw ici — rien à ouvrir"
+  dire "    Si un pare-feu protège cette machine, y reporter infra/rtc/firewall/host-ufw.sh."
+fi
+
+# L'overlay RTC est de la pile, pas d'une option : sans lui le `.well-known` n'annonce
+# aucun focus et l'écran d'appel affiche `RtcFociMissing`. Il ne demande plus qu'une seule
+# IPv4 depuis que le TURN-TLS a quitté le 443 pour le 5349 — c'est ce qui permet de le
+# monter partout, y compris sur l'hôte à une adresse de l'auto-hébergement.
+if [ "$DEV" -eq 1 ]; then
+  # `rtc/dev.docker-compose.yml` : le SFU annonce la boucle locale au lieu de partir
+  # découvrir une IP publique que le navigateur de la machine ne joindra pas (D-07).
+  COMPOSE="-f docker-compose.yml -f smoke/docker-compose.yml -f rtc/docker-compose.yml -f rtc/dev.docker-compose.yml"
+else
+  COMPOSE="-f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker-compose.yml"
 fi
 
 [ -n "$(docker compose -p tacita ps -q 2>/dev/null)" ] && deja "des conteneurs tournent déjà, ils seront mis à jour"

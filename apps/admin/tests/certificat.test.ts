@@ -133,6 +133,9 @@ describe("ce qui suit l'émission", () => {
   it("en production, monter la pile puis relancer le diagnostic", () => {
     const suite = apresEmission(false).join(" ");
     expect(suite).toContain("staging/docker-compose.yml");
+    // Le RTC est de la pile, pas d'une option : une commande sans lui laisse le
+    // `.well-known` sans focus et le bouton d'appel inerte.
+    expect(suite).toContain("rtc/docker-compose.yml");
     expect(suite).toContain("pnpm admin doctor");
   });
 

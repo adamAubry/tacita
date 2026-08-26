@@ -79,12 +79,15 @@ describe("le certificat de dev couvre le nom que Synapse appelle", () => {
     // seule la cible de fumée exerce. Celui-ci empêche la régression silencieuse.
     expect(script).toMatch(/ENV_FILE=/);
     expect(script).toMatch(/SERVER_NAME="\$\{SERVER_NAME:-\$\(lire_env SERVER_NAME\)\}"/);
-    expect(script).toMatch(/TURN_DOMAIN="\$\{TURN_DOMAIN:-\$\(lire_env TURN_DOMAIN\)\}"/);
   });
 
-  it("subjectAltName reste posé, avec TURN_DOMAIN quand il est défini", () => {
+  it("subjectAltName porte le homeserver et call., les deux seuls noms servis en TLS", () => {
     expect(script).toMatch(/-addext "subjectAltName=/);
-    expect(script).toMatch(/\$\{TURN_DOMAIN:\+,DNS:\$TURN_DOMAIN\}/);
+    expect(script).toMatch(/ALT="DNS:\$\{NAME\},DNS:call\.\$\{NAME\}"/);
+    // Le TURN n'a pas de nom à lui : il s'annonce sous SERVER_NAME, que le premier
+    // SAN couvre déjà. Un troisième nom serait un enregistrement DNS de plus à créer,
+    // et un certificat à réémettre le jour où on l'oublie.
+    expect(script).not.toContain("TURN_DOMAIN");
   });
 });
 

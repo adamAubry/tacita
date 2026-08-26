@@ -35,7 +35,7 @@ qui sait déjà ce qu'il fait.
   Étape 2 sur 6 · Configuration    pnpm admin init
   Étape 3 sur 6 · DNS              pnpm admin dns, avec attente gérée
   Étape 4 sur 6 · Certificat       pnpm admin certificat
-  Étape 5 sur 6 · Pile             docker compose up -d --build
+  Étape 5 sur 6 · Pile             ports RTC sur ufw, puis docker compose up -d --build
   Étape 6 sur 6 · Vérification     pnpm admin doctor
 ```
 
@@ -90,8 +90,8 @@ dans un service absent.
 
 ## `init` — préparer `infra/.env`
 
-Il fabrique ce que `doctor` se contente de réclamer : les six secrets, la paire VAPID, la
-clé KMS de MinIO, le domaine et le domaine TURN qui s'en déduit.
+Il fabrique ce que `doctor` se contente de réclamer : les secrets — ceux de Synapse, de
+S3 et du SFU LiveKit —, la paire VAPID, la clé KMS de MinIO et le domaine.
 
 Deux règles le gouvernent, et ce sont elles qui le rendent sûr à relancer :
 
@@ -100,7 +100,7 @@ Deux règles le gouvernent, et ce sont elles qui le rendent sûr à relancer :
    médias déjà stockés ; un `SERVER_NAME` réécrit abandonnerait le homeserver, puisque ce
    nom entre dans chaque identifiant Matrix et chaque signature d'appareil.
 2. **Rien ne s'écrase en silence.** Chaque clé est portée au compte rendu, y compris
-   celles qu'il n'a pas touchées, avec `généré`, `renseigné`, `conservé` ou `laissé vide`.
+   celles qu'il n'a pas touchées, avec `généré`, `renseigné` ou `conservé`.
    Les secrets n'y figurent que par leurs quatre premiers caractères et leur longueur : ce
    rapport s'affiche à l'écran, se copie dans un ticket et finit dans un historique de
    shell.
@@ -109,9 +109,11 @@ Les commentaires et l'ordre de `.env.example` sont préservés — ils portent l
 ce qu'un administrateur doit comprendre, et les perdre échangerait une documentation
 vivante contre une liste de clés.
 
-**`WEB_BIND_IP` et `TURN_BIND_IP` restent vides**, et c'est délibéré : l'overlay RTC exige
-deux IPv4 publiques distinctes que personne ne peut deviner. Les remplir au hasard
-produirait une pile qui refuse de démarrer pour une raison inventée par l'outil.
+**Les appels ne demandent plus rien que l'outil ne sache produire.** Il fallait deux IPv4
+publiques distinctes, que `init` laissait vides faute de pouvoir les inventer — donc une
+pile qui refusait de démarrer sur une machine qui n'en a qu'une. Depuis que le TURN-TLS a
+quitté le 443 pour le 5349 (`infra/rtc/README.md`), il ne reste que la paire de clés du
+SFU, générée comme les autres secrets.
 
 La paire VAPID est produite par `node:crypto` seul : point P-256 non compressé, 65 octets,
 87 caractères en base64url, et sa clé privée de 32 octets sur 43 caractères. Plus de
@@ -172,8 +174,9 @@ dit jamais que c'est la mémoire. **Docker** : « absent » et « installé mais
 parler » sont deux pannes distinctes, la seconde se résolvant par `usermod -aG docker` et
 une reconnexion, pas par une réinstallation.
 
-**Configuration** — `infra/.env` : le nom du serveur, les six secrets, la paire VAPID et
-son sujet, la plage d'adresses autorisée, la clé KMS, l'état des appels.
+**Configuration** — `infra/.env` : le nom du serveur, les secrets — la paire LiveKit
+comprise, depuis que les appels font partie de la pile —, la paire VAPID et son sujet, la
+plage d'adresses autorisée, la clé KMS.
 
 Les deux **pannes muettes** du dépôt sont couvertes ici. Une clé VAPID mal recopiée fait
 redémarrer la passerelle en boucle pendant que `docker compose ps` affiche la pile debout.
@@ -193,15 +196,22 @@ Une résolution vers une autre adresse **avertit sans bloquer** — le NAT sans 
 DNS à horizon partagé existent.
 
 **Pile** — l'état réel des conteneurs : services démarrés et en bonne santé, services qui
-bouclent, ports publiés. C'est ici que vit la panne la plus coûteuse du dépôt : un service
+bouclent, appels déployés, ports publiés. C'est ici que vit la panne la plus coûteuse du dépôt : un service
 qui refuse sa configuration sort, redémarre, et `docker compose ps` réaffiche « Up » à
 chaque relance. La passerelle push a bouclé sur le staging depuis le premier jour sans que
 personne le voie.
 
+Les **appels** y sont un avertissement, jamais un blocage : les trois services de
+l'overlay RTC absents, la pile reste un déploiement légitime et l'application affiche
+`RtcFociMissing`, qui est le bon diagnostic. Ce qui ne serait pas acceptable, c'est de le
+découvrir au premier appel.
+
 Et le contrôle qui protège une machine publique : l'overlay `smoke/` publie PostgreSQL et
-l'API Synapse sur l'hôte. Tout port publié en plus du 443 bloque hors développement —
-`ufw` n'y change rien, puisque Docker écrit ses règles de redirection en amont de la
-chaîne qu'`ufw` contrôle.
+l'API Synapse sur l'hôte. Tout port publié en plus du 443 et de ceux du média RTC bloque
+hors développement — `ufw` n'y change rien, puisque Docker écrit ses règles de redirection
+en amont de la chaîne qu'`ufw` contrôle. Ces ports-là sont lus dans `rtc/livekit.yaml`,
+pas recopiés : c'est le fichier qui arme le SFU et le pare-feu, et une liste figée ici
+dériverait en silence le jour où la plage change.
 
 Le rapport se replie sur la largeur du terminal, en alignant les continuations sur la
 colonne du texte. Mesuré : des constats à 159 caractères contre un SSH par défaut à 80,

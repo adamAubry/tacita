@@ -17,17 +17,21 @@ services:
       - sed "s|__TURN_DOMAIN__|$$TURN_DOMAIN|" /conf/livekit.yaml > /tmp/livekit.yaml
         && exec /livekit-server --config /tmp/livekit.yaml
     environment:
-      TURN_DOMAIN: ${TURN_DOMAIN}
+      # le TURN s'annonce sous le nom du homeserver, pas sous un sous-domaine à lui :
+      # le certificat le porte forcément, et c'est un enregistrement DNS de moins à
+      # créer. Il n'y a plus de `TURN_DOMAIN` dans `.env`, et c'est voulu.
+      TURN_DOMAIN: ${SERVER_NAME}
       LIVEKIT_KEYS: "${LIVEKIT_KEY}: ${LIVEKIT_SECRET}"
     ports:
       # miroir strict de rtc/firewall/ ; ouvrir ici sans ouvrir là
       # (ou l'inverse) donne un appel qui se connecte puis coupe à 15-20 s.
       - "50000-50100:50000-50100/udp"
       - "7881:7881/tcp"
-      - "${TURN_BIND_IP:?IP dédiée au TURN requise, voir rtc/README.md}:3478:3478/udp"
-      # TURN-TLS sur 443, sur une IP dédiée : le reverse proxy occupe
-      # déjà 443 sur l'IP principale.
-      - "${TURN_BIND_IP:?IP dédiée au TURN requise, voir rtc/README.md}:443:443/tcp"
+      - "3478:3478/udp"
+      # TURN-TLS sur 5349, l'IP par défaut de l'hôte suffit : le proxy garde le 443
+      # pour lui seul. C'est ce qui permet à un hôte à une seule IPv4 — le cas de
+      # l'auto-hébergement — de servir les appels. Motif complet dans livekit.yaml.
+      - "5349:5349/tcp"
     volumes:
       - ./livekit.yaml:/conf/livekit.yaml:ro
       # même certificat que le proxy : le TURN et le homeserver partagent le domaine
@@ -66,10 +70,10 @@ services:
       - ./element-call.json:/conf/config.json:ro
 
   proxy:
-    # le TURN-TLS réclame 443 sur son IP : on épingle le proxy sur
-    # l'autre. `!override` remplace la liste de ports au lieu de l'étendre.
-    ports: !override
-      - "${WEB_BIND_IP:?IP publique du proxy requise, voir rtc/README.md}:443:443"
+    # aucun `ports:` ici, et c'est le fait marquant de cet overlay : le proxy garde
+    # ceux de la pile de base. Le TURN a quitté le 443 pour le 5349, donc plus rien ne
+    # se dispute le port, et déployer les appels ne demande plus une seconde IPv4.
+    #
     # l'annonce du focus appartient à cet overlay, pas à la pile de base :
     # elle n'est vraie que là où les backends `/livekit/*` existent. Même cible de
     # montage que `proxy/well-known.conf`, que compose remplace au lieu de l'ajouter.

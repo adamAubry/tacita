@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import type { Execution } from "../src/contrat.ts";
+import { readFileSync } from "node:fs";
+
 import {
+  appelsAudioVideo,
   lireConteneurs,
   overlayDeFumee,
   pileDemarree,
   servicesEnBonneSante,
   servicesQuiBouclent,
+  SERVICES_RTC,
 } from "../src/pile.ts";
 import { monde } from "./monde.ts";
 
@@ -85,7 +89,12 @@ describe("la pile non démarrée n'est pas une panne", () => {
   });
 
   it("les vérifications qui en dépendent attendent aussi", async () => {
-    for (const verification of [servicesEnBonneSante, servicesQuiBouclent, overlayDeFumee]) {
+    for (const verification of [
+      servicesEnBonneSante,
+      servicesQuiBouclent,
+      appelsAudioVideo,
+      overlayDeFumee,
+    ]) {
       expect((await verification.verifier(avecPile([]))).etat).toBe("attente");
     }
   });
@@ -196,5 +205,72 @@ describe("l'overlay de fumée, qui ne doit jamais être chargé sur une machine 
 
   it("le 443 seul passe partout", async () => {
     expect((await overlayDeFumee.verifier(avecPile(PILE_SAINE))).etat).toBe("ok");
+  });
+});
+
+describe("les appels sont déployés, ou leur absence est dite avant le premier appel", () => {
+  const AVEC_RTC = [...PILE_SAINE, ...SERVICES_RTC.map((service) => conteneur(service))];
+
+  it("les trois services de l'overlay présents, la vérification passe", async () => {
+    expect((await appelsAudioVideo.verifier(avecPile(AVEC_RTC))).etat).toBe("ok");
+  });
+
+  it("l'overlay absent, c'est un avertissement et non un blocage", async () => {
+    // Une pile sans appels reste un déploiement légitime, et l'application affiche le
+    // bon diagnostic. Classer ça en « cassé » enverrait réparer ce qui va bien — ce qui
+    // ne va pas, c'est de le découvrir au premier appel.
+    const constat = await appelsAudioVideo.verifier(avecPile(PILE_SAINE));
+    expect(constat.etat).toBe("attention");
+    expect(constat.constat).toContain("RtcFociMissing");
+    expect(constat.remede).toContain("rtc/docker-compose.yml");
+  });
+
+  it("un seul service manquant suffit, et il est nommé", async () => {
+    // Le SFU seul debout donne un focus annoncé dont les jetons ne se signent nulle
+    // part : l'appel démarre et meurt à la connexion, ce qui se lit comme un bug client.
+    const sansJwt = AVEC_RTC.filter((c) => c.Service !== "lk-jwt-service");
+    const constat = await appelsAudioVideo.verifier(avecPile(sansJwt));
+    expect(constat.etat).toBe("attention");
+    expect(constat.constat).toContain("lk-jwt-service");
+    expect(constat.constat).not.toContain("livekit-sfu");
+  });
+});
+
+describe("les ports du média RTC sont publics par nature, et lus là où ils sont décidés", () => {
+  // La jonction que rien d'autre ne tient : `livekit.yaml` arme le SFU et le pare-feu,
+  // et le diagnostic doit suivre la même plage. Figée ici, elle dériverait en silence le
+  // jour où elle change, et le doctor accuserait une pile correcte d'exposer 101 ports.
+  const livekitReel = (chemin: string) =>
+    chemin === "infra/rtc/livekit.yaml"
+      ? readFileSync(new URL("../../../infra/rtc/livekit.yaml", import.meta.url), "utf-8")
+      : undefined;
+
+  const expose = [
+    conteneur("proxy", { Publishers: [{ PublishedPort: 443 }] }),
+    conteneur("livekit-sfu", {
+      Publishers: [
+        { PublishedPort: 50000 },
+        { PublishedPort: 50100 },
+        { PublishedPort: 7881 },
+        { PublishedPort: 3478 },
+        { PublishedPort: 5349 },
+      ],
+    }),
+  ];
+
+  it("la pile avec RTC en production ne déclenche pas l'alerte de l'overlay de fumée", async () => {
+    const constat = await overlayDeFumee.verifier(avecPile(expose, {}, { lire: livekitReel }));
+    expect(constat.etat).toBe("ok");
+    expect(constat.constat).toContain("ports RTC");
+  });
+
+  it("un port étranger à cette liste bloque toujours", async () => {
+    // C'est tout l'intérêt : élargir la liste aux ports du média ne doit pas rouvrir la
+    // porte à l'overlay de fumée, qui publie PostgreSQL et l'API Synapse.
+    const avecPostgres = [...expose, conteneur("postgres", { Publishers: [{ PublishedPort: 55432 }] })];
+    const constat = await overlayDeFumee.verifier(avecPile(avecPostgres, {}, { lire: livekitReel }));
+    expect(constat.etat).toBe("casse");
+    expect(constat.constat).toContain("55432");
+    expect(constat.constat).not.toContain("50100");
   });
 });

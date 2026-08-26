@@ -20,9 +20,17 @@ const bacASable = (
   const racine = mkdtempSync(join(tmpdir(), "tacita-wizard-"));
   mkdirSync(join(racine, "apps/admin/src"), { recursive: true });
   mkdirSync(join(racine, "infra/proxy/certs"), { recursive: true });
+  mkdirSync(join(racine, "infra/rtc/firewall"), { recursive: true });
   mkdirSync(join(racine, "bin"), { recursive: true });
 
   cpSync(join(DEPOT, "infra/bootstrap.sh"), join(racine, "infra/bootstrap.sh"));
+  // Le script réel, pas une doublure : c'est lui que l'assistant lance en root, et
+  // c'est `ufw` qui est doublé plus bas. Une copie ici prouve aussi que le chemin
+  // écrit dans l'assistant est celui où le fichier vit vraiment.
+  cpSync(
+    join(DEPOT, "infra/rtc/firewall/host-ufw.sh"),
+    join(racine, "infra/rtc/firewall/host-ufw.sh"),
+  );
   cpSync(join(DEPOT, "infra/.env.example"), join(racine, "infra/.env.example"));
   cpSync(join(DEPOT, "package.json"), join(racine, "package.json"));
   if (options.env !== undefined) writeFileSync(join(racine, "infra/.env"), options.env);
@@ -56,6 +64,10 @@ const bacASable = (
   poser("curl", 'echo "# simulé"');
   poser("bash", 'echo "BASH_APPELE $*"');
   poser("apt-get", 'echo "APT_APPELE $*"');
+  // Doublé, et non laissé au hasard de la machine : sans ça le test passerait ou non
+  // selon qu'un ufw traîne dans le PATH, et les deux branches de l'assistant seraient
+  // éprouvées au petit bonheur.
+  poser("ufw", 'echo "UFW_APPELE $*"');
   poser("corepack", 'echo "COREPACK_APPELE $*"');
   return racine;
 };
@@ -224,6 +236,31 @@ describe("le parcours enchaîne les six étapes", () => {
     // `dns` est interrogé en silence tant qu'il répond : ce qui se voit alors est son
     // verdict, pas son appel. C'est bien lui qui décide — le cas d'échec le montre.
     expect(sortie).toContain("les deux noms résolvent");
+  });
+
+  it("il monte le RTC, et ouvre les ports du média avant de démarrer", () => {
+    // Deux oublis de la même famille, tous deux muets. Sans l'overlay, le `.well-known`
+    // n'annonce aucun focus et le bouton d'appel rend `RtcFociMissing` ; sans les ports,
+    // l'appel se connecte puis coupe à 15-20 s quand ICE expire ses candidats.
+    // Les commandes travaillent en silence, leur sortie part au journal : c'est là
+    // qu'on lit ce qui a réellement été lancé, et non dans ce que l'écran affiche.
+    const [, journal] = /Journal de cette installation : (\S+)/.exec(sortie) ?? [];
+    expect(journal).toBeDefined();
+    const trace = readFileSync(journal!, "utf-8");
+    expect(trace).toContain("UFW_APPELE allow 50000:50100/udp");
+    expect(trace).toContain("UFW_APPELE allow 5349/tcp");
+    expect(sortie).toMatch(/Ports RTC ouverts sur ufw[^\n]*ok/);
+    expect(bootstrap).toContain("-f rtc/docker-compose.yml");
+    // L'ordre compte : ouvrir après le démarrage laisserait une fenêtre où les premiers
+    // appels échouent, sur une pile qui a l'air debout.
+    expect(bootstrap.indexOf("host-ufw.sh")).toBeLessThan(bootstrap.indexOf("COMPOSE="));
+  });
+
+  it("sur une machine sans ufw, il le dit et poursuit au lieu d'échouer", () => {
+    // Toutes les distributions n'ont pas ufw, et un pare-feu absent n'est pas une panne
+    // d'installation : c'est une consigne à laisser à l'administrateur.
+    expect(bootstrap).toContain("command -v ufw");
+    expect(bootstrap).toMatch(/pas d'ufw ici/);
   });
 
   it("init est appelé sans sa liste « ce qui reste à faire »", () => {

@@ -39,10 +39,20 @@ resource "aws_vpc_security_group_ingress_rule" "livekit_turn_udp" {
   cidr_ipv4         = "0.0.0.0/0"
 }
 
-// 443/tcp porte le HTTPS du proxy et le TURN-TLS, chacun sur son IP
-resource "aws_vpc_security_group_ingress_rule" "https_and_turn_tls" {
+// doit rester identique à turn.tls_port de ../livekit.yaml
+resource "aws_vpc_security_group_ingress_rule" "livekit_turn_tls" {
   security_group_id = var.security_group_id
-  description = "HTTPS + TURN-TLS (`infra`/02)"
+  description = "LiveKit TURN-TLS"
+  ip_protocol       = "tcp"
+  from_port         = 5349
+  to_port           = 5349
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+// le proxy, seul sur le 443 depuis que le TURN-TLS a pris le 5349
+resource "aws_vpc_security_group_ingress_rule" "https" {
+  security_group_id = var.security_group_id
+  description = "HTTPS (`infra`/02)"
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443

@@ -32,6 +32,31 @@ describe("plage UDP ouverte sur les deux couches", () => {
   });
 });
 
+describe("le TURN-TLS est ouvert sur les deux couches, au port de livekit.yaml", () => {
+  // Même règle de miroir que la plage UDP, et même symptôme quand elle est rompue : le
+  // relais de dernier recours est simplement injoignable, sans que rien ne le dise.
+  const port = livekit.turn.tls_port;
+
+  it("le pare-feu hôte ouvre ce port en TCP", () => {
+    expect(ufw).toContain(`ufw allow ${port}/tcp`);
+  });
+
+  it("le groupe de sécurité cloud ouvre ce port en TCP", () => {
+    const rule = securityGroup.match(
+      /resource\s+"aws_vpc_security_group_ingress_rule"\s+"livekit_turn_tls"\s*{([^}]*)}/s,
+    )?.[1];
+    expect(rule).toBeTruthy();
+    expect(rule).toMatch(/ip_protocol\s*=\s*"tcp"/);
+    expect(rule).toMatch(new RegExp(`from_port\\s*=\\s*${port}\\b`));
+    expect(rule).toMatch(new RegExp(`to_port\\s*=\\s*${port}\\b`));
+  });
+
+  it("le 443 reste au proxy seul, des deux côtés", () => {
+    expect(ufw).toMatch(/ufw allow 443\/tcp comment 'HTTPS \(`infra`\/02\)'/);
+    expect(securityGroup).not.toContain("TURN-TLS (`infra`/02)");
+  });
+});
+
 describe("les rtc_foci sont annoncés quand le RTC est déployé, jamais avant", () => {
   // Le corps JSON contient des accolades : on découpe sur le `return`, pas sur
   // la fin du bloc nginx. `$host` est interpolé par nginx à la requête ; neutralisé

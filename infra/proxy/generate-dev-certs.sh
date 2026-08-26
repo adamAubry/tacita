@@ -16,18 +16,16 @@ lire_env() {
 }
 ENV_FILE="$(dirname "$0")/../.env"
 SERVER_NAME="${SERVER_NAME:-$(lire_env SERVER_NAME)}"
-TURN_DOMAIN="${TURN_DOMAIN:-$(lire_env TURN_DOMAIN)}"
 
 NAME="${SERVER_NAME:-localhost}"
-# `.env` déclare TURN_DOMAIN comme devant être un SAN du certificat monté
-# (rtc/README.md) : on l'ajoute quand il est défini, sinon `infra/rtc` hérite d'un
-# certificat qui ne couvre pas son propre domaine.
+# Deux noms, et le TURN n'en demande pas un troisième : il s'annonce sous `$NAME`
+# lui-même (rtc/livekit.yaml), donc le premier SAN le couvre déjà.
 #
-# `call.<domaine>` de même : Element Call est servi sous son propre nom
-# d'hôte par l'overlay RTC, et sans ce SAN l'iframe d'appel échoue au TLS. Le shard
-# n'affiche alors que son délai de chargement, sans pouvoir en dire la
+# `call.<domaine>` en revanche est indispensable : Element Call est servi sous son
+# propre nom d'hôte par l'overlay RTC, et sans ce SAN l'iframe d'appel échoue au TLS.
+# Le shard n'affiche alors que son délai de chargement, sans pouvoir en dire la
 # cause — une panne muette de plus, pour un nom oublié dans une liste.
-ALT="DNS:${NAME},DNS:call.${NAME}${TURN_DOMAIN:+,DNS:$TURN_DOMAIN}"
+ALT="DNS:${NAME},DNS:call.${NAME}"
 
 # `subjectAltName` n'est pas facultatif. Un certificat qui ne porte qu'un CN est
 # refusé par tout client TLS moderne : les navigateurs depuis 2017, et côté serveur

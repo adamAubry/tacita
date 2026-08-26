@@ -32,10 +32,7 @@ VAPID_PUBLIC_KEY=change-me
 VAPID_PRIVATE_KEY=change-me
 SYNAPSE_IP_RANGE_WHITELIST=["172.16.0.0/12"]
 
-# Le proxy et le TURN-TLS veulent tous les deux 443 : une IP publique chacun.
-WEB_BIND_IP=
-TURN_BIND_IP=
-TURN_DOMAIN=turn.chat.example.org
+# Deux variables, et rien d'autre à décider : le SFU et le TURN tiennent sur l'IP de l'hôte.
 LIVEKIT_KEY=change-me
 LIVEKIT_SECRET=change-me
 `;
@@ -82,16 +79,17 @@ describe("la préparation d'infra/.env depuis l'exemple", () => {
     expect(contenu.indexOf("SERVER_NAME")).toBeLessThan(contenu.indexOf("POSTGRES_USER"));
   });
 
-  it("laisse vides les deux IP de liaison, qu'aucun outil ne peut deviner", () => {
-    // Les remplir au hasard produirait une pile qui refuse de démarrer pour une raison
-    // que l'outil aurait inventée lui-même.
-    expect(valeurs.get("WEB_BIND_IP")).toBe("");
-    expect(valeurs.get("TURN_BIND_IP")).toBe("");
-    expect(actionDe("WEB_BIND_IP")).toBe("laissé vide");
-  });
-
-  it("dérive le domaine TURN du domaine donné", () => {
-    expect(valeurs.get("TURN_DOMAIN")).toBe("turn.chat.tacita.fr");
+  it("les appels n'ont plus une seule valeur que l'administrateur doive deviner", () => {
+    // Il fallait deux IPv4 publiques que l'outil laissait vides, faute de pouvoir les
+    // inventer — donc une pile qui refusait de démarrer, sur une machine qui n'en a
+    // qu'une. Le TURN-TLS ayant quitté le 443 pour le 5349, il ne reste que la paire de
+    // clés du SFU, et `init` la génère comme les autres.
+    expect(actionDe("LIVEKIT_KEY")).toBe("renseigné");
+    expect(actionDe("LIVEKIT_SECRET")).toBe("généré");
+    expect(valeurs.get("LIVEKIT_SECRET")).toHaveLength(64);
+    for (const disparue of ["WEB_BIND_IP", "TURN_BIND_IP", "TURN_DOMAIN"]) {
+      expect(modifications.map((m) => m.cle)).not.toContain(disparue);
+    }
   });
 
   it("rend compte de chaque clé, y compris celles qu'elle n'a pas touchées", () => {
@@ -128,7 +126,7 @@ describe("la relance, qui ne doit rien casser de ce qui tourne déjà", () => {
     const premier = planifier(EXEMPLE, REPONSES).contenu;
     const { modifications } = planifier(premier, REPONSES);
     const actions = new Set(modifications.map((m) => m.action));
-    expect(actions).toEqual(new Set(["conservé", "laissé vide"]));
+    expect(actions).toEqual(new Set(["conservé"]));
   });
 
   it("un fichier à moitié rempli ne voit compléter que ce qui manque", () => {
@@ -175,6 +173,26 @@ describe("ce que l'outil dit ne pas pouvoir faire", () => {
     expect(etapes).toContain("hosts");
     expect(etapes).toContain("generate-dev-certs.sh");
     expect(etapes).not.toContain("certbot");
+  });
+
+  it("la commande de démarrage monte le RTC, des deux côtés", () => {
+    // Une commande sans `rtc/` monterait une pile sans SFU : le `.well-known` n'annonce
+    // alors aucun focus, et le bouton d'appel rend `RtcFociMissing`. L'administrateur
+    // aurait suivi la procédure à la lettre pour obtenir des appels qui ne partent pas.
+    expect(resteAFaire("chat.tacita.fr", false).join("\n")).toContain(
+      "-f rtc/docker-compose.yml",
+    );
+    const dev = resteAFaire("chat.example.org", true).join("\n");
+    expect(dev).toContain("-f rtc/docker-compose.yml");
+    // En dev le SFU doit annoncer la boucle locale : sans cet overlay il part chercher
+    // une IP publique que le navigateur de la machine ne joindra jamais.
+    expect(dev).toContain("-f rtc/dev.docker-compose.yml");
+  });
+
+  it("en production, il rappelle d'ouvrir les ports du média", () => {
+    // L'oubli ne se voit pas : l'appel se connecte, affiche les participants, et coupe
+    // à 15-20 s quand ICE expire ses candidats.
+    expect(resteAFaire("chat.tacita.fr", false).join("\n")).toContain("host-ufw.sh");
   });
 });
 

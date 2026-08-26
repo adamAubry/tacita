@@ -178,7 +178,7 @@ Les valeurs qui **doivent** changer par rapport à l'exemple :
 | `MINIO_KMS_SECRET_KEY`                                                                                          | `echo "tacita-staging:$(openssl rand -base64 32)"`                                             |
 | `VAPID_SUBJECT`                                                                                                 | `mailto:<ton-email>`                                                                           |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`                                                                        | voir ci-dessous                                                                                |
-| `TURN_DOMAIN`, `WEB_BIND_IP`, `TURN_BIND_IP`                                                                    | laisser tel quel : l'overlay RTC n'est pas chargé (§ 9)                                        |
+| `LIVEKIT_KEY`, `LIVEKIT_SECRET`                                                                                 | `openssl rand -hex 32` pour le secret — le SFU ne fait confiance qu'aux jetons signés avec (§ 9) |
 
 `SYNAPSE_IP_RANGE_WHITELIST` n'est pas facultatif ici. L'overlay pose un alias réseau qui
 fait résoudre `SERVER_NAME` vers le proxy depuis l'intérieur du compose (levier de D-07,
@@ -320,23 +320,25 @@ recréer à la main.
 
 ---
 
-## 9. Les appels — ce qu'il faudra en plus
+## 9. Les appels — ce qu'il faut en plus
 
-L'overlay `rtc/docker-compose.yml` **refuse de démarrer** sans `WEB_BIND_IP` et
-`TURN_BIND_IP`, et c'est délibéré : le TURN de dernier recours doit écouter en TLS sur le
-443 (souvent le seul port sortant ouvert derrière un NAT strict), or le proxy
-occupe déjà ce port. **Il faut donc une deuxième IPv4 sur la machine** — quelques euros
-par mois chez la plupart des hébergeurs. L'alternative documentée dans `rtc/README.md` est
-un hôte dédié à LiveKit.
+Presque rien, depuis le 26/08/2026 : le TURN-TLS a quitté le 443 pour le **5349**, donc la
+seconde IPv4 publique qu'exigeait l'overlay n'est plus nécessaire, et `turn.chat.<domaine>`
+non plus — le TURN s'annonce sous `SERVER_NAME`, que le certificat porte déjà. Il reste :
 
-Quand la deuxième IP est là : ajouter `turn.chat.<domaine>` au DNS, réémettre le
-certificat avec ce nom en plus, remplir les trois variables, ouvrir les ports du pare-feu
-(`rtc/firewall/` en est le miroir de référence — ouvrir d'un côté sans l'autre donne un
-appel qui se connecte puis **coupe à 15-20 secondes**), et charger l'overlay :
+1. remplir `LIVEKIT_KEY` et `LIVEKIT_SECRET` (`pnpm admin init` le fait) ;
+2. ouvrir les ports du média — `sudo sh rtc/firewall/host-ufw.sh`, dont
+   `rtc/firewall/security-group.tf` est le miroir côté fournisseur. Ouvrir d'un côté sans
+   l'autre donne un appel qui se connecte puis **coupe à 15-20 secondes** ;
+3. charger l'overlay :
 
 ```sh
 docker compose -f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker-compose.yml up -d
 ```
+
+`sh infra/bootstrap.sh` fait les trois. **Limite assumée** : un client à la fois derrière
+un NAT symétrique et un pare-feu sortant qui ne laisse passer que le 443 n'atteint plus le
+relais — voir `rtc/README.md`, qui porte le motif et ce qu'il reste à ce client.
 
 ---
 
