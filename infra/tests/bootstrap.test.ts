@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,38 @@ import { describe, expect, it } from "vitest";
 
 const bootstrap = readFileSync(new URL("../bootstrap.sh", import.meta.url), "utf-8");
 const machine = readFileSync(new URL("../../apps/admin/src/machine.ts", import.meta.url), "utf-8");
+
+
+const doublures = (versionNode: string, presents: readonly string[] = []) => {
+  const bac = mkdtempSync(join(tmpdir(), "tacita-bootstrap-"));
+  const poser = (nom: string, corps: string) => {
+    const chemin = join(bac, nom);
+    writeFileSync(chemin, `#!/bin/sh\n${corps}\n`);
+    chmodSync(chemin, 0o755);
+  };
+  poser("id", '[ "$1" = "-u" ] && { echo 0; exit 0; }\n[ "$1" = "-un" ] && { echo root; exit 0; }\nexec /usr/bin/id "$@"');
+  poser("node", `echo ${versionNode}`);
+  poser("docker", '[ "$1" = "compose" ] && { echo "Docker Compose version v2.40.3"; exit 0; }\necho "Docker version 27.3.1"');
+  poser("curl", 'echo "# script simulé"');
+  poser("bash", 'echo "BASH_APPELE $*"');
+  poser("apt-get", 'echo "APT_APPELE $*"');
+  poser("corepack", 'echo "COREPACK_APPELE $*"');
+  for (const outil of presents) poser(outil, `echo "${outil} présent"`);
+  return bac;
+};
+
+/** Rend le code et la sortie plutôt que de lever : un échec est ici un cas à éprouver. */
+const lancer = (bac: string, args: readonly string[] = []) => {
+  const resultat = spawnSync("sh", [new URL("../bootstrap.sh", import.meta.url).pathname, ...args], {
+    // PATH délibérément restreint : hériter de celui de la machine ferait dépendre le
+    // test de ce qui y est installé — un `pnpm` réel masquerait l'étape qu'on éprouve.
+    env: { PATH: `${bac}:/usr/bin:/bin` },
+    encoding: "utf-8",
+  });
+  return { code: resultat.status ?? -1, sortie: `${resultat.stdout ?? ""}${resultat.stderr ?? ""}` };
+};
+
+
 
 describe("le script d'amorçage tourne là où rien n'est encore installé", () => {
   it("c'est du shell POSIX, pas du bash", () => {
@@ -80,6 +112,20 @@ describe("il ne laisse pas l'administrateur devant une panne qu'il vient de cré
   });
 });
 
+describe("tout ce qui se demande, se demande avant", () => {
+  it("le mot de passe sudo est réclamé avant la première étape, pas au milieu", () => {
+    // Une invite qui surgit entre deux lignes du compte rendu casse l'affichage et
+    // laisse devant un écran qui n'avance plus, sans dire qu'il attend quelque chose.
+    const preAutorisation = bootstrap.indexOf("sudo -v");
+    expect(preAutorisation).toBeGreaterThan(-1);
+    expect(preAutorisation).toBeLessThan(bootstrap.indexOf("titre \"Installation\""));
+  });
+
+  it("sans terminal pour saisir le mot de passe, il le dit au lieu de bloquer", () => {
+    expect(bootstrap).toMatch(/sudo réclame un mot de passe/);
+  });
+});
+
 describe("il annonce avant d'agir, et demande une fois", () => {
   /**
    * Un script d'amorçage tourne en root sur une machine que son auteur ne voit pas, et
@@ -87,14 +133,14 @@ describe("il annonce avant d'agir, et demande une fois", () => {
    * plan puis demander une seule fois est le minimum ; `--oui` reste pour les scripts.
    */
   it("il constate tout avant de modifier quoi que ce soit", () => {
-    const constat = bootstrap.indexOf("BESOIN_DOCKER=0");
+    const constat = bootstrap.indexOf("BESOIN_APT=0");
     const premiereAction = bootstrap.indexOf("curl -fsSL https://get.docker.com");
     expect(constat).toBeGreaterThan(-1);
     expect(constat).toBeLessThan(premiereAction);
   });
 
   it("il énumère ce qu'il va faire, en tant que root, avant de demander", () => {
-    const annonce = bootstrap.indexOf("Ce script va, en tant que root");
+    const annonce = bootstrap.indexOf("Ce script va installer, en tant que root");
     expect(annonce).toBeGreaterThan(-1);
     expect(annonce).toBeLessThan(bootstrap.indexOf("Continuer ?"));
   });
@@ -145,51 +191,101 @@ describe("le script s'exécute vraiment, y compris en root", () => {
    * de bon, avec des doublures qui n'installent rien : c'est la différence entre « le
    * fichier contient les bonnes lignes » et « le programme fait ce qu'il annonce ».
    */
-  const doublures = (versionNode: string) => {
-    const bac = mkdtempSync(join(tmpdir(), "tacita-bootstrap-"));
-    const poser = (nom: string, corps: string) => {
-      const chemin = join(bac, nom);
-      writeFileSync(chemin, `#!/bin/sh\n${corps}\n`);
-      chmodSync(chemin, 0o755);
-    };
-    poser("id", '[ "$1" = "-u" ] && { echo 0; exit 0; }\n[ "$1" = "-un" ] && { echo root; exit 0; }\nexec /usr/bin/id "$@"');
-    poser("node", `echo ${versionNode}`);
-    poser("docker", '[ "$1" = "compose" ] && { echo "Docker Compose version v2.40.3"; exit 0; }\necho "Docker version 27.3.1"');
-    poser("curl", 'echo "# script simulé"');
-    poser("bash", 'echo "BASH_APPELE $*"');
-    poser("apt-get", 'echo "APT_APPELE $*"');
-    return bac;
-  };
-
-  const lancer = (bac: string, args: readonly string[] = []) =>
-    execFileSync(
-      "sh",
-      [new URL("../bootstrap.sh", import.meta.url).pathname, ...args],
-      { env: { PATH: `${bac}:${process.env["PATH"] ?? ""}` }, encoding: "utf-8", stdio: "pipe" },
-    );
-
   it("en root, avec un Node trop vieux, il installe sans se casser sur sudo", () => {
-    const bac = doublures("v18.19.1");
-    const sortie = lancer(bac, ["--oui"]);
-    // Le script NodeSource doit atteindre `bash`, et non un programme nommé « -E ».
-    expect(sortie).toContain("BASH_APPELE -");
-    expect(sortie).toContain("APT_APPELE install -y nodejs");
-    expect(sortie).not.toContain("-E");
+    const bac = doublures("v18.19.1", ["pnpm", "certbot"]);
+    const { code, sortie } = lancer(bac, ["--oui"]);
+    expect(code).toBe(0);
+
+    // Le détail vit désormais dans le journal, plus à l'écran : c'est là qu'on vérifie
+    // que le script NodeSource a bien atteint `bash`, et non un programme nommé « -E ».
+    const [, journal] = /Journal détaillé : (\S+)/.exec(sortie) ?? [];
+    expect(journal).toBeDefined();
+    const detail = readFileSync(journal!, "utf-8");
+    expect(detail).toContain("BASH_APPELE -");
+    expect(detail).toContain("APT_APPELE install -y nodejs");
+    expect(detail).not.toContain("-E:");
+
+    expect(sortie).toMatch(/\[1\/1] Node 22 +ok/);
     rmSync(bac, { recursive: true, force: true });
+    rmSync(journal!, { force: true });
   });
 
   it("en root avec tout en place, il sort sans rien faire", () => {
-    const bac = doublures("v22.14.0");
-    const sortie = lancer(bac);
+    const bac = doublures("v22.14.0", ["pnpm", "certbot"]);
+    const { code, sortie } = lancer(bac);
+    expect(code).toBe(0);
     expect(sortie).toContain("Rien à faire");
     expect(sortie).not.toContain("APT_APPELE");
     rmSync(bac, { recursive: true, force: true });
   });
 
   it("sans --oui et hors terminal, il refuse après avoir annoncé son plan", () => {
-    const bac = doublures("v18.19.1");
-    expect(() => lancer(bac)).toThrow();
+    const bac = doublures("v18.19.1", ["pnpm", "certbot"]);
+    const { code, sortie } = lancer(bac);
+    expect(code).toBe(1);
+    expect(sortie).toContain("Ce script va installer");
+    expect(sortie).toContain("relancer avec --oui");
     rmSync(bac, { recursive: true, force: true });
+  });
+});
+
+describe("l'écran ne porte qu'une ligne par étape, le détail va au journal", () => {
+  /**
+   * La demande est explicite : une installation crache des centaines de lignes, dont
+   * aucune ne dit où l'on en est. L'écran porte « [3/6] Node 22 … ok », et le détail
+   * n'apparaît que là où il sert — quand ça casse.
+   */
+  it("chaque étape tient sur une ligne numérotée, et le bruit n'y est pas", () => {
+    const bac = doublures("v18.19.1");
+    const { code, sortie } = lancer(bac, ["--oui"]);
+    expect(code).toBe(0);
+    const etapes = sortie.split("\n").filter((l) => /^ {2}\[\d+\/\d+]/.test(l));
+    expect(etapes.length).toBeGreaterThanOrEqual(3);
+    for (const ligne of etapes) expect(ligne).toMatch(/ (ok|ÉCHEC)$/);
+    // La sortie des installations elle-même n'a rien à faire à l'écran.
+    expect(sortie).not.toContain("APT_APPELE install -y certbot");
+    rmSync(bac, { recursive: true, force: true });
+  });
+
+  it("le compteur va bien jusqu'au total annoncé", () => {
+    const bac = doublures("v18.19.1");
+    const { code, sortie } = lancer(bac, ["--oui"]);
+    expect(code).toBe(0);
+    const [, dernier, total] = /\[(\d+)\/(\d+)] (?!.*\[)/s.exec(sortie) ?? [];
+    void dernier;
+    expect(sortie).toContain(`[${total}/${total}]`);
+    rmSync(bac, { recursive: true, force: true });
+  });
+
+  it("une étape en échec affiche les dernières lignes du journal, et s'arrête là", () => {
+    const bac = doublures("v18.19.1", ["certbot"]);
+    writeFileSync(join(bac, "corepack"), '#!/bin/sh\necho "E: dépôt injoignable" >&2\nexit 100\n');
+    chmodSync(join(bac, "corepack"), 0o755);
+    const { code, sortie } = lancer(bac, ["--oui"]);
+    expect(code).toBe(1);
+    expect(sortie).toContain("ÉCHEC");
+    expect(sortie).toContain("E: dépôt injoignable");
+    expect(sortie).toContain("Relancer le script reprendra où il en est");
+    // Le court-circuit : la seconde commande de l'étape ne doit pas s'exécuter.
+    expect(sortie.match(/dépôt injoignable/g)).toHaveLength(1);
+    rmSync(bac, { recursive: true, force: true });
+  });
+});
+
+describe("les prérequis couverts", () => {
+  it.each(["curl", "git", "docker", "compose", "node", "pnpm", "certbot"])(
+    "%s a son étape d'installation",
+    (outil) => {
+      expect(bootstrap).toMatch(new RegExp(`^ *${outil}\\)`, "m"));
+    },
+  );
+
+  it("pnpm vient de corepack, à la version que déclare package.json", () => {
+    // La jonction : une version recopiée dans le script finirait par diverger de celle
+    // du dépôt, et personne ne le verrait avant qu'un serveur neuf pose la mauvaise.
+    expect(bootstrap).toMatch(/packageManager/);
+    expect(bootstrap).toMatch(/corepack prepare "\$PNPM_VOULU" --activate/);
+    expect(bootstrap).not.toMatch(/pnpm@\d+\.\d+\.\d+/);
   });
 });
 

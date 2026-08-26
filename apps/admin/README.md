@@ -27,26 +27,46 @@ dans apt.
 ## `infra/bootstrap.sh` — le problème de l'œuf et de la poule
 
 Le seul artefact du lot écrit en shell, et il n'y a qu'une raison à ça : `pnpm admin` a
-besoin de Node 22, et Ubuntu 24.04 livre Node 18 dans apt. Ce script doit donc tourner
-**avant** que quoi que ce soit d'autre existe — d'où `sh` et non `bash`, aucune
+besoin de Node 22 et de pnpm, et Ubuntu 24.04 livre Node 18 dans apt. Ce script doit donc
+tourner **avant** que quoi que ce soit d'autre existe — d'où `sh` et non `bash`, aucune
 dépendance, et rien qui suppose un shell interactif.
 
-Il installe Docker (par le script officiel, pas le paquet `docker.io` qui est ancien et
-sans plugin compose v2), Node 22 depuis NodeSource, et ajoute l'utilisateur au groupe
-`docker` — en disant que ce groupe ne prend effet qu'à la reconnexion, faute de quoi on
-cherche ailleurs une panne qu'on vient de corriger. Il est rejouable, ne touche à aucune
-configuration du projet, et ne démarre rien.
+**Ce qu'il couvre** : `curl` et les certificats racine, `git`, Docker, le plugin compose
+v2, Node 22, **pnpm**, `certbot`, et l'appartenance au groupe `docker`. Sans pnpm, la
+commande `pnpm admin` n'existe pas — c'est tout l'outil d'administration qui manque à
+l'appel, et c'était le trou.
 
-**Il constate tout, annonce ce qu'il va faire en tant que root, puis demande une fois.**
-`--oui` saute la question pour l'automatisation ; hors terminal et sans `--oui`, il
-refuse plutôt que de supposer un accord. L'absence d'`apt-get` est constatée **avant** la
-première installation : sinon, sur une distribution non-Debian, il posait Docker puis
-échouait — dans un état intermédiaire que personne n'avait demandé.
+La version de pnpm est **lue dans `package.json`**, jamais recopiée : deux endroits qui
+doivent s'accorder finissent par diverger, et personne ne le verrait avant qu'un serveur
+neuf pose la mauvaise.
 
-La version de Node qu'il installe et celle que `doctor` exige sont écrites à deux
-endroits : `infra/tests/bootstrap.test.ts` est le seul lien entre elles. Sans ce test,
-relever l'une laisserait l'autre derrière, et la panne n'apparaîtrait que sur une machine
-neuve.
+Trois principes gouvernent son déroulé.
+
+**Tout se demande avant.** La confirmation et le mot de passe sudo sont réclamés d'emblée
+— ce dernier par un `sudo -v` avant la première étape. Une invite qui surgit au milieu du
+travail casse le compte rendu et laisse devant un écran qui n'avance plus, sans dire
+qu'il attend quelque chose.
+
+**Une ligne par étape, pas mille.** La sortie des installations part dans un journal ;
+l'écran ne porte que le compteur :
+
+```
+Installation
+  [0/3] Index des paquets                  ok
+  [1/3] Node 22                            ok
+  [2/3] pnpm (11.18.0)                     ok
+  [3/3] certbot                            ok
+```
+
+En cas d'échec, les vingt dernières lignes du journal s'affichent et le script s'arrête
+là — c'est le seul endroit où le détail sert. Le journal complet est conservé, et
+relancer reprend où l'on en était.
+
+**Constater d'abord, agir ensuite.** Rien n'est modifié avant que le plan entier soit
+établi et accepté. `--oui` saute la question pour l'automatisation ; hors terminal et
+sans `--oui`, il refuse plutôt que de supposer un accord. L'absence d'`apt-get` est
+constatée **avant** la première installation : sinon, sur une distribution non-Debian, il
+posait Docker puis échouait — dans un état intermédiaire que personne n'avait demandé.
 
 ## Pourquoi un outil et pas un runbook
 
