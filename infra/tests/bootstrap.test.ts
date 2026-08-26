@@ -1,4 +1,7 @@
-import { readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const bootstrap = readFileSync(new URL("../bootstrap.sh", import.meta.url), "utf-8");
@@ -128,6 +131,65 @@ describe("il ne laisse pas la machine à moitié installée", () => {
 
   it("il dit quoi faire sur une distribution qu'il ne sait pas servir", () => {
     expect(bootstrap).toMatch(/Installer à la main Node/);
+  });
+});
+
+describe("le script s'exécute vraiment, y compris en root", () => {
+  /**
+   * Le seul chemin qui comptait n'était couvert par aucun test, et il était cassé :
+   * `$SUDO -E bash -` devenait `-E bash -` quand la variable était vide — donc à chaque
+   * exécution en root, celle de tout serveur neuf. Le shell cherchait un programme nommé
+   * « -E », `set -e` arrêtait tout, et Node n'était jamais installé.
+   *
+   * Les vérifications de forme ne pouvaient pas le voir. Celle-ci lance le script pour
+   * de bon, avec des doublures qui n'installent rien : c'est la différence entre « le
+   * fichier contient les bonnes lignes » et « le programme fait ce qu'il annonce ».
+   */
+  const doublures = (versionNode: string) => {
+    const bac = mkdtempSync(join(tmpdir(), "tacita-bootstrap-"));
+    const poser = (nom: string, corps: string) => {
+      const chemin = join(bac, nom);
+      writeFileSync(chemin, `#!/bin/sh\n${corps}\n`);
+      chmodSync(chemin, 0o755);
+    };
+    poser("id", '[ "$1" = "-u" ] && { echo 0; exit 0; }\n[ "$1" = "-un" ] && { echo root; exit 0; }\nexec /usr/bin/id "$@"');
+    poser("node", `echo ${versionNode}`);
+    poser("docker", '[ "$1" = "compose" ] && { echo "Docker Compose version v2.40.3"; exit 0; }\necho "Docker version 27.3.1"');
+    poser("curl", 'echo "# script simulé"');
+    poser("bash", 'echo "BASH_APPELE $*"');
+    poser("apt-get", 'echo "APT_APPELE $*"');
+    return bac;
+  };
+
+  const lancer = (bac: string, args: readonly string[] = []) =>
+    execFileSync(
+      "sh",
+      [new URL("../bootstrap.sh", import.meta.url).pathname, ...args],
+      { env: { PATH: `${bac}:${process.env["PATH"] ?? ""}` }, encoding: "utf-8", stdio: "pipe" },
+    );
+
+  it("en root, avec un Node trop vieux, il installe sans se casser sur sudo", () => {
+    const bac = doublures("v18.19.1");
+    const sortie = lancer(bac, ["--oui"]);
+    // Le script NodeSource doit atteindre `bash`, et non un programme nommé « -E ».
+    expect(sortie).toContain("BASH_APPELE -");
+    expect(sortie).toContain("APT_APPELE install -y nodejs");
+    expect(sortie).not.toContain("-E");
+    rmSync(bac, { recursive: true, force: true });
+  });
+
+  it("en root avec tout en place, il sort sans rien faire", () => {
+    const bac = doublures("v22.14.0");
+    const sortie = lancer(bac);
+    expect(sortie).toContain("Rien à faire");
+    expect(sortie).not.toContain("APT_APPELE");
+    rmSync(bac, { recursive: true, force: true });
+  });
+
+  it("sans --oui et hors terminal, il refuse après avoir annoncé son plan", () => {
+    const bac = doublures("v18.19.1");
+    expect(() => lancer(bac)).toThrow();
+    rmSync(bac, { recursive: true, force: true });
   });
 });
 

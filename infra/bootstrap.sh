@@ -23,18 +23,31 @@ SANS_DEMANDER=0
 dire() { printf '%s\n' "$*"; }
 titre() { printf '\n%s\n' "$*"; }
 
-# On préfixe par sudo seulement quand on n'est pas déjà root : sur une image qui n'a pas
-# sudo installé — c'est fréquent en conteneur — le supposer ferait échouer un script qui
-# n'en avait pas besoin.
-if [ "$(id -u)" -eq 0 ]; then
-  SUDO=""
-else
-  if ! command -v sudo >/dev/null 2>&1; then
-    dire "Ni root, ni sudo : relancer ce script en root."
-    exit 1
-  fi
-  SUDO="sudo"
+# On n'élève les privilèges que si on ne les a pas déjà : sur une image sans sudo — c'est
+# fréquent en conteneur — le supposer ferait échouer un script qui n'en avait pas besoin.
+EST_ROOT=0
+[ "$(id -u)" -eq 0 ] && EST_ROOT=1
+if [ "$EST_ROOT" -eq 0 ] && ! command -v sudo >/dev/null 2>&1; then
+  dire "Ni root, ni sudo : relancer ce script en root."
+  exit 1
 fi
+
+# Exécute une commande avec les droits root, en préservant l'environnement (les variables
+# de proxy, notamment, sans lesquelles rien ne se télécharge derrière un pare-feu
+# d'entreprise).
+#
+# Une fonction et non un préfixe `$SUDO` : `-E` est une option de **sudo**, pas de la
+# commande appelée. Écrit `$SUDO -E bash -`, il devenait `-E bash -` quand la variable
+# était vide — donc à chaque exécution en root, celle de tout serveur neuf. Le shell
+# cherchait alors un programme nommé « -E ». Un préfixe qui change de sens selon qu'il
+# est vide ou non n'est pas un préfixe.
+en_root() {
+  if [ "$EST_ROOT" -eq 1 ]; then
+    "$@"
+  else
+    sudo -E "$@"
+  fi
+}
 
 node_majeur() {
   command -v node >/dev/null 2>&1 || { echo 0; return; }
@@ -51,7 +64,7 @@ BESOIN_GROUPE=0
 command -v docker >/dev/null 2>&1 || BESOIN_DOCKER=1
 docker compose version >/dev/null 2>&1 || BESOIN_COMPOSE=1
 [ "$(node_majeur)" -ge "$NODE_MAJEUR_MINIMAL" ] 2>/dev/null || BESOIN_NODE=1
-if [ -n "$SUDO" ] && ! id -nG "$(id -un)" | grep -qw docker; then BESOIN_GROUPE=1; fi
+if [ "$EST_ROOT" -eq 0 ] && ! id -nG "$(id -un)" | grep -qw docker; then BESOIN_GROUPE=1; fi
 
 # Docker installé par le script officiel apporte déjà le plugin : ne pas le compter deux fois.
 [ "$BESOIN_DOCKER" -eq 1 ] && BESOIN_COMPOSE=0
@@ -109,20 +122,20 @@ if [ "$BESOIN_DOCKER" -eq 1 ]; then
   # Le script officiel, et non le paquet `docker.io` d'Ubuntu : ce dernier est ancien et
   # n'apporte pas le plugin compose v2, dont toute la pile dépend.
   titre "Docker"
-  curl -fsSL https://get.docker.com | $SUDO sh
+  curl -fsSL https://get.docker.com | en_root sh
 fi
 
 if [ "$BESOIN_COMPOSE" -eq 1 ]; then
   titre "Plugin compose v2"
-  $SUDO apt-get update && $SUDO apt-get install -y docker-compose-plugin
+  en_root apt-get update && en_root apt-get install -y docker-compose-plugin
 fi
 
 if [ "$BESOIN_NODE" -eq 1 ]; then
   # `apt install nodejs` sur Ubuntu 24.04 pose Node 18, qui n'a pas le retrait de types
   # dont dépendent les services de ce dépôt. Le dépôt NodeSource est le chemin documenté.
   titre "Node ${NODE_MAJEUR_MINIMAL}"
-  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJEUR_MINIMAL}.x" | $SUDO -E bash -
-  $SUDO apt-get install -y nodejs
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJEUR_MINIMAL}.x" | en_root bash -
+  en_root apt-get install -y nodejs
 fi
 
 if [ "$BESOIN_GROUPE" -eq 1 ]; then
@@ -130,7 +143,7 @@ if [ "$BESOIN_GROUPE" -eq 1 ]; then
   # Le changement ne prend effet qu'à la session suivante : le dire ici évite de chercher
   # pourquoi la commande échoue encore juste après l'avoir corrigée.
   titre "Droits Docker"
-  $SUDO usermod -aG docker "$(id -un)"
+  en_root usermod -aG docker "$(id -un)"
   dire "  ⚠ se déconnecter puis se reconnecter pour que ce groupe prenne effet"
 fi
 
