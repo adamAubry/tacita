@@ -13,11 +13,11 @@ import { nouveauJour, shouldShowHeader, type MessageAffiche } from "./message";
 interface TimelineProps {
   messages: MessageAffiche[];
   chargement?: boolean;
-  /** REQ-UIX-13 — le starter est le premier élément de la timeline, pas un en-tête. */
+  /** le starter est le premier élément de la timeline, pas un en-tête. */
   starter?: React.ReactNode;
   reactions?: (message: MessageAffiche) => ReactionTally[];
   /**
-   * REQ-UI-13 — l'état du dernier message envoyé, et la clé de ce message.
+   * l'état du dernier message envoyé, et la clé de ce message.
    *
    * La clé vient du câblage, qui la calcule déjà pour interroger les accusés : la
    * recalculer ici donnait deux définitions de « dernier message envoyé » dans deux
@@ -29,13 +29,13 @@ interface TimelineProps {
   onReagir: (message: MessageAffiche, emoji: string) => void;
   onRenvoyer: (message: MessageAffiche) => void;
   onAbandonner: (message: MessageAffiche) => void;
-  /** REQ-UI-14 — déchiffrement des pièces jointes (M-E), et ouverture du viewer. */
+  /** déchiffrement des pièces jointes (M-E), et ouverture du viewer. */
   telecharger?: Telecharger;
   onOuvrirMedia?: (message: MessageAffiche) => void;
-  /** REQ-MED-05 — sauvegarde d'une pièce jointe sur l'appareil (M-E). */
+  /** sauvegarde d'une pièce jointe sur l'appareil (M-E). */
   onSauvegarderMedia?: (media: Media) => void;
   /**
-   * REQ-UIX-20 (M-F) — l'identifiant du message sur lequel se positionner, tel qu'un
+   * (M-F) — l'identifiant du message sur lequel se positionner, tel qu'un
    * résultat de recherche l'a passé dans l'URL.
    *
    * Un identifiant absent de la timeline chargée **ne déclenche rien** : la contrainte
@@ -44,7 +44,7 @@ interface TimelineProps {
    */
   ancre?: string;
   /**
-   * REQ-UI-21 — « remonte d'un cran dans l'historique ». Appelé quand le défilement
+   * « remonte d'un cran dans l'historique ». Appelé quand le défilement
    * approche du haut ; l'appelant décide s'il reste quelque chose à charger et cesse de
    * répondre quand le salon est remonté jusqu'à son début.
    *
@@ -52,7 +52,7 @@ interface TimelineProps {
    */
   onRemonter?: () => void;
   /**
-   * REQ-UIX-35 — l'URL d'objet du fond d'écran choisi pour ce salon (M-H), quand il y
+   * l'URL d'objet du fond d'écran choisi pour ce salon (M-H), quand il y
    * en a un. La timeline pose alors le voile de lisibilité (`scrim`), qui est ce qui
    * autorise à laisser l'utilisateur choisir n'importe quelle image.
    */
@@ -60,7 +60,7 @@ interface TimelineProps {
 }
 
 /**
- * REQ-UI-06 — la timeline : l'ordre est **celui du paquet**, jamais retrié ici.
+ * la timeline : l'ordre est **celui du paquet**, jamais retrié ici.
  *
  * Deux fonctions pures gouvernent le rendu, et elles sont testables sans DOM :
  * `nouveauJour` place les séparateurs, `shouldShowHeader` décide du regroupement Discord.
@@ -89,14 +89,14 @@ export function Timeline({
   onRemonter,
   fondEcran,
 }: TimelineProps) {
-  // REQ-UI-09 — l'état vit ici : le geste porte sur un message, la révélation porte sur
+  // l'état vit ici : le geste porte sur un message, la révélation porte sur
   // la colonne entière. C'est ce que fait Instagram, et c'est ce qu'on attend.
   const [heuresVisibles, setHeuresVisibles] = useState(false);
   const cible = useRef<HTMLDivElement>(null);
   const zone = useRef<HTMLDivElement>(null);
 
   /**
-   * REQ-UI-21 — la hauteur de la zone **avant** que des messages anciens s'insèrent en
+   * la hauteur de la zone **avant** que des messages anciens s'insèrent en
    * tête. Sans elle, l'insertion pousse tout le contenu vers le bas et le lecteur perd
    * sa ligne : il repart en haut, ce qui redéclenche aussitôt une demande — une boucle,
    * pas un chargement.
@@ -122,7 +122,7 @@ export function Timeline({
   }, [messages[0]?.cle]);
 
   /**
-   * REQ-UI-06 — **une conversation s'ouvre sur son dernier message, et y reste tant qu'on
+   * **une conversation s'ouvre sur son dernier message, et y reste tant qu'on
    * n'est pas remonté.** Rien ne positionnait la zone : elle s'ouvrait donc à zéro, c'est
    * à dire sur le message le plus ancien de la fenêtre chargée, et il fallait défiler
    * jusqu'en bas pour lire ce qui venait d'arriver.
@@ -136,7 +136,7 @@ export function Timeline({
    * l'effet sort sans rien positionner. Quand les messages arrivent, leur nombre n'a
    * souvent pas changé — le paquet les tenait déjà, seul `pret` a basculé — donc l'effet
    * ne se rejouait pas, et la conversation s'ouvrait sur le message le plus **ancien**.
-   * Signalé par les utilisateurs après que REQ-UI-06 a été posée : la logique était juste,
+   * Signalé par les utilisateurs après que a été posée : la logique était juste,
    * elle ne s'exécutait pas. Le test d'origine rendait la timeline sans jamais passer par
    * l'état de chargement, donc sans jamais emprunter le chemin réel.
    */

@@ -44,7 +44,7 @@ const postNotify = (body: unknown) =>
 
 const gone = (statusCode: number) => Object.assign(new Error("dead subscription"), { statusCode });
 
-describe("REQ-PSH-01 — endpoint /_matrix/push/v1/notify conforme", () => {
+describe("endpoint /_matrix/push/v1/notify conforme", () => {
   it("relaie un payload Synapse valide vers la subscription et ne rejette rien", async () => {
     const response = await postNotify(synapsePayload([device("https://push.example/ep1")]));
 
@@ -97,7 +97,7 @@ describe("REQ-PSH-01 — endpoint /_matrix/push/v1/notify conforme", () => {
   });
 });
 
-describe("REQ-PSH-01 — l'émission est réglée pour une messagerie, pas pour un bulletin", () => {
+describe("l'émission est réglée pour une messagerie, pas pour un bulletin", () => {
   /**
    * Trois valeurs posées à une jonction que **personne ne relit** — la règle 7. Elles ne
    * changent rien à un test fonctionnel, et tout à ce que l'utilisateur reçoit :
@@ -120,7 +120,7 @@ describe("REQ-PSH-01 — l'émission est réglée pour une messagerie, pas pour 
   });
 });
 
-describe("REQ-PSH-02 — le payload sortant ne porte que event_id et room_id", () => {
+describe("le payload sortant ne porte que event_id et room_id", () => {
   it("n'expose ni expéditeur, ni nom de salon, ni contenu", async () => {
     await postNotify(synapsePayload([device("https://push.example/ep1")]));
 
@@ -130,7 +130,7 @@ describe("REQ-PSH-02 — le payload sortant ne porte que event_id et room_id", (
   });
 });
 
-describe("REQ-PSH-03 — clé publique VAPID exposée pour l'abonnement client", () => {
+describe("clé publique VAPID exposée pour l'abonnement client", () => {
   it("GET /config retourne la clé publique et rien d'autre", async () => {
     const response = await fetch(url("/config"));
 
@@ -139,7 +139,7 @@ describe("REQ-PSH-03 — clé publique VAPID exposée pour l'abonnement client",
   });
 });
 
-describe("REQ-PSH-04 — aucun contenu utilisateur dans les logs", () => {
+describe("aucun contenu utilisateur dans les logs", () => {
   const spyConsole = () => {
     const lines: string[] = [];
     const record = (...args: unknown[]) => void lines.push(args.map((a) => JSON.stringify(a)).join(" "));

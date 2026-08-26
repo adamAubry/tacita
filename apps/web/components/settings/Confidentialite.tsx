@@ -12,7 +12,7 @@ interface ConfidentialiteProps {
 }
 
 /**
- * REQ-UI-13 (partie réglage) / REQ-RCP-07 — le **mode masqué**.
+ * (partie réglage) / le **mode masqué**.
  *
  * L'effet est **symétrique**, et c'est le seul point qui compte dans cet écran : passer
  * ses reçus en `m.read.private` ne fait pas que cacher les siens, ça éteint aussi ceux

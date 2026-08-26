@@ -15,7 +15,7 @@ import {
 } from "./harness";
 
 /**
- * REQ-INF-18 — **l'annuaire répond, et il répond à quelqu'un qui ne partage rien.**
+ * **l'annuaire répond, et il répond à quelqu'un qui ne partage rien.**
  *
  * Règle 4 du dépôt : le test de config atteste que `search_all_users: true` est écrit
  * dans le fichier ; il n'atteste pas que chercher une personne la trouve. C'est
@@ -57,7 +57,7 @@ beforeAll(async () => {
   chercheuse = (await ouvrir("iris")).session;
 }, 120_000);
 
-describe("REQ-INF-18 — l'annuaire couvre tous les comptes du serveur", () => {
+describe("l'annuaire couvre tous les comptes du serveur", () => {
   it("un fragment de nom d'affichage trouve quelqu'un avec qui on ne partage aucun salon", async () => {
     // L'index de l'annuaire est alimenté en fond : on attend qu'il rattrape, plutôt que
     // de conclure à un réglage absent sur une course.
@@ -87,7 +87,7 @@ describe("REQ-INF-18 — l'annuaire couvre tous les comptes du serveur", () => {
   });
 
   it("l'identifiant sans domaine résout la bonne personne", async () => {
-    // REQ-MSG-19 / REQ-UIX-42 — le chemin du profil, complété avec le domaine du compte
+    // le chemin du profil, complété avec le domaine du compte
     // courant. Il doit rester exact : c'est lui qui répond quand l'annuaire retarde.
     const localpart = cible.compte.userId.split(":")[0].slice(1);
 
@@ -98,7 +98,7 @@ describe("REQ-INF-18 — l'annuaire couvre tous les comptes du serveur", () => {
 
   it("une saisie qui ne désigne personne ne rend personne", async () => {
     // La contrepartie du test précédent : `profileOf` retombe sur l'identifiant lui-même
-    // quand le profil est introuvable (REQ-MSG-18), et proposer ce repli ferait
+    // quand le profil est introuvable, et proposer ce repli ferait
     // « trouver » n'importe quelle saisie.
     expect(await searchUsers(chercheuse, uniqueLocalpart("personne"))).toEqual([]);
   });

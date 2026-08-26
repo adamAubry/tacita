@@ -2,12 +2,12 @@ import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
 /**
- * REQ-INF-16 — le shard a un artefact de production. Jusqu'ici il n'existait que sous
+ * le shard a un artefact de production. Jusqu'ici il n'existait que sous
  * `next dev` : ce qui tournait en local n'était donc **jamais** ce qu'un déploiement
  * aurait servi, et aucun environnement ne pouvait le démentir.
  *
  * `standalone` et non `export` : deux routes sont rendues à la demande (`/i/[token]`,
- * `/profil/[userId]`). Un export statique les perdrait — le lien d'invitation (spec 12)
+ * `/profil/[userId]`). Un export statique les perdrait — le lien d'invitation
  * est justement la porte d'entrée du produit.
  */
 const config: NextConfig = {

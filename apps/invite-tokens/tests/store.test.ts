@@ -12,7 +12,7 @@ function espion(rows: Record<string, unknown>[] = []) {
   return { query: vi.fn(query), textes: () => textes };
 }
 
-describe("REQ-INV-07 — la consommation est une seule instruction, garde compris", () => {
+describe("la consommation est une seule instruction, garde compris", () => {
   /**
    * Pourquoi une assertion sur la **forme du SQL** plutôt que sur un comportement :
    * l'imitation en mémoire de la suite est monothread, donc atomique par construction —
@@ -20,7 +20,7 @@ describe("REQ-INV-07 — la consommation est une seule instruction, garde compri
    * atomique est la structure de l'instruction, et c'est elle qu'on garde.
    *
    * Le comportement concurrent réel ne se prouve que contre un vrai PostgreSQL ; c'est
-   * dit dans LIMITES.md.
+   * dit dans le README.
    */
   it("un seul appel, un seul UPDATE, aucun SELECT préalable des usages", async () => {
     const { query, textes } = espion([
@@ -47,9 +47,9 @@ describe("REQ-INV-07 — la consommation est une seule instruction, garde compri
 
     const sql = textes()[0]!;
     expect(sql).toMatch(/NOT revoked/);
-    expect(sql).toMatch(/expires_at > \$3/); // REQ-INV-17 — l'horloge du serveur
-    expect(sql).toMatch(/issuer <> \$2/); // REQ-INV-12 — jamais son propre lien
-    expect(sql).toMatch(/link_resolutions/); // REQ-INV-13 — jamais deux fois le même porteur
+    expect(sql).toMatch(/expires_at > \$3/); // l'horloge du serveur
+    expect(sql).toMatch(/issuer <> \$2/); // jamais son propre lien
+    expect(sql).toMatch(/link_resolutions/); // jamais deux fois le même porteur
   });
 
   it("rien n'est rendu quand aucune ligne n'a été décrémentée", async () => {
@@ -58,19 +58,19 @@ describe("REQ-INV-07 — la consommation est une seule instruction, garde compri
   });
 });
 
-describe("REQ-INV-18 — le schéma est la liste de ce que le service sait", () => {
+describe("le schéma est la liste de ce que le service sait", () => {
   it("aucune colonne de nom d'affichage, de libellé ni de contenu", () => {
     expect(SCHEMA).toMatch(/token_hash/);
     expect(SCHEMA).not.toMatch(/display_?name|avatar|topic|label|body|content|message/i);
   });
 
   it("le token n'a de place que hachée", () => {
-    // Une colonne `token` en clair rendrait REQ-INV-02 fausse sans casser un seul test
+    // Une colonne `token` en clair rendrait fausse sans casser un seul test
     // de comportement : c'est le genre de régression qu'un test de forme attrape.
     expect(SCHEMA).not.toMatch(/^\s*token\s+text/m);
   });
 
-  it("l'unicité (lien, porteur) est ce qui porte l'idempotence de REQ-INV-13", () => {
+  it("l'unicité (lien, porteur) est ce qui porte l'idempotence de", () => {
     expect(SCHEMA).toMatch(/PRIMARY KEY \(link_id, bearer\)/);
   });
 
@@ -84,7 +84,7 @@ describe("REQ-INV-18 — le schéma est la liste de ce que le service sait", () 
   });
 });
 
-describe("REQ-INV-04 — la liste est filtrée par émetteur en base, pas en mémoire", () => {
+describe("la liste est filtrée par émetteur en base, pas en mémoire", () => {
   it("le WHERE porte l'émetteur : tout filtrer côté service enverrait les liens des autres sur le réseau", async () => {
     const { query, textes } = espion();
     await createPostgresStore(query).listByIssuer("@luca:tacita.test", 1_000);

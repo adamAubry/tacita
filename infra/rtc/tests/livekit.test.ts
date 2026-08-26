@@ -3,25 +3,25 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 const livekit = parse(readFileSync(new URL("../livekit.yaml", import.meta.url), "utf-8"));
-// `logLevel: silent` — le compose porte le tag `!override` (spec 02, port 443
+// `logLevel: silent` — le compose porte le tag `!override` (port 443
 // du proxy), inconnu du parseur YAML générique.
 const compose = parse(readFileSync(new URL("../docker-compose.yml", import.meta.url), "utf-8"), {
   logLevel: "silent",
 });
 
-describe("REQ-RTC-01 — le SFU ne crée jamais de salle de lui-même", () => {
+describe("le SFU ne crée jamais de salle de lui-même", () => {
   it("room.auto_create est false", () => {
     expect(livekit.room.auto_create).toBe(false);
   });
 });
 
-describe("REQ-RTC-02 — découverte de l'IP publique par STUN", () => {
+describe("découverte de l'IP publique par STUN", () => {
   it("rtc.use_external_ip est true", () => {
     expect(livekit.rtc.use_external_ip).toBe(true);
   });
 });
 
-describe("REQ-RTC-03 — accès complet restreint au domaine du déploiement", () => {
+describe("accès complet restreint au domaine du déploiement", () => {
   const homeservers =
     compose.services["lk-jwt-service"].environment.LIVEKIT_FULL_ACCESS_HOMESERVERS;
 
@@ -34,7 +34,7 @@ describe("REQ-RTC-03 — accès complet restreint au domaine du déploiement", (
   });
 });
 
-describe("REQ-RTC-06 — TURN-TLS sur le port 443", () => {
+describe("TURN-TLS sur le port 443", () => {
   it("le TURN est activé et écoute en TLS sur 443", () => {
     expect(livekit.turn.enabled).toBe(true);
     expect(livekit.turn.tls_port).toBe(443);

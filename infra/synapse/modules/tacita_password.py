@@ -160,7 +160,7 @@ class _Ressource(DirectServeJsonResource):
         empreinte = await auth_handler.hash(nouveau)
         # `logout_devices=False` : le changement de mot de passe n'est pas une réponse à une
         # compromission ici — il est gardé par la clé, que seul le titulaire a. Déconnecter
-        # tous les appareils ferait perdre l'historique déchiffré de chacun (REQ-COR-10),
+        # tous les appareils ferait perdre l'historique déchiffré de chacun,
         # pour un gain nul. La déconnexion reste un geste explicite.
         await self._api._hs.get_set_password_handler().set_password(
             user_id, empreinte, False, requester
@@ -203,7 +203,7 @@ class _RessourceConnexion(DirectServeJsonResource):
 
     Elle est **exceptionnelle et le produit le dit** (``apps/web`` — écran de connexion).
     Ce qu'elle change au modèle de menace est écrit dans D-14 et dans
-    ``infra/LIMITES.md`` : la clé cesse d'être un secret qui *déchiffre* pour devenir un
+    Limite assumée : la clé cesse d'être un secret qui *déchiffre* pour devenir un
     secret qui *ouvre*. Qui la détient prend le compte, sans le mot de passe.
 
     Elle ne rend pas de jeton d'accès : elle rend un **jeton de connexion** à usage unique
@@ -217,8 +217,8 @@ class _RessourceConnexion(DirectServeJsonResource):
         super().__init__()
         self._api = api
         # Le limiteur de connexion du serveur, par IP, et non un compteur maison : c'est
-        # celui que REQ-INF-05 dimensionne, et un endpoint d'authentification qui ne
-        # compte pas ses échecs n'a aucun moyen de voir qu'on l'essaie (REQ-INV-09).
+        # celui que dimensionne, et un endpoint d'authentification qui ne
+        # compte pas ses échecs n'a aucun moyen de voir qu'on l'essaie.
         self._limiteur = Ratelimiter(
             store=api._store,
             clock=api._clock,
@@ -240,7 +240,7 @@ class _RessourceConnexion(DirectServeJsonResource):
         if not await self._ouvrable(user_id, corps.get("recovery_key")):
             # **Un seul message pour toutes les causes** — compte inconnu, désactivé, sans
             # clé, ou clé fausse. Les distinguer donnerait un oracle de comptes à qui veut,
-            # et cet endpoint est ouvert. Même jurisprudence que REQ-INV-08.
+            # et cet endpoint est ouvert. Même jurisprudence que.
             respond_with_json(
                 request,
                 403,

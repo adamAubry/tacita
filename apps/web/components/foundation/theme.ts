@@ -2,8 +2,8 @@ import { PALETTE as D, type Couple } from "./palette";
 import { defineTheme, type TokenName, type TokenValue } from "./primitives";
 
 /**
- * REQ-UI-03 — le thème Tacita, seul endroit du dépôt où une valeur de DESIGN.md est
- * recopiée. La table de correspondance qui le gouverne est dans `specs/ui/M-A.md` ;
+ * le thème Tacita, seul endroit du dépôt où une valeur de DESIGN.md est
+ * recopiée. La table de correspondance qui le gouverne est dans `DESIGN.md` ;
  * toute évolution visuelle passe par DESIGN.md, jamais par une valeur en dur ailleurs.
  *
  * Les valeurs sont des couples `[clair, sombre]`, exactement la forme du tableau de
@@ -27,7 +27,7 @@ const chromatiquesNeutralisees = Object.fromEntries(
     [`--color-icon-${famille}`, t(D.textMuted)],
     [`--color-text-${famille}`, t(D.textMuted)],
   ]),
-  // Les noms sont construits, donc opaques au typage. Le test de REQ-UI-03 vérifie que
+  // Les noms sont construits, donc opaques au typage. Le test de vérifie que
   // les quarante sont bien posés — c'est lui qui tient ce que le compilateur lâche ici.
 ) as Partial<Record<TokenName, TokenValue>>;
 

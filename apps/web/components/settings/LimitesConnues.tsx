@@ -14,7 +14,7 @@ interface Limite {
 }
 
 /**
- * REQ-UIX-32 — l'écran « limites connues ». **Honnêteté produit** (spec 00, interdit
+ * l'écran « limites connues ». **Honnêteté produit** (interdit
  * n°13) : ce que le produit ne garantit pas est écrit ici, une fois, en clair.
  *
  * Rédaction sobre et non anxiogène — le but est qu'on puisse décider, pas qu'on ait
@@ -62,7 +62,7 @@ const LIMITES: Limite[] = [
   {
     /*
      * D-12 puis **D-14** — la contrepartie du garde, dite là où elle se lit avant d'en
-     * dépendre. `infra/LIMITES.md` la porte pour l'opérateur ; cet écran est le seul
+     * dépendre. Cet écran est le seul
      * endroit où l'utilisateur peut la voir.
      *
      * Elle est ici et pas seulement dans l'écran de changement : quelqu'un qui décide de
@@ -128,7 +128,7 @@ export function LimitesConnues() {
       ))}
 
       {/* Le type d'événement est lu du paquet, pas recopié : une chaîne recopiée n'est
-          plus un contrat (spec 11). Discret — il n'intéresse que qui sait le lire. */}
+          plus un contrat. Discret — il n'intéresse que qui sait le lire. */}
       <Text type="code" color="secondary">
         {DELIVERED_EVENT_TYPE}
       </Text>

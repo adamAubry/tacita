@@ -73,7 +73,7 @@ const STATS: SearchStats = {
   newestTs: LUNDI_10H,
 };
 
-/** Le paquet spec 09, mocké — M-F ne teste pas l'index, il teste ce qu'il en fait. */
+/** Le paquet `@tacita/search`, mocké — M-F ne teste pas l'index, il teste ce qu'il en fait. */
 function rechercheMock(resultats: SearchHit[] = []): Search & { search: ReturnType<typeof vi.fn> } {
   return {
     index: vi.fn().mockResolvedValue(undefined),
@@ -90,14 +90,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("REQ-UI-16 — la barre, et le périmètre dit en toutes lettres", () => {
+describe("la barre, et le périmètre dit en toutes lettres", () => {
   it("les bornes de stats() sont rendues, pas devinées", () => {
     render(
       <SearchBar tokens={[]} onTokens={vi.fn()} contacts={[]} salons={[]} stats={STATS} />,
     );
 
     const perimetre = screen.getByText(/Recherche dans l'historique téléchargé/);
-    // Les deux bornes de REQ-SRC-06, formatées par Intl — le texte contient l'année des
+    // Les deux bornes de, formatées par Intl — le texte contient l'année des
     // deux dates, ce qui suffit à prouver qu'elles viennent bien de `stats()`.
     expect(perimetre.textContent).toMatch(/2026/);
     expect(perimetre.textContent).toContain("du ");
@@ -132,7 +132,7 @@ describe("REQ-UI-16 — la barre, et le périmètre dit en toutes lettres", () =
   });
 });
 
-describe("REQ-UIX-19 — recherches récentes : scroller, content peek, purge", () => {
+describe("recherches récentes : scroller, content peek, purge", () => {
   const profils = [
     { userId: MIRA, nom: "mira" },
     { userId: "@luca:tacita.test", nom: "luca" },
@@ -212,7 +212,7 @@ describe("REQ-UIX-19 — recherches récentes : scroller, content peek, purge", 
   });
 });
 
-describe("REQ-UIX-20 — deux sections titrées, occurrences surlignées", () => {
+describe("deux sections titrées, occurrences surlignées", () => {
   const resultat = {
     eventId: "$un",
     roomId: "!dm:tacita.test",
@@ -314,8 +314,8 @@ describe("REQ-UIX-20 — deux sections titrées, occurrences surlignées", () =>
   });
 });
 
-describe("REQ-UIX-21 — filtres servis par l'index, jamais par du plein-texte", () => {
-  it("chaque champ de la barre devient le critère correspondant de REQ-SRC-11", () => {
+describe("filtres servis par l'index, jamais par du plein-texte", () => {
+  it("chaque champ de la barre devient le critère correspondant de", () => {
     expect(filtresDepuis([{ field: CHAMP_PERSONNE, value: { type: "enum", value: MIRA } }])).toEqual(
       { sender: MIRA },
     );
@@ -421,7 +421,7 @@ describe("REQ-UIX-21 — filtres servis par l'index, jamais par du plein-texte",
   });
 });
 
-describe("REQ-UIX-22 — débounce des changements de critères, skeletons, zéro réseau", () => {
+describe("débounce des changements de critères, skeletons, zéro réseau", () => {
   beforeEach(() => vi.useFakeTimers());
 
   it("vingt changements en rafale ne produisent qu'un seul appel à search", async () => {
@@ -474,7 +474,7 @@ describe("REQ-UIX-22 — débounce des changements de critères, skeletons, zér
     expect(screen.getByLabelText("Message dans mira")).toBeTruthy();
   });
 
-  it("aucun appel réseau ne part de la recherche (REQ-SRC-03)", async () => {
+  it("aucun appel réseau ne part de la recherche", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const recherche = rechercheMock([hit()]);
@@ -523,7 +523,7 @@ describe("REQ-UIX-22 — débounce des changements de critères, skeletons, zér
   });
 });
 
-describe("REQ-UI-16 — l'index de recherche appartient à la session, pas à un écran", () => {
+describe("l'index de recherche appartient à la session, pas à un écran", () => {
   /**
    * Le défaut que ces trois lectures empêchent, et qui ne se voit dans aucun rendu :
    * `createSearch` n'indexe que ce qui se déchiffre **pendant qu'il est branché**. Créé à

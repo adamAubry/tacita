@@ -103,7 +103,7 @@ beforeEach(() => {
 const wellKnown = (body: unknown, ok = true) =>
   vi.fn(async () => new Response(JSON.stringify(body), { status: ok ? 200 : 404 }));
 
-describe("REQ-CAL-01 — URL Element Call complète et paramétrée", () => {
+describe("URL Element Call complète et paramétrée", () => {
   it("porte salon, identité et homeserver, sans aucun credential LiveKit", () => {
     const { url, params } = buildCallWidget(session, SALON, WIDGET);
 
@@ -122,7 +122,7 @@ describe("REQ-CAL-01 — URL Element Call complète et paramétrée", () => {
   });
 
   it("traduit le point d'entrée en `intent`, celui de la version épinglée", () => {
-    // E-14 close. Relu dans `UserIntent` de la v0.23.0 (REQ-RTC-08) : `start_call` ouvre
+    // E-14 close. Relu dans `UserIntent` de la v0.23.0 : `start_call` ouvre
     // en vidéo, `start_call_voice` en audio, et les deux laissent le lobby.
     const audio = new URLSearchParams(buildCallWidget(session, SALON, WIDGET).params);
     expect(audio.get("intent")).toBe("start_call_voice");
@@ -162,7 +162,7 @@ describe("REQ-CAL-01 — URL Element Call complète et paramétrée", () => {
   });
 });
 
-describe("REQ-CAL-02 — découverte des rtc_foci, erreur typée sinon", () => {
+describe("découverte des rtc_foci, erreur typée sinon", () => {
   it("rend le focus LiveKit publié par le .well-known", async () => {
     vi.stubGlobal("fetch", wellKnown({ [RTC_FOCI_WELL_KNOWN_KEY]: [FOCUS] }));
     await expect(discoverFocus(HOMESERVER)).resolves.toEqual(FOCUS);
@@ -189,7 +189,7 @@ describe("REQ-CAL-02 — découverte des rtc_foci, erreur typée sinon", () => {
   });
 });
 
-describe("REQ-CAL-03 — détection d'appel en cours par les événements d'état", () => {
+describe("détection d'appel en cours par les événements d'état", () => {
   it("passe de idle à active puis ended", () => {
     const call = activeCall(session, SALON);
     const seen: string[] = [];
@@ -243,7 +243,7 @@ describe("REQ-CAL-03 — détection d'appel en cours par les événements d'éta
   });
 });
 
-describe("REQ-CAL-04 — littéraux MatrixRTC centralisés dans un seul fichier", () => {
+describe("littéraux MatrixRTC centralisés dans un seul fichier", () => {
   const srcDir = fileURLToPath(new URL("../src/", import.meta.url));
 
   it("n'écrit aucun littéral de protocole hors de matrixrtc.ts", () => {
@@ -271,7 +271,7 @@ describe("REQ-CAL-04 — littéraux MatrixRTC centralisés dans un seul fichier"
   });
 });
 
-describe("REQ-CAL-05 — driver widget standard, sans logique RTC maison", () => {
+describe("driver widget standard, sans logique RTC maison", () => {
   it("relaie les événements d'état vers la Session", async () => {
     const driver = new CallWidgetDriver(session, SALON);
     const sent = await driver.sendEvent(CALL_MEMBER_EVENT_TYPE, { foci_preferred: [] }, "_k", null);
@@ -309,7 +309,7 @@ describe("REQ-CAL-05 — driver widget standard, sans logique RTC maison", () =>
   });
 });
 
-describe("REQ-CAL-06 — aucune donnée d'appel dans les logs", () => {
+describe("aucune donnée d'appel dans les logs", () => {
   it("ne journalise rien pendant la construction du widget ni le hangup", async () => {
     const spies = (["log", "info", "warn", "error", "debug"] as const).map((level) =>
       vi.spyOn(console, level).mockImplementation(() => {}),

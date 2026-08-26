@@ -1,5 +1,5 @@
 /**
- * REQ-CAL-04 — **le seul fichier du client portant des littéraux MatrixRTC.** Un test
+ * **le seul fichier du client portant des littéraux MatrixRTC.** Un test
  * structurel échoue si l'un d'eux réapparaît ailleurs dans `src/`.
  *
  * Les MSC MatrixRTC ne sont pas stabilisés : ces valeurs ne se recopient pas de mémoire,
@@ -8,7 +8,7 @@
  * - `matrix-js-sdk@42.0.0`, la version déployée — `lib/matrixrtc/MembershipManager.js`
  *   (type d'événement et fabrique de state key) et `lib/@types/event.d.ts`
  *   (`GroupCallMemberPrefix`) ;
- * - `infra/rtc/README.md` (REQ-RTC-07) et `infra/rtc/well-known.conf`, pour la clé de
+ * - `infra/rtc/README.md` et `infra/rtc/well-known.conf`, pour la clé de
  *   découverte des foci et les champs du focus LiveKit.
  *
  * ⚠️ Divergence connue, à surveiller : le brouillon courant de MSC4143 remplace ces

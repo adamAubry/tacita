@@ -27,7 +27,7 @@ afterEach(() => {
 
 const sentTxnIds = (from = ctx) => from.client.sendEvent.mock.calls.map((call) => call[3]);
 
-describe("REQ-OBX-02 — à la reconnexion, la file part en FIFO par salon", () => {
+describe("à la reconnexion, la file part en FIFO par salon", () => {
   it("envoie dans l'ordre de mise en file", async () => {
     ctx.client.sendEvent.mockRejectedValue(new Error("hors ligne"));
     await outbox.enqueue(ROOM, message("un"), "t1");
@@ -100,7 +100,7 @@ describe("REQ-OBX-02 — à la reconnexion, la file part en FIFO par salon", () 
   });
 });
 
-describe("REQ-OBX-03 — txnId stable entre les tentatives", () => {
+describe("txnId stable entre les tentatives", () => {
   it("réutilise le même txnId à chaque essai plutôt que d'en générer un nouveau", async () => {
     ctx.client.sendEvent.mockRejectedValue(new Error("hors ligne"));
     await outbox.enqueue(ROOM, message("un"), "t1");
@@ -122,7 +122,7 @@ describe("REQ-OBX-03 — txnId stable entre les tentatives", () => {
   });
 });
 
-describe("REQ-OBX-04 — statuts queued/sending/failed, retry et remove", () => {
+describe("statuts queued/sending/failed, retry et remove", () => {
   it("un envoi réussi sort de la file plutôt que de passer à un statut « envoyé »", async () => {
     await outbox.enqueue(ROOM, message("un"), "t1");
     await outbox.flush();
@@ -188,7 +188,7 @@ describe("REQ-OBX-04 — statuts queued/sending/failed, retry et remove", () => 
   });
 });
 
-describe("REQ-OBX-09 — rien ne part vers un salon non chiffré", () => {
+describe("rien ne part vers un salon non chiffré", () => {
   it("aucun envoi n'est émis, et l'entrée est condamnée avec son propre code", async () => {
     ctx.session.isEncrypted = vi.fn(async () => false);
     await outbox.enqueue(ROOM, message("un"), "t1");
@@ -232,7 +232,7 @@ describe("REQ-OBX-09 — rien ne part vers un salon non chiffré", () => {
   });
 });
 
-describe("REQ-OBX-05 — les entrées portent de quoi fusionner avec la timeline", () => {
+describe("les entrées portent de quoi fusionner avec la timeline", () => {
   it("expose txnId, roomId, contenu, statut et ordre FIFO", async () => {
     ctx.client.sendEvent.mockRejectedValue(new Error("hors ligne"));
     await outbox.enqueue(ROOM, message("un"), "t1");

@@ -1,7 +1,7 @@
 # Staging — configurer le VPS Ubuntu
 
 Runbook de la machine de staging : de l'image Ubuntu nue à une pile joignable depuis un
-téléphone. REQ-INF-17.
+téléphone..
 
 Le pendant local est `infra/README.md` (le socle) et le runbook de dev de la machine de
 développement. Ici, rien n'est machine-dépendant : ce fichier est le contrat de
@@ -23,10 +23,10 @@ Ce qui marchera pour la première fois ici, et qui n'a jamais pu marcher en loca
 | ✅ Un vrai certificat, donc un vrai contexte sécurisé | service worker, PWA installable, `crypto.subtle`                                                                                           |
 | ✅ Ouvrir l'application depuis un téléphone           | plus besoin d'un fichier hosts ni d'un CA importé                                                                                          |
 | ⚠️ **Push notifications**                             | la chaîne est complète pour la première fois ; **rien n'a jamais été délivré de bout en bout**, c'est ici que ça se prouve ou que ça tombe |
-| ❌ **Appels audio/vidéo**                             | l'overlay `rtc/` exige deux IPv4 publiques (REQ-RTC-06), voir § 9                                                                          |
+| ❌ **Appels audio/vidéo** | l'overlay `rtc/` exige deux IPv4 publiques, voir § 9 |
 
 L'absence d'appels est **attendue et annoncée correctement** : sans overlay RTC, le
-`.well-known` n'annonce aucun focus (REQ-RTC-05) et l'UI affiche `RtcFociMissing` plutôt
+`.well-known` n'annonce aucun focus et l'UI affiche `RtcFociMissing` plutôt
 qu'un appel qui se charge puis meurt.
 
 ---
@@ -65,7 +65,7 @@ identifiant Matrix (`@moi:chat.<domaine>`), dans chaque clé de salon et dans ch
 signature d'appareil : le changer ne renomme rien, il crée un autre homeserver et
 abandonne l'ancien. Le choisir maintenant, une fois.
 
-`call.chat.<domaine>` est Element Call (REQ-RTC-08), servi par nous. Le déclarer
+`call.chat.<domaine>` est Element Call, servi par nous. Le déclarer
 maintenant même sans overlay RTC : le certificat doit le couvrir dès l'émission, sinon
 il faut le réémettre au moment où on branche les appels.
 
@@ -172,7 +172,7 @@ Les valeurs qui **doivent** changer par rapport à l'exemple :
 | Variable                                                                                                        | Valeur                                                                                         |
 | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `SERVER_NAME`                                                                                                   | `chat.<domaine>`                                                                               |
-| `SHARD_ORIGIN`                                                                                                  | **vide** — REQ-INF-16, le shard est servi sur le même domaine, il n'y a pas d'origine à ouvrir |
+| `SHARD_ORIGIN` | **vide** — le shard est servi sur le même domaine, il n'y a pas d'origine à ouvrir |
 | `SYNAPSE_IP_RANGE_WHITELIST`                                                                                    | `["172.16.0.0/12"]` — obligatoire, voir ci-dessous                                             |
 | `POSTGRES_PASSWORD`, `SYNAPSE_*_SECRET*`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_OIDC_CLIENT_SECRET`, `S3_*_KEY*` | `openssl rand -hex 32` pour chacun, jamais deux fois la même                                   |
 | `MINIO_KMS_SECRET_KEY`                                                                                          | `echo "tacita-staging:$(openssl rand -base64 32)"`                                             |
@@ -250,7 +250,7 @@ Keycloak pas encore prêt au démarrage de Synapse (`docker compose restart syna
 
 Ce 302 **est** la preuve, parce que le chemin qu'il emprunte est celui du client HTTP de
 Synapse (Twisted). Interroger la même URL depuis un autre outil dans le conteneur
-prouverait un chemin que Synapse n'emprunte pas — c'est la règle 3 de `specs/00-conventions.md`,
+prouverait un chemin que Synapse n'emprunte pas — c'est la règle 3 de `CLAUDE.md`,
 et elle a déjà coûté une journée sur ce dépôt.
 
 Puis, depuis un navigateur : `https://chat.<domaine>` doit servir le shard.
@@ -267,14 +267,14 @@ plus.)*
 
 Créer un compte se fait depuis l'app : « Créer un compte » sur l'écran de connexion, un
 identifiant, un mot de passe. Pas de code d'invitation, pas d'e-mail, pas de captcha
-(REQ-INF-04).
+.
 
 ⚠️ **Sur une machine publique, ça veut dire n'importe qui.** Et un compte suffit à
-énumérer l'annuaire (REQ-INF-18). C'est l'arbitrage de D-13, pris pour un déploiement
+énumérer l'annuaire. C'est l'arbitrage de D-13, pris pour un déploiement
 auto-hébergé en cercle restreint — il ne tient pas au-delà. Si ce staging devient
 joignable par des inconnus, le repli est écrit dans D-13 : remettre
 `registration_requires_token: true` dans `synapse/homeserver.yaml.tmpl`, redémarrer
-Synapse, et émettre les jetons par l'API d'admin. Le test de REQ-INF-04 échouera alors et
+Synapse, et émettre les jetons par l'API d'admin. Le test de échouera alors et
 c'est voulu : il tient la décision, dans un sens comme dans l'autre.
 
 ### Créer un compte sans navigateur
@@ -291,7 +291,7 @@ Le pseudo devient le localpart Matrix tel quel (`adam` → `@adam:chat.<domaine>
 majuscule, pas de `@`.
 
 Au premier écran après connexion, **la clé de récupération est bloquante et c'est voulu**
-(REQ-COR-06 / D-08) : sans elle le cross-signing n'est pas amorcé et le compte ne peut pas
+(D-08) : sans elle le cross-signing n'est pas amorcé et le compte ne peut pas
 chiffrer. La noter, l'écran ne la remontre pas.
 
 ---
@@ -315,7 +315,7 @@ docker compose -f docker-compose.yml -f staging/docker-compose.yml stop
 `stop`, jamais `down -v` : les volumes portent les comptes Keycloak, la base Synapse, les
 médias — et **la clé de signature du homeserver**, dont la perte invalide toutes les
 sessions et tous les appareils appairés. La base `invite_tokens` n'est créée qu'à la
-première initialisation du volume PostgreSQL (REQ-INF-15) ; la reperdre demande de la
+première initialisation du volume PostgreSQL ; la reperdre demande de la
 recréer à la main.
 
 ---
@@ -324,7 +324,7 @@ recréer à la main.
 
 L'overlay `rtc/docker-compose.yml` **refuse de démarrer** sans `WEB_BIND_IP` et
 `TURN_BIND_IP`, et c'est délibéré : le TURN de dernier recours doit écouter en TLS sur le
-443 (REQ-RTC-06, souvent le seul port sortant ouvert derrière un NAT strict), or le proxy
+443 (souvent le seul port sortant ouvert derrière un NAT strict), or le proxy
 occupe déjà ce port. **Il faut donc une deuxième IPv4 sur la machine** — quelques euros
 par mois chez la plupart des hébergeurs. L'alternative documentée dans `rtc/README.md` est
 un hôte dédié à LiveKit.
@@ -356,8 +356,8 @@ docker compose -f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker
 | `RtcFociMissing` à l'écran d'appel                                       | pile sans SFU — attendu ici                                                                                              | § 9      |
 | `push-gateway` redémarre en boucle, « Vapid public key should be 65 bytes long » | `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` invalides dans `infra/.env` — service jamais démarré, donc aucun push possible | § 5 |
 | `502` sur `/push/config`                                                 | la passerelle ne tourne pas — voir la ligne au-dessus                                                                    | § 5      |
-| Aucune notification push ne parvient, la passerelle tournant             | lire `docker compose … logs push-gateway` : aucune ligne ⇒ Synapse n'appelle pas (`SYNAPSE_IP_RANGE_WHITELIST`, ou salon en silencieux) ; `push_failed` ⇒ le code dit lequel. L'écran Profil › Réglages › Notifications dit le maillon manquant | `infra/README.md` § REQ-INF-14 |
+| Aucune notification push ne parvient, la passerelle tournant | lire `docker compose … logs push-gateway` : aucune ligne ⇒ Synapse n'appelle pas (`SYNAPSE_IP_RANGE_WHITELIST`, ou salon en silencieux) ; `push_failed` ⇒ le code dit lequel. L'écran Profil › Réglages › Notifications dit le maillon manquant | `infra/README.md` § |
 
 Pour ce qui ressemble à une limite du produit plutôt qu'à une panne, la liste « Ce qui
-n'est pas prouvé » d'`apps/web/README.md` fait foi, et `infra/LIMITES.md` porte les
+n'est pas prouvé » d'`apps/web/README.md` fait foi, et `infra/README.md` porte les
 limites assumées du socle.

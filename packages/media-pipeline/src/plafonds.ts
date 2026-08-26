@@ -1,5 +1,5 @@
 /**
- * REQ-MED-15 — **deux plafonds de taille en réception**, et la fonction pure qui tranche.
+ * **deux plafonds de taille en réception**, et la fonction pure qui tranche.
  *
  * Le raisonnement « la compression à l'envoi borne la mémoire » ne vaut que pour ce que
  * Tacita émet. Une vidéo reçue d'Element iOS peut faire 400 Mo en HEVC 4K, et sur le
@@ -46,14 +46,14 @@ export type Verdict = "inline" | "telechargement" | "refus";
  */
 
 /**
- * REQ-MED-15 — la décision, sans UI et sans réseau.
+ * la décision, sans UI et sans réseau.
  *
  * `flux` dit si le téléchargement par tranches est disponible (`showSaveFilePicker`).
  * Quand il l'est, `dur` ne s'applique pas : le clair ne coexiste jamais avec lui-même, et
  * le seul plafond qui reste est celui du chiffré — que `inline` ne borne pas non plus.
  *
  * Taille inconnue ⇒ `inline`. **Limite assumée** : un événement sans `info.size` échappe
- * aux deux plafonds. Notre pipeline l'écrit toujours (REQ-MED-04) ; un client tiers qui
+ * aux deux plafonds. Notre pipeline l'écrit toujours ; un client tiers qui
  * l'omet retombe sur le comportement d'avant cette REQ, pas sur un refus — refuser ce
  * qu'on ne sait pas mesurer bloquerait des médias parfaitement lisibles.
  */

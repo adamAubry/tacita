@@ -1,7 +1,7 @@
 import type { Bytes } from "./attachments";
 
 /**
- * Muxeur Ogg pour flux Opus — **octets → octets, aucun DOM** (spec 08, § Méthode, E-10).
+ * Muxeur Ogg pour flux Opus — **octets → octets, aucun DOM** (§ Méthode, E-10).
  *
  * Écrit à la main et sans dépendance : un muxeur n'encode rien, il empaquette. Le format
  * Ogg tient en une en-tête de 27 octets et une table de segmentation ; l'importer coûterait

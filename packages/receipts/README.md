@@ -1,8 +1,8 @@
-# @tacita/receipts — accusés à 3 niveaux (spec 06)
+# @tacita/receipts — accusés à 3 niveaux
 
 `createReceipts(session)` suit chaque message sortant à travers **sending → sent →
 delivered → read** et rend un statut observable par `event_id`. Zéro DOM, aucun accès
-direct à IndexedDB : tout passe par la `Session` de `@tacita/client-core` (spec 04).
+direct à IndexedDB : tout passe par la `Session` de `@tacita/client-core`.
 
 ```ts
 const receipts = createReceipts(session);
@@ -25,7 +25,7 @@ receipts.setHiddenMode(true);
 n'existe pas de niveau intermédiaire à activer côté serveur. Le nôtre est une extension
 propre à Tacita, interopérable avec aucun autre client : un correspondant sous Element
 n'émettra jamais de `org.tacita.delivered`, et ses messages resteront à `sent`.
-L'UI (spec 11) reprend cette formulation et ne présente jamais le crochet « délivré »
+L'UI reprend cette formulation et ne présente jamais le crochet « délivré »
 comme une garantie du protocole.
 
 ## Limites assumées

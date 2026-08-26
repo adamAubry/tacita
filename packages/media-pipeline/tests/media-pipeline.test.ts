@@ -83,7 +83,7 @@ function fakeSession() {
         ): string | null => "https://tacita.test/_matrix/client/v1/media/download/tacita.test/blob",
       ),
       getAccessToken: () => "syt_token",
-      /** REQ-MED-19 — le plafond que le serveur annonce ; 200 Mo, comme le déploiement. */
+      /** le plafond que le serveur annonce ; 200 Mo, comme le déploiement. */
       getMediaConfig: vi.fn(
         async (): Promise<Record<string, unknown>> => ({ "m.upload.size": 200 * 1024 * 1024 }),
       ),
@@ -119,7 +119,7 @@ async function uploadedBytes(index: number): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-describe("REQ-MED-01 — chiffrement client AES-CTR, schéma EncryptedFile", () => {
+describe("chiffrement client AES-CTR, schéma EncryptedFile", () => {
   it("produit un blob opaque et des clés au format v2", async () => {
     const clear = bytes("photo de vacances");
     const { ciphertext, keys } = await encryptAttachment(clear, env);
@@ -150,7 +150,7 @@ describe("REQ-MED-01 — chiffrement client AES-CTR, schéma EncryptedFile", () 
   });
 });
 
-describe("REQ-MED-02 — un seul pipeline pour tous les types de fichiers", () => {
+describe("un seul pipeline pour tous les types de fichiers", () => {
   it("fait passer un PDF et une image par la même fonction d'upload", async () => {
     const pdf = new File([bytes("%PDF-1.7")], "notice.pdf", { type: "application/pdf" });
     const image = new File([bytes("\xFF\xD8\xFF")], "chat.jpg", { type: "image/jpeg" });
@@ -173,7 +173,7 @@ describe("REQ-MED-02 — un seul pipeline pour tous les types de fichiers", () =
   });
 });
 
-describe("REQ-MED-03 — vignettes générées côté client, chiffrées séparément", () => {
+describe("vignettes générées côté client, chiffrées séparément", () => {
   it("téléverse deux blobs aux clés distinctes et n'interroge jamais le serveur", async () => {
     const image = new File([bytes("jpeg")], "chat.jpg", { type: "image/jpeg" });
     const content = await uploadAttachment(session, env, image);
@@ -226,7 +226,7 @@ describe("REQ-MED-03 — vignettes générées côté client, chiffrées sépar�
   });
 });
 
-describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
+describe("compression adaptative, seuils D-04", () => {
   it("applique les cibles du profil contraint quand le réseau l'est", async () => {
     env = fakeEnv({ connection: { effectiveType: "3g" } });
     await uploadAttachment(session, env, new File([bytes("x")], "a.jpg", { type: "image/jpeg" }));
@@ -262,7 +262,7 @@ describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
 
   it("décrit les octets livrés, pas la cible visée : un envoi non compressé le dit", async () => {
     /*
-     * REQ-MED-04 / REQ-MED-12 — **le repli du shard, vu du pipeline.** Là où ce navigateur
+     * **le repli du shard, vu du pipeline.** Là où ce navigateur
      * ne sait ni démuxer ni encoder — WebM, HEVC hors Safari, Firefox sans encodeur —,
      * `transcodeVideo` rend la source telle quelle plutôt que de refuser l'envoi. Écrire
      * alors `video/mp4` dans l'événement ferait mentir le contenu sur ses propres octets,
@@ -280,7 +280,7 @@ describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
 
   it("la vignette vient du décodeur quand il en a une, du lecteur seulement sinon", async () => {
     /*
-     * REQ-MED-03 — **le poster suit le décodeur, pas le lecteur.** Les deux chemins qui
+     * **le poster suit le décodeur, pas le lecteur.** Les deux chemins qui
      * décodent tiennent déjà une frame ; rouvrir le fichier dans un `<video>` pour
      * redemander ce qu'on avait sous la main était le detour qui laissait les vidéos sans
      * vignette dès que ce lecteur refusait le fichier. `extractPoster` n'est plus qu'un
@@ -309,7 +309,7 @@ describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
 
   it("une vignette impossible ne fait pas échouer l'envoi de la vidéo", async () => {
     /*
-     * REQ-MED-03 — la vignette est un confort, l'envoi est la fonction. Un poster que le
+     * la vignette est un confort, l'envoi est la fonction. Un poster que le
      * navigateur ne sait pas extraire — codec illisible dans un `<video>` — faisait échouer
      * tout l'envoi. `thumbnail_file` est facultatif dans l'événement ; l'absence d'un
      * confort ne doit pas coûter le message.
@@ -327,7 +327,7 @@ describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
 
   it("un fichier sans type déclaré est reconnu à ses octets, pas rangé en « fichier »", async () => {
     /*
-     * REQ-MED-12 — `File.type` est vide plus souvent qu'on ne le croit : glisser-déposer,
+     * `File.type` est vide plus souvent qu'on ne le croit : glisser-déposer,
      * `.mkv` sous Windows, partages Android via un fournisseur qui ne mappe pas
      * l'extension. Le fichier partait alors en `m.file`, ni compressé ni vignetté.
      */
@@ -347,7 +347,7 @@ describe("REQ-MED-04 — compression adaptative, seuils D-04", () => {
   });
 });
 
-describe("REQ-MED-05 — original non compressé conservé sur l'appareil de l'auteur", () => {
+describe("original non compressé conservé sur l'appareil de l'auteur", () => {
   it("préfère le sélecteur de fichiers, retombe sur le téléchargement", async () => {
     const original = new Blob([bytes("raw sensor data")]);
 
@@ -381,7 +381,7 @@ describe("REQ-MED-05 — original non compressé conservé sur l'appareil de l'a
   });
 });
 
-describe("REQ-MED-06 — vocaux m.audio avec forme d'onde et durée", () => {
+describe("vocaux m.audio avec forme d'onde et durée", () => {
   it("porte la durée et une forme d'onde MSC1767 dans le contenu", async () => {
     const voice = new File([bytes("ogg")], "vocal.ogg", { type: "audio/ogg" });
     const content = await uploadAttachment(session, env, voice);
@@ -401,7 +401,7 @@ describe("REQ-MED-06 — vocaux m.audio avec forme d'onde et durée", () => {
   });
 });
 
-describe("REQ-MED-07 — transcodage vers Ogg/Opus quand l'entrée n'en est pas", () => {
+describe("transcodage vers Ogg/Opus quand l'entrée n'en est pas", () => {
   it("transcode une capture Safari iOS en MP4/AAC", async () => {
     const aac = new File([bytes("mp4 aac")], "vocal.m4a", { type: "audio/mp4" });
     const content = await uploadAttachment(session, env, aac);
@@ -421,7 +421,7 @@ describe("REQ-MED-07 — transcodage vers Ogg/Opus quand l'entrée n'en est pas"
   });
 });
 
-describe("REQ-MED-08 — vérification du hash puis déchiffrement local", () => {
+describe("vérification du hash puis déchiffrement local", () => {
   it("rend les octets d'origine sur un aller-retour complet", async () => {
     const clear = bytes("les octets exacts, au bit près");
     const { ciphertext, keys } = await encryptAttachment(clear, env);
@@ -447,7 +447,7 @@ describe("REQ-MED-08 — vérification du hash puis déchiffrement local", () =>
   });
 });
 
-describe("REQ-MED-09 — média authentifié, aucune URL publique supposée", () => {
+describe("média authentifié, aucune URL publique supposée", () => {
   it("passe par l'endpoint authentifié avec le jeton en en-tête", async () => {
     const clear = bytes("blob chiffré");
     const { ciphertext, keys } = await encryptAttachment(clear, env);
@@ -457,7 +457,7 @@ describe("REQ-MED-09 — média authentifié, aucune URL publique supposée", ()
     const file: EncryptedFile = { ...keys, url: MXC };
     expect(await downloadAttachment(session, env, file)).toEqual(clear);
 
-    // Dernier argument : `useAuthentication`. Les endpoints v3 répondent 404 (REQ-INF-12).
+    // Dernier argument : `useAuthentication`. Les endpoints v3 répondent 404.
     expect(fake.client.mxcUrlToHttp).toHaveBeenCalledWith(
       MXC,
       undefined,
@@ -482,7 +482,7 @@ describe("REQ-MED-09 — média authentifié, aucune URL publique supposée", ()
   });
 });
 
-describe("REQ-MED-10 — aucun contenu média ni clé dans les erreurs", () => {
+describe("aucun contenu média ni clé dans les erreurs", () => {
   it("ne laisse fuiter ni clé, ni IV, ni octets dans l'erreur d'intégrité", async () => {
     const { ciphertext, keys } = await encryptAttachment(bytes("secret"), env);
     ciphertext[0] = (ciphertext[0] ?? 0) ^ 0xff;
@@ -504,8 +504,8 @@ describe("REQ-MED-10 — aucun contenu média ni clé dans les erreurs", () => {
   });
 });
 
-/** Le contenu rendu est directement `enqueue`-able (spec 07) : pas de post-traitement. */
-describe("REQ-MED-02 — contenu prêt pour la file d'envoi", () => {
+/** Le contenu rendu est directement `enqueue`-able : pas de post-traitement. */
+describe("contenu prêt pour la file d'envoi", () => {
   it("porte msgtype, body et file sans étape supplémentaire", async () => {
     const content: AttachmentContent = await uploadAttachment(
       session,
@@ -520,7 +520,7 @@ describe("REQ-MED-02 — contenu prêt pour la file d'envoi", () => {
 
   /**
    * L'invariant que le PM a exigé en contrepartie de « le média est hors périmètre de
-   * REQ-OBX-09 par construction » (04/08/2026). La construction est saine : le pipeline
+   * par construction » (04/08/2026). La construction est saine : le pipeline
    * téléverse et rend un contenu, c'est `outbox` qui envoie — donc la garde de salon
    * non chiffré s'applique une fois, au bon endroit. Rien ne la gardait.
    *
@@ -532,7 +532,7 @@ describe("REQ-MED-02 — contenu prêt pour la file d'envoi", () => {
   });
 });
 
-describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel unique", () => {
+describe("l'unique chemin public du pipeline, et son site d'appel unique", () => {
   const photo = () => new File([bytes("\xFF\xD8\xFF")], "moi.jpg", { type: "image/jpeg" });
 
   it("téléverse la photo de profil en clair : un avatar chiffré n'est un avatar nulle part", async () => {
@@ -540,7 +540,7 @@ describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel
 
     expect(uri).toBe(MXC);
     const [blob, options] = fake.client.uploadContent.mock.calls[0] as [Blob, { type: string }];
-    // Le contraste avec REQ-MED-02 est tout le sujet : là, `application/octet-stream`,
+    // Le contraste avec est tout le sujet : là, `application/octet-stream`,
     // parce que le serveur ne voit qu'un blob opaque. Ici il doit pouvoir le servir à
     // des clients qui n'ont aucune clé.
     expect(options.type).not.toBe("application/octet-stream");
@@ -562,7 +562,7 @@ describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel
   });
 
   it("n'a que ses deux sites d'appel nommés dans tout le dépôt", () => {
-    // La condition qui rend REQ-MED-11 acceptable. « Tout ce qui sort du pipeline est
+    // La condition qui rend acceptable. « Tout ce qui sort du pipeline est
     // chiffré, sauf le chemin nommé public » ne vaut que tant que ses appelants sont
     // comptés par une machine — une consigne de revue se contourne par distraction.
     //
@@ -588,7 +588,7 @@ describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel
     };
     parcourir(racine.replace(/\/$/, ""));
 
-    // Le câblage du profil (M-G) et celui des images par défaut (REQ-MSG-22), et rien
+    // Le câblage du profil (M-G) et celui des images par défaut, et rien
     // d'autre. Pas `ProfilMoi.tsx` ni `identite.ts` du paquet messagerie : l'un reçoit
     // `onPhoto` injecté, l'autre reçoit `televerser` — ils ne connaissent ni `Session`
     // ni le pipeline. C'est ce découplage qui garde la liste courte.
@@ -602,7 +602,7 @@ describe("REQ-MED-11 — l'unique chemin public du pipeline, et son site d'appel
   });
 });
 
-describe("REQ-MED-19 — on ne téléverse pas ce que le serveur refusera", () => {
+describe("on ne téléverse pas ce que le serveur refusera", () => {
   /**
    * Mesuré le 20/08/2026 : une vidéo de onze minutes sort à environ 206 Mo aux cibles
    * D-04, au-dessus du plafond de 200 Mo du déploiement. Sans ce contrôle, le client

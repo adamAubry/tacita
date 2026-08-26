@@ -24,16 +24,16 @@ import { SearchResults } from "./SearchResults";
 import { useResultats } from "./useResultats";
 
 interface RechercheProps {
-  /** Le paquet spec 09. Injecté : ce composant ne crée aucun worker. */
+  /** Le paquet `@tacita/search`. Injecté : ce composant ne crée aucun worker. */
   recherche: Search;
   conversations: Conversation[];
   contacts: Contact[];
   /** Notre identifiant, pour le filtre `mentions` de l'onglet dédié. */
   moi: string;
-  /** `search` = l'onglet Recherche ; `mentions` = l'onglet Mentions (REQ-UIX-21). */
+  /** `search` = l'onglet Recherche ; `mentions` = l'onglet Mentions. */
   variation?: "search" | "mentions";
   /**
-   * REQ-UIX-33 — des tokens pré-posés à l'ouverture, quand l'écran est atteint depuis
+   * des tokens pré-posés à l'ouverture, quand l'écran est atteint depuis
    * ailleurs : « Rechercher dans la conversation » (M-H) arme le salon.
    *
    * Ils sont un **état initial**, pas une contrainte : l'utilisateur peut les retirer.
@@ -42,7 +42,7 @@ interface RechercheProps {
   tokensInitiaux?: readonly Token[];
   onOuvrirConversation: (roomId: string) => void;
   onOuvrirMessage: (resultat: ResultatMessage) => void;
-  /** REQ-UIX-19 — le stockage des profils récents. Injecté pour les tests. */
+  /** le stockage des profils récents. Injecté pour les tests. */
   indexedDB?: IDBFactory;
   maintenant?: number;
 }
@@ -50,7 +50,7 @@ interface RechercheProps {
 /**
  * Layout Default, variations search et mentions (M-F).
  *
- * **Aucun appel réseau ne part d'ici** (REQ-SRC-03) : tout passe par `recherche`, qui
+ * **Aucun appel réseau ne part d'ici** : tout passe par `recherche`, qui
  * interroge un index local dans un worker. C'est ce qui fait que la recherche fonctionne
  * hors ligne — et une recherche qui ne rendrait rien hors ligne serait un bug, pas une
  * dégradation (README du paquet).
@@ -77,7 +77,7 @@ export function Recherche({
   const filtres = filtresDepuis(tokens);
 
   /**
-   * REQ-UIX-21 — l'onglet Mentions **filtre, il ne cherche pas** : terme vide, et le
+   * l'onglet Mentions **filtre, il ne cherche pas** : terme vide, et le
    * seul critère `mentions`. Une recherche plein-texte sur un nom d'affichage raterait
    * les mentions en pièce jointe et prendrait un homonyme pour une mention (README du
    * paquet search) — c'est précisément ce que l'exigence interdit.
@@ -89,7 +89,7 @@ export function Recherche({
     ? { ...filtres, mentions: [moi, ROOM_MENTION] }
     : filtres;
 
-  // Sans terme ni critère, il n'y a rien à chercher : c'est l'état initial (REQ-UIX-19).
+  // Sans terme ni critère, il n'y a rien à chercher : c'est l'état initial.
   const actif = mentions || terme.length > 0 || Object.keys(filtres).length > 0;
 
   const { hits, chargement } = useResultats(recherche, terme, criteres, actif);
@@ -115,7 +115,7 @@ export function Recherche({
     };
   }, [indexedDB]);
 
-  /** REQ-UIX-19 — un filtre « personne » utilisé entre dans les profils récents. */
+  /** un filtre « personne » utilisé entre dans les profils récents. */
   useEffect(() => {
     const personne = filtres.sender;
     if (!indexedDB || !personne || recents[0] === personne) return;
@@ -130,11 +130,11 @@ export function Recherche({
   );
 
   /**
-   * REQ-UIX-21 — « exclure les groupes ». L'index ne porte pas la nature du salon : le
+   * « exclure les groupes ». L'index ne porte pas la nature du salon : le
    * critère se pose donc sur l'ensemble des DM connus, localement, après coup.
    *
    * ponytail: post-filtre sur les résultats plutôt qu'un critère d'index. Ajouter
-   * `direct` au schéma de la spec 09 jetterait le snapshot de tous les utilisateurs
+   * `direct` au schéma de `@tacita/search` jetterait le snapshot de tous les utilisateurs
    * (limite assumée du paquet) pour un filtre que l'ensemble des DM rend déjà exact.
    * À reprendre si un `roomId` inconnu du client devient possible.
    */

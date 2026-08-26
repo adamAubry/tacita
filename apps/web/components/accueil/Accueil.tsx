@@ -30,7 +30,7 @@ interface Donnees {
  * Layout Default, variation home (M-C) — l'écran d'atterrissage.
  *
  * Il ne calcule rien : la liste, les compteurs et les invitations viennent du package
- * messaging (spec 05), et le seul état local est celui de l'écran — tri courant, feuille
+ * messaging, et le seul état local est celui de l'écran — tri courant, feuille
  * de création ouverte, bannière écartée. Le shard ne contient aucune logique métier.
  */
 export function Accueil() {

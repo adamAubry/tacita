@@ -13,7 +13,7 @@ import {
 const Mio = 1024 * 1024;
 const seuils = { inline: 10, dur: 100 };
 
-describe("REQ-MED-15 — la décision de taille est une fonction pure, sans UI ni réseau", () => {
+describe("la décision de taille est une fonction pure, sans UI ni réseau", () => {
   it.each([
     [undefined, true, "inline"],
     [undefined, false, "inline"],
@@ -35,7 +35,7 @@ describe("REQ-MED-15 — la décision de taille est une fonction pure, sans UI n
   });
 });
 
-describe("REQ-MED-15 / REQ-MED-08 — déchiffrement par tranches, vérification globale d'abord", () => {
+describe("déchiffrement par tranches, vérification globale d'abord", () => {
   const env = { subtle: globalThis.crypto.subtle, getRandomValues: (b: Uint8Array) => globalThis.crypto.getRandomValues(b) };
 
   /** Assez long pour couvrir plusieurs tranches **et** une dernière tranche partielle. */

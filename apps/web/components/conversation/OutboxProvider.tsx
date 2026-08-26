@@ -11,7 +11,7 @@ const ContexteOutbox = createContext<Outbox | null>(null);
 export const useOutbox = () => useContext(ContexteOutbox);
 
 /**
- * REQ-OBX-01 / REQ-UI-17 — **la file d'envoi appartient à la session, pas à un écran.**
+ * **la file d'envoi appartient à la session, pas à un écran.**
  *
  * Elle vivait dans `Conversation` : créée à l'ouverture d'un salon, `dispose()` au
  * démontage. Le bandeau hors ligne promet pourtant que « ce que vous écrivez partira à la
@@ -34,7 +34,7 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
     let creee: Outbox | undefined;
 
     /*
-     * REQ-OBX-10 / REQ-MED-17 — l'étape de téléversement est **injectée** : la file
+     * l'étape de téléversement est **injectée** : la file
      * possède la reprise, le pipeline fournit l'étape idempotente, et aucun des deux
      * paquets ne dépend de l'autre. C'est ici, et seulement ici, qu'ils se rencontrent.
      */

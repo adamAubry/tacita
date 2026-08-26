@@ -13,7 +13,7 @@ interface ThemeConversationProps {
 }
 
 /**
- * REQ-UIX-35 / REQ-UI-20 — le fond d'écran d'une conversation.
+ * le fond d'écran d'une conversation.
  *
  * **Aperçu avant application** : l'image choisie est montrée sous le voile de lisibilité
  * exact de la timeline (`--tacita-scrim`, DESIGN.md), avec du texte par-dessus. Sans lui,

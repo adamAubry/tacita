@@ -74,7 +74,7 @@ const rendreAutrui = (props: Partial<Parameters<typeof ProfilAutrui>[0]> = {}) =
   return actions;
 };
 
-describe("REQ-UIX-25 — profil d'un ami : le sélecteur Actions / Activity", () => {
+describe("profil d'un ami : le sélecteur Actions / Activity", () => {
   it("un ami voit le sélecteur, jamais le bouton d'ajout", () => {
     rendreAutrui({ estAmi: true });
 
@@ -105,7 +105,7 @@ describe("REQ-UIX-25 — profil d'un ami : le sélecteur Actions / Activity", ()
   });
 });
 
-describe("REQ-UIX-26 — profil d'un non-ami : Send invite, et rien d'autre", () => {
+describe("profil d'un non-ami : Send invite, et rien d'autre", () => {
   it("un non-ami voit le bouton d'ajout, jamais le sélecteur", () => {
     rendreAutrui({ estAmi: false });
 
@@ -146,7 +146,7 @@ describe("REQ-UIX-26 — profil d'un non-ami : Send invite, et rien d'autre", ()
   });
 });
 
-describe("REQ-UIX-27 — note privée : libellé exact, persistée, relue", () => {
+describe("note privée : libellé exact, persistée, relue", () => {
   it("le libellé est celui de l'exigence, mot pour mot", () => {
     render(<Note userId={MIRA.userId} indexedDB={base} />);
 
@@ -190,7 +190,7 @@ describe("REQ-UIX-27 — note privée : libellé exact, persistée, relue", () =
   });
 });
 
-describe("REQ-UIX-28 — Add-friends : lien, annuaire débouncé, aucune suggestion promise", () => {
+describe("Add-friends : lien, annuaire débouncé, aucune suggestion promise", () => {
   const rendre = (props: Partial<Parameters<typeof AjouterAmis>[0]> = {}) => {
     const actions = {
       chercher: vi.fn().mockResolvedValue([]),
@@ -265,7 +265,7 @@ describe("REQ-UIX-28 — Add-friends : lien, annuaire débouncé, aucune suggest
   });
 });
 
-describe("REQ-UIX-29 — Friend request : accepter, refuser, état vide", () => {
+describe("Friend request : accepter, refuser, état vide", () => {
   const demande: Demande = {
     roomId: "!dm:tacita.test",
     userId: "@mira:tacita.test",
@@ -337,7 +337,7 @@ describe("REQ-UIX-29 — Friend request : accepter, refuser, état vide", () => 
   });
 });
 
-describe("REQ-UIX-30 — bloquer et retirer : la confirmation dit l'effet réel", () => {
+describe("bloquer et retirer : la confirmation dit l'effet réel", () => {
   const ouvrirOptions = () => fireEvent.click(screen.getByRole("button", { name: "Options" }));
 
   it("bloquer explique ce que le blocage ne fait pas", async () => {
@@ -347,7 +347,7 @@ describe("REQ-UIX-30 — bloquer et retirer : la confirmation dit l'effet réel"
     fireEvent.click(screen.getByText("Bloquer"));
 
     const corps = screen.getByText(/Ses messages ne s'afficheront plus chez vous/);
-    // Les trois limites réelles de `m.ignored_user_list` (REQ-MSG-17), pas une promesse
+    // Les trois limites réelles de `m.ignored_user_list`, pas une promesse
     // d'expulsion que le protocole ne tient pas.
     expect(corps.textContent).toContain("n'en sera pas informée");
     expect(corps.textContent).toContain("continuer à écrire");
@@ -403,12 +403,12 @@ describe("REQ-UIX-30 — bloquer et retirer : la confirmation dit l'effet réel"
   });
 });
 
-describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", () => {
+describe("son propre profil : nom, identifiant, et form edit", () => {
   it("le nom et l'identifiant sont tous deux affichés", () => {
     render(<ProfilMoi profil={MOI} onEnregistrer={vi.fn()} onPhoto={vi.fn()} />);
 
     expect(screen.getByText("adam")).toBeTruthy();
-    // REQ-UIX-42 — l'identifiant, sans son domaine : c'est le même pour tout le monde.
+    // l'identifiant, sans son domaine : c'est le même pour tout le monde.
     expect(screen.getByText("@adam")).toBeTruthy();
     // Pas de statut ami sur son propre profil : la question ne s'y pose pas.
     expect(screen.queryByText("Ami")).toBeNull();
@@ -435,7 +435,7 @@ describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", ()
   });
 
   it("la déconnexion est posée à droite de la modification, dans la même rangée", () => {
-    // REQ-UIX-06 — `LogoutButton` était testé mais rendu par aucun écran : la
+    // `LogoutButton` était testé mais rendu par aucun écran : la
     // déconnexion n'existait dans aucun parcours. Ce test garde le point de branchement.
     render(
       <ProfilMoi
@@ -458,7 +458,7 @@ describe("REQ-UIX-24 — son propre profil : nom, identifiant, et form edit", ()
   });
 });
 
-describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle expose", () => {
+describe("photo de profil : livrée, et honnête sur ce qu'elle expose", () => {
   const rendre = () => {
     const onEnregistrer = vi.fn().mockResolvedValue(undefined);
     const onPhoto = vi.fn().mockResolvedValue("mxc://tacita.test/avatar");
@@ -483,13 +483,13 @@ describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle ex
     // le champ était **absent** ; il est maintenant là et il marche.
     expect(screen.getByRole("button", { name: "Choisir une photo de profil" })).toBeTruthy();
     expect(screen.getByLabelText("Choisir une photo de profil")).toBeTruthy();
-    // REQ-UIX-41 — la bannière emprunte le même chemin, elle est là au même titre.
+    // la bannière emprunte le même chemin, elle est là au même titre.
     expect(screen.getByRole("button", { name: "Choisir une bannière" })).toBeTruthy();
   });
 
   it("dit au moment du choix que les images ne sont pas chiffrées", () => {
     rendre();
-    // La condition qui rend REQ-MED-11 acceptable : dans la feuille où l'on choisit,
+    // La condition qui rend acceptable : dans la feuille où l'on choisit,
     // pas dans un écran de réglages qu'on n'ouvrira jamais. Une phrase pour les deux
     // images — c'est la même limite, et la répéter la banaliserait.
     expect(screen.getByText(AVERTISSEMENT_PHOTO)).toBeTruthy();
@@ -508,7 +508,7 @@ describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle ex
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
     });
-    // Le nom n'a pas bougé : il n'est pas dans le patch (REQ-MSG-18).
+    // Le nom n'a pas bougé : il n'est pas dans le patch.
     expect(onEnregistrer).toHaveBeenCalledWith({ avatarUrl: "mxc://tacita.test/avatar" });
   });
 
@@ -530,7 +530,7 @@ describe("REQ-UI-20 — photo de profil : livrée, et honnête sur ce qu'elle ex
   });
 });
 
-describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membre confirme", () => {
+describe("réception d'un lien : on frappe, un membre confirme", () => {
   const TOKEN = "jeton-opaque";
   const GROUPE = "!groupe:t";
 
@@ -574,7 +574,7 @@ describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membr
     const liens = service(vi.fn(async () => ({ kind: "friend" as const, issuer: "@mira:tacita.test" })));
     render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
 
-    // REQ-INV-13 — `inviter` rend le DM existant s'il y en a un (REQ-MSG-15) : rien à
+    // `inviter` rend le DM existant s'il y en a un : rien à
     // distinguer ici, et donc rien à demander à l'utilisateur.
     await waitFor(() => expect(remplacer).toHaveBeenCalled());
     expect(frapper).not.toHaveBeenCalled();
@@ -584,7 +584,7 @@ describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membr
     const liens = service(vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t", roomId: GROUPE })));
     render(<ReceptionLien token={TOKEN} liens={liens} session={session("join")} />);
 
-    // REQ-INV-13, succès idempotent : rouvrir un lien déjà utilisé n'est pas une erreur.
+    // succès idempotent : rouvrir un lien déjà utilisé n'est pas une erreur.
     await waitFor(() => expect(remplacer).toHaveBeenCalledWith(routeConversation(GROUPE)));
     expect(frapper).not.toHaveBeenCalled();
   });
@@ -601,7 +601,7 @@ describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membr
     const liens = service(vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t" })));
     render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
 
-    // REQ-INV-08 : inconnu, expiré, révoqué et bloqué rendent la même chose. Deviner
+    // inconnu, expiré, révoqué et bloqué rendent la même chose. Deviner
     // laquelle pour l'afficher reconstruirait l'énumérabilité que le service refuse.
     const message = await screen.findByText("Ce lien n'est plus valide");
     expect(message).toBeTruthy();
@@ -610,7 +610,7 @@ describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membr
     }
   });
 
-  it("service injoignable : l'ajout par identifiant reste proposé (REQ-INV-16)", async () => {
+  it("service injoignable : l'ajout par identifiant reste proposé", async () => {
     const liens = service(vi.fn(async () => Promise.reject(new Error("503"))));
     render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
 
@@ -643,7 +643,7 @@ describe("REQ-INV-06 / REQ-INV-13 — réception d'un lien : on frappe, un membr
   });
 });
 
-describe("REQ-UIX-42 — l'identifiant s'affiche sans son domaine", () => {
+describe("l'identifiant s'affiche sans son domaine", () => {
   const rendreAjouter = (props: Partial<Parameters<typeof AjouterAmis>[0]> = {}) => {
     const actions = {
       chercher: vi.fn().mockResolvedValue([]),
@@ -657,7 +657,7 @@ describe("REQ-UIX-42 — l'identifiant s'affiche sans son domaine", () => {
 
   /**
    * Retour utilisateur : « l'id `@adam:chat.example.org` est beaucoup trop long, il
-   * faudrait `@adam` uniquement ». La fédération étant désactivée (REQ-INF-02), le
+   * faudrait `@adam` uniquement ». La fédération étant désactivée, le
    * domaine est le même pour tout le monde : il occupe la place du nom sans rien
    * apprendre. Ce que les callbacks reçoivent, en revanche, reste l'adresse entière.
    */
@@ -702,10 +702,10 @@ describe("REQ-UIX-42 — l'identifiant s'affiche sans son domaine", () => {
   });
 });
 
-describe("REQ-UIX-28 — le champ nomme les deux chemins, et dit ce qu'ils exposent", () => {
+describe("le champ nomme les deux chemins, et dit ce qu'ils exposent", () => {
   /**
    * E-21, tranchée le 21/08/2026 : l'annuaire couvre tous les comptes du serveur
-   * (REQ-INF-18). Deux conséquences d'écran, et elles vont ensemble — l'une dit ce que
+   * Deux conséquences d'écran, et elles vont ensemble — l'une dit ce que
    * la recherche peut, l'autre ce qu'elle coûte.
    */
   const rendre = () =>
@@ -726,7 +726,7 @@ describe("REQ-UIX-28 — le champ nomme les deux chemins, et dit ce qu'ils expos
 
   it("l'écran dit que l'utilisateur est lui aussi trouvable", () => {
     rendre();
-    // La réciprocité de l'annuaire est une exposition assumée (`infra/LIMITES.md`) :
+    // La réciprocité de l'annuaire est une exposition assumée :
     // c'est ici, au moment où la personne s'en sert, qu'elle doit pouvoir l'apprendre.
     expect(screen.getByText(/y compris le vôtre/)).toBeTruthy();
   });

@@ -19,7 +19,7 @@ const paquet = JSON.parse(lire("package.json")) as {
   devDependencies: Record<string, string>;
 };
 
-describe("REQ-UI-01 — PWA installable, service worker de coquille seule", () => {
+describe("PWA installable, service worker de coquille seule", () => {
   it("les couleurs du manifeste sont celles de DESIGN.md", () => {
     // Le manifeste est un JSON statique : il ne peut pas importer le thème. C'est donc
     // le seul endroit où la palette est recopiée, et le seul endroit où elle peut
@@ -45,7 +45,7 @@ describe("REQ-UI-01 — PWA installable, service worker de coquille seule", () =
   });
 
   /**
-   * Le critère de la SPEC 11 : « liste des routes précachées du SW : zéro entrée de
+   * Le critère de `apps/web` : « liste des routes précachées du SW : zéro entrée de
    * données ». C'est l'interdit n°8 appliqué au cache — un contenu déchiffré qui y
    * entrerait survivrait à la déconnexion, hors de portée du registre de wipe.
    */
@@ -80,8 +80,8 @@ describe("REQ-UI-01 — PWA installable, service worker de coquille seule", () =
   });
 });
 
-describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
-  // La liste close de la SPEC 11. `@tacita/*` : les paquets 04–10 que le shard compose —
+describe("Astryx exclusif, par défaut de refus", () => {
+  // La liste close de `apps/web`. `@tacita/*` : les paquets 04–10 que le shard compose —
   // ils sont le produit, pas une dépendance de style.
   const AUTORISES = [/^@astryxdesign\//, /^@stylexjs\/stylex$/, /^@tacita\//, /^next$/, /^react(-dom)?$/];
   const STYLE_INTERDIT = /tailwind|bootstrap|shadcn|styled-components|@emotion|stitches|vanilla-extract|sass|less/i;
@@ -158,7 +158,7 @@ describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
 });
 
 /**
- * REQ-MED-08 (b) — **les bornes du service worker sont la phase, pas un détail.**
+ * (b) — **les bornes du service worker sont la phase, pas un détail.**
  *
  * Il n'y a qu'un worker par portée : celui qui sert les médias **est** celui du push,
  * réveillé hors de toute page. La note de conception D-10 prévoyait une table de clés en
@@ -168,7 +168,7 @@ describe("REQ-UI-02 — Astryx exclusif, par défaut de refus", () => {
  *
  * Sans ces tests, ces bornes ne seraient qu'un commentaire.
  */
-describe("REQ-MED-08 (b) — le service worker sert des plages sans jamais détenir de clé", () => {
+describe(" (b) — le service worker sert des plages sans jamais détenir de clé", () => {
   const source = sansCommentaires(sw);
 
   it("aucune clé, aucun déchiffrement, aucune empreinte dans le worker", () => {

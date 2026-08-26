@@ -21,7 +21,7 @@ beforeEach(async () => {
   outbox = await createOutbox(ctx.session, { indexedDB: ctx.indexedDB });
 });
 
-describe("REQ-OBX-01 — persistance IndexedDB avant tout réseau, survit au reload", () => {
+describe("persistance IndexedDB avant tout réseau, survit au reload", () => {
   it("écrit l'entrée avant la première tentative d'envoi", async () => {
     const order: string[] = [];
     ctx.client.sendEvent.mockImplementation(async () => {
@@ -65,7 +65,7 @@ describe("REQ-OBX-01 — persistance IndexedDB avant tout réseau, survit au rel
   });
 });
 
-describe("REQ-OBX-06 — le contenu ne passe ni par localStorage ni par les logs", () => {
+describe("le contenu ne passe ni par localStorage ni par les logs", () => {
   it("aucun stockage synchrone du navigateur n'est touché", () => {
     expect(code).not.toMatch(/localStorage|sessionStorage|document\.cookie/);
   });
@@ -92,7 +92,7 @@ describe("REQ-OBX-06 — le contenu ne passe ni par localStorage ni par les logs
   });
 });
 
-describe("REQ-OBX-08 — le store est enregistré au registre de wipe de la Session", () => {
+describe("le store est enregistré au registre de wipe de la Session", () => {
   it("s'enregistre sous le nom outbox", () => {
     expect(ctx.session.registerWipe).toHaveBeenCalledWith("outbox", expect.any(Function));
   });
@@ -113,7 +113,7 @@ describe("REQ-OBX-08 — le store est enregistré au registre de wipe de la Sess
   });
 });
 
-describe("REQ-OBX-10 — la reprise d'un téléversement média appartient à la file", () => {
+describe("la reprise d'un téléversement média appartient à la file", () => {
   const octets = (taille: number): ArrayBuffer => new Uint8Array(taille).fill(7).buffer;
   const media = () => ({
     msgtype: "m.image",

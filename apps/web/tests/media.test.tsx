@@ -46,15 +46,15 @@ const image = (id = "$img") =>
       msgtype: "m.image",
       body: "plage.jpg",
       file: FICHIER,
-      // `info.mimetype` est ce que le pipeline écrit (REQ-MED-02/04), et ce dont la
-      // résolution de type part (REQ-MED-12). Une fixture qui l'omettait décrivait un
+      // `info.mimetype` est ce que le pipeline écrit, et ce dont la
+      // résolution de type part. Une fixture qui l'omettait décrivait un
       // événement que ce dépôt ne produit pas.
       info: { size: 2048, mimetype: "image/jpeg", thumbnail_file: VIGNETTE },
     },
     id,
   );
 
-/** Le pipeline est mocké à son interface (spec 11) : aucun octet n'est déchiffré ici. */
+/** Le pipeline est mocké à son interface : aucun octet n'est déchiffré ici. */
 const telecharger = vi.fn(async () => new Blob(["binaire"], { type: "image/jpeg" }));
 
 beforeEach(() => {
@@ -69,7 +69,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocaux", () => {
+describe("pièces jointes : vignettes déchiffrées, tuiles, vocaux", () => {
   it("la vignette est rendue depuis le blob déchiffré, et aucune URL serveur n'est construite", async () => {
     const reseau = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("réseau interdit"));
 
@@ -248,7 +248,7 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
   });
 
   /**
-   * REQ-MED-05 — un fichier qui n'est ni photo ni vidéo n'ouvre aucun viewer : sans ce
+   * un fichier qui n'est ni photo ni vidéo n'ouvre aucun viewer : sans ce
    * bouton, ses octets étaient déchiffrables et pourtant inatteignables. Signalé tel quel
    * par les utilisateurs.
    */
@@ -340,7 +340,7 @@ describe("REQ-UI-14 — pièces jointes : vignettes déchiffrées, tuiles, vocau
   });
 });
 
-describe("REQ-UI-15 — capture : « sur votre appareil » et « envoyé » ne se confondent pas", () => {
+describe("capture : « sur votre appareil » et « envoyé » ne se confondent pas", () => {
   const flux = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream;
 
   beforeEach(() => {
@@ -368,7 +368,7 @@ describe("REQ-UI-15 — capture : « sur votre appareil » et « envoyé » ne s
     render(<PhotoCapture ouvert onFermer={vi.fn()} onEnregistrer={vi.fn()} onEnvoyer={vi.fn()} />);
     await prendre();
 
-    // REQ-MED-05 : l'original reste sur l'appareil, le correspondant reçoit une version
+    // l'original reste sur l'appareil, le correspondant reçoit une version
     // compressée. Les deux libellés le disent, chacun le sien.
     expect(screen.getByRole("button", { name: /Enregistrer sur votre appareil \(original\)/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Envoyer \(version compressée\)/ })).toBeTruthy();
@@ -457,7 +457,7 @@ describe("REQ-UI-15 — capture : « sur votre appareil » et « envoyé » ne s
   });
 });
 
-describe("REQ-UIX-16 — viewer plein écran : navigation, sauvegarde, fermeture", () => {
+describe("viewer plein écran : navigation, sauvegarde, fermeture", () => {
   const medias: Media[] = [
     mediaDe(image("$a"))!,
     { ...mediaDe(image("$b"))!, nom: "montagne.jpg" },
@@ -530,7 +530,7 @@ describe("REQ-UIX-16 — viewer plein écran : navigation, sauvegarde, fermeture
   });
 
   /**
-   * Le pendant de « un rendu de plus ne re-déchiffre rien » (REQ-UI-14), là où il coûtait
+   * Le pendant de « un rendu de plus ne re-déchiffre rien », là où il coûtait
    * le plus cher : `Conversation` reconstruit ses `Media` à chaque tour de `/sync`, et la
    * vidéo ouverte était re-téléchargée et re-déchiffrée **pendant sa lecture**, qui
    * repartait de zéro à chaque fois. C'est le « on déchiffre 2 secondes par 2 secondes »
@@ -598,7 +598,7 @@ describe("REQ-UIX-16 — viewer plein écran : navigation, sauvegarde, fermeture
   });
 });
 
-describe("REQ-UIX-17 / REQ-UIX-18 — galeries partagées : quatre onglets, périmètre honnête", () => {
+describe("galeries partagées : quatre onglets, périmètre honnête", () => {
   const evenements: EvenementLu[] = [
     image("$img"),
     evenement({ msgtype: "m.file", body: "contrat.pdf", file: FICHIER, info: { size: 10 } }, "$fic"),
@@ -631,7 +631,7 @@ describe("REQ-UIX-17 / REQ-UIX-18 — galeries partagées : quatre onglets, pér
     expect(screen.getByText(/historique téléchargé sur cet appareil/)).toBeTruthy();
   });
 
-  it("l'onglet Épinglés porte la mention de non-chiffrement (REQ-UIX-18)", () => {
+  it("l'onglet Épinglés porte la mention de non-chiffrement", () => {
     render(
       <ConversationCollections evenements={evenements} epingles={["$txt"]} telecharger={telecharger} />,
     );
@@ -645,7 +645,7 @@ describe("REQ-UIX-17 / REQ-UIX-18 — galeries partagées : quatre onglets, pér
   });
 
   /**
-   * REQ-UIX-17 — la planche contact : trois carrés par ligne, comme Instagram.
+   * la planche contact : trois carrés par ligne, comme Instagram.
    *
    * Les médias sortaient en **liste verticale de tuiles au ratio de leur original** — la
    * géométrie de la timeline, où une photo est un message et garde le cadrage de son
@@ -687,13 +687,13 @@ describe("REQ-UIX-17 / REQ-UIX-18 — galeries partagées : quatre onglets, pér
 });
 
 /**
- * REQ-MED-12 — **la liste close, côté écran.**
+ * **la liste close, côté écran.**
  *
  * La résolution elle-même est prouvée dans le paquet (`types-rendus.test.ts`, entrées
  * hostiles comprises). Ce qui se prouve ici, c'est ce que le viewer en fait : rien de
  * hors liste ne descend, rien de non identifié ne s'affiche, et aucun lecteur vide.
  */
-describe("REQ-MED-12 — le viewer refuse de rendre ce qui n'est pas dans la liste close", () => {
+describe("le viewer refuse de rendre ce qui n'est pas dans la liste close", () => {
   const mediaDeType = (mimetype: string | undefined, msgtype = "m.image") =>
     mediaDe(
       evenement({
@@ -782,13 +782,13 @@ describe("REQ-MED-12 — le viewer refuse de rendre ce qui n'est pas dans la lis
 });
 
 /**
- * REQ-MED-15 — **les plafonds, côté écran.**
+ * **les plafonds, côté écran.**
  *
  * La décision est prouvée pure dans le paquet (table de vérité, et le déchiffrement par
  * tranches avec elle). Ce qui se prouve ici, c'est qu'aucun octet ne descend quand la
  * taille l'interdit — la garde ne sert à rien si l'écran la contourne.
  */
-describe("REQ-MED-15 — au-delà du plafond, pas de lecteur", () => {
+describe("au-delà du plafond, pas de lecteur", () => {
   const lourd = (octets: number) =>
     mediaDe(
       evenement({
@@ -870,14 +870,14 @@ describe("REQ-MED-15 — au-delà du plafond, pas de lecteur", () => {
 });
 
 /**
- * REQ-MED-04 — **la refonte du transcodage, par ce que jsdom peut en dire.**
+ * **la refonte du transcodage, par ce que jsdom peut en dire.**
  *
  * Le chemin nominal demande `WebCodecs`, que jsdom n'a pas : ce qui se mesure vraiment —
  * 1080p de 3 min sous 30 s, aucun long task, mémoire stable — se mesure au navigateur et
  * se consigne avec sa date. Ce que ces tests tiennent, c'est que les lignes qui portent
  * ces propriétés ne disparaissent pas en silence (règle 7).
  */
-describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", () => {
+describe("le transcodage ne rejoue plus la vidéo pour la lire", () => {
   // Commentaires retirés, comme partout ailleurs : « les interdits portent sur ce que le
   // shard exécute, pas sur ce qu'il explique » — et ce fichier explique longuement ce
   // qu'il ne fait plus.
@@ -916,7 +916,7 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
 
   it("la vignette sort du décodeur, sur les deux chemins qui décodent", () => {
     /*
-     * REQ-MED-03 — le poster était pris en rejouant le fichier dans un `<video>` sur le
+     * le poster était pris en rejouant le fichier dans un `<video>` sur le
      * thread principal : le plus faible des trois mécanismes, employé y compris là où un
      * décodeur était déjà ouvert. Quand ce lecteur refusait le fichier — et il le refusait
      * —, la vidéo partait sans vignette, et la timeline n'avait rien à montrer.
@@ -933,7 +933,7 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
 
   it("la vignette porte l'orientation affichée, pas les pixels codés", () => {
     /*
-     * REQ-MED-14 — le `<video>` appliquait la matrice du `tkhd` pour nous ; un décodeur
+     * le `<video>` appliquait la matrice du `tkhd` pour nous ; un décodeur
      * rend la frame codée. Sans redressement, la vignette d'une vidéo filmée en portrait
      * sortait couchée à côté d'une vidéo qui, elle, se lisait droite.
      *
@@ -957,7 +957,7 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
   });
 
   it("le transcodage tourne dans un worker, jamais sur le thread de rendu", () => {
-    // Spec 08 § Méthode l'exigeait depuis l'origine ; rien ne le portait.
+    // `@tacita/media-pipeline` § Méthode l'exigeait depuis l'origine ; rien ne le portait.
     const env = sansCommentaires(lire("lib/media-env.ts"));
     expect(env).toContain('new Worker(new URL("./transcode-worker.ts", import.meta.url))');
     expect(env).toContain("worker.terminate()");
@@ -965,7 +965,7 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
 
   it("un transcodage impossible envoie la source telle quelle plutôt que rien", () => {
     /*
-     * REQ-MED-04 / interdit n°13 — trois familles de sources échouent au chemin nominal et
+     * / interdit n°13 — trois familles de sources échouent au chemin nominal et
      * aucune n'est marginale : les conteneurs que le démuxeur ne connaît pas (WebM,
      * Matroska — tout ce qu'un navigateur enregistre lui-même), les codecs que
      * `VideoDecoder` refuse là où l'appareil sait pourtant les lire (HEVC hors Safari), et
@@ -1002,19 +1002,19 @@ describe("REQ-MED-04 — le transcodage ne rejoue plus la vidéo pour la lire", 
 
   it("la rotation de la source traverse jusqu'au conteneur et jusqu'aux dimensions", () => {
     expect(source).toContain("rotation: source.rotation");
-    // REQ-MED-14 — `info.w`/`info.h` décrivent ce qui sera vu, pas ce qui est codé.
+    // `info.w`/`info.h` décrivent ce qui sera vu, pas ce qui est codé.
     expect(source).toContain('const pivote = rotation === 90 || rotation === 270;');
   });
 });
 
 /**
- * REQ-MED-08 (b) — **la lecture progressive, côté écran.**
+ * (b) — **la lecture progressive, côté écran.**
  *
  * Ce qui se prouve ici : le chemin ne se prend que lorsque ses trois conditions sont
  * réunies, et le chemin d'un seul bloc reste dessous, intact. La vérification par bloc
  * elle-même est prouvée dans le paquet (`blocs.test.ts`, bloc corrompu compris).
  */
-describe("REQ-MED-08 (b) — le viewer ne lit par plages que quand les trois conditions sont là", () => {
+describe(" (b) — le viewer ne lit par plages que quand les trois conditions sont là", () => {
   const video = (blocs?: string[]) =>
     mediaDe(
       evenement({
@@ -1081,14 +1081,14 @@ describe("REQ-MED-08 (b) — le viewer ne lit par plages que quand les trois con
 });
 
 /**
- * REQ-MED-04 / REQ-MED-19 — **les trois échecs d'envoi, relus à la source.**
+ * **les trois échecs d'envoi, relus à la source.**
  *
  * `Conversation` ne se rend pas en jsdom sans une session complète, et ces trois phrases
  * dépendent d'un worker que jsdom n'a pas. Ce que ces tests tiennent, c'est que chaque
  * situation garde sa phrase, et que le contrôle de taille reste **avant** la mise en file
  * — mesuré le 20/08/2026, où les trois se confondaient en une seule.
  */
-describe("REQ-MED-04 / REQ-MED-19 — un échec d'envoi dit lequel", () => {
+describe("un échec d'envoi dit lequel", () => {
   const ecran = sansCommentaires(lire("components/conversation/Conversation.tsx"));
 
   it("un format illisible ne se confond plus avec un échec de compression", () => {

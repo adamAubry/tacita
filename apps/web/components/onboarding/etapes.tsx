@@ -17,7 +17,7 @@ import { Preparation, usePreparation } from "./Onboarding";
 import { RecoveryStep } from "./RecoveryStep";
 
 /**
- * REQ-UI-22 — **la liste des étapes du parcours d'accueil, et le seul endroit où elle
+ * **la liste des étapes du parcours d'accueil, et le seul endroit où elle
  * vit.**
  *
  * Ajouter une étape, en retirer une, en changer l'ordre : c'est le tableau du bas de ce
@@ -60,7 +60,7 @@ export interface EtapeOnboarding {
  * Étape 2 — **l'identité, dessinée pendant que l'écran se monte.**
  *
  * C'est le seul endroit du produit où la photo et la bannière par défaut se fabriquent
- * (REQ-MSG-22). Elles l'étaient auparavant en arrière-plan, à la confirmation de la clé :
+ * Elles l'étaient auparavant en arrière-plan, à la confirmation de la clé :
  * personne ne les voyait apparaître, et un échec réseau laissait un compte sur ses
  * initiales sans que rien ne le dise. Ici, l'écran attend le résultat et le montre — le
  * geste a un avant et un après.
@@ -128,11 +128,11 @@ function EtapeIdentite({ session, avancer }: ContenuEtapeProps) {
  *
  * C'est le composant des réglages (M-H) qui est rendu ici, pas une copie : il connaît les
  * six états de la chaîne push, il nomme le maillon qui manque, et il sait déjà quoi dire
- * sur un iPhone hors écran d'accueil, où aucun abonnement n'est possible (REQ-PSH-05).
+ * sur un iPhone hors écran d'accueil, où aucun abonnement n'est possible.
  * Un écran d'accueil qui redemanderait tout ça en plus simple aurait fini par mentir.
  *
  * La marque « la question a été posée » est posée **à l'affichage**, comme ailleurs
- * (REQ-UI-18) : une proposition montrée est une question posée, quelle qu'en soit la
+ * une proposition montrée est une question posée, quelle qu'en soit la
  * suite. Sans elle, la même question reviendrait au premier message reçu — la voie qui
  * reste pour les appareils qui n'ont pas fait ce parcours.
  */
@@ -164,7 +164,7 @@ function EtapeNotifications() {
  *
  * Un compte neuf n'a personne à qui écrire, et c'est le seul vrai obstacle du premier
  * jour : tout ce que l'application sait faire reste invisible tant qu'il n'y a pas un
- * salon. Cette étape en ouvre un — le sien (REQ-UI-23) —, puis y emmène. Ce qui se passe
+ * salon. Cette étape en ouvre un — le sien — puis y emmène. Ce qui se passe
  * ensuite n'est plus un écran d'accueil : c'est le produit.
  *
  * Le salon est créé **pendant** que l'explication se lit, pas au clic : ce sont deux ou
@@ -229,7 +229,7 @@ function EtapePremiereConversation({ session, avancer }: ContenuEtapeProps) {
 
 export const ETAPES: EtapeOnboarding[] = [
   {
-    // REQ-UI-04 — bloquante, et donc sans sortie. Elle termine en ouvrant la porte
+    // bloquante, et donc sans sortie. Elle termine en ouvrant la porte
     // (`recuperationConfirmee`), ce qui remonte ce composant au rang suivant.
     cle: "cle-de-recuperation",
     Contenu: ({ session }) => <RecoveryStep session={session} />,

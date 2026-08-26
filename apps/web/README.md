@@ -1,4 +1,4 @@
-# apps/web — le shard UI (spec 11)
+# apps/web — le shard UI
 
 PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** : le shard
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
@@ -21,7 +21,7 @@ vers l'OIDC est correcte et part vers un nom qui ne mène nulle part.
 ## Trois contraintes de construction — sans elles, `next build` échoue
 
 Ce sont des faits, trouvés en cassant le build pendant le spike du 05/08/2026 ; ils sont
-au contrat dans `specs/11-ui-shard.md` et `specs/ui/M-A.md`. Pas des préférences de style.
+au contrat dans `DESIGN.md`. Pas des préférences de style.
 
 1. **Jamais le barrel `@astryxdesign/core`.** *« unsupported to use "export \*" in a client
    boundary »*. Toujours le sous-chemin. En pratique : **un seul fichier importe Astryx**,
@@ -35,7 +35,7 @@ au contrat dans `specs/11-ui-shard.md` et `specs/ui/M-A.md`. Pas des préférenc
 
 `components/foundation/theme.ts` est **le seul endroit du dépôt** où une valeur hexadécimale
 de DESIGN.md est recopiée. La table de correspondance qui le gouverne — 16 tokens DESIGN.md
-vers 79 tokens Astryx — est dans `specs/ui/M-A.md`. Trois points s'y jouent, et aucun ne se
+vers 79 tokens Astryx — est dans `DESIGN.md`. Trois points s'y jouent, et aucun ne se
 voit à l'œil nu :
 
 - les **40 tokens chromatiques** d'Astryx (`blue`, `pink`, `red`…) sont posés sur les neutres.
@@ -58,7 +58,7 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 
 - **rien n'a été rendu dans un vrai navigateur.** jsdom prouve la logique et la propagation
   des événements ; il ne prouve ni un doigt sur un écran, ni le conflit entre un swipe et le
-  défilement, ni la zone morte de Safari iOS (REQ-UI-08/09, module M-D) ;
+  défilement, ni la zone morte de Safari iOS (module M-D) ;
 - **le service worker n'a jamais tourné dans un navigateur.** Ses gestionnaires `push` et
   `notificationclick` sont, eux, exercés : la suite évalue **le fichier livré** avec un
   `self` fourni, et vérifie la notification construite comme celle qui reste générique.
@@ -72,7 +72,7 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **aucun appel n'a été passé.** Le shell d'appel est prouvé sur ce qui lui appartient —
   permissions de l'iframe, message de `RtcFociMissing`, sortie de secours au délai,
   paramètre de lancement — avec le paquet 10 mocké. Qu'Element Call démarre, s'authentifie
-  auprès du SFU et rende du média demande la pile RTC déployée (spec 02) ;
+  auprès du SFU et rende du média demande la pile RTC déployée ;
 - **les paramètres d'URL d'Element Call sont relus dans la version épinglée** (E-14 close) :
   `infra/rtc/` fixe la `v0.23.0` par digest, et le point d'entrée part en `intent`. Ce qui
   reste non prouvé, c'est le rendu — voir le point précédent. `skipLobby` n'est jamais
@@ -91,7 +91,7 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   câblage interroge `VideoEncoder.isConfigSupported` au montage. Le transcodage relit la
   vidéo **en temps réel** pour la décoder — une minute de vidéo prend une minute ;
 - **l'envoi de pièce jointe n'a pas de barre de progression**, seulement un état : le
-  pipeline (spec 08) ne rapporte rien pendant la compression ni le téléversement, et une
+  pipeline ne rapporte rien pendant la compression ni le téléversement, et une
   barre serait une animation inventée plutôt qu'une mesure ;
 - **la photo de profil est livrée, et elle n'est pas chiffrée** (E-12 close, voie A) : un
   avatar Matrix est un `mxc://` nu que tout client doit pouvoir afficher, et le chiffrer en

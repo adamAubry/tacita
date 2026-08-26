@@ -64,7 +64,7 @@ const créer = async (body: unknown = { kind: "friend" }, token = "jeton-luca") 
     expiresAt: number;
   };
 
-describe("REQ-INV-01 — POST /links, authentification obligatoire", () => {
+describe("POST /links, authentification obligatoire", () => {
   it("crée avec un jeton valide, refuse sans", async () => {
     expect((await appel("POST", "/links", { body: { kind: "friend" } })).status).toBe(401);
 
@@ -84,7 +84,7 @@ describe("REQ-INV-01 — POST /links, authentification obligatoire", () => {
   });
 });
 
-describe("REQ-INV-04 — GET /links ne rend que les liens de l'appelant", () => {
+describe("GET /links ne rend que les liens de l'appelant", () => {
   it("chacun le sien", async () => {
     await créer();
     await créer({ kind: "friend" }, "jeton-mira");
@@ -95,7 +95,7 @@ describe("REQ-INV-04 — GET /links ne rend que les liens de l'appelant", () => 
   });
 });
 
-describe("REQ-INV-05 — DELETE /links/:id révoque", () => {
+describe("DELETE /links/:id révoque", () => {
   it("204 pour le propriétaire, échec neutre pour un autre", async () => {
     const { id, token } = await créer();
 
@@ -105,7 +105,7 @@ describe("REQ-INV-05 — DELETE /links/:id révoque", () => {
   });
 });
 
-describe("REQ-INV-06 — POST /links/:token/resolve rend l'identifiant", () => {
+describe("POST /links/:token/resolve rend l'identifiant", () => {
   it("le porteur authentifié obtient kind, issuer et roomId", async () => {
     const { token } = await créer({ kind: "group", roomId: SALON });
 
@@ -120,7 +120,7 @@ describe("REQ-INV-06 — POST /links/:token/resolve rend l'identifiant", () => {
   });
 });
 
-describe("REQ-INV-09 — limitation de débit par IP", () => {
+describe("limitation de débit par IP", () => {
   it("au-delà du budget, la même IP est refusée en 429 avant tout appel à Synapse", async () => {
     const { token } = await créer();
     matrix.whoami.mockClear();
@@ -152,7 +152,7 @@ describe("REQ-INV-09 — limitation de débit par IP", () => {
   });
 });
 
-describe("REQ-INV-20 — aucun identifiant, aucun roomId, aucun token dans les logs", () => {
+describe("aucun identifiant, aucun roomId, aucun token dans les logs", () => {
   it("le journal porte l'issue et le gabarit de route, jamais qui", async () => {
     const { id, token } = await créer({ kind: "group", roomId: SALON });
     await appel("POST", `/links/${token}/resolve`, { token: "jeton-mira" });

@@ -11,7 +11,7 @@ interface RequestsBannerProps {
 }
 
 /**
- * REQ-UIX-10 — bannière « Nouvelles demandes » (composant 5).
+ * bannière « Nouvelles demandes » (composant 5).
  *
  * **Elle n'existe pas quand il n'y a rien.** Pas de version vide, pas de « 0 demande » :
  * une bannière permanente cesse d'être lue le jour où elle a quelque chose à dire — même

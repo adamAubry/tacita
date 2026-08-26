@@ -1,19 +1,19 @@
-# infra/rtc — chemin voix/vidéo (spec 02)
+# infra/rtc — chemin voix/vidéo
 
 Config-as-code du backend RTC : SFU LiveKit auto-hébergé, `lk-jwt-service`
 (traduit une identité Matrix en jeton d'accès LiveKit), TURN, et la découverte
 `.well-known/matrix/client`. Ce module ne livre que l'infra : le client embarque
-Element Call en widget (spec 10), il n'y a aucun code RTC maison.
+Element Call en widget, il n'y a aucun code RTC maison.
 
 ## Démarrage
 
-Overlay du compose de la spec 01, même projet donc même réseau :
+Overlay du compose de `infra`, même projet donc même réseau :
 
 ```sh
 docker compose -f docker-compose.yml -f rtc/docker-compose.yml up -d
 ```
 
-Variables à remplir dans `.env` en plus de celles de la spec 01 :
+Variables à remplir dans `.env` en plus de celles de `infra` :
 `WEB_BIND_IP`, `TURN_BIND_IP`, `TURN_DOMAIN`, `LIVEKIT_KEY`, `LIVEKIT_SECRET`.
 
 | Service | Version | Digest |
@@ -24,7 +24,7 @@ Variables à remplir dans `.env` en plus de celles de la spec 01 :
 `lk-jwt-service` ne publie pas de tag semver amont (uniquement `sha-*` et
 `latest-ci_*`) : l'épinglage se fait par digest, à revérifier avant tout bump.
 
-## ⚠️ REQ-RTC-07 — les MSC MatrixRTC ne sont pas stabilisés
+## ⚠️ les MSC MatrixRTC ne sont pas stabilisés
 
 Aucune valeur littérale du protocole MatrixRTC ne doit être recopiée de mémoire
 ni depuis un billet de blog. **Avant tout usage littéral, relire la doc courante
@@ -40,9 +40,9 @@ d'Element Call et de `lk-jwt-service`** :
 
 Une valeur périmée ne casse pas bruyamment : le bouton d'appel reste simplement
 inerte. Le seul endroit du dépôt qui porte ces littéraux est `rtc/well-known.conf`
-(REQ-RTC-05) ; la spec 10 les relit côté client.
+ ; `@tacita/calls` les relit côté client.
 
-## REQ-RTC-05 — l'annonce du focus appartient à cet overlay
+## l'annonce du focus appartient à cet overlay
 
 Deux fichiers servent la même route, un seul est monté à la fois :
 
@@ -57,10 +57,10 @@ par cible, l'overlay remplace donc le fichier de base au lieu de s'y ajouter.
 **Pourquoi ce détour plutôt qu'un `rtc_foci` en dur dans `nginx.conf`** — c'est ce
 qu'on faisait jusqu'au 05/08/2026 (escalade E-08). Une pile sans SFU annonçait un focus
 dont le backend n'existe pas : `discoverFocus()` réussissait, et l'appel mourait en
-502 à la connexion au lieu du `RtcFociMissing` que REQ-CAL-02 rend affichable. Une
+502 à la connexion au lieu du `RtcFociMissing` que rend affichable. Une
 annonce ne doit pas survivre au déploiement qu'elle décrit.
 
-## REQ-RTC-04 — la plage UDP s'ouvre en deux endroits
+## la plage UDP s'ouvre en deux endroits
 
 `firewall/host-ufw.sh` (pare-feu de l'hôte) **et**
 `firewall/security-group.tf` (groupe de sécurité cloud) déclarent la même plage
@@ -78,11 +78,11 @@ l'autre. Vérifier les deux couches avant de chercher ailleurs.
 forme de référence, à transposer si le déploiement part sur un autre
 fournisseur. Les ports, eux, ne changent pas.
 
-## REQ-RTC-06 — TURN-TLS sur 443 et deuxième IP publique
+## TURN-TLS sur 443 et deuxième IP publique
 
 Le TURN de dernier recours doit écouter en TLS sur 443 : pour un client derrière
 un NAT symétrique ou un pare-feu sortant strict, c'est souvent le seul port
-ouvert. Mais le reverse proxy (spec 01) occupe déjà 443.
+ouvert. Mais le reverse proxy occupe déjà 443.
 
 **Il faut donc deux IP publiques sur l'hôte** : `WEB_BIND_IP` pour le proxy,
 `TURN_BIND_IP` pour le TURN. L'overlay épingle chaque service sur la sienne (les
@@ -96,7 +96,7 @@ qu'un CN : pour tester le chemin TURN en local, lui ajouter le SAN
 correspondant, sinon la négociation TLS du TURN échoue silencieusement et le
 client retombe sur les candidats directs.
 
-## REQ-RTC-08 — Element Call est à nous, donc épinglé
+## Element Call est à nous, donc épinglé
 
 **Version déployée : `v0.23.0`**, image
 `ghcr.io/element-hq/element-call@sha256:e352de468647777e3780fec45281e2ccc90da69a828f7a3d88700ff9ac04bb0b`,
@@ -133,13 +133,13 @@ foi et ne faisaient rien du tout.
 
 Le certificat monté depuis `proxy/certs` doit porter un **SAN pour `call.<SERVER_NAME>`**,
 au même titre que `TURN_DOMAIN`. Sans lui, l'iframe échoue au TLS et le shard n'affiche
-que son délai de chargement (REQ-UIX-38), sans pouvoir en donner la cause.
+que son délai de chargement, sans pouvoir en donner la cause.
 
 ## Limites assumées
 
 - **Métadonnées d'appel visibles.** Le média est chiffré de bout en bout
   (SFU en relais aveugle), mais le SFU et `lk-jwt-service` voient qui appelle
   qui, quand et combien de temps — même limite que le reste du serveur, voir
-  `../LIMITES.md`.
+  `../README.md`.
 - **TURN relayé = bande passante serveur.** Les clients en NAT symétrique font
   transiter tout leur média par l'hôte. Aucun quota n'est posé en V1.

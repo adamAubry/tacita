@@ -1,4 +1,4 @@
-# Chemin RTC — spec 02. Overlay du compose de la spec 01 (même projet, même
+# Chemin RTC — `infra/rtc`. Overlay du compose de `infra` (même projet, même
 # réseau, donc les noms d'hôte attendus par le proxy résolvent) :
 #
 #   docker compose -f docker-compose.yml -f rtc/docker-compose.yml up -d
@@ -20,12 +20,12 @@ services:
       TURN_DOMAIN: ${TURN_DOMAIN}
       LIVEKIT_KEYS: "${LIVEKIT_KEY}: ${LIVEKIT_SECRET}"
     ports:
-      # REQ-RTC-04 — miroir strict de rtc/firewall/ ; ouvrir ici sans ouvrir là
+      # miroir strict de rtc/firewall/ ; ouvrir ici sans ouvrir là
       # (ou l'inverse) donne un appel qui se connecte puis coupe à 15-20 s.
       - "50000-50100:50000-50100/udp"
       - "7881:7881/tcp"
       - "${TURN_BIND_IP:?IP dédiée au TURN requise, voir rtc/README.md}:3478:3478/udp"
-      # REQ-RTC-06 — TURN-TLS sur 443, sur une IP dédiée : le reverse proxy occupe
+      # TURN-TLS sur 443, sur une IP dédiée : le reverse proxy occupe
       # déjà 443 sur l'IP principale.
       - "${TURN_BIND_IP:?IP dédiée au TURN requise, voir rtc/README.md}:443:443/tcp"
     volumes:
@@ -34,7 +34,7 @@ services:
       - ../proxy/certs:/certs:ro
 
   # Traduit une identité Matrix en jeton d'accès LiveKit. Le SFU ne fait confiance
-  # qu'aux jetons qu'il signe (REQ-RTC-01) : c'est ici que se joue l'autorisation.
+  # qu'aux jetons qu'il signe : c'est ici que se joue l'autorisation.
   lk-jwt-service:
     image: ghcr.io/element-hq/lk-jwt-service@sha256:29918567e6b7cd920e2853b4cd6848ce01b79947c3d19a9f1ed5b74f0a2a88bf # main, résolu le 2026-08-02 (amont ne publie pas de tag semver)
     restart: unless-stopped
@@ -42,11 +42,11 @@ services:
       LIVEKIT_URL: wss://${SERVER_NAME}/livekit/sfu
       LIVEKIT_KEY: ${LIVEKIT_KEY}
       LIVEKIT_SECRET: ${LIVEKIT_SECRET}
-      # REQ-RTC-03 — restreint au domaine du déploiement. `*` laisserait n'importe
+      # restreint au domaine du déploiement. `*` laisserait n'importe
       # quel homeserver déclencher la création de salles sur notre SFU.
       LIVEKIT_FULL_ACCESS_HOMESERVERS: ${SERVER_NAME}
 
-  # REQ-RTC-08 — Element Call, le seul client RTC autorisé (interdit n°7), servi par
+  # Element Call, le seul client RTC autorisé (interdit n°7), servi par
   # nous. Épinglé par digest comme tout le compose : c'est lui qui rend vraies les
   # valeurs que `packages/calls` écrit dans l'URL du widget — un paramètre relu dans
   # une version, puis servi par une autre, est une jonction non relue (E-14).
@@ -66,15 +66,15 @@ services:
       - ./element-call.json:/conf/config.json:ro
 
   proxy:
-    # REQ-RTC-06 — le TURN-TLS réclame 443 sur son IP : on épingle le proxy sur
+    # le TURN-TLS réclame 443 sur son IP : on épingle le proxy sur
     # l'autre. `!override` remplace la liste de ports au lieu de l'étendre.
     ports: !override
       - "${WEB_BIND_IP:?IP publique du proxy requise, voir rtc/README.md}:443:443"
-    # REQ-RTC-05 — l'annonce du focus appartient à cet overlay, pas à la pile de base :
+    # l'annonce du focus appartient à cet overlay, pas à la pile de base :
     # elle n'est vraie que là où les backends `/livekit/*` existent. Même cible de
     # montage que `proxy/well-known.conf`, que compose remplace au lieu de l'ajouter.
     #
-    # REQ-RTC-08 — même mécanique pour le service d'Element Call : la pile de base
+    # même mécanique pour le service d'Element Call : la pile de base
     # monte un fichier vide, l'overlay monte le bloc `server` qui le sert.
     volumes:
       - ./well-known.conf:/etc/nginx/well-known.conf:ro

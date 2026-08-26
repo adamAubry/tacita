@@ -20,14 +20,14 @@ const source = readFileSync(
 /** Même convention que `client-core/tests/session.test.ts` : ce qui s'exécute, pas ce qui se documente. */
 const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
-describe("REQ-COR-07 (D-08) — la fumée à deux personnes passe par le chemin produit", () => {
+describe(" (D-08) — la fumée à deux personnes passe par le chemin produit", () => {
   it("aucun appel de vérification manuelle ne rend les tests verts à la place du produit", () => {
     expect(code).not.toMatch(/setDeviceVerified/);
     expect(code).not.toMatch(/requestDeviceVerification/);
   });
 
   it("la confiance vient du bootstrap d'inscription, seul geste autorisé", () => {
-    // REQ-COR-06 : c'est `setupRecoveryKey()` qui amorce le cross-signing, donc qui
+    // c'est `setupRecoveryKey()` qui amorce le cross-signing, donc qui
     // signe l'appareil. Si ce geste disparaît, les tests ne prouvent plus rien.
     expect(code).toMatch(/setupRecoveryKey\(\)/);
   });

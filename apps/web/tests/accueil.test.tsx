@@ -20,7 +20,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pousser, back: vi.fn() }),
 }));
 
-/** Les paquets 04–10 sont mockés à leurs interfaces (spec 11). */
+/** Les paquets 04–10 sont mockés à leurs interfaces. */
 const restoreSession = vi.fn<() => Promise<Session | null>>();
 vi.mock("@tacita/client-core", async (original) => ({
   ...(await original<typeof import("@tacita/client-core")>()),
@@ -67,7 +67,7 @@ function conversation(partiel: Partial<Conversation> = {}): Conversation {
  * `PointerEvent` (vérifié), et l'événement de repli que Testing Library construit alors
  * ne porte **pas** `clientX` — le seuil ne serait jamais franchi, et le test passerait
  * au vert en n'ayant rien glissé. `MouseEvent` porte les coordonnées, et React lit le
- * type qu'on lui donne. À reprendre tel quel pour les gestes de M-D (REQ-UI-08/09).
+ * type qu'on lui donne. À reprendre tel quel pour les gestes de M-D.
  */
 function glisser(cible: HTMLElement, distance: number) {
   fireEvent(cible, new MouseEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 }));
@@ -85,7 +85,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("REQ-UI-05 — la carte de conversation : avatar, nom, aperçu, date", () => {
+describe("la carte de conversation : avatar, nom, aperçu, date", () => {
   it("rend la preview complète à partir des données du package", () => {
     render(
       <ConversationPreview
@@ -134,7 +134,7 @@ describe("REQ-UI-05 — la carte de conversation : avatar, nom, aperçu, date", 
   });
 });
 
-describe("REQ-UIX-08 — badges : 9+ au-delà de neuf, la mention prime", () => {
+describe("badges : 9+ au-delà de neuf, la mention prime", () => {
   const rendre = (partiel: Partial<Conversation>) =>
     render(
       <ConversationPreview
@@ -166,7 +166,7 @@ describe("REQ-UIX-08 — badges : 9+ au-delà de neuf, la mention prime", () => 
   });
 });
 
-describe("REQ-UIX-09 — épingler : glissement droit, et son équivalent non gestuel", () => {
+describe("épingler : glissement droit, et son équivalent non gestuel", () => {
   it("le glissement au-delà du seuil épingle", () => {
     const onEpingler = vi.fn();
     render(
@@ -245,7 +245,7 @@ describe("REQ-UIX-09 — épingler : glissement droit, et son équivalent non ge
   });
 });
 
-describe("REQ-UIX-10 — bannière de demandes : elle n'existe que s'il y en a", () => {
+describe("bannière de demandes : elle n'existe que s'il y en a", () => {
   it("zéro demande, aucune bannière", () => {
     render(<RequestsBanner demandes={0} onOuvrir={vi.fn()} onIgnorer={vi.fn()} />);
     expect(screen.queryByText("Nouvelles demandes")).toBeNull();
@@ -272,7 +272,7 @@ describe("REQ-UIX-10 — bannière de demandes : elle n'existe que s'il y en a",
   });
 });
 
-describe("REQ-UIX-07 — en-tête de l'accueil : sélecteur, tri, recherche, création", () => {
+describe("en-tête de l'accueil : sélecteur, tri, recherche, création", () => {
   const rendre = (props: Partial<Parameters<typeof HomeHeader>[0]> = {}) => {
     const actions = {
       tri: "recentes" as const,
@@ -315,7 +315,7 @@ describe("REQ-UIX-07 — en-tête de l'accueil : sélecteur, tri, recherche, cr�
   });
 });
 
-describe("REQ-UIX-11 — création : un DM sans doublon, ou un groupe", () => {
+describe("création : un DM sans doublon, ou un groupe", () => {
   it("choisir un contact ouvre le DM par le package, jamais par createRoom", async () => {
     listees.mockReturnValue([conversation()]);
     rendreAccueil();
@@ -360,7 +360,7 @@ describe("REQ-UIX-11 — création : un DM sans doublon, ou un groupe", () => {
   });
 });
 
-describe("REQ-UIX-04 — la liste dit ce qu'elle fait : skeleton, puis vide, puis contenu", () => {
+describe("la liste dit ce qu'elle fait : skeleton, puis vide, puis contenu", () => {
   it("en attente de données, des skeletons — pas un écran vide qui ment", () => {
     render(
       <ConversationsList conversations={[]} chargement onOuvrir={vi.fn()} onEpingler={vi.fn()} />,

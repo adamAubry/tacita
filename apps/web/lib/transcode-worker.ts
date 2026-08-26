@@ -1,7 +1,7 @@
 /**
  * Le point d'entrée du worker de transcodage vidéo.
  *
- * **Spec 08 § Méthode : « les opérations lourdes tournent en Web Worker — jamais sur le
+ * **`@tacita/media-pipeline` § Méthode : « les opérations lourdes tournent en Web Worker — jamais sur le
  * thread principal ».** La contrainte était écrite depuis l'origine et n'était pas tenue :
  * le transcodage décodait et réencodait sur le thread de rendu, qui portait aussi la
  * timeline. Une phrase de spec sans fichier pour la porter n'empêche rien.
@@ -28,7 +28,7 @@ export type ReponseTranscodage =
       height: number;
       durationMs: number;
       sansSon: boolean;
-      /** REQ-MED-03 — l'image de la vignette, prise au décodeur. Absente si rien n'a pu être peint. */
+      /** l'image de la vignette, prise au décodeur. Absente si rien n'a pu être peint. */
       poster?: Blob;
     }
   | { ok: false; motif: MotifEchec; message: string };
@@ -51,7 +51,7 @@ self.onmessage = async ({ data }: MessageEvent<DemandeTranscodage>) => {
       poster,
     } satisfies ReponseTranscodage);
   } catch (cause) {
-    // Le message ne cite jamais le média (REQ-MED-10) — seulement la nature de l'échec.
+    // Le message ne cite jamais le média — seulement la nature de l'échec.
     self.postMessage({
       ok: false,
       // Le motif traverse, pas seulement le texte : c'est lui qui décide de la phrase

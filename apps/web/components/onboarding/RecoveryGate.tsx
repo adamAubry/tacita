@@ -12,7 +12,7 @@ import { RecoveryUnlock } from "./RecoveryUnlock";
 import { useSession } from "./SessionProvider";
 
 /**
- * REQ-UI-04 / REQ-UI-22 / REQ-UIX-06 — la porte d'entrée de toute l'app.
+ * la porte d'entrée de toute l'app.
  *
  * **Elle remplace le contenu, elle ne redirige pas.** Un garde de route se contourne en
  * tapant une adresse ; ici, tant que la clé de récupération n'est pas confirmée — puis
@@ -51,7 +51,7 @@ export function RecoveryGate({
 
   if (etat.phase === "hors-session") {
     /*
-     * REQ-UIX-06 — **le formulaire, et non une redirection** (D-12, 25/08/2026).
+     * **le formulaire, et non une redirection** (D-12, 25/08/2026).
      *
      * Cet écran affichait « Connexion… / Redirection vers votre fournisseur » : il n'y
      * avait rien à saisir, l'identité vivant chez Keycloak. Elle est revenue dans le
@@ -66,7 +66,7 @@ export function RecoveryGate({
 
   if (etat.phase === "recuperation-requise") {
     /*
-     * Deux chemins, pas un. `mode` vient de `recoveryState()` (spec 04) : le shard ne
+     * Deux chemins, pas un. `mode` vient de `recoveryState()` : le shard ne
      * dérive rien. La porte ne proposait que la création, et l'ouvrait donc à chaque
      * reconnexion — chaque `m.login.token` donne un `device_id` neuf, non signé, ce que
      * l'ancienne source confondait avec « ce compte n'a pas de clé ».
@@ -87,7 +87,7 @@ export function RecoveryGate({
   }
 
   /*
-   * REQ-UI-22 — la clé est confirmée et l'app est joignable, mais le parcours n'est pas
+   * la clé est confirmée et l'app est joignable, mais le parcours n'est pas
    * fini : il reprend **après** l'étape bloquante, qui vient d'être franchie ou l'avait
    * été avant un rechargement. Les étapes qui suivent sont toutes idempotentes (les
    * images par défaut ne s'écrasent pas, la conversation personnelle ne se duplique pas),

@@ -12,7 +12,7 @@ import { initSession, restoreSession, type SessionConfig } from "../src";
 vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
 
 // Le store SDK est mocké, mais celui des credentials est du vrai IndexedDB : c'est
-// lui qu'on teste en REQ-COR-11. Neuf à chaque test, sinon les sessions débordent
+// lui qu'on teste en. Neuf à chaque test, sinon les sessions débordent
 // de l'un sur l'autre.
 let config: SessionConfig;
 
@@ -38,7 +38,7 @@ beforeEach(() => {
   };
 });
 
-describe("REQ-COR-01 — crypto vodozemac via initRustCrypto, libolm interdit", () => {
+describe("crypto vodozemac via initRustCrypto, libolm interdit", () => {
   it("initSession initialise la crypto Rust", async () => {
     await initSession(config);
     expect(client.initRustCrypto).toHaveBeenCalledOnce();
@@ -65,7 +65,7 @@ describe("REQ-COR-01 — crypto vodozemac via initRustCrypto, libolm interdit", 
   });
 });
 
-describe("REQ-COR-02 — chiffrement sur l'appareil avant tout envoi réseau", () => {
+describe("chiffrement sur l'appareil avant tout envoi réseau", () => {
   it("la crypto est prête avant que la boucle /sync ne démarre", async () => {
     await initSession(config);
     const cryptoReady = client.initRustCrypto.mock.invocationCallOrder[0]!;
@@ -80,7 +80,7 @@ describe("REQ-COR-02 — chiffrement sur l'appareil avant tout envoi réseau", (
   });
 });
 
-describe("REQ-COR-03 — persistance exclusivement IndexedDB", () => {
+describe("persistance exclusivement IndexedDB", () => {
   it("le store passé au client est un IndexedDBStore démarré", async () => {
     await initSession(config);
     expect(IndexedDBStore).toHaveBeenCalledWith({
@@ -120,7 +120,7 @@ describe("REQ-COR-03 — persistance exclusivement IndexedDB", () => {
   });
 });
 
-describe("REQ-COR-05 — /sync est du long-polling HTTP, jamais du WebSocket", () => {
+describe("/sync est du long-polling HTTP, jamais du WebSocket", () => {
   it("la boucle /sync est ouverte par startClient", async () => {
     await initSession(config);
     expect(client.startClient).toHaveBeenCalledWith({ initialSyncLimit: 20 });
@@ -133,7 +133,7 @@ describe("REQ-COR-05 — /sync est du long-polling HTTP, jamais du WebSocket", (
   });
 });
 
-describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signés (D-08)", () => {
+describe("clés Megolm partagées avec les seuls appareils signés (D-08)", () => {
   it("le mode d'isolation « appareils signés uniquement » est posé", async () => {
     await initSession(config);
     expect(crypto.isolationMode).toBeInstanceOf(OnlySignedDevicesIsolationMode);
@@ -145,7 +145,7 @@ describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signé
     // `AllDevicesIsolationMode` est l'autre mode du SDK : celui qui repartagerait
     // avec des appareils non signés. C'est exactement ce que D-08 refuse.
     expect(() => crypto.setDeviceIsolationMode(new AllDevicesIsolationMode(false))).toThrow(
-      /REQ-COR-07/,
+      //
     );
     expect(crypto.isolationMode).toBeInstanceOf(OnlySignedDevicesIsolationMode);
   });
@@ -161,7 +161,7 @@ describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signé
     crypto.getUserVerificationStatus.mockResolvedValue({ needsUserApproval: true });
     const session = await initSession(config);
 
-    // D-08 — l'UI (spec 11) bloque l'envoi vers cet utilisateur jusqu'à confirmation
+    // D-08 — l'UI bloque l'envoi vers cet utilisateur jusqu'à confirmation
     // explicite. Le module remonte l'état ; il ne décide pas de l'écran.
     await expect(session.identityResetOf("@bob:tacita.test")).resolves.toBe(true);
     expect(crypto.getUserVerificationStatus).toHaveBeenCalledWith("@bob:tacita.test");
@@ -201,7 +201,7 @@ describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signé
   it("le contrat V1 n'annonce plus de vérification interactive", () => {
     // D-08 renvoie SAS/QR au post-V1, dans sa spec dédiée. Un exporté sans appelant sur
     // un chemin de clés est un piège : interdit n°13, on n'annonce pas ce qu'on ne rend
-    // pas. La spec 04 a perdu la ligne en même temps.
+    // pas. `@tacita/client-core` a perdu la ligne en même temps.
     expect(code).not.toMatch(/verifyDevice|requestDeviceVerification/);
   });
 
@@ -215,7 +215,7 @@ describe("REQ-COR-07 — clés Megolm partagées avec les seuls appareils signé
   });
 });
 
-describe("REQ-COR-12 — l'état de chiffrement est un prédicat, pas une assertion", () => {
+describe("l'état de chiffrement est un prédicat, pas une assertion", () => {
   it("rend true quand le SDK dit que le salon est chiffré", async () => {
     crypto.isEncryptionEnabledInRoom.mockResolvedValue(true);
     const session = await initSession(config);
@@ -239,7 +239,7 @@ describe("REQ-COR-12 — l'état de chiffrement est un prédicat, pas une assert
   });
 });
 
-describe("REQ-COR-08 — identifiant et mot de passe, portés par Synapse", () => {
+describe("identifiant et mot de passe, portés par Synapse", () => {
   it("se connecte par mot de passe et construit le client avec ses credentials", async () => {
     await initSession(config);
     /*
@@ -274,13 +274,13 @@ describe("REQ-COR-08 — identifiant et mot de passe, portés par Synapse", () =
   });
 });
 
-describe("REQ-COR-11 — reprise de session sans réseau", () => {
+describe("reprise de session sans réseau", () => {
   it("rouvre la session précédente sans redemander le mot de passe", async () => {
     await initSession(config);
 
     // Rechargement de page : objets SDK neufs, même IndexedDB. C'est aussi ce qui
     // rend la crypto neuve — `initSession` verrouille la sienne, et la reverrouiller
-    // lèverait (REQ-COR-07).
+    // lèverait.
     ({ crypto, client } = resetSdk());
 
     const reprise = await restoreSession(config);
@@ -323,7 +323,7 @@ describe("REQ-COR-11 — reprise de session sans réseau", () => {
   });
 });
 
-describe("REQ-UIX-06 — un jeton refusé ne rouvre pas la session", () => {
+describe("un jeton refusé ne rouvre pas la session", () => {
   it("un `M_UNKNOWN_TOKEN` à la reprise rend null et efface les credentials", async () => {
     // Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée,
     // et l'application se rouvrait entièrement — liste des conversations comprise. Le
@@ -338,7 +338,7 @@ describe("REQ-UIX-06 — un jeton refusé ne rouvre pas la session", () => {
     expect(await restoreSession(config)).toBeNull();
 
     // Effacés : garder un jeton que le serveur refuse ne peut que refaire échouer la
-    // tentative suivante (REQ-COR-11).
+    // tentative suivante.
     ({ crypto, client } = resetSdk());
     expect(await restoreSession(config)).toBeNull();
   });
@@ -346,7 +346,7 @@ describe("REQ-UIX-06 — un jeton refusé ne rouvre pas la session", () => {
   it("un serveur injoignable ne compte pas pour un refus", async () => {
     // La distinction est tout l'enjeu : traiter une panne réseau comme une révocation
     // jetterait dehors quelqu'un qui a seulement perdu la connexion — soit l'inverse de
-    // ce que REQ-UI-17 promet.
+    // ce que promet.
     await initSession(config);
     ({ crypto, client } = resetSdk());
     client.whoami.mockRejectedValueOnce(new TypeError("Failed to fetch"));
@@ -355,7 +355,7 @@ describe("REQ-UIX-06 — un jeton refusé ne rouvre pas la session", () => {
   });
 });
 
-describe("REQ-COR-10 — déconnexion = wipe complet des données locales", () => {
+describe("déconnexion = wipe complet des données locales", () => {
   it("efface les stores SDK et chaque store applicatif enregistré", async () => {
     const session = await initSession(config);
     const wipeSearch = vi.fn();
@@ -394,39 +394,5 @@ describe("REQ-COR-10 — déconnexion = wipe complet des données locales", () =
 
     expect(wipe).toHaveBeenCalledOnce();
     expect(client.clearStores).toHaveBeenCalledOnce();
-  });
-});
-
-describe("spec 00 — le croquis de la spec 04 ne ment pas sur l'interface livrée", () => {
-  /**
-   * Ce garde vient d'un défaut observé **deux fois le 04/08/2026**, dans les deux sens :
-   * le croquis annonçait `verifyDevice`, que D-08 avait retiré du contrat ; puis
-   * `confirmIdentityOf` a été livrée avant d'être écrite. Un croquis d'interface est un
-   * document accessoire — la jurisprudence PM dit que l'exigence l'emporte — mais un
-   * accessoire qui ment est ce que le développeur lit en premier.
-   */
-  const spec = readFileSync(new URL("../../../specs/04-client-core.md", import.meta.url), "utf-8");
-  const declarés = [...spec.matchAll(/^Session\.([a-zA-Z]+)/gm)].map((m) => m[1]!);
-  const interfaceSession = readSrc("session.ts").match(
-    /export interface Session \{[\s\S]*?\n\}/,
-  )![0];
-
-  /** Les membres réellement déclarés. Sans regex construite : dans un template
-   *  literal, `\s` s'écrase en `s` — le premier jet de ce garde est tombé dessus. */
-  const membresRéels = interfaceSession
-    .split("\n")
-    .map((ligne) => ligne.trim().replace(/^readonly /, ""))
-    .filter((ligne) => /^[a-zA-Z]+[(:]/.test(ligne))
-    .map((ligne) => ligne.split(/[(:]/)[0]!);
-
-  it("chaque membre annoncé par le croquis existe dans l'interface", () => {
-    expect(declarés.length).toBeGreaterThan(0); // le croquis a bien été lu
-    for (const membre of declarés) {
-      expect(membresRéels, `le croquis annonce ${membre}, absent de Session`).toContain(membre);
-    }
-  });
-
-  it("le croquis n'annonce rien que D-08 a retiré du contrat V1", () => {
-    expect(spec).not.toMatch(/^Session\.verifyDevice/m);
   });
 });

@@ -19,7 +19,7 @@ beforeEach(() => {
   ({ client } = resetSdk());
 });
 
-describe("REQ-COR-04 — OrderedTimeline restitue l'ordre du flux /sync", () => {
+describe("OrderedTimeline restitue l'ordre du flux /sync", () => {
   it("conserve l'ordre d'accumulation même quand les timestamps sont dans le désordre", async () => {
     // Horodatages décroissants : un tri par `origin_server_ts` inverserait la liste.
     const sync = [fakeEvent("$a", 3000), fakeEvent("$b", 1000), fakeEvent("$c", 2000)];
@@ -50,7 +50,7 @@ describe("REQ-COR-04 — OrderedTimeline restitue l'ordre du flux /sync", () => 
   });
 });
 
-describe("REQ-COR-13 — la timeline remonte l'historique au serveur", () => {
+describe("la timeline remonte l'historique au serveur", () => {
   it("demande la page précédente au salon et signale qu'il en reste", async () => {
     const session = await initSession(config);
     const room = fakeRoom([fakeEvent("$a", 1000)]);

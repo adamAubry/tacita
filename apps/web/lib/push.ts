@@ -4,11 +4,11 @@ import { mentionCandidates, messages as listerMessages, messageText } from "@tac
 import { PUSH_CONFIG_URL, PUSH_NOTIFY_URL } from "./config";
 
 /**
- * REQ-UI-18 — la chaîne Web Push côté client, de bout en bout.
+ * la chaîne Web Push côté client, de bout en bout.
  *
  * Le service worker n'a **aucun accès aux clés Megolm** : elles vivent dans le store
  * crypto Rust d'une fenêtre. C'est donc lui qui demande l'aperçu à une fenêtre ouverte,
- * par ce protocole — un message, une réponse, rien de conservé nulle part (REQ-UIX-40).
+ * par ce protocole — un message, une réponse, rien de conservé nulle part.
  *
  * Limite assumée, écrite dans les limites connues (M-H) : sans fenêtre ouverte, la
  * notification reste générique. Faire mieux demanderait la crypto Rust dans le service
@@ -26,7 +26,7 @@ export interface Apercu {
  * SDK a déjà déchiffrée pour cette fenêtre.
  *
  * `null` dès que quoi que ce soit manque : événement pas encore synchronisé, clé absente,
- * message sans corps. REQ-UIX-40 : l'appelant affiche alors une notification générique,
+ * message sans corps. : l'appelant affiche alors une notification générique,
  * sans erreur bruyante — un échec de déchiffrement est un cas de fonctionnement normal
  * sur un client chiffré, pas une panne.
  */
@@ -39,7 +39,7 @@ export function apercuLocal(session: Session, roomId: string, eventId?: string):
     if (!evenement || !texte) return null;
 
     const auteur = evenement.getSender() ?? "";
-    // Le même annuaire que la conversation (REQ-MSG-10) : pas d'accès SDK ici.
+    // Le même annuaire que la conversation : pas d'accès SDK ici.
     const nom = mentionCandidates(session, roomId).find((c) => c.id === auteur)?.label ?? auteur;
     return { expediteur: nom, texte };
   } catch {
@@ -48,7 +48,7 @@ export function apercuLocal(session: Session, roomId: string, eventId?: string):
 }
 
 /**
- * REQ-PSH-05 — sur iOS, le Web Push n'existe **que** pour une PWA installée à l'écran
+ * sur iOS, le Web Push n'existe **que** pour une PWA installée à l'écran
  * d'accueil. Hors standalone, `Notification` n'existe même pas dans Safari : sans cette
  * distinction, l'écran des réglages annonce « ce navigateur ne gère pas les
  * notifications » à quelqu'un dont le navigateur les gère très bien — il lui manque un
@@ -140,7 +140,7 @@ export interface DiagnosticPush {
 
 const APP_ID = "org.tacita.web";
 
-/** REQ-PSH-03 — la clé publique VAPID, servie par la passerelle. */
+/** la clé publique VAPID, servie par la passerelle. */
 async function cleVapid(): Promise<string> {
   const reponse = await fetch(PUSH_CONFIG_URL);
   if (!reponse.ok) throw new Error("passerelle push indisponible");
@@ -165,7 +165,7 @@ function octetsDeBase64Url(valeur: string): Uint8Array {
  * spinner éternel, même quand il dit non.
  *
  * L'enregistrement est retenté ici, à la demande : si celui du démarrage a échoué
- * (REQ-UI-01), c'est le moment où quelqu'un demande explicitement des notifications qui
+ * c'est le moment où quelqu'un demande explicitement des notifications qui
  * mérite une seconde chance. Hors production on ne l'enregistre pas — même règle que
  * `app/register-sw.tsx`, et pour la même raison.
  */
@@ -209,7 +209,7 @@ function memeCleVapid(abonnement: PushSubscription, cle: Uint8Array): boolean {
 }
 
 /**
- * REQ-UI-18 — met la chaîne en état, et **rend ce qu'elle vaut vraiment**.
+ * met la chaîne en état, et **rend ce qu'elle vaut vraiment**.
  *
  * Idempotente, sans effet de bord visible, appelable à chaque ouverture de l'app : c'est
  * elle qui répare toute seule les trois pannes qu'on ne peut pas empêcher — la
@@ -219,7 +219,7 @@ function memeCleVapid(abonnement: PushSubscription, cle: Uint8Array): boolean {
  * {@link demanderEtBrancher}, qui a le geste de l'utilisateur pour elle.
  *
  * Le pusher n'est réécrit que s'il manque. Sa présence est relue après écriture : une
- * promesse résolue ne prouve que l'acceptation du POST, et REQ-PSH-01 fait de Synapse
+ * promesse résolue ne prouve que l'acceptation du POST, et fait de Synapse
  * l'appelant de la passerelle — un pusher absent du compte, c'est une chaîne coupée à
  * l'endroit précis où personne ne regarde.
  */
@@ -265,7 +265,7 @@ export async function brancherPush(session: Session): Promise<DiagnosticPush> {
       keys?: { p256dh?: string; auth?: string };
     };
     // Sans ces deux clés, la passerelle ne peut chiffrer aucun push et rejette le pusher
-    // (REQ-PSH-01) : l'enregistrer serait enregistrer une panne.
+    // l'enregistrer serait enregistrer une panne.
     if (!keys?.p256dh || !keys.auth) return { ...echec(), abonnement: false };
 
     const deja = pushers.some((pusher) => pusher.pushkey === endpoint && pusher.app_id === APP_ID);
@@ -280,10 +280,10 @@ export async function brancherPush(session: Session): Promise<DiagnosticPush> {
       lang: "fr",
       // La spec Matrix laisse `data` libre ; le type du SDK ne connaît que `url`, `format`
       // et `brand`. Les clés de la subscription y sont indispensables — c'est là que la
-      // passerelle les relit (spec 03), et sans elles aucun push ne peut être chiffré.
+      // passerelle les relit, et sans elles aucun push ne peut être chiffré.
       data: {
         url: PUSH_NOTIFY_URL,
-        // REQ-PSH-02 — le format que la passerelle relaie : jamais de contenu, seulement
+        // le format que la passerelle relaie : jamais de contenu, seulement
         // de quoi réveiller ce navigateur.
         format: "event_id_only",
         p256dh: keys.p256dh,
@@ -309,7 +309,7 @@ export async function brancherPush(session: Session): Promise<DiagnosticPush> {
 }
 
 /**
- * REQ-UI-18 — l'abonnement complet, **depuis un geste de l'utilisateur**.
+ * l'abonnement complet, **depuis un geste de l'utilisateur**.
  *
  * `Notification.requestPermission()` n'a d'effet que dans un gestionnaire d'événement :
  * appelée ailleurs, elle rend `denied` sur mobile sans rien afficher. Tous les appelants

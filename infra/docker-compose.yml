@@ -8,11 +8,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: synapse
-      # REQ-INF-01 — Synapse refuse de démarrer sans locale C.
+      # Synapse refuse de démarrer sans locale C.
       POSTGRES_INITDB_ARGS: "--lc-collate=C --lc-ctype=C --encoding=UTF8"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # REQ-INF-15 — crée la base dédiée du service de liens (spec 12) à la première
+      # crée la base dédiée du service de liens à la première
       # initialisation du volume. Sur une pile existante, voir le script.
       - ./postgres/10-invite-tokens.sh:/docker-entrypoint-initdb.d/10-invite-tokens.sh:ro
     healthcheck:
@@ -29,7 +29,7 @@ services:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY}
       # KMS mono-clé intégré : requis par MinIO pour honorer `mc encrypt set sse-s3`
-      # (REQ-INF-08). En prod avec un vrai S3 (AWS...), SSE-S3 est natif, pas de KMS à gérer.
+      # En prod avec un vrai S3 (AWS...), SSE-S3 est natif, pas de KMS à gérer.
       MINIO_KMS_SECRET_KEY: ${MINIO_KMS_SECRET_KEY}
     volumes:
       - minio-data:/data
@@ -39,8 +39,8 @@ services:
       timeout: 5s
       retries: 10
 
-  # REQ-INF-08 — crée le bucket et active SSE-S3 (défense en profondeur uniquement,
-  # voir infra/LIMITES.md : l'opérateur du bucket détient ces clés).
+  # crée le bucket et active SSE-S3 (défense en profondeur uniquement,
+  # l'opérateur du bucket détient ces clés).
   minio-init:
     image: minio/mc@sha256:95b5f3f7969a5c5a9f3a700ba72d5c84172819e13385aaf916e237cf111ab868 # RELEASE.2025-08-13
     depends_on:
@@ -84,12 +84,12 @@ services:
       - ./synapse/modules:/conf/modules:ro
       - synapse-data:/data
 
-  # REQ-INF-14 — la spec 03 livre le service, la spec 01 le provisionne : sans ça, la
+  # `push-gateway` livre le service le provisionne : sans ça, la
   # passerelle est terminée et injoignable. Synapse la contacte par son nom sur le
   # réseau du compose ; l'URL à enregistrer côté client est dans README.md.
   #
   # Aucun `ports:` volontairement. `/_matrix/push/v1/notify` n'a pas d'authentification
-  # (spec 03 : la subscription complète arrive dans le payload de Synapse) — publié sur
+  # (`push-gateway` : la subscription complète arrive dans le payload de Synapse) — publié sur
   # l'hôte, il ferait de la passerelle un relais de push ouvert. Seule la clé publique
   # VAPID sort, par le proxy.
   push-gateway:
@@ -102,8 +102,8 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
 
-  # REQ-INF-15 — le service de liens d'invitation (spec 12). Même jurisprudence que la
-  # passerelle push : la spec 12 livre le code, la spec 01 le provisionne.
+  # le service de liens d'invitation. Même jurisprudence que la
+  # passerelle push : `invite-tokens` livre le code le provisionne.
   #
   # **Aucun secret d'administration Synapse ici**, et un test l'asserte : le service ne
   # détient aucun pouvoir Matrix. Il valide le jeton de son appelant auprès de Synapse et
@@ -129,8 +129,8 @@ services:
       # sont internes, ils n'ont rien à gagner à ressortir.
       HOMESERVER_URL: http://synapse:8008
 
-  # REQ-INF-10 — seul point d'entrée TLS ; routes /_matrix, /livekit/jwt, /livekit/sfu
-  # (backends /livekit/* provisionnés par la spec 02, absents tant qu'elle n'est pas déployée).
+  # seul point d'entrée TLS ; routes /_matrix, /livekit/jwt, /livekit/sfu
+  # (backends /livekit/* provisionnés par `infra/rtc`, absents tant qu'elle n'est pas déployée).
   proxy:
     image: nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 # nginx:1.27-alpine
     restart: unless-stopped
@@ -141,10 +141,10 @@ services:
       - "443:443"
     volumes:
       - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
-      # REQ-RTC-05 — pile sans SFU : le `.well-known` n'annonce aucun focus. L'overlay
+      # pile sans SFU : le `.well-known` n'annonce aucun focus. L'overlay
       # RTC monte son propre fichier à ce chemin, compose fusionne par cible de montage.
       - ./proxy/well-known.conf:/etc/nginx/well-known.conf:ro
-      # REQ-RTC-08 — même mécanique : pile sans SFU, aucun Element Call servi. Le
+      # même mécanique : pile sans SFU, aucun Element Call servi. Le
       # fichier est vide de directives ; l'overlay RTC monte le bloc `server` à sa place.
       - ./proxy/call.conf:/etc/nginx/call.conf:ro
       - ./proxy/certs:/etc/nginx/certs:ro

@@ -1,7 +1,7 @@
 /**
  * Le point d'entrée du worker de recherche, côté shard.
  *
- * Il ne fait que réexporter celui du paquet (spec 09), et donne au shard **une seule
+ * Il ne fait que réexporter celui du paquet, et donne au shard **une seule
  * forme** de construction de worker : `new Worker(new URL("../../lib/search-worker.ts",
  * import.meta.url))`.
  *

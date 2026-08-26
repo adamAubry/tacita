@@ -14,7 +14,7 @@ export interface Bouton {
 }
 
 /**
- * REQ-UIX-05 — Buttons list (composant 7 du wireframe) : une liste d'actions.
+ * Buttons list (composant 7 du wireframe) : une liste d'actions.
  *
  * `ListItem` d'Astryx **est** déjà la ligne cliquable, avec son libellé, sa description,
  * son contenu de tête et sa sémantique clavier. DESIGN.md interdit de recoder une

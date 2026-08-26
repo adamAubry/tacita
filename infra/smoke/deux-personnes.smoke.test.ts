@@ -19,7 +19,7 @@ import {
  *
  * Ce que la cible existante ne couvre pas : elle valide un utilisateur qui se parle
  * à lui-même — même appareil, mêmes clés. Le partage de clés Megolm entre appareils
- * distincts n'y est jamais exercé, alors que REQ-COR-07 le restreint aux appareils
+ * distincts n'y est jamais exercé, alors que le restreint aux appareils
  * signés par leur propriétaire (D-08, mode `OnlySignedDevicesIsolationMode`).
  *
  * Si ce fichier échoue, la question n'est pas « le test est-il bon » mais « deux
@@ -34,7 +34,7 @@ let bob: { compte: Account; session: Session };
 /**
  * `signe: false` saute `setupRecoveryKey()` et rend donc un appareil **non signé**
  * par son propriétaire. C'est un état que le parcours produit n'autorise pas
- * (REQ-COR-06 rend le bootstrap obligatoire à l'inscription) — il ne sert qu'à
+ * (rend le bootstrap obligatoire à l'inscription) — il ne sert qu'à
  * fabriquer l'intrus du test négatif.
  */
 async function ouvrir(
@@ -47,7 +47,7 @@ async function ouvrir(
   const session = await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: disque });
   if (!session) throw new Error(`session ${prefixe} non ouverte`);
 
-  // REQ-COR-06 — le parcours d'inscription impose la clé de récupération, qui amorce
+  // le parcours d'inscription impose la clé de récupération, qui amorce
   // le cross-signing. C'est elle qui rend l'appareil signé, donc digne des clés
   // Megolm (D-08) : le produit n'a besoin de rien d'autre pour que deux personnes
   // se parlent.
@@ -60,11 +60,11 @@ beforeAll(async () => {
   bob = await ouvrir("bob");
 });
 
-describe("REQ-COR-07 — un appareil non signé reste illisible (D-08)", () => {
+describe("un appareil non signé reste illisible (D-08)", () => {
   it("le message d'un appareil que son propriétaire n'a pas signé arrive chiffré et le reste", async () => {
     // L'intrus est le **destinataire** : Dave n'a pas amorcé son cross-signing, son
     // appareil ne porte donc aucune signature de son propriétaire. C'est la forme
-    // qu'a un appareil injecté côté serveur — celui contre lequel REQ-INF-11 protège,
+    // qu'a un appareil injecté côté serveur — celui contre lequel protège,
     // et la protection que le TOFU par appareil aurait cédée.
     //
     // Carol, elle, est signée : sous D-08 un expéditeur sans identité cross-signing
@@ -115,7 +115,7 @@ describe("Fumée — deux personnes distinctes dans un salon chiffré", () => {
       ATTENTE,
     );
 
-    // REQ-MSG-02 — le salon doit être chiffré pour les deux, pas seulement pour
+    // le salon doit être chiffré pour les deux, pas seulement pour
     // celle qui l'a créé.
     await vi.waitFor(
       async () => expect(await bob.session.isEncrypted(room_id)).toBe(true),
@@ -140,7 +140,7 @@ describe("Fumée — deux personnes distinctes dans un salon chiffré", () => {
     await sendText(alice.session, room_id, texte);
 
     // Le point qui décide de tout : Bob a-t-il reçu la clé de session ?
-    // REQ-COR-07 la réserve aux appareils signés par leur propriétaire.
+    // la réserve aux appareils signés par leur propriétaire.
     const reçu = await vi.waitFor(() => {
       const trouvé = messages(bob.session, room_id).find(
         (event) => event.getContent().body === texte,

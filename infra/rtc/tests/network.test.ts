@@ -13,7 +13,7 @@ const wellKnownRtc = read("../well-known.conf");
 const composeBase = parse(read("../../docker-compose.yml"));
 const composeRtc = parse(read("../docker-compose.yml"));
 
-describe("REQ-RTC-04 — plage UDP ouverte sur les deux couches", () => {
+describe("plage UDP ouverte sur les deux couches", () => {
   const start = livekit.rtc.port_range_start;
   const end = livekit.rtc.port_range_end;
 
@@ -32,7 +32,7 @@ describe("REQ-RTC-04 — plage UDP ouverte sur les deux couches", () => {
   });
 });
 
-describe("REQ-RTC-05 — les rtc_foci sont annoncés quand le RTC est déployé, jamais avant", () => {
+describe("les rtc_foci sont annoncés quand le RTC est déployé, jamais avant", () => {
   // Le corps JSON contient des accolades : on découpe sur le `return`, pas sur
   // la fin du bloc nginx. `$host` est interpolé par nginx à la requête ; neutralisé
   // pour le parse.

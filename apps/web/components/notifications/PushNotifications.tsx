@@ -18,14 +18,14 @@ import { IosPushEducation } from "../onboarding/IosPushEducation";
 import { useSession } from "../onboarding/SessionProvider";
 
 /**
- * REQ-UI-18 — la chaîne push côté fenêtre. Elle ne rend presque jamais rien.
+ * la chaîne push côté fenêtre. Elle ne rend presque jamais rien.
  *
  * Trois rôles, tous invisibles la plupart du temps :
  *
  * 1. **répondre au service worker.** Réveillé par un push, il ne peut pas déchiffrer :
  *    les clés Megolm sont dans le store crypto de cette fenêtre. Il demande donc
  *    l'aperçu ici, et nous le rendons — rien n'est conservé de part ni d'autre
- *    (REQ-UIX-40) ;
+ *
  * 2. **réparer l'abonnement à chaque ouverture.** Une `PushSubscription` tourne sans
  *    prévenir, un pusher disparaît du compte au premier 410, une reconnexion donne un
  *    `device_id` neuf : rien de tout cela n'est une panne, et rien de tout cela ne se
@@ -38,7 +38,7 @@ import { useSession } from "../onboarding/SessionProvider";
  *    reposée à chaque `/sync` n'est plus une question, c'est un obstacle.
  */
 interface PushNotificationsProps {
-  /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
+  /** surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }
 
@@ -127,7 +127,7 @@ export function PushNotifications({ indexedDB }: PushNotificationsProps = {}) {
 
   return (
     <>
-      {/* REQ-PSH-05 — sur iPhone hors écran d'accueil, aucun abonnement n'est possible :
+      {/* sur iPhone hors écran d'accueil, aucun abonnement n'est possible :
           l'éducation (M-B) passe avant la demande de permission, qui échouerait. */}
       <IosPushEducation declenche={declenche} indexedDB={indexedDB} />
 

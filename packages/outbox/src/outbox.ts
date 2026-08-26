@@ -6,15 +6,15 @@ import { openOutboxStore } from "./store";
 
 /**
  * ponytail: seul `m.room.message` est mis en file — c'est le seul type qui se
- * compose hors ligne (texte spec 05, média spec 08 produit le même type). Ajouter
+ * compose hors ligne (texte `@tacita/messaging`, média `@tacita/media-pipeline` produit le même type). Ajouter
  * un champ `eventType` à l'entrée le jour où un autre type doit être différé.
  */
 const EVENT_TYPE = "m.room.message";
 
 /**
- * REQ-OBX-09 — code d'échec propre au refus d'envoyer en clair. Il n'appartient pas
+ * code d'échec propre au refus d'envoyer en clair. Il n'appartient pas
  * à l'espace de noms Matrix : c'est nous qui refusons, pas le serveur. Le shard UI
- * (spec 11) doit lui donner un libellé qui dise pourquoi, sinon l'utilisateur voit
+ * doit lui donner un libellé qui dise pourquoi, sinon l'utilisateur voit
  * « échec » et réessaie en boucle.
  */
 export const NOT_ENCRYPTED = "TACITA_NOT_ENCRYPTED";
@@ -23,7 +23,7 @@ export const BASE_BACKOFF_MS = 1_000;
 export const MAX_BACKOFF_MS = 60_000;
 
 /**
- * REQ-OBX-04 — au bout de combien d'échecs **sans statut HTTP** une entrée cesse de
+ * au bout de combien d'échecs **sans statut HTTP** une entrée cesse de
  * réessayer, quand le serveur est joignable.
  *
  * Une erreur sans statut est indiscernable d'une panne réseau, et une panne réseau se
@@ -46,9 +46,9 @@ export interface OutboxOptions {
   /** Injectable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
   /**
-   * REQ-OBX-10 — l'étape de téléversement, **injectée** : ce paquet ne connaît ni les
-   * médias, ni le chiffrement, ni l'API media de Matrix. Le pipeline (spec 08,
-   * REQ-MED-17) fournit une étape idempotente, la file décide quand la rejouer.
+   * l'étape de téléversement, **injectée** : ce paquet ne connaît ni les
+   * médias, ni le chiffrement, ni l'API media de Matrix. Le pipeline (
+   *) fournit une étape idempotente, la file décide quand la rejouer.
    *
    * Absente ⇒ une entrée qui attend un téléversement ne peut pas partir, et le dit.
    */
@@ -60,14 +60,14 @@ export interface Outbox {
     roomId: string,
     content: Record<string, unknown>,
     txnId?: string,
-    /** REQ-OBX-10 — les blobs chiffrés à téléverser avant l'envoi de l'événement. */
+    /** les blobs chiffrés à téléverser avant l'envoi de l'événement. */
     televersements?: TeleversementEnAttente[],
   ): Promise<OutboxEntry>;
-  /** REQ-OBX-04 — renvoi manuel après échec définitif. */
+  /** renvoi manuel après échec définitif. */
   retry(txnId: string): Promise<void>;
-  /** REQ-OBX-04 — abandon d'une entrée. */
+  /** abandon d'une entrée. */
   remove(txnId: string): Promise<void>;
-  /** REQ-OBX-05 — entrées du salon en ordre FIFO, à fusionner avec la timeline. */
+  /** entrées du salon en ordre FIFO, à fusionner avec la timeline. */
   pending(roomId: string): OutboxEntry[];
   subscribe(listener: () => void): () => void;
   flush(): Promise<void>;
@@ -99,7 +99,7 @@ function retryAfterMs(error: unknown): number | undefined {
 const RETRYABLE = new Set(["M_LIMIT_EXCEEDED", "M_UNKNOWN_TOKEN"]);
 
 /**
- * REQ-OBX-04 — un 4xx définitif ne changera pas d'avis : salon inconnu, droits
+ * un 4xx définitif ne changera pas d'avis : salon inconnu, droits
  * refusés, contenu rejeté. Réessayer en boucle ne ferait que brûler la batterie.
  * Tout le reste (réseau, 5xx, et les codes ci-dessus) reste réessayable.
  */
@@ -108,7 +108,7 @@ function isPermanent(error: unknown): boolean {
   return status !== undefined && status >= 400 && status < 500 && !RETRYABLE.has(errcodeOf(error));
 }
 
-/** REQ-OBX-07 — exponentiel, mais le serveur a le dernier mot s'il donne un délai. */
+/** exponentiel, mais le serveur a le dernier mot s'il donne un délai. */
 export function backoffMs(attempts: number, error: unknown): number {
   return retryAfterMs(error) ?? Math.min(BASE_BACKOFF_MS * 2 ** attempts, MAX_BACKOFF_MS);
 }
@@ -122,7 +122,7 @@ export async function createOutbox(
   const entries = new Map<string, OutboxEntry>();
   const listeners = new Set<() => void>();
 
-  // REQ-OBX-01 — réhydratation : la file survit au rechargement de page, ce que le
+  // réhydratation : la file survit au rechargement de page, ce que le
   // local echo du SDK ne fait pas.
   for (const entry of await store.all()) entries.set(entry.txnId, entry);
 
@@ -164,7 +164,7 @@ export async function createOutbox(
 
   /**
    * Tête de file de chaque salon : les seules entrées qui peuvent partir
-   * (FIFO par salon, REQ-OBX-02). C'est aussi elle qui fixe le prochain réveil —
+   * (FIFO par salon). C'est aussi elle qui fixe le prochain réveil —
    * viser une entrée coincée derrière ferait tourner le timer à vide.
    */
   const heads = (): OutboxEntry[] => {
@@ -187,7 +187,7 @@ export async function createOutbox(
   const attempt = async (entree: OutboxEntry): Promise<boolean> => {
     // Réassignable : les téléversements réussis avancent l'entrée avant l'envoi.
     let entry = entree;
-    // REQ-OBX-09 — rien ne part vers un salon non chiffré. Le contrôle est ici et
+    // rien ne part vers un salon non chiffré. Le contrôle est ici et
     // non à l'enqueue : la file est différée par nature, l'état du salon au moment
     // de la mise en file n'est pas celui de l'envoi.
     //
@@ -208,10 +208,10 @@ export async function createOutbox(
     mark({ ...entry, status: "sending" });
     try {
       /*
-       * REQ-OBX-10 — **les téléversements d'abord, un par un, et chacun persisté.**
+       * **les téléversements d'abord, un par un, et chacun persisté.**
        *
        * Un envoi média se fait en deux temps, et le premier n'appartenait à personne : la
-       * spec 08 met la file hors scope, celle-ci ne parlait que d'événements, et un
+       * `@tacita/media-pipeline` met la file hors scope, celle-ci ne parlait que d'événements, et un
        * téléversement de 200 Mo qui échouait à 90 % n'était réessayé par personne.
        *
        * Chaque réussite sort de la liste **et l'entrée est réécrite** : une reprise — après
@@ -280,7 +280,7 @@ export async function createOutbox(
 
   const pass = async (): Promise<void> => {
     const now = Date.now();
-    // REQ-OBX-02 — FIFO par salon : dès qu'une entrée d'un salon ne part pas, les
+    // FIFO par salon : dès qu'une entrée d'un salon ne part pas, les
     // suivantes de ce salon attendent, sinon le message 2 doublerait le message 1.
     const blocked = new Set<string>();
     for (const entry of [...entries.values()].sort(byQueuedAt)) {
@@ -334,7 +334,7 @@ export async function createOutbox(
   };
   session.client.on(ClientEvent.Sync, onSync);
 
-  // REQ-OBX-08 — la file fait partie de ce qu'une déconnexion efface.
+  // la file fait partie de ce qu'une déconnexion efface.
   session.registerWipe("outbox", async () => {
     entries.clear();
     await store.clear();
@@ -356,7 +356,7 @@ export async function createOutbox(
         queuedAt: now,
         nextAttemptAt: now,
       };
-      // REQ-OBX-01 — persisté avant toute tentative réseau, jamais l'inverse.
+      // persisté avant toute tentative réseau, jamais l'inverse.
       await save(entry);
       void flush();
       return entry;
@@ -366,7 +366,7 @@ export async function createOutbox(
       const entry = entries.get(txnId);
       if (!entry) return;
       // Renvoi demandé par l'utilisateur : le backoff repart de zéro, mais le txnId
-      // ne bouge pas (REQ-OBX-03).
+      // ne bouge pas.
       await save({ ...entry, status: "queued", attempts: 0, nextAttemptAt: Date.now() });
       await flush();
     },
@@ -398,7 +398,7 @@ export async function createOutbox(
 
 /**
  * Écrit une URL au bout d'un chemin dans le contenu. Le chemin existe : c'est le pipeline
- * qui l'a créé en même temps que le téléversement qui l'accompagne (REQ-MED-17).
+ * qui l'a créé en même temps que le téléversement qui l'accompagne.
  */
 function poser(contenu: Record<string, unknown>, chemin: string[], url: string): void {
   let noeud: Record<string, unknown> = contenu;

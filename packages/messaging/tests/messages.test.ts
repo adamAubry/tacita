@@ -38,7 +38,7 @@ const codeOf = (...names: string[]) =>
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^[ \t]*\/\/.*$/gm, "");
 
-describe("REQ-MSG-01 — envoi et réception de messages texte chiffrés", () => {
+describe("envoi et réception de messages texte chiffrés", () => {
   it("envoie un m.room.message via la Session", async () => {
     await sendText(ctx.session, ROOM, "salut");
     const [roomId, type, content] = lastSend();
@@ -67,7 +67,7 @@ describe("REQ-MSG-01 — envoi et réception de messages texte chiffrés", () =>
   });
 });
 
-describe("REQ-MSG-03 — déduplication par txnId, mécanisme natif du SDK", () => {
+describe("déduplication par txnId, mécanisme natif du SDK", () => {
   it("rejouer la même requête avec le même txnId produit le même event_id", async () => {
     const first = await sendText(ctx.session, ROOM, "salut", { txnId: "txn-1" });
     const second = await sendText(ctx.session, ROOM, "salut", { txnId: "txn-1" });
@@ -86,7 +86,7 @@ describe("REQ-MSG-03 — déduplication par txnId, mécanisme natif du SDK", () 
   });
 });
 
-describe("REQ-MSG-04 — réponse via m.in_reply_to", () => {
+describe("réponse via m.in_reply_to", () => {
   it("attache la relation au message cité", async () => {
     await reply(ctx.session, ROOM, "$cible", "d'accord");
     expect(lastSend()[2]).toMatchObject({
@@ -97,7 +97,7 @@ describe("REQ-MSG-04 — réponse via m.in_reply_to", () => {
   });
 });
 
-describe("REQ-MSG-04 — la réponse, dans les deux sens", () => {
+describe("la réponse, dans les deux sens", () => {
   it("écrit la relation `m.in_reply_to`", async () => {
     await reply(ctx.session, ROOM, "$cible", "oui");
     expect(lastSend()[2]).toMatchObject({
@@ -109,13 +109,13 @@ describe("REQ-MSG-04 — la réponse, dans les deux sens", () => {
   /**
    * Le côté lecture manquait, et c'est ce qui empêchait le shard de montrer à quel
    * message une réponse répond : le `body` porte bien une citation en `> `, mais
-   * `messageText` la retire (REQ-MSG-07), et elle ne dit ni qui ni quoi quand le message
+   * `messageText` la retire, et elle ne dit ni qui ni quoi quand le message
    * cité est une photo.
    */
   it("relit la cible depuis l'événement comme depuis un contenu en file", () => {
     const evenement = fakeEvent("$reponse", replyRelation("$cible"));
     expect(replyTo(evenement as never)).toBe("$cible");
-    // La file d'envoi (spec 07) tient un contenu, pas encore un événement : l'affichage
+    // La file d'envoi tient un contenu, pas encore un événement : l'affichage
     // optimiste doit citer aussi bien qu'un message revenu de /sync.
     expect(replyToOf(replyRelation("$cible"))).toBe("$cible");
   });
@@ -129,7 +129,7 @@ describe("REQ-MSG-04 — la réponse, dans les deux sens", () => {
   });
 });
 
-describe("REQ-MSG-05 — réactions emoji en clair, métadonnée exposée", () => {
+describe("réactions emoji en clair, métadonnée exposée", () => {
   it("envoie une annotation m.reaction", async () => {
     await react(ctx.session, ROOM, "$cible", "👍");
     const [, type, content] = lastSend();
@@ -223,7 +223,7 @@ describe("REQ-MSG-05 — réactions emoji en clair, métadonnée exposée", () =
   });
 });
 
-describe("REQ-MSG-06 — modification, suppression, et droits par message", () => {
+describe("modification, suppression, et droits par message", () => {
   it("l'édition passe par m.replace avec m.new_content", async () => {
     await edit(ctx.session, ROOM, "$cible", "corrigé");
     expect(lastSend()[2]).toMatchObject({
@@ -261,7 +261,7 @@ describe("REQ-MSG-06 — modification, suppression, et droits par message", () =
   });
 });
 
-describe("REQ-MSG-07 — extraction du texte pour copie", () => {
+describe("extraction du texte pour copie", () => {
   it("rend le corps du message", () => {
     expect(messageText(fakeEvent("$a", { body: "salut" }) as never)).toBe("salut");
   });
@@ -284,7 +284,7 @@ describe("REQ-MSG-07 — extraction du texte pour copie", () => {
   });
 });
 
-describe("REQ-MSG-12 — ordre repris de OrderedTimeline, aucun tri propre", () => {
+describe("ordre repris de OrderedTimeline, aucun tri propre", () => {
   it("conserve l'ordre de la timeline malgré des timestamps décroissants", () => {
     ctx.setTimeline([
       fakeEvent("$a", { body: "un" }),
@@ -301,7 +301,7 @@ describe("REQ-MSG-12 — ordre repris de OrderedTimeline, aucun tri propre", () 
   });
 });
 
-describe("REQ-MSG-06 / REQ-MSG-12 — déchiffrement et suppression redemandent un rendu", () => {
+describe("déchiffrement et suppression redemandent un rendu", () => {
   it("s'abonne aussi à MatrixEventEvent.Decrypted, et se désabonne des deux", () => {
     // Un message entre dans la timeline **chiffré** ; son texte n'existe qu'au
     // `Decrypted` qui suit, parfois bien plus tard — la clé Megolm arrive par to-device.
@@ -326,7 +326,7 @@ describe("REQ-MSG-06 / REQ-MSG-12 — déchiffrement et suppression redemandent 
   });
 });
 
-describe("REQ-MSG-06 — une modification remplace, elle ne s'ajoute pas à la timeline", () => {
+describe("une modification remplace, elle ne s'ajoute pas à la timeline", () => {
   it("l'événement `m.replace` n'est pas rendu à côté de l'original", () => {
     // Un `m.replace` est lui aussi un `m.room.message`. Le SDK réécrit le contenu de
     // l'original sur place : le garder tous les deux affichait **deux fois** le même

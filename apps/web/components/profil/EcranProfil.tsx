@@ -26,9 +26,9 @@ import { ProfilMoi } from "./ProfilMoi";
 /**
  * Le câblage des deux layouts Profile.
  *
- * La photo de profil et la bannière (REQ-UI-20, REQ-UIX-41) passent par le **même**
+ * La photo de profil et la bannière passent par le **même**
  * `onPhoto` : deux images publiques, une seule fonction de téléversement, donc un seul
- * site d'appel du chemin public — la condition de REQ-MED-11, vérifiée par un test
+ * site d'appel du chemin public — la condition de, vérifiée par un test
  * structurel du paquet média. `userId` absent = son propre profil.
  *
  * Les composants rendus ne connaissent ni `Session` ni les paquets : ils reçoivent un
@@ -81,12 +81,12 @@ export function EcranProfil({ userId }: { userId?: string }) {
           await updateProfile(session, changements);
           setRevision((rang) => rang + 1);
         }}
-        // REQ-MED-11 — **l'unique site d'appel du chemin public**, dans tout le dépôt.
+        // **l'unique site d'appel du chemin public**, dans tout le dépôt.
         // Un test structurel du paquet média balaie les sources et échoue s'il en
         // apparaît un second : c'est ce qui rend la phrase « tout ce qui sort du
         // pipeline est chiffré, sauf l'unique chemin nommé public » vérifiable.
         onPhoto={(fichier) => uploadPublicProfileImage(session, env, fichier)}
-        // REQ-UIX-06 — la déconnexion est **branchée ici et nulle part ailleurs** : c'est
+        // la déconnexion est **branchée ici et nulle part ailleurs** : c'est
         // le seul écran qui parle de « moi », et jusqu'à aujourd'hui `LogoutButton`
         // n'était rendu par aucun composant — testé, mais inatteignable.
         deconnexion={<LogoutButton session={session} />}
@@ -106,7 +106,7 @@ export function EcranProfil({ userId }: { userId?: string }) {
         void contacts.inviter(cible).then((roomId) => router.push(routeConversation(roomId)));
       }}
       onAppel={() => {
-        // REQ-UIX-39 — **le même chemin que le header 1:1**, littéralement le même
+        // **le même chemin que le header 1:1**, littéralement le même
         // constructeur de route. Passer par la conversation pour y cliquer une seconde
         // fois ferait deux gestes là où le bouton en promet un.
         if (dm) router.push(routeAppel(dm.roomId));

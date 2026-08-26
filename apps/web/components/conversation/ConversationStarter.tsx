@@ -15,7 +15,7 @@ interface ConversationStarterProps {
 }
 
 /**
- * REQ-UIX-13 — Conversation starter (composant 10) : le premier élément de la timeline.
+ * Conversation starter (composant 10) : le premier élément de la timeline.
  *
  * **Aligné à gauche comme les messages**, pas centré : c'est le début de la conversation,
  * pas un en-tête d'écran. L'avatar y est à sa plus grande occurrence de l'app — c'est le

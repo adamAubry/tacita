@@ -31,14 +31,14 @@ interface ReceptionLienProps {
 }
 
 /**
- * REQ-INV-06 / REQ-INV-13 — l'écran qui consomme un lien d'invitation (E-13, voie A).
+ * l'écran qui consomme un lien d'invitation (E-13, voie A).
  *
  * Il fait **une** chose et la fait sans rien demander : on a cliqué sur un lien, on a
  * déjà exprimé son intention. Un écran « voulez-vous vraiment ? » ajouterait un geste à
  * une décision déjà prise.
  *
  * Deux chemins, selon ce que le service rend — et le service ne fait ni l'un ni l'autre,
- * il ne fait que résoudre (ratification n°1 de la spec 12) :
+ * il ne fait que résoudre (ratification n°1 du service de liens) :
  *
  * - `friend` → invitation de DM native vers l'émetteur, le chemin de D-09 ;
  * - `group` → **`knock`** sur le salon. C'est tout ce qu'un non-membre peut faire : il ne
@@ -46,7 +46,7 @@ interface ReceptionLienProps {
  *   membre confirmera depuis les informations du groupe.
  *
  * L'échec est **indifférencié**, et c'est voulu : le service rend la même réponse pour un
- * token inconnu, expiré, révoqué ou bloqué (REQ-INV-08). Deviner laquelle pour l'afficher
+ * token inconnu, expiré, révoqué ou bloqué. Deviner laquelle pour l'afficher
  * reconstruirait l'énumérabilité qu'il refuse. « Ce lien n'est plus valide » est tout ce
  * qu'on peut honnêtement dire.
  */
@@ -68,8 +68,8 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
         if (annule) return;
 
         if (resolu.kind === "friend") {
-          // REQ-INV-13 — idempotent : `inviter` rend le DM existant s'il y en a un, sinon
-          // le crée. Rien à distinguer ici, le paquet s'en charge (REQ-MSG-15).
+          // idempotent : `inviter` rend le DM existant s'il y en a un, sinon
+          // le crée. Rien à distinguer ici, le paquet s'en charge.
           const roomId = await contactsDeLaSession(session).inviter(resolu.issuer);
           if (!annule) router.replace(routeConversation(roomId));
           return;
@@ -82,7 +82,7 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
           return;
         }
 
-        // REQ-INV-13 — déjà membre : rien à demander, on ouvre. Le cas se produit quand
+        // déjà membre : rien à demander, on ouvre. Le cas se produit quand
         // on rouvre un lien qu'on a déjà utilisé.
         const salon = session.client.getRoom(resolu.roomId);
         if (salon?.getMyMembership() === "join") {

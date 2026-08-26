@@ -42,7 +42,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("REQ-SRC-01 — indexation et requêtes déportées dans le worker", () => {
+describe("indexation et requêtes déportées dans le worker", () => {
   it("index et search passent par des messages, pas par un appel direct", async () => {
     await search.index(doc("$e1", "rendez-vous au parc"));
 
@@ -61,7 +61,7 @@ describe("REQ-SRC-01 — indexation et requêtes déportées dans le worker", ()
     vi.useRealTimers();
     await vi.waitFor(async () => expect(await search.stats()).toMatchObject({ size: 2 }));
 
-    // REQ-SRC-09 — un seul message pour les deux événements de la rafale.
+    // un seul message pour les deux événements de la rafale.
     expect(worker.posted.filter((message) => message.method === "index")).toHaveLength(1);
   });
 
@@ -85,7 +85,7 @@ describe("REQ-SRC-01 — indexation et requêtes déportées dans le worker", ()
   });
 });
 
-describe("REQ-SRC-03 — aucune recherche n'émet d'appel réseau", () => {
+describe("aucune recherche n'émet d'appel réseau", () => {
   it("fetch et XMLHttpRequest ne sont pas touchés pendant une recherche", async () => {
     const fetchSpy = vi.fn();
     const xhrSpy = vi.fn();
@@ -108,7 +108,7 @@ describe("REQ-SRC-03 — aucune recherche n'émet d'appel réseau", () => {
   });
 });
 
-describe("REQ-SRC-11 — msgtype et mentions alimentés au déchiffrement", () => {
+describe("msgtype et mentions alimentés au déchiffrement", () => {
   const MIRA = "@mira:tacita.test";
 
   it("relit msgtype et m.mentions de l'événement, sans que l'appelant s'en occupe", async () => {
@@ -153,7 +153,7 @@ describe("REQ-SRC-11 — msgtype et mentions alimentés au déchiffrement", () =
   });
 });
 
-describe("REQ-SRC-06 — le périmètre couvert est exposé pour l'UI", () => {
+describe("le périmètre couvert est exposé pour l'UI", () => {
   it("stats donne de quoi dire « historique téléchargé », pas « tout l'historique »", async () => {
     await search.index([doc("$e1", "un", 1_000), doc("$e2", "deux", 9_000)]);
 
@@ -172,7 +172,7 @@ describe("REQ-SRC-06 — le périmètre couvert est exposé pour l'UI", () => {
   });
 });
 
-describe("REQ-SRC-10 — l'index suit le cycle de vie des messages", () => {
+describe("l'index suit le cycle de vie des messages", () => {
   it("une suppression retire le texte de l'index", async () => {
     ctx.emitDecrypted(matrixEvent("$e1", ROOM, "à supprimer"));
     await vi.waitFor(async () => expect((await search.stats()).size).toBe(1));
@@ -213,7 +213,7 @@ describe("REQ-SRC-10 — l'index suit le cycle de vie des messages", () => {
   });
 });
 
-describe("REQ-SRC-08 — wipe enregistré au registre de la Session", () => {
+describe("wipe enregistré au registre de la Session", () => {
   it("s'enregistre sous le nom search et vide l'index quand il est appelé", async () => {
     expect(ctx.session.registerWipe).toHaveBeenCalledWith("search", expect.any(Function));
 
@@ -243,7 +243,7 @@ describe("REQ-SRC-08 — wipe enregistré au registre de la Session", () => {
   });
 });
 
-describe("REQ-SRC-01 — l'index s'amorce sur ce que le client tient déjà", () => {
+describe("l'index s'amorce sur ce que le client tient déjà", () => {
   /**
    * L'écoute seule ne voit que les déchiffrements postérieurs au branchement. Sur une
    * session rouverte, l'historique est relu depuis IndexedDB et déchiffré avant qu'on

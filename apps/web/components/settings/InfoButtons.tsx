@@ -12,7 +12,7 @@ export interface BoutonInfo {
 }
 
 /**
- * REQ-UIX-33 — composant 14 du wireframe : les **Info buttons**.
+ * composant 14 du wireframe : les **Info buttons**.
  *
  * Taille navbar et libellé sous l'icône, quatre boutons équirépartis. Le `NavIcon` est
  * la primitive imposée par DESIGN.md pour ce motif — la même que la barre du bas, ce qui

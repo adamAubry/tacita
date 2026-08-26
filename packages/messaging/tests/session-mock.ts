@@ -36,7 +36,7 @@ export interface FakeReaction {
   key: string;
   sender?: string;
   redacted?: boolean;
-  /** Défaut : `$reaction-<rang>`. La bascule de REQ-MSG-05 redacte **par identifiant**. */
+  /** Défaut : `$reaction-<rang>`. La bascule de redacte **par identifiant**. */
   id?: string;
 }
 
@@ -45,30 +45,30 @@ export interface FakeRoomOptions {
   pinned?: string[];
   maySendEvent?: boolean;
   mayRedact?: boolean;
-  /** Réactions portées par `$cible`, pour la lecture agrégée de REQ-MSG-05. */
+  /** Réactions portées par `$cible`, pour la lecture agrégée de. */
   reactions?: FakeReaction[];
-  /** REQ-MSG-17 — l'état initial de `m.ignored_user_list`. */
+  /** l'état initial de `m.ignored_user_list`. */
   ignored?: string[];
-  /** REQ-MSG-18 — ce que `getProfileInfo` rend. */
+  /** ce que `getProfileInfo` rend. */
   profile?: { displayname?: string; avatar_url?: string } & Record<string, unknown>;
-  /** REQ-MSG-19 — ce que l'annuaire du homeserver rend. */
+  /** ce que l'annuaire du homeserver rend. */
   annuaire?: { user_id: string; display_name?: string; avatar_url?: string }[];
-  /** REQ-MSG-11 — niveau exigé par l'état du salon pour l'action `kick`. */
+  /** niveau exigé par l'état du salon pour l'action `kick`. */
   kickLevel?: number;
-  /** L'invitant, quand le salon est une invitation de DM (REQ-MSG-15). */
+  /** L'invitant, quand le salon est une invitation de DM. */
   inviter?: string;
-  /** REQ-MSG-20 — la règle d'accès dans l'état du salon. `undefined` = aucun événement. */
+  /** la règle d'accès dans l'état du salon. `undefined` = aucun événement. */
   joinRule?: string;
-  /** REQ-MSG-20 — ceux qui ont frappé et attendent : jamais dans les membres joints. */
+  /** ceux qui ont frappé et attendent : jamais dans les membres joints. */
   knockers?: ReturnType<typeof fakeMember>[];
-  /** REQ-UIX-36 — les push rules du compte, telles que `/sync` les rend. */
+  /** les push rules du compte, telles que `/sync` les rend. */
   pushRules?: IPushRules;
 }
 
 /**
- * Session mockée (spec 05 — « suite Vitest avec Session mockée »). `sendEvent`
+ * Session mockée (« suite Vitest avec Session mockée »). `sendEvent`
  * simule la déduplication par `txnId` du serveur : même transaction, même
- * `event_id` (REQ-MSG-03).
+ * `event_id`.
  */
 export function fakeSession(options: FakeRoomOptions = {}) {
   const {
@@ -92,11 +92,11 @@ export function fakeSession(options: FakeRoomOptions = {}) {
   const room = {
     roomId: "!salon:tacita.test",
     getJoinedMembers: () => members,
-    // REQ-MSG-20 — l'appartenance `knock` est une catégorie à part : quelqu'un qui a
+    // l'appartenance `knock` est une catégorie à part : quelqu'un qui a
     // frappé n'est pas joint, et un mock qui le rendrait dans `getJoinedMembers`
     // laisserait passer une lecture fausse.
     getMembersWithMembership: (membership: string) => (membership === "knock" ? knockers : []),
-    // REQ-MSG-15 — l'invitant d'une invitation de DM : `acceptInvitation` le lit avant
+    // l'invitant d'une invitation de DM : `acceptInvitation` le lit avant
     // de rejoindre, pour inscrire le salon dans `m.direct`.
     getDMInviter: () => options.inviter,
     getJoinedMemberCount: () => members.length,
@@ -124,7 +124,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
       }),
       maySendEvent: vi.fn(() => maySendEvent),
       maySendRedactionForEvent: vi.fn(() => mayRedact),
-      // REQ-MSG-11 — le seuil vient de l'état du salon, comme chez le SDK : le test
+      // le seuil vient de l'état du salon, comme chez le SDK : le test
       // pilote le niveau exigé, jamais le résultat du prédicat.
       hasSufficientPowerLevelFor: vi.fn(
         (_action: string, powerLevel: number) => powerLevel >= kickLevel,
@@ -154,7 +154,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     setPowerLevel: vi.fn(async (_roomId: string, _userId: string, _level: number) => ({
       event_id: "$pl",
     })),
-    // Le modèle social de D-09 (REQ-MSG-16 à 19). `ignored` est un état porté par le
+    // Le modèle social de D-09. `ignored` est un état porté par le
     // mock et non un tableau figé : `ignoreUser` relit la liste avant d'écrire, et un
     // faux qui rendrait toujours la même chose ne prouverait pas cette relecture.
     joinRoom: vi.fn(async (roomId: string) => ({ roomId })),
@@ -168,7 +168,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     getProfileInfo: vi.fn(async (_userId: string) => profile),
     setDisplayName: vi.fn(async (_name: string) => ({})),
     setAvatarUrl: vi.fn(async (_url: string) => ({})),
-    /** REQ-MSG-21 — l'écriture d'un champ de profil étendu (MSC4133). */
+    /** l'écriture d'un champ de profil étendu (MSC4133). */
     setExtendedProfileProperty: vi.fn(async (_key: string, _value: unknown) => {}),
     searchUserDirectory: vi.fn(async (_options: { term: string; limit?: number }) => ({
       results: annuaire,
@@ -189,7 +189,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
 
   const session = {
     client,
-    // REQ-COR-12 — le prédicat **dérive** du crypto comme dans la vraie Session, au
+    // le prédicat **dérive** du crypto comme dans la vraie Session, au
     // lieu de rendre `true` en dur : les tests qui simulent un salon non chiffré le
     // font en pilotant le crypto, et c'est ce couplage-là qu'ils doivent exercer.
     isEncrypted: vi.fn(async (roomId: string) => {
@@ -205,7 +205,7 @@ export function fakeSession(options: FakeRoomOptions = {}) {
     // annonçait `unknown[]`, et personne ne le voyait.
     timeline: vi.fn((_roomId: string) => ({
       events: () => timelineEvents as MatrixEvent[],
-      // REQ-COR-13 — la remontée d'historique appartient à `client-core` ; aucun test de
+      // la remontée d'historique appartient à `client-core` ; aucun test de
       // ce paquet ne la déclenche, mais le contrat l'exige, et un mock qui l'omettrait ne
       // compilerait pas (c'est le point du `satisfies`).
       paginate: vi.fn(async () => false),

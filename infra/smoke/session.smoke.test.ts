@@ -26,7 +26,7 @@ const ATTENTE = { timeout: 30_000, interval: 250 };
  * Ce que valide ce fichier, et que 189 tests sur mocks ne valident pas : la crypto
  * Rust (vodozemac) réelle, un vrai IndexedDB, un vrai Synapse, et le fait que nos
  * packages tiennent ensemble contre eux. Sept modules seront intégrés d'un coup par
- * la spec 11 ; c'est ici qu'on découvre les écarts, pas là-bas.
+ * `apps/web` ; c'est ici qu'on découvre les écarts, pas là-bas.
  *
  * Hors périmètre, décidé et non subi : le tronçon OIDC (`initSession`). Voir
  * `harness.ts` et le ticket OIDC.
@@ -54,7 +54,7 @@ beforeAll(async () => {
   expect(restaurée, "restoreSession n'a pas rendu de session").not.toBeNull();
   session = restaurée!;
 
-  // REQ-COR-06 / D-08 — sous le mode « appareils signés uniquement », un compte sans
+  // / D-08 — sous le mode « appareils signés uniquement », un compte sans
   // identité cross-signing ne peut pas chiffrer *du tout* : la crypto Rust rejette
   // avec « Encryption failed because cross-signing is not set up on your account ».
   // Le bootstrap n'est donc plus seulement la condition pour être *lu*, c'est la
@@ -71,7 +71,7 @@ describe("Fumée — chiffrement de bout en bout contre un vrai Synapse", () => 
   it("ouvre une session avec la crypto Rust prête", async () => {
     const crypto = session.client.getCrypto();
     expect(crypto, "aucune crypto : le SDK n'a pas initialisé vodozemac").toBeDefined();
-    // REQ-COR-01 — le backend réellement chargé, pas celui que la config annonce.
+    // le backend réellement chargé, pas celui que la config annonce.
     expect(await crypto!.getVersion()).toMatch(/vodozemac/i);
     expect(session.client.getUserId()).toBe(compte.userId);
   });
@@ -80,7 +80,7 @@ describe("Fumée — chiffrement de bout en bout contre un vrai Synapse", () => 
     const { room_id } = await createGroupChat(session, "salon de fumée");
     salon = room_id;
 
-    // REQ-MSG-02 / REQ-INF-03 — pas « la config dit que ça devrait être chiffré »,
+    // pas « la config dit que ça devrait être chiffré »,
     // mais « le serveur a bien enregistré l'événement d'état, et le SDK le voit ».
     await vi.waitFor(
       async () =>
@@ -102,13 +102,13 @@ describe("Fumée — chiffrement de bout en bout contre un vrai Synapse", () => 
     }, ATTENTE);
 
     expect(reçu.getContent().body).toBe(texte);
-    // REQ-COR-02 — ce que Synapse a stocké est `m.room.encrypted`, pas le texte.
+    // ce que Synapse a stocké est `m.room.encrypted`, pas le texte.
     expect(reçu.getWireType()).toBe("m.room.encrypted");
     expect(JSON.stringify(reçu.getWireContent())).not.toContain("parc");
   });
 });
 
-describe("Fumée — REQ-COR-11, la session se rouvre sans réseau", () => {
+describe("Fumée — la session se rouvre sans réseau", () => {
   it("rouvre après « rechargement » et retrouve l'historique déchiffré", async () => {
     const avant = messages(session, salon).length;
     expect(avant).toBeGreaterThan(0);
@@ -117,7 +117,7 @@ describe("Fumée — REQ-COR-11, la session se rouvre sans réseau", () => {
     // Rechargement de page : objets neufs, même disque. Aucun jeton n'est fourni —
     // si `restoreSession` ne relit pas les credentials, il n'y a pas de session.
     const rechargée = await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: disque });
-    expect(rechargée, "la session ne s'est pas rouverte : REQ-COR-11 n'est pas tenue").not.toBeNull();
+    expect(rechargée, "la session ne s'est pas rouverte : n'est pas tenue").not.toBeNull();
 
     try {
       expect(rechargée!.client.getUserId()).toBe(compte.userId);
@@ -136,7 +136,7 @@ describe("Fumée — REQ-COR-11, la session se rouvre sans réseau", () => {
   });
 
   it("sans session locale, rend null plutôt que d'échouer", async () => {
-    // Un disque vierge, c'est un premier lancement : le shard UI (spec 11) doit
+    // Un disque vierge, c'est un premier lancement : le shard UI doit
     // recevoir le signal « passe par l'OIDC », pas une exception.
     expect(await restoreSession({ homeserverUrl: HOMESERVER, indexedDB: new IDBFactory() })).toBeNull();
   });

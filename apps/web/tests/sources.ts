@@ -9,7 +9,7 @@ import { join } from "node:path";
 /**
  * Séparateurs normalisés en `/`. Les tests comparent des chemins littéraux
  * (`endsWith("/app/layout.tsx")`), et `join` rend des antislashs sous Windows : sans
- * cette normalisation, REQ-UI-02 et REQ-UI-03 échouent sur une machine Windows alors que
+ * cette normalisation, échouent sur une machine Windows alors que
  * le code est correct — un rouge qui ne dit rien du produit.
  */
 const enPosix = (chemin: string) => chemin.replaceAll("\\", "/");

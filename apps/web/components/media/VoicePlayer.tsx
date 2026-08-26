@@ -9,7 +9,7 @@ interface VoicePlayerProps {
   /** URL d'objet du blob **déchiffré**. Jamais une URL serveur. */
   source?: string;
   dureeMs: number;
-  /** REQ-MED-06 — pics 0–1024 calculés à l'envoi, transportés dans l'événement. */
+  /** pics 0–1024 calculés à l'envoi, transportés dans l'événement. */
   ondes?: number[];
 }
 
@@ -17,10 +17,10 @@ const HAUTEUR = 28;
 const ECHELLE = 1024;
 
 /**
- * REQ-UI-14 — lecteur vocal avec forme d'onde et durée.
+ * lecteur vocal avec forme d'onde et durée.
  *
  * DESIGN.md : « barres verticales strictes sur la grille ». Les pics viennent de
- * l'événement (le paquet les a calculés à l'envoi, REQ-MED-06) — les recalculer à la
+ * l'événement (le paquet les a calculés à l'envoi) — les recalculer à la
  * lecture demanderait de décoder tout l'audio pour dessiner un rectangle.
  *
  * La barre lue est en accent, le reste en filet : la progression se lit sans curseur.

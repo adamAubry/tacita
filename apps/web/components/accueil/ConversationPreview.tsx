@@ -17,14 +17,14 @@ interface ConversationPreviewProps {
   /** Injecté en test, pour que « aujourd'hui » ne dépende pas de l'heure du CI. */
   maintenant?: number;
   /**
-   * Variation « résultat de recherche » (M-F, REQ-UIX-20) : ni badge, ni geste d'épingle.
+   * Variation « résultat de recherche » (M-F) : ni badge, ni geste d'épingle.
    * Une prop plutôt qu'une copie du composant — la règle du plan frontend.
    */
   simple?: boolean;
 }
 
 /**
- * REQ-UIX-08 — le badge. La mention **prime** sur le nombre : savoir qu'on vous a
+ * le badge. La mention **prime** sur le nombre : savoir qu'on vous a
  * nommé compte plus que savoir combien de messages ont passé. Au-delà de neuf, le
  * compte exact n'apporte plus rien — « 9+ » suffit et la largeur cesse de bouger.
  *
@@ -50,10 +50,10 @@ function BadgeNonLus({ unread, mention }: { unread: number; mention: boolean }) 
 }
 
 /**
- * REQ-UI-05 — la carte « conversation preview » (composant 3) : avatar, nom, aperçu
+ * la carte « conversation preview » (composant 3) : avatar, nom, aperçu
  * tronqué, date localisée, badge.
  *
- * REQ-UIX-09 — un glissement vers la droite l'épingle. Le geste n'est pas le seul
+ * un glissement vers la droite l'épingle. Le geste n'est pas le seul
  * chemin : l'appui long ouvre un hold menu qui porte la même action (DESIGN.md — chaque
  * geste a un équivalent visible). Sans lui, épingler serait invisible au clavier et à
  * qui ne connaît pas le geste.

@@ -19,7 +19,7 @@ export interface MentionContent {
   "m.mentions": { room?: true; user_ids?: string[] };
 }
 
-/** REQ-MSG-10 — données d'autocomplétion : `@everyone` puis les membres du salon. */
+/** données d'autocomplétion : `@everyone` puis les membres du salon. */
 export function mentionCandidates(session: Session, roomId: string): MentionCandidate[] {
   return [
     { id: ROOM_MENTION, label: "everyone" },
@@ -37,10 +37,10 @@ const EVERYONE_RE = new RegExp(`${EVERYONE}\\b`, "g");
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * REQ-MSG-10 — `@everyone` est réécrit en `@room` dans le corps : c'est ce littéral
+ * `@everyone` est réécrit en `@room` dans le corps : c'est ce littéral
  * que `.m.rule.roomnotif` cherche. `m.mentions.room` est posé en parallèle pour la
  * règle `.m.rule.is_room_mention` des serveurs récents. Le rendu inverse (`@room`
- * réaffiché en `@everyone`) est à l'UI, spec 11.
+ * réaffiché en `@everyone`) est à l'UI.
  *
  * Limite assumée : seuls les libellés sans espace sont résolus (`@luca`, pas
  * `@Jean Dupont`) — un pseudo à espaces reste du texte. Voir README.md.

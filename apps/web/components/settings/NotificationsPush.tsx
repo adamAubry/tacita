@@ -41,7 +41,7 @@ const ETATS: Record<EtatPush, { titre: string; texte: string; action?: string }>
   },
   refuse: {
     titre: "Notifications refusées",
-    // REQ-UI-18 — le chemin de rattrapage. Un refus se lève **dans le navigateur** : le
+    // le chemin de rattrapage. Un refus se lève **dans le navigateur** : le
     // dire est la seule chose utile ici, un bouton « Activer » ne pourrait qu'échouer en
     // silence, la permission n'étant plus redemandable.
     texte:
@@ -49,7 +49,7 @@ const ETATS: Record<EtatPush, { titre: string; texte: string; action?: string }>
   },
   "ios-a-installer": {
     titre: "Ajoutez Tacita à votre écran d'accueil",
-    // REQ-PSH-05 — sur iPhone, ce n'est pas un réglage à trouver : hors écran d'accueil,
+    // sur iPhone, ce n'est pas un réglage à trouver : hors écran d'accueil,
     // Safari ne propose aucune notification, à personne. Le dire évite de chercher.
     texte:
       "Sur iPhone, les notifications n'existent que pour une application ajoutée à l'écran d'accueil. Ouvrez le menu de partage de Safari, puis « Sur l'écran d'accueil », et revenez ici.",
@@ -76,7 +76,7 @@ const MAILLONS: { cle: keyof Omit<DiagnosticPush, "etat">; libelle: string }[] =
 ];
 
 /**
- * REQ-UI-18 — l'état de l'abonnement push, et son rattrapage, dans les réglages.
+ * l'état de l'abonnement push, et son rattrapage, dans les réglages.
  *
  * C'est le second point d'entrée voulu par l'exigence : le premier est la proposition au
  * premier message reçu, celui-ci est celui qu'on cherche quand on s'est aperçu de rien.

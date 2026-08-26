@@ -33,7 +33,7 @@ export function EcranAmis({ variation }: { variation: "ajouter" | "demandes" }) 
     [session],
   );
 
-  // Un seul client de la spec 12 dans le dépôt : celui de M-H, qui sait aussi lister et
+  // Un seul client du service de liens dans le dépôt : celui de M-H, qui sait aussi lister et
   // révoquer. M-G n'a besoin que d'émettre, mais pas d'une seconde implémentation.
   const onPartagerLien = useCallback(async () => {
     if (!session) return "annule" as const;

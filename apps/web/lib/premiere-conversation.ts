@@ -2,7 +2,7 @@ import type { Session } from "@tacita/client-core";
 import { conversations, createGroupChat, registerDirect } from "@tacita/messaging";
 
 /**
- * REQ-UI-23 — **la conversation personnelle**, celle avec laquelle un compte neuf
+ * **la conversation personnelle**, celle avec laquelle un compte neuf
  * n'arrive plus dans une application vide.
  *
  * Pourquoi elle existe. Un compte qui vient d'être créé n'a aucun correspondant : la
@@ -13,14 +13,14 @@ import { conversations, createGroupChat, registerDirect } from "@tacita/messagin
  * ce qu'on y écrit y reste.
  *
  * Ce n'est pas un salon d'exception. C'est un salon privé chiffré ordinaire
- * (`createGroupChat`, REQ-MSG-02) dont personne d'autre n'est membre, inscrit dans
+ * (`createGroupChat`) dont personne d'autre n'est membre, inscrit dans
  * `m.direct` sous son propre identifiant : c'est ce qui le fait lire comme une
  * conversation et non comme un groupe d'une personne — nom, avatar, et l'en-tête de
  * timeline qui dit « c'est le début de votre conversation » plutôt que « de ce groupe ».
  * Le corollaire est dans `lib/contacts.ts` : on n'est pas son propre ami, et cette
  * inscription-là ne fait entrer personne dans la liste d'amis.
  *
- * **Jamais deux fois** : la déduplication est la même que celle de REQ-MSG-15 — un DM
+ * **Jamais deux fois** : la déduplication est la même que celle de un DM
  * rejoint avec ce correspondant existe, on le rend. C'est ce qui rend l'appel sûr depuis
  * une étape qu'un rechargement peut rejouer.
  */

@@ -36,7 +36,7 @@ function fakeMatrix(jetons: Record<string, string> = { "jeton-luca": LUCA, "jeto
   return {
     whoami: vi.fn(async (token: string) => jetons[token]),
     // Signatures explicites : sans elles, `mock.calls` est un tuple vide et un test qui
-    // inspecte les arguments ne compile pas — ici, celui qui garde REQ-INV-14.
+    // inspecte les arguments ne compile pas — ici, celui qui garde.
     ignores: vi.fn(async (_accessToken: string, _self: string, _other: string) => false),
     accountExists: vi.fn(async (_accessToken: string, _userId: string) => true),
   } satisfies MatrixReader;
@@ -61,7 +61,7 @@ const échec = async (promesse: Promise<unknown>) => {
   return error as LinkError;
 };
 
-describe("REQ-INV-01 — POST /links crée un lien, authentifié auprès de Synapse", () => {
+describe("POST /links crée un lien, authentifié auprès de Synapse", () => {
   it("l'identité vient de whoami, jamais du corps de la requête", async () => {
     const { id } = await issue(deps, "jeton-luca", { kind: "friend", issuer: MIRA } as never);
 
@@ -106,7 +106,7 @@ describe("REQ-INV-01 — POST /links crée un lien, authentifié auprès de Syna
   });
 });
 
-describe("REQ-INV-02 — token opaque, aléatoire, stocké haché", () => {
+describe("token opaque, aléatoire, stocké haché", () => {
   it("256 bits de CSPRNG, jamais deux fois le même", async () => {
     const tokens = new Set<string>();
     for (let n = 0; n < 50; n++) tokens.add((await lienAmi()).token);
@@ -133,7 +133,7 @@ describe("REQ-INV-02 — token opaque, aléatoire, stocké haché", () => {
   });
 });
 
-describe("REQ-INV-03 — un lien ne révèle rien avant résolution authentifiée", () => {
+describe("un lien ne révèle rien avant résolution authentifiée", () => {
   it("la réponse de création ne porte ni émetteur, ni salon, ni libellé", async () => {
     const créé = await issue(deps, "jeton-luca", { kind: "group", roomId: SALON });
 
@@ -153,7 +153,7 @@ describe("REQ-INV-03 — un lien ne révèle rien avant résolution authentifié
   });
 });
 
-describe("REQ-INV-04 — GET /links liste les liens de l'émetteur, jamais ceux d'un autre", () => {
+describe("GET /links liste les liens de l'émetteur, jamais ceux d'un autre", () => {
   it("chacun ne voit que les siens", async () => {
     await lienAmi();
     await issue(deps, "jeton-mira", { kind: "friend" });
@@ -182,7 +182,7 @@ describe("REQ-INV-04 — GET /links liste les liens de l'émetteur, jamais ceux 
   });
 });
 
-describe("REQ-INV-05 — DELETE /links/:id révoque immédiatement", () => {
+describe("DELETE /links/:id révoque immédiatement", () => {
   it("le lien révoqué ne se résout plus", async () => {
     const { id, token } = await lienAmi();
     await revoke(deps, "jeton-luca", id);
@@ -202,7 +202,7 @@ describe("REQ-INV-05 — DELETE /links/:id révoque immédiatement", () => {
   });
 });
 
-describe("REQ-INV-06 — la résolution rend un identifiant, et le service s'arrête là", () => {
+describe("la résolution rend un identifiant, et le service s'arrête là", () => {
   it("rend kind et issuer, plus roomId pour un lien de groupe", async () => {
     const ami = await lienAmi();
     expect(await resolve(deps, "jeton-mira", ami.token)).toEqual({ kind: "friend", issuer: LUCA });
@@ -231,7 +231,7 @@ describe("REQ-INV-06 — la résolution rend un identifiant, et le service s'arr
   });
 });
 
-describe("REQ-INV-07 — la consommation est atomique", () => {
+describe("la consommation est atomique", () => {
   it("deux résolutions concurrentes du dernier usage : une seule réussit", async () => {
     const { token, id } = await issue(deps, "jeton-luca", { kind: "friend", maxUses: 1 });
     const autres = fakeMatrix({ "jeton-a": "@a:tacita.test", "jeton-b": "@b:tacita.test" });
@@ -261,7 +261,7 @@ describe("REQ-INV-07 — la consommation est atomique", () => {
   });
 });
 
-describe("REQ-INV-08 — un seul message d'échec pour trois causes", () => {
+describe("un seul message d'échec pour trois causes", () => {
   it("inconnu, expiré et révoqué rendent strictement la même chose", async () => {
     const inconnu = await échec(resolve(deps, "jeton-mira", "jamais-émis"));
 
@@ -289,7 +289,7 @@ describe("REQ-INV-08 — un seul message d'échec pour trois causes", () => {
   });
 });
 
-describe("REQ-INV-09 — limitation de débit sur la résolution, par compte", () => {
+describe("limitation de débit sur la résolution, par compte", () => {
   it("au-delà du budget, la résolution est refusée sans toucher à la base", async () => {
     const { token, id } = await lienAmi();
     const budget = vi.fn((clé: string) => clé !== `compte:${MIRA}`);
@@ -301,7 +301,7 @@ describe("REQ-INV-09 — limitation de débit sur la résolution, par compte", (
   });
 });
 
-describe("REQ-INV-10 — porteur sans compte : aucun usage consommé", () => {
+describe("porteur sans compte : aucun usage consommé", () => {
   it("répond avant même de regarder le token : il ne peut pas être consommé", async () => {
     const { token, id } = await lienAmi();
     const sansCompte = { ...deps, matrix: fakeMatrix({}) };
@@ -309,13 +309,13 @@ describe("REQ-INV-10 — porteur sans compte : aucun usage consommé", () => {
     const erreur = await échec(resolve(sansCompte, "jeton-sans-compte", token));
     expect(erreur.status).toBe(401);
     // Le service ne peut pas distinguer « pas de compte » de « déconnecté » — c'est
-    // l'UI qui choisit entre le login OIDC et l'écran d'explication (REQ-INV-11).
+    // l'UI qui choisit entre le login OIDC et l'écran d'explication.
     expect(erreur.errcode).toBe("TACITA_AUTH_REQUIRED");
     expect(store.rows.get(id)!.usesLeft).toBe(1);
   });
 });
 
-describe("REQ-INV-11 — porteur déconnecté : le token n'est consommé qu'après authentification", () => {
+describe("porteur déconnecté : le token n'est consommé qu'après authentification", () => {
   it("le même lien reste résolvable une fois le porteur authentifié", async () => {
     const { token, id } = await lienAmi();
 
@@ -329,7 +329,7 @@ describe("REQ-INV-11 — porteur déconnecté : le token n'est consommé qu'apr�
   });
 });
 
-describe("REQ-INV-12 — le porteur est l'émetteur", () => {
+describe("le porteur est l'émetteur", () => {
   it("refus explicite, aucun DM avec soi-même, aucun usage consommé", async () => {
     const { token, id } = await lienAmi();
 
@@ -339,7 +339,7 @@ describe("REQ-INV-12 — le porteur est l'émetteur", () => {
   });
 });
 
-describe("REQ-INV-13 — lien déjà résolu par ce porteur : succès idempotent", () => {
+describe("lien déjà résolu par ce porteur : succès idempotent", () => {
   it("la reprise rend le même résultat et ne consomme aucun usage de plus", async () => {
     const { token, id } = await issue(deps, "jeton-luca", { kind: "group", roomId: SALON });
 
@@ -353,10 +353,10 @@ describe("REQ-INV-13 — lien déjà résolu par ce porteur : succès idempotent
   });
 });
 
-describe("REQ-INV-14 — l'un des deux a bloqué l'autre", () => {
+describe("l'un des deux a bloqué l'autre", () => {
   it("le service ne lit que la liste d'ignorés de l'appelant, jamais celle de l'émetteur", async () => {
     // Le sens émetteur → porteur est hors de portée : cette liste n'est lisible qu'avec
-    // les droits de l'émetteur, que la spec 12 refuse au service. Il est tenu par Matrix
+    // les droits de l'émetteur, que `invite-tokens` refuse au service. Il est tenu par Matrix
     // lui-même, côté client. Ce test garde la frontière : chercher à le vérifier ici
     // supposerait un pouvoir Matrix, et c'est exactement ce qu'on a refusé.
     const { token } = await lienAmi();
@@ -380,7 +380,7 @@ describe("REQ-INV-14 — l'un des deux a bloqué l'autre", () => {
   });
 });
 
-describe("REQ-INV-15 — émetteur disparu", () => {
+describe("émetteur disparu", () => {
   it("compte désactivé : lien invalide, même réponse neutre", async () => {
     const { token } = await lienAmi();
     matrix.accountExists.mockResolvedValue(false);
@@ -389,7 +389,7 @@ describe("REQ-INV-15 — émetteur disparu", () => {
   });
 
   it("« salon quitté » n'est pas vérifié, et rien n'essaie de l'être", async () => {
-    // Limite assumée (spec 12 amendée, LIMITES.md) : le lire supposerait l'état d'un
+    // Limite assumée : le lire supposerait l'état d'un
     // salon dont ni le service ni le porteur ne sont membres. Un lien de groupe reste
     // donc résolvable, et c'est le parcours d'invitation côté client qui échouera.
     const { token } = await issue(deps, "jeton-luca", { kind: "group", roomId: SALON });
@@ -414,7 +414,7 @@ describe("REQ-INV-15 — émetteur disparu", () => {
   });
 });
 
-describe("REQ-INV-17 — expiration vérifiée contre l'horloge du serveur", () => {
+describe("expiration vérifiée contre l'horloge du serveur", () => {
   it("une date fournie par le client est ignorée", async () => {
     const { id } = await issue(deps, "jeton-luca", {
       kind: "friend",
@@ -431,7 +431,7 @@ describe("REQ-INV-17 — expiration vérifiée contre l'horloge du serveur", () 
   });
 });
 
-describe("REQ-INV-18 — stockage minimal, lignes expirées purgées", () => {
+describe("stockage minimal, lignes expirées purgées", () => {
   it("la ligne ne porte que ce que la spec autorise", async () => {
     const { id } = await issue(deps, "jeton-luca", { kind: "group", roomId: SALON });
 
@@ -454,7 +454,7 @@ describe("REQ-INV-18 — stockage minimal, lignes expirées purgées", () => {
 
     expect(await store.purge(MAINTENANT + 61_000)).toBe(1);
     // Celui qui reste est le lien épuisé : c'est lui qui porte l'idempotence de
-    // REQ-INV-13, l'effacer ferait échouer la reprise du porteur.
+    // l'effacer ferait échouer la reprise du porteur.
     expect(await resolve(deps, "jeton-mira", token)).toMatchObject({ issuer: LUCA });
   });
 });

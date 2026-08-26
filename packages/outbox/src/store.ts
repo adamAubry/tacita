@@ -18,7 +18,7 @@ export interface OutboxStore {
 }
 
 /**
- * REQ-OBX-01/06 — IndexedDB, un seul object store clé par `txnId`. Pas de
+ * IndexedDB, un seul object store clé par `txnId`. Pas de
  * localStorage : le contenu en attente est du message utilisateur.
  *
  * L'API brute suffit ici (un store, quatre opérations) — une dépendance de
@@ -37,7 +37,7 @@ export async function openOutboxStore(
   const reading = () => db.transaction(STORE, "readonly").objectStore(STORE);
 
   /**
-   * REQ-OBX-01 — « persisté avant toute tentative réseau » veut dire committé : le
+   * « persisté avant toute tentative réseau » veut dire committé : le
    * `onsuccess` d'une requête précède le commit, qui peut encore avorter. Sur erreur,
    * `transaction.error` n'est pas encore posé quand `onerror` se déclenche — d'où le
    * repli, sans lequel on rejetterait avec `null`.

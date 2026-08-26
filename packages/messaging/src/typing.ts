@@ -2,7 +2,7 @@ import type { Session } from "@tacita/client-core";
 import { RoomMemberEvent } from "matrix-js-sdk";
 
 /**
- * REQ-MSG-09 — `m.typing` est une EDU éphémère : rien n'est écrit en base côté
+ * `m.typing` est une EDU éphémère : rien n'est écrit en base côté
  * serveur. Le coût est en requêtes, d'où le throttling ici : une frappe n'émet pas
  * une requête.
  *
@@ -29,11 +29,11 @@ interface RoomTyping {
 }
 
 /**
- * REQ-MSG-09, côté **lecture** — qui écrit en ce moment dans ce salon, soi-même exclu.
+ * côté **lecture** — qui écrit en ce moment dans ce salon, soi-même exclu.
  *
  * L'état vit sur les membres du salon, alimenté par l'EDU `m.typing` : rien n'est
  * accumulé ici, et il n'y a donc rien à nettoyer quand le serveur cesse d'émettre. Le
- * shard UI (spec 11) rend la liste, il ne la dérive pas.
+ * shard UI rend la liste, il ne la dérive pas.
  */
 export function typingUsers(session: Session, roomId: string): string[] {
   const self = session.client.getUserId();
@@ -42,7 +42,7 @@ export function typingUsers(session: Session, roomId: string): string[] {
     .map((member) => member.userId);
 }
 
-/** REQ-MSG-09 — signal de changement, branché sur l'émetteur du SDK. */
+/** signal de changement, branché sur l'émetteur du SDK. */
 export function subscribeTyping(
   session: Session,
   roomId: string,

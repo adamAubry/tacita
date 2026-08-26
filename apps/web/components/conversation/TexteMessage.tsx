@@ -23,7 +23,7 @@ export interface MorceauTexte {
 }
 
 /**
- * REQ-UI-06 — découpe un corps de message en texte et liens. **Fonction pure**, éprouvée
+ * découpe un corps de message en texte et liens. **Fonction pure**, éprouvée
  * sans DOM : c'est elle qui décide ce qui est cliquable, et c'est le seul endroit où
  * cette décision se prend.
  *

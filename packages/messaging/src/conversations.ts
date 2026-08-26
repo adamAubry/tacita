@@ -12,14 +12,14 @@ import { messages, messageText } from "./messages";
 import { createDirectMessage } from "./rooms";
 
 /**
- * REQ-MSG-14 — l'épingle est le tag natif `m.favourite`. Rien n'est inventé par-dessus :
+ * l'épingle est le tag natif `m.favourite`. Rien n'est inventé par-dessus :
  * les tags sont de l'account data de salon, donc synchronisés entre les appareils sans
  * qu'aucun store maison n'ait à l'être. Le serveur les voit — c'est une métadonnée de
- * plus, au même titre que l'appartenance au salon (honnêteté produit, spec 00).
+ * plus, au même titre que l'appartenance au salon (honnêteté produit).
  */
 export const FAVOURITE_TAG = "m.favourite";
 
-/** REQ-MSG-13 — une conversation telle que le shard UI (spec 11) en a besoin. */
+/** une conversation telle que le shard UI en a besoin. */
 export interface Conversation {
   roomId: string;
   /** Nom du salon tel que le SDK le calcule ; en DM, c'est celui de l'autre. */
@@ -38,7 +38,7 @@ export interface Conversation {
   pinned: boolean;
 }
 
-/** REQ-MSG-13 — une invitation en attente : la « demande d'ami » de D-09. */
+/** une invitation en attente : la « demande d'ami » de D-09. */
 export interface Invitation {
   roomId: string;
   name: string;
@@ -62,7 +62,7 @@ function directPeers(session: Session): Map<string, string> {
 }
 
 /**
- * REQ-MSG-15 — **inscrit un salon dans `m.direct`.** Personne d'autre ne le fait.
+ * **inscrit un salon dans `m.direct`.** Personne d'autre ne le fait.
  *
  * `createRoom({ is_direct: true })` ne pose ce drapeau que dans l'invitation envoyée : le
  * serveur n'écrit **pas** l'account data `m.direct` du créateur, et le SDK non plus. Sans
@@ -72,7 +72,7 @@ function directPeers(session: Session): Map<string, string> {
  *
  * Cinq choses en dépendaient, toutes cassées en silence : le libellé et l'avatar du DM,
  * la liste d'amis (vide, elle filtre sur `peerId`), « retirer un ami » (ne trouvait aucun
- * salon), et surtout la déduplication de REQ-MSG-15 — sans `m.direct`, `openDirectMessage`
+ * salon), et surtout la déduplication de sans `m.direct`, `openDirectMessage`
  * recréait un salon **à chaque fois**, ce que l'exigence interdit explicitement.
  *
  * Lecture-modification-écriture : l'account data est un document unique pour tous les
@@ -94,7 +94,7 @@ export async function registerDirect(
 }
 
 function describe(session: Session, room: Room, peers: Map<string, string>): Conversation {
-  // REQ-MSG-12 — le dernier message est le dernier du flux /sync, pas le plus récemment
+  // le dernier message est le dernier du flux /sync, pas le plus récemment
   // horodaté. Aucun tri n'est introduit ici.
   const last = messages(session, room.roomId).at(-1);
   const peerId = peers.get(room.roomId);
@@ -113,16 +113,16 @@ function describe(session: Session, room: Room, peers: Map<string, string>): Con
 }
 
 /**
- * REQ-MSG-13 — les conversations rejointes, la plus récente d'abord.
+ * les conversations rejointes, la plus récente d'abord.
  *
- * **Sur l'ordre.** L'interdit de tri par `origin_server_ts` (REQ-COR-04, REQ-MSG-12)
+ * **Sur l'ordre.** L'interdit de tri par `origin_server_ts`
  * porte sur l'ordre des messages *dans* une timeline, où le flux /sync fait autorité et
  * où l'horodatage est un mensonge possible du serveur. Une **liste de salons**, elle,
  * n'a pas d'ordre dans /sync : `getRooms()` rend l'ordre d'insertion du store, qui n'est
  * ni la récence ni rien de stable. La récence du dernier message est le seul signal
  * disponible côté client, et il est ici *le seul* endroit du dépôt où il sert de clé de
  * tri — jamais à l'intérieur d'un salon. Décision et alternatives écartées :
- * `specs/ui/ESCALATIONS.md` § E-09.
+ * Escalade E-09.
  */
 export function conversations(session: Session): Conversation[] {
   const peers = directPeers(session);
@@ -134,7 +134,7 @@ export function conversations(session: Session): Conversation[] {
 }
 
 /**
- * REQ-MSG-13 — les invitations en attente. D-09 : une demande d'ami **est** une
+ * les invitations en attente. D-09 : une demande d'ami **est** une
  * invitation de salon DM native ; il n'y a pas d'autre objet à lire.
  */
 export function invitations(session: Session): Invitation[] {
@@ -145,7 +145,7 @@ export function invitations(session: Session): Invitation[] {
 }
 
 /**
- * REQ-MSG-14 — épingler et désépingler. `{}` en métadonnée : l'ordre des favoris se
+ * épingler et désépingler. `{}` en métadonnée : l'ordre des favoris se
  * porte par un champ `order` que rien ne lit chez nous, et l'inventer serait un tri de
  * plus à maintenir.
  */
@@ -156,7 +156,7 @@ export function setFavourite(session: Session, roomId: string, pinned: boolean):
 }
 
 /**
- * REQ-MSG-15 — le DM avec cet utilisateur, existant ou créé. **Jamais un second.**
+ * le DM avec cet utilisateur, existant ou créé. **Jamais un second.**
  *
  * La règle vit ici et pas dans l'UI : deux écrans peuvent ouvrir une conversation
  * (accueil, profil), et une déduplication recopiée dérive. Un DM quitté ne compte pas —
@@ -169,14 +169,14 @@ export async function openDirectMessage(session: Session, userId: string): Promi
   }
   const { room_id } = await createDirectMessage(session, userId);
   // Sans cette ligne, la boucle ci-dessus ne retrouvera jamais ce salon et un second
-  // sera créé au prochain appel — ce que REQ-MSG-15 interdit.
+  // sera créé au prochain appel — ce que interdit.
   await registerDirect(session, userId, room_id);
   return room_id;
 }
 
 /**
- * REQ-MSG-13 — signal de changement de la liste, branché sur l'émetteur du SDK comme
- * `subscribe()` (spec 05) : aucun store ni bus maison par-dessus.
+ * signal de changement de la liste, branché sur l'émetteur du SDK comme
+ * `subscribe()` : aucun store ni bus maison par-dessus.
  *
  * Cinq événements, parce que cinq choses changent la liste : l'apparition d'un salon
  * (invitation reçue), un message (aperçu et récence), un tag (épingle), un reçu (les

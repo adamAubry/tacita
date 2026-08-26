@@ -120,8 +120,8 @@ describe("D-14 — la clé de récupération ouvre une session quand le mot de p
     /*
      * Cet endpoint est le seul du déploiement qui authentifie **sans** jeton. Une clé de
      * 256 bits ne s'énumère pas de front, mais un endpoint d'authentification qui ne
-     * compte pas ses échecs n'a aucun moyen de voir qu'on l'essaie (REQ-INV-09). Le
-     * limiteur est celui du serveur, par IP, dimensionné par REQ-INF-05 — pas un compteur
+     * compte pas ses échecs n'a aucun moyen de voir qu'on l'essaie. Le
+     * limiteur est celui du serveur, par IP, dimensionné par pas un compteur
      * maison qui aurait sa propre idée du débit.
      */
     expect(ressourceSecours).toContain("Ratelimiter(");
@@ -142,7 +142,7 @@ describe("D-14 — la clé de récupération ouvre une session quand le mot de p
     /*
      * Compte inconnu, désactivé, sans clé, clé fausse : la même réponse. Les distinguer
      * donnerait un oracle de comptes à qui interroge cette porte ouverte — même
-     * jurisprudence que REQ-INV-08, et l'écran ne peut donc rien dire de plus précis.
+     * jurisprudence que, et l'écran ne peut donc rien dire de plus précis.
      */
     expect(ressourceSecours.match(/respond_with_json\(\s*request,\s*403/g)).toHaveLength(1);
   });
@@ -159,7 +159,7 @@ describe("D-14 — la clé de récupération ouvre une session quand le mot de p
   });
 });
 
-describe("REQ-INF-20 — le plancher de mot de passe est dit au même nombre partout", () => {
+describe("le plancher de mot de passe est dit au même nombre partout", () => {
   /*
    * **Mesuré le 25/08/2026 : un compte s'est créé avec le mot de passe « a ».** Le
    * plancher existait à deux endroits — le module et l'écran de changement — et à aucun

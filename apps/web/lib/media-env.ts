@@ -4,7 +4,7 @@ import type { MotifEchec } from "./transcode-video";
 import type { DemandeTranscodage, ReponseTranscodage } from "./transcode-worker";
 
 /**
- * L'implémentation navigateur du `MediaEnvironment` que le pipeline (spec 08) attend
+ * L'implémentation navigateur du `MediaEnvironment` que le pipeline attend
  * injecté. Le paquet reste sans DOM ; c'est ici que les APIs du navigateur entrent.
  */
 
@@ -30,10 +30,10 @@ import type { DemandeTranscodage, ReponseTranscodage } from "./transcode-worker"
  * Reste `transcodeAudio`, appelé pour le seul chemin Safari/iOS (MP4/AAC → Opus). Il lève
  * tant que le spike E-10 n'a pas dit si `WebCodecs` encode l'Opus sur les iOS ciblés ;
  * selon sa réponse, l'implémentation sera un `AudioEncoder` ici, ou un encodeur WASM
- * **dans le paquet** — jamais une dépendance d'`apps/web`, REQ-UI-02 restant close.
+ * **dans le paquet** — jamais une dépendance d'`apps/web`, restant close.
  */
 export class TranscodageIndisponible extends Error {
-  /** REQ-MED-04 — ce qui a échoué, pour que l'UI dise laquelle des trois phrases. */
+  /** ce qui a échoué, pour que l'UI dise laquelle des trois phrases. */
   readonly motif: MotifEchec;
 
   constructor(quoi: "video" | "audio", detail?: string, motif: MotifEchec = "autre") {
@@ -153,7 +153,7 @@ async function chercher(video: HTMLVideoElement, seconde: number): Promise<void>
 }
 
 /**
- * REQ-MED-04 — **ce que la source mesure, quand on n'a pas pu la transcoder.**
+ * **ce que la source mesure, quand on n'a pas pu la transcoder.**
  *
  * Le `<video>` du navigateur lit beaucoup plus large que `VideoDecoder` : il ouvre les
  * conteneurs que le démuxeur ne connaît pas (WebM, Matroska) et les codecs que WebCodecs
@@ -175,10 +175,10 @@ async function mesurerVideo(blob: Blob): Promise<{ width: number; height: number
 }
 
 /**
- * REQ-MED-04 — démuxage par le paquet, décodage et réencodage par `WebCodecs`,
+ * démuxage par le paquet, décodage et réencodage par `WebCodecs`,
  * empaquetage par le muxeur du paquet (E-10). Le shard n'écrit aucun format.
  *
- * **Dans un worker**, comme la spec 08 l'exige depuis l'origine : un transcodage tient le
+ * **Dans un worker**, comme `@tacita/media-pipeline` l'exige depuis l'origine : un transcodage tient le
  * processeur pendant des secondes, et sur le thread de rendu c'est la timeline qui se
  * fige. Un worker par transcodage, terminé aussitôt après — pas de pool à tenir pour une
  * opération que l'utilisateur déclenche une fois de temps en temps.
@@ -216,11 +216,11 @@ function viaWorker(
  *
  * `OffscreenCanvas` plutôt que `<canvas>` : le redimensionnement d'une photo de 12 Mpx
  * bloque le thread principal une demi-seconde, et cet objet est transférable dans un
- * worker le jour où on l'y déplace (contrainte spec 08).
+ * worker le jour où on l'y déplace (contrainte `@tacita/media-pipeline`).
  */
 export function environnementMedia(options: { signaler?: MediaEnvironment["signaler"] } = {}): MediaEnvironment {
   return {
-    /** REQ-MED-13 — le canal par lequel le pipeline dit ce qu'il a dû abandonner. */
+    /** le canal par lequel le pipeline dit ce qu'il a dû abandonner. */
     signaler: options.signaler,
     subtle: globalThis.crypto.subtle,
     getRandomValues: (bytes) => {
@@ -266,7 +266,7 @@ export function environnementMedia(options: { signaler?: MediaEnvironment["signa
         return await viaWorker(blob, cibles);
       } catch (cause) {
         /*
-         * REQ-MED-04 / interdit n°13 — **le dernier recours : la source telle quelle.**
+         * / interdit n°13 — **le dernier recours : la source telle quelle.**
          *
          * Trois familles de sources échouent au chemin nominal, et aucune n'est
          * marginale : les conteneurs que le démuxeur ne connaît pas (WebM et Matroska,
@@ -297,7 +297,7 @@ export function environnementMedia(options: { signaler?: MediaEnvironment["signa
     },
 
     /**
-     * REQ-MED-05 — l'original non compressé, sur l'appareil. `showSaveFilePicker` est
+     * l'original non compressé, sur l'appareil. `showSaveFilePicker` est
      * absent de Firefox et Safari ; `saveOriginal` retombe alors sur le téléchargement.
      */
     saveViaFilePicker: choisirFichier
@@ -309,7 +309,7 @@ export function environnementMedia(options: { signaler?: MediaEnvironment["signa
       : undefined,
 
     /**
-     * REQ-MED-15 — le **flux** de la même API, pour écrire un gros média tranche par
+     * le **flux** de la même API, pour écrire un gros média tranche par
      * tranche. Même absence que `saveViaFilePicker` sur Firefox et Safari : le pipeline
      * retombe alors sur le chemin tout-ou-rien, borné par `SEUILS.dur`.
      */

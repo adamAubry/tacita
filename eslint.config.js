@@ -23,7 +23,7 @@ export default tseslint.config(
     },
   },
   {
-    // Le service worker (REQ-UI-01) s'exécute dans un contexte qui n'est ni Node ni la
+    // Le service worker s'exécute dans un contexte qui n'est ni Node ni la
     // page : `self`, `caches`, `Response` y sont natifs. Sans ces globales déclarées,
     // le lint le refuse ligne par ligne — et le désactiver fichier entier ferait perdre
     // le reste des règles sur le seul fichier qui touche au cache.
@@ -37,7 +37,7 @@ export default tseslint.config(
           "Response",
           "URL",
           "Request",
-          // Le réveil push (REQ-UI-18) : il interroge une fenêtre par `MessageChannel`,
+          // Le réveil push : il interroge une fenêtre par `MessageChannel`,
           // avec un délai au-delà duquel la notification part générique.
           "MessageChannel",
           "setTimeout",

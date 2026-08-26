@@ -22,6 +22,6 @@ COPY apps/invite-tokens/src ./src
 USER node
 
 # Le service refuse de démarrer sans DATABASE_URL ni HOMESERVER_URL (src/index.ts).
-# Aucun jeton d'administration Synapse ne lui est passé, ici ni ailleurs : la spec 12
+# Aucun jeton d'administration Synapse ne lui est passé, ici ni ailleurs : `invite-tokens`
 # lui interdit tout pouvoir Matrix.
 CMD ["node", "--experimental-strip-types", "src/index.ts"]

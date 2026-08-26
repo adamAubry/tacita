@@ -4,7 +4,7 @@ import { CHAMP_BLOCS, SEUILS, type EncryptedFile, type Seuils } from "@tacita/me
  * Ce que le shard lit d'un événement, et **rien de plus**.
  *
  * Un type structurel plutôt qu'un import de `matrix-js-sdk` : la liste close de
- * REQ-UI-02 n'autorise pas le SDK dans `apps/web`, et c'est voulu — le shard consomme
+ * n'autorise pas le SDK dans `apps/web`, et c'est voulu — le shard consomme
  * les paquets, il ne parle pas Matrix. Un `MatrixEvent` satisfait cette forme sans
  * conversion, et le compilateur le vérifie au point d'appel.
  */
@@ -16,7 +16,7 @@ export interface EvenementLu {
 /** Ce que l'UI a besoin de savoir d'une pièce jointe, lu dans l'événement déchiffré. */
 export interface Media {
   msgtype: "m.image" | "m.video" | "m.audio" | "m.file";
-  /** Nom du fichier. C'est du contenu : il ne part jamais au serveur (spec 08). */
+  /** Nom du fichier. C'est du contenu : il ne part jamais au serveur. */
   nom: string;
   fichier: EncryptedFile;
   /** Vignette chiffrée à part, avec sa propre clé. Absente sur audio et fichier. */
@@ -31,7 +31,7 @@ export interface Media {
   vignetteMime?: string;
   taille?: number;
   /**
-   * `info.mimetype`, tel que le pipeline l'écrit (REQ-MED-02).
+   * `info.mimetype`, tel que le pipeline l'écrit.
    *
    * Il n'est pas décoratif : `downloadAttachment` rend des **octets nus**, et le blob
    * qu'on en fabrique n'a que le type qu'on lui donne. Un `<video>` ou un `<audio>` dont
@@ -43,7 +43,7 @@ export interface Media {
   mime?: string;
   /**
    * Dimensions de l'original, telles que le pipeline les écrit dans `info.w`/`info.h`
-   * (REQ-MED-03). Elles servent à **réserver la boîte** de la vignette avant de l'avoir
+   * Elles servent à **réserver la boîte** de la vignette avant de l'avoir
    * déchiffrée : sans elles, la tuile n'a pas de hauteur connue et la timeline saute au
    * moment où l'image arrive. Absentes d'un événement envoyé par un autre client qui ne
    * les renseigne pas — d'où le repli.
@@ -52,14 +52,14 @@ export interface Media {
   hauteur?: number;
   dureeMs?: number;
   /**
-   * REQ-MED-08 (b) — les empreintes par bloc, quand l'expéditeur en a écrit.
+   * (b) — les empreintes par bloc, quand l'expéditeur en a écrit.
    *
    * Absentes d'un média envoyé par un client tiers : le champ est à nous, namespacé, et
    * son absence fait simplement retomber sur le chemin d'un seul bloc. Aucune régression
    * d'interop, aucune garantie en moins — c'est la même vérification, en une fois.
    */
   blocs?: string[];
-  /** REQ-MED-06 — pics MSC1767, entiers 0–1024. */
+  /** pics MSC1767, entiers 0–1024. */
   ondes?: number[];
 }
 
@@ -107,7 +107,7 @@ export function mediaDe(evenement: EvenementLu): Media | undefined {
 }
 
 /**
- * REQ-MED-15 — le téléchargement par tranches existe-t-il sur ce navigateur ?
+ * le téléchargement par tranches existe-t-il sur ce navigateur ?
  *
  * `showSaveFilePicker` est absent de Firefox et de Safari. Sans lui, le clair doit tenir
  * en mémoire d'un bloc, et c'est le seul cas où le plafond dur s'applique.
@@ -117,7 +117,7 @@ export function fluxFichierDisponible(): boolean {
 }
 
 /**
- * REQ-MED-15 — les plafonds de **cet** appareil.
+ * les plafonds de **cet** appareil.
  *
  * `deviceMemory` est la seule mesure directe, et elle n'existe que sur les navigateurs
  * Chromium. À défaut, `pointer: coarse` : un pointeur grossier est un doigt, donc un
@@ -132,7 +132,7 @@ export function seuilsAppareil(): Seuils {
 }
 
 /**
- * REQ-MED-12 — **ce navigateur-ci sait-il décoder ce type ?**
+ * **ce navigateur-ci sait-il décoder ce type ?**
  *
  * La liste close (paquet, `resoudreType`) dit ce que Tacita accepte de rendre ; elle ne
  * dit pas ce que la plateforme sait lire. Le HEVC d'iOS se lit sur Safari et pas partout
@@ -171,7 +171,7 @@ export function dureeLisible(ms: number): string {
 }
 
 /**
- * REQ-UIX-17 — les quatre onglets des galeries partagées.
+ * les quatre onglets des galeries partagées.
  *
  * `liens` n'est pas un type de message Matrix : c'est un message texte qui **contient**
  * une URL. La détection est volontairement stricte — `https?://` seulement, pas de
@@ -189,7 +189,7 @@ export function liensDe(evenement: EvenementLu): string[] {
 
 /**
  * Répartit l'historique **déjà téléchargé** dans les quatre onglets. Aucun appel réseau :
- * le périmètre est ce que la session a synchronisé, et l'UI le dit (REQ-UIX-17).
+ * le périmètre est ce que la session a synchronisé, et l'UI le dit.
  */
 export function repartir(
   evenements: EvenementLu[],

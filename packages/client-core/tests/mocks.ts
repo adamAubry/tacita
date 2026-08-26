@@ -1,13 +1,13 @@
 import { vi } from "vitest";
 
 /**
- * matrix-js-sdk instrumenté (spec 04 — « suite Vitest avec matrix-js-sdk
+ * matrix-js-sdk instrumenté (« suite Vitest avec matrix-js-sdk
  * mocké/instrumenté »). Chaque fichier de test fait :
  *
  *   vi.mock("matrix-js-sdk", async () => (await import("./mocks")).sdkModule());
  *
  * L'état est reconstruit à chaque test via `resetSdk()` : `initSession` verrouille
- * `setDeviceIsolationMode` en non-configurable (REQ-COR-07), un objet partagé entre
+ * `setDeviceIsolationMode` en non-configurable, un objet partagé entre
  * tests serait donc figé dès le premier.
  */
 
@@ -31,7 +31,7 @@ export const sdkModule = () => ({ createClient, IndexedDBStore });
 function makeCrypto() {
   return {
     /**
-     * REQ-COR-07 — `initSession` pose le mode puis remplace la méthode par le verrou
+     * `initSession` pose le mode puis remplace la méthode par le verrou
      * (`defineProperty`). Le spy ne survit donc pas à l'appel : on retient le mode
      * appliqué dans un champ, qui lui reste lisible.
      */
@@ -41,7 +41,7 @@ function makeCrypto() {
     }),
     getActiveSessionBackupVersion: vi.fn(async (): Promise<string | null> => "1"),
     /**
-     * REQ-COR-06 — la source de `recoveryState()`. Par défaut l'appareil est signé :
+     * la source de `recoveryState()`. Par défaut l'appareil est signé :
      * le cas normal est une session déjà utilisable, et les tests qui veulent une porte
      * fermée le disent.
      */
@@ -51,7 +51,7 @@ function makeCrypto() {
       }),
     ),
     /**
-     * REQ-COR-06 — la seconde source de `recoveryState()`. `false` = ce compte n'a aucune
+     * la seconde source de `recoveryState()`. `false` = ce compte n'a aucune
      * identité cross-signing, donc une inscription.
      *
      * C'est cette question-là et pas `getKeyBackupInfo()` : une sauvegarde peut exister
@@ -68,7 +68,7 @@ function makeCrypto() {
       encodedPrivateKey: "EsTb ABCD EFGH",
     })),
     /**
-     * REQ-COR-06 — `authUploadDeviceSigningKeys` est typé ici parce que les tests d'UIA
+     * `authUploadDeviceSigningKeys` est typé ici parce que les tests d'UIA
      * le rappellent : c'est le SDK qui l'invoque en vrai, avec la requête à envoyer.
      */
     bootstrapCrossSigning: vi.fn(
@@ -109,7 +109,7 @@ function makeCrypto() {
         this.secretStorageAUneCle = true;
       }
     }),
-    // REQ-COR-07 / D-08 — `needsUserApproval` est le signal du SDK pour « cet
+    // / D-08 — `needsUserApproval` est le signal du SDK pour « cet
     // utilisateur a changé d'identité depuis qu'on l'a vue ». Faux par défaut : le cas
     // normal est qu'il ne se passe rien.
     getUserVerificationStatus: vi.fn(async (_userId: string) => ({
@@ -127,7 +127,7 @@ function makeClient(crypto: CryptoMock) {
       device_id: "DEVICE1",
     })),
     /**
-     * REQ-COR-08 — l'inscription. Réussit du premier coup par défaut ; les tests qui
+     * l'inscription. Réussit du premier coup par défaut ; les tests qui
      * veulent l'UIA en deux étapes de Synapse la posent eux-mêmes, parce que c'est
      * exactement ce que le mock ne doit pas décider à leur place (règle 3).
      */
@@ -144,13 +144,13 @@ function makeClient(crypto: CryptoMock) {
     getCrypto: vi.fn((): CryptoMock | undefined => crypto),
     startClient: vi.fn(async (_opts?: unknown) => {}),
     /**
-     * REQ-UIX-06 — la validation du jeton à la reprise. Elle réussit par défaut : les
+     * la validation du jeton à la reprise. Elle réussit par défaut : les
      * tests qui veulent un jeton refusé le disent explicitement, et ceux qui n'en
      * parlent pas ne doivent pas se voir refuser une session valable.
      */
     whoami: vi.fn(async () => ({ user_id: "@luca:tacita.test" })),
     /**
-     * REQ-COR-06 — le secret storage tel que `unlockRecovery` l'interroge : quelle clé
+     * le secret storage tel que `unlockRecovery` l'interroge : quelle clé
      * protège ce compte, et celle qu'on lui présente est-elle la bonne. `checkKey` accepte
      * par défaut ; les tests de saisie fausse la font refuser.
      */
@@ -159,7 +159,7 @@ function makeClient(crypto: CryptoMock) {
       checkKey: vi.fn(async (_key: Uint8Array, _info: unknown) => true),
     },
     /**
-     * REQ-COR-06 — la page de repli SSO que `setupRecoveryKey` fait ouvrir quand Synapse
+     * la page de repli SSO que `setupRecoveryKey` fait ouvrir quand Synapse
      * exige une UIA pour remplacer une identité. Même forme que le SDK.
      */
     getFallbackAuthUrl: vi.fn(
@@ -179,7 +179,7 @@ function makeClient(crypto: CryptoMock) {
     },
     getAccessToken: vi.fn((): string | null => "syt_access"),
     /**
-     * REQ-COR-15 — les appareils du compte. Deux par défaut, dont celui de la session :
+     * les appareils du compte. Deux par défaut, dont celui de la session :
      * un compte à un seul appareil ne dirait rien de la distinction « le mien / les
      * autres », qui est tout ce que l'écran a à trancher.
      */
@@ -190,13 +190,13 @@ function makeClient(crypto: CryptoMock) {
       ] as { device_id: string; display_name?: string; last_seen_ts?: number }[],
     })),
     /**
-     * REQ-COR-15 — la révocation. Elle exige une UIA côté serveur ; par défaut le mock
+     * la révocation. Elle exige une UIA côté serveur ; par défaut le mock
      * accepte, et les tests qui veulent le 401 le posent eux-mêmes (règle 3).
      */
     deleteMultipleDevices: vi.fn(async (_ids: string[], _auth?: unknown) => ({})),
     getRoom: vi.fn((_roomId: string): unknown => null),
     /**
-     * REQ-COR-13 — la pagination arrière du SDK. Elle rend le salon, et c'est
+     * la pagination arrière du SDK. Elle rend le salon, et c'est
      * `oldState.paginationToken` — mis à `null` par le SDK quand il n'y a plus rien en
      * amont — qui dit si l'historique est épuisé.
      */
@@ -226,7 +226,7 @@ export function fakeEvent(id: string, originServerTs: number) {
 
 /**
  * Une `Room` réduite à ce que le module en lit : sa timeline vive, et le jeton de
- * pagination de son ancien état (REQ-COR-13). Un jeton présent = il reste de l'historique
+ * pagination de son ancien état. Un jeton présent = il reste de l'historique
  * en amont ; `null` = début du salon.
  */
 export function fakeRoom(events: unknown[], paginationToken: string | null = "t42") {

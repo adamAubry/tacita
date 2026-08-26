@@ -8,7 +8,7 @@ import { Sheet } from "../foundation/Sheet";
 import { ecrireRefusEducationIOS, lireRefusEducationIOS } from "../../lib/preferences";
 
 /**
- * REQ-UI-18 (partie éducation) / REQ-PSH-05 — sur iOS, le Web Push n'existe **que** pour
+ * (partie éducation) / sur iOS, le Web Push n'existe **que** pour
  * une PWA installée à l'écran d'accueil. Ce n'est pas une limite de notre passerelle,
  * c'est Safari : hors standalone, aucun abonnement n'est possible.
  *
@@ -19,7 +19,7 @@ import { ecrireRefusEducationIOS, lireRefusEducationIOS } from "../../lib/prefer
 export { estIOS, estInstallee } from "../../lib/push";
 
 interface IosPushEducationProps {
-  /** REQ-UI-18 : **pas au premier lancement** — au premier point de friction pertinent. */
+  /** : **pas au premier lancement** — au premier point de friction pertinent. */
   declenche: boolean;
   indexedDB?: IDBFactory;
 }
@@ -32,7 +32,7 @@ export function IosPushEducation({ declenche, indexedDB }: IosPushEducationProps
     if (!declenche || !estIOS(globalThis.navigator.userAgent) || estInstallee()) return;
 
     let annule = false;
-    // REQ-UI-18 — un refus explicite vaut pour toujours. Insister est le plus court
+    // un refus explicite vaut pour toujours. Insister est le plus court
     // chemin vers quelqu'un qui n'écoute plus, et la préférence survit au rechargement.
     void lireRefusEducationIOS(base).then((refusee) => {
       if (!annule && !refusee) setVisible(true);

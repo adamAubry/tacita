@@ -30,7 +30,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("REQ-OBX-07 — backoff exponentiel sur rate-limit et erreurs réseau", () => {
+describe("backoff exponentiel sur rate-limit et erreurs réseau", () => {
   it("le délai double à chaque tentative jusqu'à un plafond", () => {
     expect(backoffMs(0, networkError())).toBe(BASE_BACKOFF_MS);
     expect(backoffMs(1, networkError())).toBe(BASE_BACKOFF_MS * 2);
@@ -88,7 +88,7 @@ describe("REQ-OBX-07 — backoff exponentiel sur rate-limit et erreurs réseau",
   });
 });
 
-describe("REQ-OBX-04 — une erreur qu'on ne sait pas classer ne boucle pas indéfiniment", () => {
+describe("une erreur qu'on ne sait pas classer ne boucle pas indéfiniment", () => {
   /**
    * Mesuré le 20/08/2026 : un téléversement au-dessus du plafond recevait un **413 sans
    * en-tête CORS**, que le navigateur masquait au JavaScript. Le client ne voyait qu'une

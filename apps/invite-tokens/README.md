@@ -1,4 +1,4 @@
-# invite-tokens — service de liens d'invitation (spec 12)
+# invite-tokens — service de liens d'invitation
 
 Il **traduit un token en identifiant**, et rien d'autre. Il émet des liens à durée de vie
 bornée et les résout pour un appelant authentifié.
@@ -17,8 +17,8 @@ authentifié ; **c'est le client qui invite ensuite**, par le chemin natif de D-
 (invitation de DM pour un ami, invitation de salon pour un groupe).
 
 Ses trois seuls appels à Synapse sont des **lectures faites avec le jeton de l'appelant** :
-`whoami` (REQ-INV-01/06), la liste d'ignorés de l'appelant (REQ-INV-14), le profil de
-l'émetteur (REQ-INV-15). Aucun n'utilise un pouvoir qui lui appartiendrait.
+`whoami`, la liste d'ignorés de l'appelant, le profil de
+l'émetteur. Aucun n'utilise un pouvoir qui lui appartiendrait.
 
 ## API
 
@@ -42,27 +42,27 @@ assumée : elle est le prix de la non-énumérabilité.*
 Les deux exceptions ne trahissent rien :
 
 - `401 TACITA_AUTH_REQUIRED` — répondu **avant** toute lecture du token, donc sans
-  consommer d'usage (REQ-INV-10/11) ;
+  consommer d'usage ;
 - `400 TACITA_OWN_LINK` — seul l'émetteur peut le déclencher, et il connaît déjà son
-  propre lien (REQ-INV-12).
+  propre lien.
 
 Une reprise n'est pas un échec : un porteur qui rouvre un lien qu'il a déjà résolu obtient
-le **même succès**, sans consommer d'usage de plus (REQ-INV-13).
+le **même succès**, sans consommer d'usage de plus.
 
 ## Déploiement
 
-Le raccordement appartient à la spec 01 — **REQ-INF-15** : image, service compose, base
+Le raccordement appartient à `infra` — : image, service compose, base
 PostgreSQL dédiée, route proxy, variables. Voir `infra/README.md`.
 
 ```
 DATABASE_URL=postgres://…    # base dédiée, jamais celle de Synapse
 HOMESERVER_URL=https://…     # pour whoami et les deux lectures de compte
 PORT=8009
-PURGE_INTERVAL_MS=3600000    # REQ-INV-18 — les lignes expirées ne survivent pas
+PURGE_INTERVAL_MS=3600000 # les lignes expirées ne survivent pas
 ```
 
 **Aucune variable ne porte de secret d'administration Synapse**, et un test de
-configuration l'asserte : la spec 12 interdit à ce service tout pouvoir Matrix, le
+configuration l'asserte : `invite-tokens` interdit à ce service tout pouvoir Matrix, le
 raccordement ne doit pas le lui rendre.
 
 Le schéma est créé au démarrage (`CREATE TABLE IF NOT EXISTS`) : deux tables, aucune
@@ -70,4 +70,4 @@ migration à dérouler.
 
 ## Limites assumées
 
-Dans `LIMITES.md` — dont la principale : **ce service apprend qui invite qui.**
+La principale : **ce service apprend qui invite qui.**

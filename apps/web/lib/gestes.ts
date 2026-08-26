@@ -10,7 +10,7 @@ export const SEUIL_GLISSEMENT = 64;
 const TOLERANCE_VERTICALE = 32;
 
 /**
- * REQ-UI-09 — **zone morte de 20 px au bord gauche.** Un glissement vers la droite qui
+ * **zone morte de 20 px au bord gauche.** Un glissement vers la droite qui
  * part du bord déclenche le retour arrière de Safari iOS hors standalone : le geste
  * n'arrive jamais jusqu'à nous, et la page a changé. On ne peut pas l'empêcher, on peut
  * refuser d'agir dessus — sinon l'utilisateur voit *les deux* se produire selon la
@@ -39,7 +39,7 @@ export interface OptionsGlissement {
   onDroite?: () => void;
   onGauche?: () => void;
   onAppuiLong?: () => void;
-  /** À activer sur tout ce qui vit dans une pile de navigation (REQ-UI-09). */
+  /** À activer sur tout ce qui vit dans une pile de navigation. */
   zoneMorteBord?: boolean;
 }
 

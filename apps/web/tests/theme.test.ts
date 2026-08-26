@@ -11,7 +11,7 @@ const tokens = tacitaTheme.tokens as Record<string, string>;
 /** `defineTheme` résout un couple clair/sombre en une valeur `light-dark()`. */
 const couple = ({ clair, sombre }: { clair: string; sombre: string }) => `light-dark(${clair}, ${sombre})`;
 
-describe("REQ-UI-03 — le thème porte les valeurs de DESIGN.md, et rien d'autre", () => {
+describe("le thème porte les valeurs de DESIGN.md, et rien d'autre", () => {
   const { bg, surface, surfaceRaised, hairline, text, textMuted, accent, accentSoft, danger, warning } =
     COULEURS_DESIGN;
 
@@ -241,7 +241,7 @@ describe("REQ-UI-03 — le thème porte les valeurs de DESIGN.md, et rien d'autr
   });
 });
 
-describe("REQ-UI-03 — le choix de thème est persisté en IndexedDB", () => {
+describe("le choix de thème est persisté en IndexedDB", () => {
   it("le défaut est le clair, thème de référence de DESIGN.md", () => {
     expect(MODE_DEFAUT).toBe("light");
   });

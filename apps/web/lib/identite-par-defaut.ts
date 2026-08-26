@@ -5,11 +5,11 @@ import { poserImagesParDefaut, TAILLE_IDENTITE } from "@tacita/messaging";
 import { environnementMedia } from "./media-env";
 
 /**
- * REQ-MSG-22 / REQ-MED-11 — le câblage des images par défaut : le paquet dessine, le
+ * le câblage des images par défaut : le paquet dessine, le
  * shard trame, le pipeline téléverse.
  *
  * Ce découpage n'est pas un goût d'architecture. Le dessin est déterministe et sans DOM,
- * donc il appartient au paquet (et c'est là que DiceBear est installé : REQ-UI-02 tient
+ * donc il appartient au paquet (et c'est là que DiceBear est installé : tient
  * la liste des dépendances du shard close, même jurisprudence qu'E-10 pour les codecs).
  * La trame, elle, a besoin d'un canvas, et le canvas n'entre que par ici — comme
  * `media-env` pour le reste du pipeline.
@@ -50,7 +50,7 @@ async function tramer(svg: string): Promise<File> {
 }
 
 /**
- * REQ-MED-11 — **le téléversement d'une image publique de profil, pour tout le shard.**
+ * **le téléversement d'une image publique de profil, pour tout le shard.**
  *
  * Le chemin public du pipeline n'a que deux sites d'appel dans le dépôt, et un test
  * structurel du paquet média échoue s'il en apparaît un troisième. Ce fichier en est un ;
@@ -62,9 +62,9 @@ export const televerserImageProfil = (session: Session, fichier: File): Promise<
   uploadPublicProfileImage(session, environnementMedia(), fichier);
 
 /**
- * REQ-MSG-22 — appelée une fois, à la création du compte (parcours d'accueil, M-B).
+ * appelée une fois, à la création du compte (parcours d'accueil, M-B).
  *
- * REQ-MED-11 — **le second des deux sites d'appel du chemin public**, et le test
+ * **le second des deux sites d'appel du chemin public**, et le test
  * structurel du paquet média les nomme tous les deux. Ces images sont publiques et non
  * chiffrées exactement comme la photo qu'elles remplacent : elles n'ajoutent aucune
  * exception, elles empruntent celle qui existe.

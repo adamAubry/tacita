@@ -61,10 +61,10 @@ type Intention =
 /**
  * Layout Conversation (M-D) — le cœur de l'app.
  *
- * Tout ce qui est métier vient des paquets : l'ordre de la timeline (specs 04/05), la
+ * Tout ce qui est métier vient des paquets : l'ordre de la timeline (`@tacita/client-core`/05), la
  * file d'envoi (07), les accusés (06), le typing et les mentions (05). Ce composant les
  * compose et rend ; il ne dérive rien — pas même le nom du salon, qui vient de
- * `conversations()` plutôt que d'un accès au SDK que la spec 00 interdit au shard.
+ * `conversations()` plutôt que d'un accès au SDK que `CLAUDE.md` interdit au shard.
  */
 export function Conversation({ roomId }: { roomId: string }) {
   const { etat } = useSession();
@@ -92,13 +92,13 @@ export function Conversation({ roomId }: { roomId: string }) {
   const [capture, setCapture] = useState(false);
   const [viewer, setViewer] = useState<number | undefined>();
 
-  // L'environnement média (spec 08) est créé une fois : il ouvre un `AudioContext` et
+  // L'environnement média est créé une fois : il ouvre un `AudioContext` et
   // lit `navigator.connection`, ni l'un ni l'autre à refaire à chaque rendu. Les deux
   // gestes qui l'accompagnent — déchiffrer, sauvegarder — viennent du même endroit que
   // pour les autres écrans à médias.
   const { env, avis, telecharger, telechargerChiffre, sauvegarder } = useMediaActions(session);
   /**
-   * REQ-MED-04 — l'échec **dédié** de la compression, distinct de l'absence de bouton.
+   * l'échec **dédié** de la compression, distinct de l'absence de bouton.
    *
    * La vidéo est proposée partout depuis que le chemin rapide existe (E-18) : une source
    * déjà conforme se remuxe sans encodeur. Ce qui reste possible, c'est qu'une source
@@ -111,7 +111,7 @@ export function Conversation({ roomId }: { roomId: string }) {
   const rafraichir = useCallback(() => setVersion((v) => v + 1), []);
 
   /**
-   * REQ-UIX-35 — le fond d'écran choisi pour ce salon (M-H), lu sur cet appareil.
+   * le fond d'écran choisi pour ce salon (M-H), lu sur cet appareil.
    *
    * L'URL d'objet est révoquée au changement de salon comme au démontage : sans cela,
    * chaque conversation ouverte retiendrait son image en mémoire pour toujours.
@@ -146,7 +146,7 @@ export function Conversation({ roomId }: { roomId: string }) {
       subscribe(session, roomId, rafraichir),
       subscribeTyping(session, roomId, rafraichir),
       receipts.current.subscribe(rafraichir),
-      // REQ-UI-13 — le mode masqué est réglé dans les réglages (M-H) et s'applique ici :
+      // le mode masqué est réglé dans les réglages (M-H) et s'applique ici :
       // sans ce branchement, la bascule n'aurait aucun effet sur les reçus émis.
       brancherModeMasque(globalThis.indexedDB, receipts.current),
     ];
@@ -166,7 +166,7 @@ export function Conversation({ roomId }: { roomId: string }) {
   useEffect(() => outbox?.subscribe(rafraichir), [outbox, rafraichir]);
 
   /**
-   * REQ-UI-21 — **remonter l'historique.**
+   * **remonter l'historique.**
    *
    * Ce que /sync laisse dans le store est une fenêtre courte : au bout de quelques jours,
    * les messages plus anciens n'y sont plus, et jusqu'ici rien n'allait les rechercher —
@@ -214,7 +214,7 @@ export function Conversation({ roomId }: { roomId: string }) {
 
   /**
    * Le nom d'affichage d'un auteur. `mentionCandidates` **est** l'annuaire des membres du
-   * salon avec leurs libellés (REQ-MSG-10) : le relire ici évite une API de plus dans le
+   * salon avec leurs libellés : le relire ici évite une API de plus dans le
    * paquet et un accès SDK dans le shard.
    */
   const nomDe = useCallback(
@@ -251,7 +251,7 @@ export function Conversation({ roomId }: { roomId: string }) {
     const lus = listerMessages(session, roomId).map((evenement) => {
       const auteur = evenement.getSender() ?? "";
       return {
-        // REQ-UI-08 — l'événement cité, lu par le paquet : le `body` porte bien une
+        // l'événement cité, lu par le paquet : le `body` porte bien une
         // citation en `> `, mais `messageText` la retire et elle ne dit ni qui ni quoi
         // quand le message cité est une photo.
         citeId: replyTo(evenement),
@@ -264,7 +264,7 @@ export function Conversation({ roomId }: { roomId: string }) {
           texte: messageText(evenement),
           horodatage: evenement.getTs(),
           moi: auteur === moi,
-          // REQ-MSG-06 — les droits viennent du paquet, message par message. Les calculer
+          // les droits viennent du paquet, message par message. Les calculer
           // ici, où l'on tient déjà l'événement, évite de le rechercher au moment du menu.
           modifiable: canEdit(session, roomId, evenement),
           supprimable: canRedact(session, roomId, evenement),
@@ -274,7 +274,7 @@ export function Conversation({ roomId }: { roomId: string }) {
     });
 
     /*
-     * REQ-UI-08 — de quoi résoudre une citation **sans repasser par le SDK** : le message
+     * de quoi résoudre une citation **sans repasser par le SDK** : le message
      * cité est presque toujours quelques lignes plus haut, et la fenêtre chargée le porte
      * déjà. Ce qu'elle ne porte pas se dit tel quel (`citation`), plutôt que d'aller le
      * chercher au serveur ligne par ligne.
@@ -292,7 +292,7 @@ export function Conversation({ roomId }: { roomId: string }) {
     const attente = (outbox?.pending(roomId) ?? []).map((entree) =>
       citer(replyToOf(entree.content), depuisFile(entree, nomDe(moi), moi, avatarDe(moi))),
     );
-    // REQ-UI-06 — les entrées en attente vont **à la fin**, sans exception : elles n'ont
+    // les entrées en attente vont **à la fin**, sans exception : elles n'ont
     // pas encore d'ordre dans /sync, et leur donner une place au milieu supposerait un
     // tri d'horodatages que l'interdit n°6 refuse. C'est aussi ce qu'attend celui qui
     // vient d'écrire : son message est en bas.
@@ -303,10 +303,10 @@ export function Conversation({ roomId }: { roomId: string }) {
   }, [session, roomId, outbox, nomDe, avatarDe, version]);
 
   /**
-   * REQ-RCP-07 / REQ-UIX-08 — **ouvrir une conversation la marque lue.**
+   * **ouvrir une conversation la marque lue.**
    *
    * Le badge de non-lus est le compteur natif du serveur (`getUnreadNotificationCount`,
-   * REQ-MSG-13) : il ne retombe que sur un reçu `m.read`, et **personne ne l'émettait**.
+   *) : il ne retombe que sur un reçu `m.read`, et **personne ne l'émettait**.
    * `createReceipts` exposait `markRead` depuis le premier jour, sans un seul appelant —
    * le compteur ne pouvait donc que monter, ce que les utilisateurs ont signalé tel quel.
    * C'est exactement la règle 7 : un membre que rien ne lit est indétectable.
@@ -330,7 +330,7 @@ export function Conversation({ roomId }: { roomId: string }) {
     void receipts.current?.markRead(dernier).catch(() => {});
   }, [session, roomId, pret, version]);
 
-  // REQ-UI-13 — l'accusé se rend sur le dernier message envoyé, et sur lui seul.
+  // l'accusé se rend sur le dernier message envoyé, et sur lui seul.
   const dernierEnvoye = [...messages].reverse().find((message) => message.moi && message.eventId);
   const recu = dernierEnvoye?.eventId
     ? {
@@ -345,14 +345,14 @@ export function Conversation({ roomId }: { roomId: string }) {
     const contenu = { msgtype: "m.text", ...parseMentions(texte, candidats) };
 
     if (intention?.quoi === "modifier" && intention.message.eventId) {
-      // REQ-UI-07 — une modification part directement : elle porte sur un événement qui
+      // une modification part directement : elle porte sur un événement qui
       // existe déjà côté serveur, la file d'envoi n'a rien à en faire.
       void edit(session, roomId, intention.message.eventId, texte, { mentions: candidats });
     } else {
-      // REQ-UIX-15 — envoi optimiste : l'entrée entre dans la file, la timeline la rend
-      // aussitôt. Chiffrement et reprises sont l'affaire de la spec 07.
+      // envoi optimiste : l'entrée entre dans la file, la timeline la rend
+      // aussitôt. Chiffrement et reprises sont l'affaire de `@tacita/outbox`.
       /*
-       * REQ-UI-08 — la relation vient du paquet (REQ-MSG-04), et elle porte l'`event_id`
+       * la relation vient du paquet, et elle porte l'`event_id`
        * du message cité — jamais sa `cle`, qui est un identifiant de transaction tant que
        * le serveur n'a rien attribué. Répondre à un message encore en file aurait posé une
        * relation vers un événement qui n'existe nulle part : personne ne l'aurait résolue,
@@ -384,7 +384,7 @@ export function Conversation({ roomId }: { roomId: string }) {
   };
 
   /**
-   * REQ-UI-14 — un seul pipeline pour toutes les pièces jointes (interdit n°11) :
+   * un seul pipeline pour toutes les pièces jointes (interdit n°11) :
    * `uploadAttachment` chiffre, compresse et téléverse, puis le contenu rendu part par la
    * file d'envoi comme un message texte.
    */
@@ -396,7 +396,7 @@ export function Conversation({ roomId }: { roomId: string }) {
     try {
       for (const fichier of fichiers) {
         /*
-         * REQ-OBX-10 — **la compression et le chiffrement ici, le téléversement dans la
+         * **la compression et le chiffrement ici, le téléversement dans la
          * file.** Rien ne part au réseau avant `enqueue` : ce qui est mis en file porte
          * ses octets chiffrés, donc un envoi interrompu reprend là où il s'est arrêté,
          * sans rechiffrer, y compris après un rechargement de la page.
@@ -404,7 +404,7 @@ export function Conversation({ roomId }: { roomId: string }) {
         const { contenu, televersements } = await prepareAttachment(env, fichier);
 
         /*
-         * REQ-MED-19 — **on ne met pas en file ce que le serveur refusera.** Le plafond
+         * **on ne met pas en file ce que le serveur refusera.** Le plafond
          * vient du serveur lui-même, pas d'une constante : sans ce contrôle, une vidéo
          * de onze minutes partait en 206 Mo pour s'entendre refuser à la fin, et le refus
          * arrivait sous une forme que le navigateur masquait (413 sans en-tête CORS).
@@ -431,7 +431,7 @@ export function Conversation({ roomId }: { roomId: string }) {
           })),
         );
       }
-      // REQ-MED-13 / REQ-MED-04 — la vidéo est partie ; ce qu'elle a laissé en route se dit
+      // la vidéo est partie ; ce qu'elle a laissé en route se dit
       // maintenant, à l'expéditeur et à lui seul. Une vidéo envoyée est un succès ; la
       // taire à moitié serait l'interdit n°13.
       if (avis.current === "video-sans-son") {
@@ -442,9 +442,9 @@ export function Conversation({ roomId }: { roomId: string }) {
         );
       }
     } catch (cause) {
-      // REQ-MED-10 — le message ne cite jamais le fichier : ni son nom, ni ses octets.
+      // le message ne cite jamais le fichier : ni son nom, ni ses octets.
       /*
-       * REQ-MED-04 — **trois phrases, parce que ce sont trois situations.** « Ce
+       * **trois phrases, parce que ce sont trois situations.** « Ce
        * navigateur ne sait pas lire ce format » se règle en changeant d'appareil ou en
        * réexportant la vidéo ; « il ne sait pas l'encoder » non. Les confondre — ce que
        * faisait la phrase unique — envoyait chercher une solution qui n'existe pas :
@@ -484,10 +484,10 @@ export function Conversation({ roomId }: { roomId: string }) {
           titre={salon?.name ?? "Conversation"}
           fin={
             <div style={{ display: "flex", gap: "var(--spacing-1)" }}>
-              {/* M-D fournit l'emplacement, M-I le comportement (REQ-UI-19) : les deux
+              {/* M-D fournit l'emplacement, M-I le comportement : les deux
                   boutons routent vers l'écran d'appel, qui embarque Element Call. Rien
                   n'est composé ici (interdit n°7), et **aucun des deux n'est désactivé**
-                  sans focus RTC — la cause s'affiche dans l'écran (REQ-CAL-02). */}
+                  sans focus RTC — la cause s'affiche dans l'écran. */}
               <Button
                 label="Appel audio"
                 variant="ghost"
@@ -515,7 +515,7 @@ export function Conversation({ roomId }: { roomId: string }) {
           }
         />
 
-        {/* REQ-UI-19 — « appel en cours — rejoindre », dans le salon concerné. */}
+        {/* « appel en cours — rejoindre », dans le salon concerné. */}
         <BandeauAppel roomId={roomId} />
 
         <Timeline
@@ -529,7 +529,7 @@ export function Conversation({ roomId }: { roomId: string }) {
               nom={salon?.name ?? ""}
               sousTitre={
                 salon?.direct
-                  ? // REQ-UIX-42 — l'identifiant sans son domaine, identique pour tous.
+                  ? // l'identifiant sans son domaine, identique pour tous.
                     (salon.peerId ? identifiantCourt(salon.peerId) : "")
                   : `${session ? memberCount(session, roomId) : 0} membres`
               }
@@ -563,7 +563,7 @@ export function Conversation({ roomId }: { roomId: string }) {
           contexte={
             intention && {
               libelle: intention.quoi === "repondre" ? `Réponse à ${intention.message.nom}` : "Modification",
-              // REQ-UI-08 — « Photo », « Vidéo », « Message vocal » : un média n'a pas de
+              // « Photo », « Vidéo », « Message vocal » : un média n'a pas de
               // texte, et son `body` est un nom de fichier que personne ne reconnaît.
               extrait: apercu(intention.message),
               onAnnuler: () => setIntention(undefined),
@@ -594,7 +594,7 @@ export function Conversation({ roomId }: { roomId: string }) {
       <PhotoCapture
         ouvert={capture}
         onFermer={() => setCapture(false)}
-        // REQ-UI-15 — deux gestes, deux destinations : l'original reste sur l'appareil,
+        // deux gestes, deux destinations : l'original reste sur l'appareil,
         // seule la version compressée par le pipeline part au correspondant.
         onEnregistrer={(original, nom) => saveOriginal(env, original, nom)}
         onEnvoyer={(photo) => void joindre([photo])}
@@ -623,7 +623,7 @@ export function Conversation({ roomId }: { roomId: string }) {
         }
         onReagir={(emoji) => holdSur && reagir(holdSur, emoji)}
         onRepondre={() => holdSur && setIntention({ quoi: "repondre", message: holdSur })}
-        // REQ-MSG-07 — le texte vient du paquet, l'accès presse-papiers est à l'UI.
+        // le texte vient du paquet, l'accès presse-papiers est à l'UI.
         onCopier={() => holdSur && void navigator.clipboard?.writeText(holdSur.texte)}
         onModifier={() => holdSur && setIntention({ quoi: "modifier", message: holdSur })}
         onSupprimer={() => {

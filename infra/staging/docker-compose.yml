@@ -2,7 +2,7 @@
 #
 #   docker compose -f docker-compose.yml -f staging/docker-compose.yml up -d --build
 #
-# Il n'ajoute qu'une chose à la pile de base — le shard, servi par le proxy (REQ-INF-16).
+# Il n'ajoute qu'une chose à la pile de base — le shard, servi par le proxy.
 # Tout le reste est déjà dans `docker-compose.yml`, et c'est voulu : un staging qui
 # diffère du socle par plus qu'un service ne prouve plus rien sur le socle.
 #
@@ -13,7 +13,7 @@
 name: tacita
 
 services:
-  # REQ-INF-16 — l'artefact de production du shard. Construit **sur la machine cible** :
+  # l'artefact de production du shard. Construit **sur la machine cible** :
   # `next build` inline `NEXT_PUBLIC_*` dans le bundle, donc l'image dépend du domaine.
   # Un registre d'images n'aurait de sens qu'avec une configuration lue au démarrage.
   web:
@@ -27,7 +27,7 @@ services:
         NEXT_PUBLIC_HOMESERVER_URL: https://${SERVER_NAME}
         NEXT_PUBLIC_ELEMENT_CALL_URL: https://call.${SERVER_NAME}
         # Interne au réseau du compose, et **doit le rester** :
-        # `/_matrix/push/v1/notify` n'a aucune authentification (spec 03).
+        # `/_matrix/push/v1/notify` n'a aucune authentification.
         NEXT_PUBLIC_PUSH_NOTIFY_URL: http://push-gateway:8008/_matrix/push/v1/notify
     restart: unless-stopped
     # Aucun `ports:`, volontairement. Le shard n'est joignable que par le proxy : publié

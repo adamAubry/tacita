@@ -9,7 +9,7 @@ import { RecoveryStep } from "./RecoveryStep";
 import { useSession } from "./SessionProvider";
 
 /**
- * REQ-UI-04 — **la deuxième connexion.** L'autre moitié de la porte, celle qui manquait.
+ * **la deuxième connexion.** L'autre moitié de la porte, celle qui manquait.
  *
  * Chaque connexion OIDC donne un `device_id` neuf : l'appareil n'est pas signé par
  * l'identité de son propriétaire, et D-08 le laisse alors muet *et* sourd — il n'enverra

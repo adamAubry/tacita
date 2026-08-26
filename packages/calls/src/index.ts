@@ -23,7 +23,7 @@ export {
 export type { LivekitFocus } from "./matrixrtc";
 
 /**
- * REQ-CAL-02 — erreur typée, pas de bouton inerte : sans focus, l'UI doit pouvoir dire
+ * erreur typée, pas de bouton inerte : sans focus, l'UI doit pouvoir dire
  * *pourquoi* l'appel est impossible. `reason` distingue les trois pannes réelles, qui
  * n'appellent pas la même action côté exploitant.
  */
@@ -64,11 +64,11 @@ export interface CallWidgetOptions {
   widgetId: string;
   /**
    * Point d'entrée : `true` pour « appel vidéo », `false` pour « appel audio »
-   * (REQ-UIX-38). C'est un **paramètre de lancement**, pas un réglage : la bascule
+   * C'est un **paramètre de lancement**, pas un réglage : la bascule
    * voix↔vidéo pendant l'appel appartient à Element Call (E-07).
    *
    * Traduit en `intent`, relu dans `src/UrlParams.ts` de la **v0.23.0** — la version
-   * qu'épingle `infra/rtc/` (REQ-RTC-08). E-14 close : la version précédente de ce
+   * qu'épingle `infra/rtc/`. E-14 close : la version précédente de ce
    * fichier envoyait `video=true|false`, un paramètre qu'Element Call **ne lit nulle
    * part**. Il ne cassait rien et ne faisait rien.
    */
@@ -76,21 +76,21 @@ export interface CallWidgetOptions {
 }
 
 /**
- * REQ-UIX-38 — les intentions de lancement d'Element Call, relues dans l'enum
+ * les intentions de lancement d'Element Call, relues dans l'enum
  * `UserIntent` de la v0.23.0. Elles ne se recopient pas de mémoire : `infra/rtc/README.md`
  * dit où les relire au prochain bump d'image.
  *
  * `start_call` et `start_call_voice` posent tous deux `skipLobby: false` : le lobby
  * reste, et avec lui le rattrapage si l'intention envoyée n'est pas celle qu'on voulait.
  * Les variantes `_dm` ne sont volontairement pas utilisées — elles activent sonnerie et
- * attente de décrochage, ce que la spec 10 a écarté en V1 (YAGNI).
+ * attente de décrochage, ce que `@tacita/calls` a écarté en V1 (YAGNI).
  */
 const INTENT_AUDIO = "start_call_voice";
 const INTENT_VIDEO = "start_call";
 
 /**
- * REQ-CAL-02 — découverte des foci via `.well-known/matrix/client` (servi par le proxy
- * avec CORS, spec 02 REQ-RTC-05). Toute panne remonte typée.
+ * découverte des foci via `.well-known/matrix/client` (servi par le proxy
+ * avec CORS). Toute panne remonte typée.
  */
 export async function discoverFocus(homeserverUrl: string): Promise<LivekitFocus> {
   let wellKnown: Record<string, unknown>;
@@ -114,12 +114,12 @@ export async function discoverFocus(homeserverUrl: string): Promise<LivekitFocus
 }
 
 /**
- * REQ-CAL-01 — URL du widget Element Call, prête pour une iframe montée par le shard UI
- * (spec 11). Les paramètres vivent dans le fragment : ils ne partent jamais au serveur
+ * URL du widget Element Call, prête pour une iframe montée par le shard UI
+ * Les paramètres vivent dans le fragment : ils ne partent jamais au serveur
  * qui héberge Element Call.
  *
  * Aucun credential LiveKit n'apparaît ici. L'autorisation SFU se fait plus tard, par
- * l'échange jeton OpenID → `lk-jwt-service` que porte le driver (REQ-CAL-05).
+ * l'échange jeton OpenID → `lk-jwt-service` que porte le driver.
  */
 export function buildCallWidget(
   session: Session,
@@ -149,7 +149,7 @@ export function buildCallWidget(
     // et pas hérité du preset d'`intent` : c'est la garantie du produit, elle ne dépend
     // pas d'une valeur par défaut d'amont. Les params explicites gagnent sur le preset.
     perParticipantE2EE: "true",
-    // REQ-UIX-38 — le point d'entrée choisi, transmis au lancement. Défaut audio :
+    // le point d'entrée choisi, transmis au lancement. Défaut audio :
     // allumer la caméra de quelqu'un qui n'a rien demandé se répare mal.
     intent: options.video ? INTENT_VIDEO : INTENT_AUDIO,
   };
@@ -161,18 +161,18 @@ export function buildCallWidget(
 }
 
 /**
- * REQ-CAL-05 — branche l'API widget sur une iframe **déjà rendue par le shard UI**.
+ * branche l'API widget sur une iframe **déjà rendue par le shard UI**.
  *
- * Le rendu de l'iframe reste hors de ce paquet (spec 10) ; le pont postMessage, lui, y
+ * Le rendu de l'iframe reste hors de ce paquet ; le pont postMessage, lui, y
  * est : sans lui le widget n'obtient pas son jeton OpenID et l'appel n'est jamais
- * autorisé par le SFU. Il vit ici et pas dans le shard parce que REQ-UI-02 tient une
+ * autorisé par le SFU. Il vit ici et pas dans le shard parce que tient une
  * liste close de dépendances qui n'inclut pas `matrix-widget-api` — et n'a pas à
  * l'inclure : c'est du protocole, pas de l'interface.
  *
  * `onReady` est appelé quand le widget **nous a parlé**. C'est le seul signal qui dise
  * qu'Element Call a démarré : le `load` de l'iframe, lui, se déclenche pour n'importe
  * quel document — y compris une page d'erreur du serveur qui l'héberge. Le shard s'en
- * sert pour son délai de chargement (REQ-UIX-38).
+ * sert pour son délai de chargement.
  */
 export function attachCallWidget(
   session: Session,
@@ -198,7 +198,7 @@ export function attachCallWidget(
 }
 
 /**
- * REQ-CAL-03 — état d'appel d'un salon, dérivé des seuls événements d'état MatrixRTC.
+ * état d'appel d'un salon, dérivé des seuls événements d'état MatrixRTC.
  * YAGNI assumé : ni sonnerie, ni refus, ni appel manqué — l'état d'appartenance dit déjà
  * qui est là et depuis quand.
  */

@@ -6,7 +6,7 @@ import type { Session } from "@tacita/client-core";
 import { profileOf, updateProfile } from "./social";
 
 /**
- * REQ-MSG-22 — **l'identité visuelle d'un compte neuf**, dessinée sur l'appareil.
+ * **l'identité visuelle d'un compte neuf**, dessinée sur l'appareil.
  *
  * Un compte fraîchement créé n'a ni photo ni bannière : la carte de profil affiche alors
  * des initiales sur un aplat d'accent, et toutes les cartes de l'app se ressemblent. Ces
@@ -36,8 +36,8 @@ const CONSTELLATION = new Style(constellation);
 export const TAILLE_IDENTITE = 512;
 
 /**
- * REQ-MSG-22 — les deux SVG, tels que DiceBear les rend. Rendus **en clair** parce
- * qu'ils sont publics au même titre que la photo qu'ils remplacent (REQ-MED-11).
+ * les deux SVG, tels que DiceBear les rend. Rendus **en clair** parce
+ * qu'ils sont publics au même titre que la photo qu'ils remplacent.
  *
  * Deux styles distincts et pas un seul décliné : l'avatar est une forme unique et
  * lisible à 32 px (« glyphs »), la bannière est une texture qui doit supporter d'être
@@ -52,12 +52,12 @@ export function imagesParDefaut(seed: string): { avatar: string; banniere: strin
 }
 
 /**
- * REQ-MSG-22 — pose les images par défaut sur son propre profil, **sans jamais écraser
+ * pose les images par défaut sur son propre profil, **sans jamais écraser
  * ce que le compte a déjà**. Les deux champs sont regardés séparément : quelqu'un qui a
  * choisi sa photo mais pas sa bannière ne perd pas sa photo.
  *
  * `televerser` est injecté et non appelé ici pour la même raison que `onPhoto` dans M-G :
- * ce paquet ne connaît pas le pipeline média, et REQ-MED-11 veut que les sites d'appel du
+ * ce paquet ne connaît pas le pipeline média, et veut que les sites d'appel du
  * chemin public restent comptables un par un. Il reçoit un SVG et rend le `mxc://`.
  *
  * Appelée à la création du compte (M-B). L'appeler deux fois ne fait rien la seconde

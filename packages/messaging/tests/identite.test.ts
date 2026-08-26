@@ -19,7 +19,7 @@ function fauxTeleversement() {
   };
 }
 
-describe("REQ-MSG-22 — images par défaut : deux styles, un seed, aucun réseau", () => {
+describe("images par défaut : deux styles, un seed, aucun réseau", () => {
   it("rend un glyphe et une constellation, déterministes pour un même identifiant", () => {
     const images = imagesParDefaut(MOI);
 

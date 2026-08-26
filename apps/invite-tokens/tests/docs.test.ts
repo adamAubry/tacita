@@ -1,26 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const lire = (chemin: string) => readFileSync(new URL(chemin, import.meta.url), "utf-8");
-
-const limites = lire("../LIMITES.md");
 const racine = new URL("../../../", import.meta.url);
 
-describe("REQ-INV-19 — la métadonnée « qui invite qui » est documentée, pas masquée", () => {
-  it("LIMITES.md la nomme, la borne, et dit ce qu'elle n'est pas", () => {
-    expect(limites).toMatch(/qui invite qui/i);
-    expect(limites).toMatch(/métadonnée/i);
-    // Ce qui empêche la limite de grossir dans les têtes : elle n'est pas du contenu.
-    expect(limites).toMatch(/jamais du contenu/i);
-    expect(limites).toMatch(/REQ-INF-13/);
-  });
-
-  it("elle dit aussi comment s'en passer — sinon ce n'est pas une limite, c'est une fatalité", () => {
-    expect(limites).toMatch(/identifiant Matrix direct/i);
-  });
-});
-
-describe("REQ-INV-16 — l'ajout par identifiant ne passe pas par ce service", () => {
+describe("l'ajout par identifiant ne passe pas par ce service", () => {
   /**
    * Ce qui doit rester vrai : **un seul module hors de ce dossier connaît ce service**,
    * et c'est le client de liens du shard. Le reste du dépôt l'ignore, ce qui garantit

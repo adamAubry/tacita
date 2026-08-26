@@ -1,15 +1,15 @@
 import type { Bytes } from "./attachments";
 
 /**
- * Muxeur MP4 (ISO BMFF) — **octets → octets, aucun DOM** (spec 08, § Méthode, E-10).
+ * Muxeur MP4 (ISO BMFF) — **octets → octets, aucun DOM** (§ Méthode, E-10).
  *
  * Il n'encode rien : il reçoit des échantillons déjà encodés — par `WebCodecs` pour la
  * vidéo, tels quels depuis la source pour l'audio — et les range dans les boîtes qu'un
  * lecteur attend. C'est le pendant vidéo du muxeur Ogg.
  *
- * **Deux pistes depuis le 20/08/2026 (REQ-MED-13).** Le commentaire qui vivait ici disait
+ * **Deux pistes depuis le 20/08/2026.** Le commentaire qui vivait ici disait
  * « une piste, pas de son : l'audio d'une vidéo de téléphone n'est pas dans le périmètre
- * de D-04, et aucune exigence ne la demande ». C'était vrai de la lettre des specs et faux
+ * de D-04, et aucune exigence ne la demande ». C'était vrai de la lettre de specs et faux
  * du produit : sur une messagerie, une vidéo muette est perçue comme un bug. La REQ existe
  * maintenant, et la piste avec elle.
  */
@@ -39,7 +39,7 @@ export interface EchantillonAudio {
   duree: number;
 }
 
-/** REQ-MED-13 — la piste audio, telle que le muxeur la reçoit : déjà encodée, jamais convertie. */
+/** la piste audio, telle que le muxeur la reçoit : déjà encodée, jamais convertie. */
 export interface PisteAudio {
   /**
    * La boîte `esds` de la source, **recopiée octet pour octet**, en-tête compris.
@@ -67,7 +67,7 @@ export interface Mp4Options {
   description: Bytes;
   echantillons: EchantillonVideo[];
   /**
-   * REQ-MED-14 — la rotation **à l'affichage**, propagée dans la matrice du `tkhd`.
+   * la rotation **à l'affichage**, propagée dans la matrice du `tkhd`.
    *
    * Gratuite et sans perte : les pixels ne bougent pas, seul le lecteur tourne l'image.
    * `largeur`/`hauteur` restent celles des pixels codés — c'est la matrice qui dit au
@@ -76,7 +76,7 @@ export interface Mp4Options {
    */
   rotation?: Rotation;
   /**
-   * REQ-MED-13 — la piste audio, quand la source en a une **et** qu'elle est transportable.
+   * la piste audio, quand la source en a une **et** qu'elle est transportable.
    *
    * Absente ⇒ fichier **mono-piste**, jamais une piste vide : un `trak` sans échantillon
    * fait échouer certains lecteurs et n'apporte rien aux autres.
@@ -140,7 +140,7 @@ const pleine = (drapeaux = 0): number[] => [
 const f1616 = (valeur: number): number[] => u32(valeur * 0x10000);
 
 /**
- * REQ-MED-14 — la matrice de transformation du `tkhd`, disposée `{a, b, u, c, d, v, x, y, w}`.
+ * la matrice de transformation du `tkhd`, disposée `{a, b, u, c, d, v, x, y, w}`.
  *
  * Seuls les quatre termes de rotation sont posés ; les translations restent nulles, comme
  * le fait la matrice d'affichage de ffmpeg. Un lecteur qui honore la matrice fait tourner
@@ -300,7 +300,7 @@ export function ecrireMp4({
   );
 
   /*
-   * REQ-MED-13 — **l'entrelacement**, et pourquoi il n'est pas cosmétique.
+   * **l'entrelacement**, et pourquoi il n'est pas cosmétique.
    *
    * Deux pistes rangées d'un bloc obligent un lecteur à sauter d'un bout à l'autre du
    * fichier pour tenir une seconde de son en face d'une seconde d'image. Sur un blob

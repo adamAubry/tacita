@@ -1,6 +1,6 @@
 import webpush from "web-push";
 
-/** Données de pusher enregistrées par le client (spec 11) : les clés de la subscription Web Push.
+/** Données de pusher enregistrées par le client : les clés de la subscription Web Push.
  *  L'endpoint n'y est pas répété — c'est la `pushkey`, qui identifie déjà la subscription. */
 type PusherData = { p256dh?: string; auth?: string };
 type Device = { pushkey?: string; data?: PusherData };
@@ -50,20 +50,20 @@ export async function notify(notification: Notification): Promise<string[]> {
         return;
       }
       try {
-        // REQ-PSH-02 : event_id et room_id, rien d'autre. Le client déchiffre après réveil.
+        // event_id et room_id, rien d'autre. Le client déchiffre après réveil.
         const subscription = { endpoint: pushkey, keys: { p256dh: data.p256dh, auth: data.auth } };
         const envoi = await webpush.sendNotification(
           subscription,
           JSON.stringify({ event_id, room_id }),
           OPTIONS,
         );
-        // REQ-PSH-04 : un code de statut, rien d'autre. C'est la seule preuve qu'un
+        // un code de statut, rien d'autre. C'est la seule preuve qu'un
         // push est bien parti, et le seul endroit du déploiement où elle soit lisible.
         console.info("push_ok", { status: envoi?.statusCode ?? 0 });
       } catch (error) {
         const status = (error as { statusCode?: number }).statusCode;
         if (status === 404 || status === 410) rejected.push(pushkey);
-        // REQ-PSH-04 : ID d'événement et code de statut, jamais le payload ni l'erreur brute.
+        // ID d'événement et code de statut, jamais le payload ni l'erreur brute.
         console.warn("push_failed", { event_id, status: status ?? 0 });
       }
     }),

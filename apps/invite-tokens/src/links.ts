@@ -2,7 +2,7 @@ import type { MatrixReader } from "./matrix.ts";
 import type { Link, LinkKind, Store } from "./store.ts";
 import { hashToken, mintToken } from "./tokens.ts";
 
-/** REQ-INV-01 — un usage, un jour, sept jours au plus. */
+/** un usage, un jour, sept jours au plus. */
 export const DEFAULT_MAX_USES = 1;
 export const DEFAULT_TTL_SECONDS = 86_400;
 export const MAX_TTL_SECONDS = 604_800;
@@ -10,10 +10,10 @@ export const MAX_TTL_SECONDS = 604_800;
 export interface Deps {
   store: Store;
   matrix: MatrixReader;
-  /** REQ-INV-17 — l'horloge du serveur, jamais une date venue du client. */
+  /** l'horloge du serveur, jamais une date venue du client. */
   now?: () => number;
   /**
-   * REQ-INV-09 — limitation par **compte appelant** ; l'autre moitié, par IP, est
+   * limitation par **compte appelant** ; l'autre moitié, par IP, est
    * appliquée par le serveur avant même l'authentification. Rend `false` quand le
    * budget est épuisé. Ici et pas dans le serveur : le compte n'est connu qu'après
    * `whoami`, et le refaire pour le limiteur doublerait l'appel à Synapse.
@@ -23,7 +23,7 @@ export interface Deps {
 
 /**
  * L'échec, tel qu'il sort du service. `status` et `errcode` seuls : pas de champ libre,
- * donc pas de détail qui distinguerait deux causes que REQ-INV-08 veut confondre.
+ * donc pas de détail qui distinguerait deux causes que veut confondre.
  */
 export class LinkError extends Error {
   readonly status: number;
@@ -44,7 +44,7 @@ export class LinkError extends Error {
 }
 
 /**
- * REQ-INV-08 — **le seul** échec de résolution. Token inconnu, expiré, révoqué, épuisé,
+ * **le seul** échec de résolution. Token inconnu, expiré, révoqué, épuisé,
  * émetteur disparu, blocage : une réponse, un corps, un code. Distinguer les causes
  * permettrait de sonder l'existence d'un token et, pour le blocage, de confirmer au
  * bloqué qu'il l'est. L'UI dit « ce lien n'est plus valide » et propose d'en redemander.
@@ -52,9 +52,9 @@ export class LinkError extends Error {
 const invalide = () => new LinkError(404, "TACITA_LINK_INVALID");
 
 /**
- * REQ-INV-10/11 — pas de jeton valide, donc pas de compte **ou** pas encore authentifié.
+ * pas de jeton valide, donc pas de compte **ou** pas encore authentifié.
  * Le service ne peut pas distinguer les deux, et n'a pas à le faire : il répond avant
- * toute lecture de token, donc aucun usage n'est consommé, et l'UI (spec 11) mène à
+ * toute lecture de token, donc aucun usage n'est consommé, et l'UI mène à
  * l'écran de connexion, où l'on se connecte ou l'on crée son compte. Ce service, lui,
  * n'en crée aucun — depuis D-13 c'est le formulaire qui s'en charge, sans code
  * d'invitation.
@@ -76,7 +76,7 @@ export interface IssueRequest {
   ttlSeconds?: unknown;
 }
 
-/** REQ-INV-01 — création. Tout ce qui n'est pas conforme est refusé, pas corrigé en silence. */
+/** création. Tout ce qui n'est pas conforme est refusé, pas corrigé en silence. */
 export async function issue(
   deps: Deps,
   accessToken: string | undefined,
@@ -96,7 +96,7 @@ export async function issue(
   }
 
   const ttl = request.ttlSeconds ?? DEFAULT_TTL_SECONDS;
-  // REQ-INV-17 — le plafond est appliqué ici, sur l'horloge du serveur. Un TTL au-delà
+  // le plafond est appliqué ici, sur l'horloge du serveur. Un TTL au-delà
   // est refusé plutôt que rogné : un lien qui dure moins que ce qu'on a demandé se
   // découvre au pire moment.
   if (typeof ttl !== "number" || !Number.isInteger(ttl) || ttl < 1 || ttl > MAX_TTL_SECONDS) {
@@ -113,7 +113,7 @@ export async function issue(
     maxUses,
   });
 
-  // REQ-INV-03 — le porteur ne reçoit que l'opaque et sa date : ni émetteur, ni salon,
+  // le porteur ne reçoit que l'opaque et sa date : ni émetteur, ni salon,
   // ni libellé. Un lien qui fuite ne dit pas qui invite qui.
   return { id: link.id, token, expiresAt: link.expiresAt };
 }
@@ -125,14 +125,14 @@ export interface LinkSummary {
   usesLeft: number;
 }
 
-/** REQ-INV-04 — les liens actifs de l'appelant, jamais ceux d'un autre. */
+/** les liens actifs de l'appelant, jamais ceux d'un autre. */
 export async function list(deps: Deps, accessToken: string | undefined): Promise<LinkSummary[]> {
   const issuer = await caller(deps, accessToken);
   const links = await deps.store.listByIssuer(issuer, clock(deps)());
   return links.map(({ id, kind, expiresAt, usesLeft }) => ({ id, kind, expiresAt, usesLeft }));
 }
 
-/** REQ-INV-05 — révocation immédiate. Le lien d'un autre est traité comme inexistant. */
+/** révocation immédiate. Le lien d'un autre est traité comme inexistant. */
 export async function revoke(
   deps: Deps,
   accessToken: string | undefined,
@@ -155,7 +155,7 @@ const rendu = (link: Link): Resolution => ({
 });
 
 /**
- * REQ-INV-06 — **le service s'arrête à l'identifiant.** Il n'émet aucune invitation, ne
+ * **le service s'arrête à l'identifiant.** Il n'émet aucune invitation, ne
  * joint aucun salon, ne crée rien : c'est le client qui invite ensuite, par le chemin
  * natif de D-09. Un service compromis peut mentir sur un identifiant ; il ne peut rien
  * envoyer, joindre ni lire.
@@ -166,37 +166,37 @@ export async function resolve(
   token: string,
 ): Promise<Resolution> {
   const bearer = await caller(deps, accessToken);
-  // REQ-INV-09 — un service qui ne compte pas ses échecs n'a aucun moyen de voir qu'on
+  // un service qui ne compte pas ses échecs n'a aucun moyen de voir qu'on
   // l'essaie. Compté avant toute lecture de la base : un essai reste un essai.
   if (deps.limit && !deps.limit(`compte:${bearer}`)) throw new LinkError(429, "TACITA_RATE_LIMITED");
 
   const now = clock(deps)();
   const hash = hashToken(token);
 
-  // Lecture d'abord : les refus de REQ-INV-12 à REQ-INV-15 ne doivent consommer aucun
-  // usage. La consommation, elle, reste une instruction atomique (REQ-INV-07).
+  // Lecture d'abord : les refus de à ne doivent consommer aucun
+  // usage. La consommation, elle, reste une instruction atomique.
   const found = await deps.store.find(hash, bearer, now);
   if (!found) throw invalide();
 
-  // REQ-INV-12 — le porteur est l'émetteur. Message explicite : lui seul peut déclencher
+  // le porteur est l'émetteur. Message explicite : lui seul peut déclencher
   // ce cas, et il connaît déjà son propre lien, donc rien ne fuite.
   if (found.link.issuer === bearer) throw new LinkError(400, "TACITA_OWN_LINK");
 
-  // REQ-INV-14 — un blocage ne s'annonce pas : le dire confirmerait au bloqué qu'il
-  // l'est. Voir LIMITES.md pour l'autre sens, que le service ne peut pas connaître.
+  // un blocage ne s'annonce pas : le dire confirmerait au bloqué qu'il
+  // l'est. pour l'autre sens, que le service ne peut pas connaître.
   if (await deps.matrix.ignores(accessToken!, bearer, found.link.issuer)) throw invalide();
 
-  // REQ-INV-15 — émetteur disparu. Vérifié à chaque résolution, jamais mis en cache : un
+  // émetteur disparu. Vérifié à chaque résolution, jamais mis en cache : un
   // compte désactivé hier ne doit pas rester valide parce qu'il l'était avant-hier.
   if (!(await deps.matrix.accountExists(accessToken!, found.link.issuer))) throw invalide();
 
-  // REQ-INV-13 — ce porteur a déjà résolu ce lien : succès idempotent, aucun usage de
+  // ce porteur a déjà résolu ce lien : succès idempotent, aucun usage de
   // plus. Ce n'est pas une erreur, le client rouvre simplement la conversation.
   if (found.repeated) return rendu(found.link);
 
   const consumed = await deps.store.consume(hash, bearer, now);
   // Usages épuisés, ou dernier usage perdu au profit d'une résolution concurrente : même
-  // échec neutre que tout le reste (REQ-INV-08).
+  // échec neutre que tout le reste.
   if (!consumed) throw invalide();
   return rendu(consumed);
 }

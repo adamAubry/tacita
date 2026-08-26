@@ -30,7 +30,7 @@ interface SalonFictif {
 /**
  * Un client à plusieurs salons — ce que `session-mock` n'offre pas : il en tient un
  * seul, ce qui suffit aux quatre autres suites et pas à celle-ci. Le contrat `Session`
- * reste vérifié par `asSession`, seul site de compilation autorisé (spec 00).
+ * reste vérifié par `asSession`, seul site de compilation autorisé.
  */
 function fakeClient(salons: SalonFictif[], directs: Record<string, string[]> = {}) {
   const rooms = salons.map((salon) => ({
@@ -53,7 +53,7 @@ function fakeClient(salons: SalonFictif[], directs: Record<string, string[]> = {
     setRoomTag: vi.fn(async (_roomId: string, _tag: string, _metadata: object) => ({})),
     deleteRoomTag: vi.fn(async (_roomId: string, _tag: string) => ({})),
     createRoom: vi.fn(async () => ({ room_id: "!neuf:tacita.test" })),
-    // REQ-MSG-15 — `m.direct` s'écrit vraiment : le mock le conserve, pour que la
+    // `m.direct` s'écrit vraiment : le mock le conserve, pour que la
     // relecture voie ce que l'écriture a posé.
     setAccountData: vi.fn(async (type: string, contenu: Record<string, string[]>) => {
       if (type === "m.direct") Object.assign(directs, contenu);
@@ -80,7 +80,7 @@ function fakeClient(salons: SalonFictif[], directs: Record<string, string[]> = {
   return { session, client };
 }
 
-describe("REQ-MSG-13 — liste des conversations, compteurs natifs, invitations à part", () => {
+describe("liste des conversations, compteurs natifs, invitations à part", () => {
   it("rend les salons rejoints, le plus récent d'abord, avec aperçu et horodatage", () => {
     const { session } = fakeClient([
       { roomId: "!vieux:t", name: "vieux", messages: [{ texte: "salut", ts: 1000 }] },
@@ -156,7 +156,7 @@ describe("REQ-MSG-13 — liste des conversations, compteurs natifs, invitations 
   });
 });
 
-describe("REQ-MSG-14 — épingle par le tag natif m.favourite", () => {
+describe("épingle par le tag natif m.favourite", () => {
   it("épingler pose le tag, désépingler le retire", async () => {
     const { session, client } = fakeClient([{ roomId: "!a:t", name: "a" }]);
 
@@ -173,7 +173,7 @@ describe("REQ-MSG-14 — épingle par le tag natif m.favourite", () => {
   });
 });
 
-describe("REQ-MSG-15 — un seul DM par correspondant", () => {
+describe("un seul DM par correspondant", () => {
   it("réutilise le DM existant sans créer de salon", async () => {
     const { session, client } = fakeClient([{ roomId: "!dm:t", name: "adam" }], {
       [ADAM]: ["!dm:t"],
@@ -194,7 +194,7 @@ describe("REQ-MSG-15 — un seul DM par correspondant", () => {
   });
 });
 
-describe("REQ-MSG-15 — un DM est inscrit dans m.direct, sinon il n'en est un pour personne", () => {
+describe("un DM est inscrit dans m.direct, sinon il n'en est un pour personne", () => {
   /**
    * Mesuré avec deux navigateurs contre un vrai Synapse le 07/08/2026 : un DM créé par
    * l'app s'affichait « 2 membres, c'est le début de ce groupe ». `is_direct` ne pose le

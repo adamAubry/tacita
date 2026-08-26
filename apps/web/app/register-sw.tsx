@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /**
- * REQ-UI-01 — enregistrement du service worker. Hors production, on ne l'enregistre pas :
+ * enregistrement du service worker. Hors production, on ne l'enregistre pas :
  * un SW qui sert une coquille en cache pendant le développement fait passer des heures à
  * déboguer du code qui n'est plus celui du disque.
  */

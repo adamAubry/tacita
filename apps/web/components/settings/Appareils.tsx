@@ -15,7 +15,7 @@ import {
 } from "../foundation/primitives";
 
 /**
- * REQ-UI-25 — **les appareils connectés, et le moyen de les déconnecter.**
+ * **les appareils connectés, et le moyen de les déconnecter.**
  *
  * Il n'existait rien de tel, et l'audit du 25/08/2026 a dit ce que ça voulait dire mis
  * bout à bout : les jetons d'accès de ce déploiement n'expirent jamais, le changement de

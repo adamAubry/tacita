@@ -22,7 +22,7 @@ import {
  *
  * Pourquoi elle compte : `initSession`/`restoreSession` n'ont aucun garde contre une
  * seconde ouverture, et un shard React en mode strict monte ses effets **deux fois**.
- * L'onboarding de la spec 11 appellera donc `restoreSession` deux fois au premier rendu,
+ * L'onboarding de `apps/web` appellera donc `restoreSession` deux fois au premier rendu,
  * que le développeur le veuille ou non.
  *
  * **Réponse mesurée : rien ne casse.** La seconde session s'ouvre sans erreur, garde le
@@ -60,7 +60,7 @@ beforeAll(async () => {
   }
 });
 
-describe("REQ-COR-03 — deux sessions sur le même store IndexedDB coexistent", () => {
+describe("deux sessions sur le même store IndexedDB coexistent", () => {
   it("la seconde ouverture n'échoue pas et garde le même appareil", () => {
     expect(erreurSeconde, "la seconde ouverture a levé").toBeUndefined();
     expect(seconde).not.toBeNull();

@@ -12,7 +12,7 @@ import type { Bytes } from "./attachments";
 import type { EchantillonVideo, PisteAudio, Rotation } from "./mp4";
 
 /**
- * REQ-MED-04 / E-17 — **le démuxage d'un fichier entrant, par bibliothèque.**
+ * / E-17 — **le démuxage d'un fichier entrant, par bibliothèque.**
  *
  * `mp4box@2.4.1`, digest dans le lockfile
  * (`sha512-0HGX7nXoDIX6FKLVl4a3wtYjBlwqsN3xuQC3GXzNtKp98FXUOhDSq623azsz8DG5ptd9ZXcXodDkgbdMZOjWvw==`).
@@ -40,7 +40,7 @@ export interface SourceVideo {
   /** Dimensions **codées**, avant application de la matrice. */
   largeur: number;
   hauteur: number;
-  /** REQ-MED-14 — la rotation lue dans la matrice du `tkhd`, jamais devinée. */
+  /** la rotation lue dans la matrice du `tkhd`, jamais devinée. */
   rotation: Rotation;
   dureeMs: number;
   /** Débit moyen réel, calculé sur les échantillons — pas celui que le conteneur annonce. */
@@ -52,7 +52,7 @@ export interface SourceVideo {
   /** Nombre total de pistes de la source, vidéo comprise. */
   pistes: number;
   /**
-   * REQ-MED-13 — la piste audio **transportable**, quand il y en a une.
+   * la piste audio **transportable**, quand il y en a une.
    *
    * Absente quand la source n'a pas de son, ou quand son codec n'est pas de l'AAC : ce
    * muxeur recopie une piste, il n'en convertit aucune. Le second cas est signalé par
@@ -60,14 +60,14 @@ export interface SourceVideo {
    * demandent pas la même phrase à l'écran.
    */
   audio?: PisteAudio;
-  /** La source avait du son, et il ne part pas : l'UI doit le dire (REQ-MED-13). */
+  /** La source avait du son, et il ne part pas : l'UI doit le dire. */
   audioAbandonne: boolean;
 }
 
 const signe = (valeur: number): number => (valeur > 0x7fffffff ? valeur - 0x100000000 : valeur);
 
 /**
- * REQ-MED-14 — l'angle que dit la matrice, ou `0` si elle ne dit rien de reconnaissable.
+ * l'angle que dit la matrice, ou `0` si elle ne dit rien de reconnaissable.
  *
  * Seuls `a` et `b` sont lus : les quatre orientations qu'une caméra écrit s'y distinguent
  * déjà, et une matrice arbitraire — mise à l'échelle, cisaillement — n'est pas une
@@ -155,7 +155,7 @@ function pistesSonores(fichier: ISOFile, info: { tracks?: { id: number }[] }): n
 }
 
 /**
- * REQ-MED-04 — lit la **première piste vidéo** d'un MP4/MOV et rend ce qu'il faut pour
+ * lit la **première piste vidéo** d'un MP4/MOV et rend ce qu'il faut pour
  * décider : remuxer, réencoder, ou refuser.
  *
  * Une seule piste vidéo est lue, et c'est assumé : le pipeline en produit une (D-04), et
@@ -177,7 +177,7 @@ export async function lireMp4(octets: Bytes): Promise<SourceVideo> {
       }
 
       /*
-       * REQ-MED-04 — **la description du codec vidéo est la seule qui soit obligatoire.**
+       * **la description du codec vidéo est la seule qui soit obligatoire.**
        * Sans elle rien ne se décode ni ne se remuxe ; on refuse ici, avec le mot juste.
        */
       const description = boiteDe(fichier, piste.id, ["avcC", "hvcC", "vpcC", "av1C"], false);
@@ -187,7 +187,7 @@ export async function lireMp4(octets: Bytes): Promise<SourceVideo> {
       }
 
       /*
-       * REQ-MED-13 — la piste audio n'est reprise que si elle est **de l'AAC** et qu'elle
+       * la piste audio n'est reprise que si elle est **de l'AAC** et qu'elle
        * porte son `esds` : le muxeur recopie une piste, il n'en convertit aucune (voir
        * `SourceVideo.audio`). Le PCM d'un `.mov` d'enregistrement d'écran, ou une piste
        * dont la description manque, tombent tous deux du même côté — la vidéo part muette
@@ -269,7 +269,7 @@ export async function lireMp4(octets: Bytes): Promise<SourceVideo> {
                 echantillons: echantillonsAudio,
               }
             : undefined,
-        // REQ-MED-13 — « il y avait du son et il ne part pas », quel qu'ait été son codec :
+        // « il y avait du son et il ne part pas », quel qu'ait été son codec :
         // c'est le `hdlr` qui l'atteste, pas le fait que mp4box ait su nommer le codec.
         audioAbandonne: sonores.length > 0 && !audioReprise,
       });

@@ -7,17 +7,17 @@ import { Banner } from "./primitives";
 export type EtatConnexion = "en-ligne" | "hors-ligne" | "synchronisation";
 
 /**
- * REQ-UIX-04 / REQ-UI-17 — bandeau d'état de connexion.
+ * bandeau d'état de connexion.
  *
  * En ligne, il n'existe pas : un bandeau permanent qui dit « tout va bien » est du bruit,
  * et on cesse de le lire au moment où il aurait quelque chose à dire.
  *
  * Le texte hors ligne est **une promesse tenue**, pas une excuse : l'historique reste
- * lisible et les messages écrits partent à la reconnexion (file d'envoi, spec 07). Dire
+ * lisible et les messages écrits partent à la reconnexion (file d'envoi). Dire
  * seulement « hors ligne » laisserait croire que l'app est inutilisable.
  *
- * L'état vient de la Session (spec 04) ; ce composant ne le dérive pas — le shard ne
- * contient aucune logique métier (SPEC 11).
+ * L'état vient de la Session ; ce composant ne le dérive pas — le shard ne
+ * contient aucune logique métier.
  */
 export function ConnectionBanner({ etat }: { etat: EtatConnexion }) {
   if (etat === "en-ligne") return null;
@@ -51,7 +51,7 @@ export function ConnectionBanner({ etat }: { etat: EtatConnexion }) {
  * Un composant qu'aucun écran ne monte ne tient aucune promesse.
  *
  * La source est `navigator.onLine` et ses deux événements : c'est un fait du navigateur,
- * pas de la logique métier (SPEC 11), et il n'y a rien à réécrire pour l'obtenir.
+ * pas de la logique métier, et il n'y a rien à réécrire pour l'obtenir.
  *
  * ponytail: `onLine` sait dire « aucun réseau », pas « serveur injoignable » — l'état
  * « synchronisation » reste donc sans source. Le brancher sur l'état de /sync quand la

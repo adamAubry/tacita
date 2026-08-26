@@ -16,12 +16,12 @@ import { openSnapshot, type Snapshot } from "./snapshot";
 /** DECISIONS D-01 — plafond dur, éviction des plus anciens au-delà. */
 export const MAX_EVENTS = 200_000;
 
-/** REQ-SRC-09 — taille d'un lot entre deux rendus de la main au worker. */
+/** taille d'un lot entre deux rendus de la main au worker. */
 export const BATCH_SIZE = 500;
 
 /**
- * Schéma d'index (spec 09) : de quoi retrouver l'événement et servir les critères de
- * REQ-SRC-11. Pas de fuzzy avancé — ce YAGNI-là tient toujours, aucun besoin établi.
+ * Schéma d'index : de quoi retrouver l'événement et servir les critères de
+ * Pas de fuzzy avancé — ce YAGNI-là tient toujours, aucun besoin établi.
  *
  * **Tout ce qui est ici est du contenu déchiffré**, `mentions` au même titre que `body` :
  * l'interdit n°8 couvre le schéma entier, logs, télémétrie, cache du service worker et
@@ -30,18 +30,18 @@ export const BATCH_SIZE = 500;
 const schema = {
   // `enum` et non `string` : une propriété `string` est tokenisée et le `where`
   // devient une correspondance floue — un identifiant de salon doit filtrer à
-  // l'égalité exacte (REQ-SRC-04). Ça les sort aussi de la recherche plein texte,
+  // l'égalité exacte. Ça les sort aussi de la recherche plein texte,
   // ce qui est voulu : chercher un mot ne doit pas matcher un identifiant.
   roomId: "enum",
   sender: "enum",
-  // REQ-SRC-11 — le filtre qui distingue texte et média. Même raison d'être un `enum` :
+  // le filtre qui distingue texte et média. Même raison d'être un `enum` :
   // `m.text` ne doit pas répondre à une recherche du mot « text ».
   msgtype: "enum",
-  // REQ-SRC-11 — l'onglet « Mentions » se sert de ce champ, **jamais** d'un plein-texte
+  // l'onglet « Mentions » se sert de ce champ, **jamais** d'un plein-texte
   // sur un nom d'affichage : un nom change, et un homonyme dans une phrase n'est pas
   // une mention.
   mentions: "enum[]",
-  // Deux horodatages, deux usages, jamais interchangeables (spec 09).
+  // Deux horodatages, deux usages, jamais interchangeables.
   tsIndexed: "number",
   tsOrigin: "number",
   body: "string",
@@ -52,8 +52,8 @@ export interface IndexableEvent {
   roomId: string;
   sender: string;
   /**
-   * `origin_server_ts`. Sert aux bornes de `stats()` (REQ-SRC-06) et au filtre de dates
-   * de REQ-SRC-11 : jamais à trier, jamais à évincer (interdit n°6).
+   * `origin_server_ts`. Sert aux bornes de `stats()` et au filtre de dates
+   * de : jamais à trier, jamais à évincer (interdit n°6).
    */
   tsOrigin: number;
   body: string;
@@ -64,12 +64,12 @@ export interface IndexableEvent {
 }
 
 /**
- * REQ-SRC-11 — critères combinables, tous servis par l'index local : un critère absent
+ * critères combinables, tous servis par l'index local : un critère absent
  * ne restreint rien, les critères présents se composent en ET. Aucun n'ajoute d'appel
- * réseau (REQ-SRC-03 inchangée).
+ * réseau (inchangée).
  */
 export interface SearchFilters {
-  /** REQ-SRC-04 — une seule conversation. */
+  /** une seule conversation. */
   roomId?: string;
   sender?: string;
   msgtype?: string;
@@ -100,12 +100,12 @@ export interface SearchHit extends IndexableEvent {
 }
 
 export interface SearchStats {
-  /** REQ-SRC-05 — nombre d'événements actuellement indexés. */
+  /** nombre d'événements actuellement indexés. */
   size: number;
   /** Le plafond, pour que l'UI puisse dire « les plus anciens ont été évincés ». */
   max: number;
   /**
-   * REQ-SRC-06 — bornes réellement couvertes. La recherche porte sur l'historique
+   * bornes réellement couvertes. La recherche porte sur l'historique
    * téléchargé, pas sur celui du serveur : c'est ce couple que l'UI doit afficher
    * plutôt que laisser croire à une recherche exhaustive.
    */
@@ -123,9 +123,9 @@ export interface EngineOptions {
 
 export interface SearchEngine {
   index(events: IndexableEvent[]): Promise<void>;
-  /** REQ-SRC-10 — retire les documents redactés. Les identifiants inconnus sont ignorés. */
+  /** retire les documents redactés. Les identifiants inconnus sont ignorés. */
   remove(eventIds: string[]): Promise<void>;
-  /** REQ-SRC-04/11 — mot-clé, restreint par les critères fournis. */
+  /** mot-clé, restreint par les critères fournis. */
   search(query: string, filters?: SearchFilters): Promise<SearchHit[]>;
   stats(): Promise<SearchStats>;
   wipe(): Promise<void>;
@@ -146,7 +146,7 @@ const toHit = (hit: { id: string; score: number; document: Record<string, unknow
 });
 
 /**
- * REQ-SRC-11 — les critères se composent en ET ; un critère absent ne restreint rien.
+ * les critères se composent en ET ; un critère absent ne restreint rien.
  * Les propriétés `enum` se filtrent par opérateur explicite : une valeur nue serait lue
  * caractère par caractère comme autant d'opérations.
  */
@@ -168,7 +168,7 @@ const whereOf = (filters: SearchFilters) => {
   return where;
 };
 
-/** REQ-SRC-06 — bornes affichées : la date d'origine, celle qui parle à l'utilisateur. */
+/** bornes affichées : la date d'origine, celle qui parle à l'utilisateur. */
 const edgeTs = async (db: Database, order: "ASC" | "DESC"): Promise<number | null> => {
   const results = await search(db, { limit: 1, sortBy: { property: "tsOrigin", order } });
   return (results.hits[0]?.document.tsOrigin as number | undefined) ?? null;
@@ -181,7 +181,7 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
   const snapshot: Snapshot = await openSnapshot(options.indexedDB);
   let db: Database = create({ schema });
 
-  // REQ-SRC-02 — l'index reprend là où il s'était arrêté ; pas de réindexation
+  // l'index reprend là où il s'était arrêté ; pas de réindexation
   // complète au démarrage.
   const restored = await snapshot.read();
   if (restored) load(db, restored);
@@ -218,7 +218,7 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
   };
 
   return {
-    // REQ-SRC-09 — par lots, avec rendu de la main : un sync de rattrapage ne doit
+    // par lots, avec rendu de la main : un sync de rattrapage ne doit
     // pas monopoliser le worker d'un bloc.
     async index(events) {
       for (let offset = 0; offset < events.length; offset += BATCH_SIZE) {
@@ -236,7 +236,7 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
 
         for (const { eventId, ...rest } of batch.values()) {
           const previous = getByID(db, eventId) as IndexedDocument | undefined;
-          // REQ-SRC-10 — réindexer un événement connu **remplace** son document au lieu
+          // réindexer un événement connu **remplace** son document au lieu
           // d'en créer un second. C'est ce qui fait qu'une édition ne laisse pas
           // l'ancienne version trouvable (le proxy indexe une édition sous l'identifiant
           // de sa cible), et ça rend le re-déchiffrement d'un événement inoffensif.
@@ -269,7 +269,7 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
       await persist();
     },
 
-    // REQ-SRC-10 — le texte d'un message supprimé ne doit plus être trouvable. Les
+    // le texte d'un message supprimé ne doit plus être trouvable. Les
     // identifiants inconnus sont filtrés : on redacte aussi des messages que l'index
     // n'a jamais vus (média, échec de déchiffrement), ce n'est pas une erreur.
     async remove(eventIds) {
@@ -279,7 +279,7 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
       await persist();
     },
 
-    // REQ-SRC-03/04/11 — mot-clé et critères, strictement en local. Un terme vide est
+    // mot-clé et critères, strictement en local. Un terme vide est
     // légitime : l'onglet « Mentions » filtre sans rien chercher.
     async search(query, filters = {}) {
       const where = whereOf(filters);
@@ -300,7 +300,7 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
       };
     },
 
-    // REQ-SRC-08 — l'index contient du contenu déchiffré : la déconnexion le détruit.
+    // l'index contient du contenu déchiffré : la déconnexion le détruit.
     async wipe() {
       db = create({ schema });
       await snapshot.clear();

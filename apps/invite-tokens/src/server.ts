@@ -6,7 +6,7 @@ import { issue, LinkError, list, resolve, revoke, type Deps } from "./links.ts";
 const MAX_BODY = 8 * 1024;
 
 /**
- * REQ-INV-09 — fenêtre fixe, en mémoire. Le budget est par clé : l'appelant en a une,
+ * fenêtre fixe, en mémoire. Le budget est par clé : l'appelant en a une,
  * son IP une autre, et il faut passer les deux.
  *
  * ponytail: compteur local au processus. Deux répliques doublent le budget réel ;
@@ -53,7 +53,7 @@ const accessToken = (req: IncomingMessage): string | undefined =>
   /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
 
 /**
- * Derrière le proxy de la spec 01, qui est le seul chemin d'entrée : `X-Forwarded-For`
+ * Derrière le proxy de `infra`, qui est le seul chemin d'entrée : `X-Forwarded-For`
  * vient de lui. Le premier élément est le client d'origine.
  */
 const clientIp = (req: IncomingMessage): string =>
@@ -62,10 +62,10 @@ const clientIp = (req: IncomingMessage): string =>
   "inconnue";
 
 export interface ServerOptions extends Deps {
-  /** REQ-INV-09 — essais de résolution autorisés par fenêtre, pour une IP comme pour un compte. */
+  /** essais de résolution autorisés par fenêtre, pour une IP comme pour un compte. */
   maxResolvesPerWindow?: number;
   windowMs?: number;
-  /** REQ-INV-20 — sortie des journaux ; injectable pour que le test puisse l'écouter. */
+  /** sortie des journaux ; injectable pour que le test puisse l'écouter. */
   log?: (event: Record<string, unknown>) => void;
 }
 
@@ -79,7 +79,7 @@ export function createInviteService(options: ServerOptions) {
     const segments = url.pathname.split("/").filter(Boolean);
 
     /**
-     * REQ-INV-20 — le journal porte l'issue et le motif technique, **jamais qui** : ni
+     * le journal porte l'issue et le motif technique, **jamais qui** : ni
      * identifiant d'utilisateur, ni `roomId`, ni token. `route` est le gabarit et non
      * l'URL reçue — l'URL de résolution *contient* le token.
      */
@@ -124,7 +124,7 @@ export function createInviteService(options: ServerOptions) {
 
     if (req.method === "POST" && segments.length === 3 && segments[2] === "resolve") {
       const route = "POST /links/:token/resolve";
-      // REQ-INV-09 — la moitié « par IP » se paie avant l'authentification : sinon une
+      // la moitié « par IP » se paie avant l'authentification : sinon une
       // rafale non authentifiée coûte un appel à Synapse par essai.
       if (!limit(`ip:${clientIp(req)}`)) {
         return answer(route, 429, { errcode: "TACITA_RATE_LIMITED" });

@@ -7,7 +7,7 @@ import {
 } from "@tacita/media-pipeline";
 
 /**
- * REQ-MED-08 (b) — **la lecture progressive, côté page.**
+ * (b) — **la lecture progressive, côté page.**
  *
  * Le service worker répond aux plages que réclame le `<video>` ; il ne déchiffre rien et
  * ne détient aucune clé. Il **demande** les octets à une fenêtre vivante, qui les vérifie
@@ -45,7 +45,7 @@ const inscrits = new Map<string, Inscrit>();
 
 let branche = false;
 
-/** REQ-MED-08 — la vérification par bloc, puis le déchiffrement de la seule plage demandée. */
+/** la vérification par bloc, puis le déchiffrement de la seule plage demandée. */
 async function servir(inscrit: Inscrit, debut: number, fin: number): Promise<Bytes> {
   const source: SourceChiffree = {
     taille: inscrit.chiffre.length,
@@ -114,7 +114,7 @@ export function retirerMedia(url: string): void {
   inscrits.delete(url.slice(PREFIXE_MEDIA.length));
 }
 
-/** REQ-MED-08 (b) — la lecture progressive n'existe que si un worker contrôle la page. */
+/** (b) — la lecture progressive n'existe que si un worker contrôle la page. */
 export function lectureProgressiveDisponible(): boolean {
   return typeof navigator !== "undefined" && navigator.serviceWorker?.controller != null;
 }

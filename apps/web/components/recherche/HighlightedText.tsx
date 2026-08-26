@@ -9,7 +9,7 @@ interface HighlightedTextProps {
 }
 
 /**
- * REQ-UIX-20 — composant 18, « Highlighted text ». Fond teinté par le token `highlight`
+ * composant 18, « Highlighted text ». Fond teinté par le token `highlight`
  * de DESIGN.md, **texte inchangé** : la couleur d'encre ne bouge pas, sinon le contraste
  * dépendrait du thème et de la teinte à la fois.
  *

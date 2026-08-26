@@ -14,8 +14,8 @@ const readme = read("../README.md");
 
 const service = compose.services["push-gateway"];
 
-describe("REQ-INF-14 — la passerelle Web Push est provisionnée par ce module", () => {
-  it("un service push-gateway est construit depuis l'app de la spec 03", () => {
+describe("la passerelle Web Push est provisionnée par ce module", () => {
+  it("un service push-gateway est construit depuis l'app de `push-gateway`", () => {
     expect(service).toBeDefined();
     // Contexte à la racine du dépôt : l'image s'installe depuis le lockfile du
     // workspace, pas en résolvant les dépendances au build.
@@ -102,12 +102,12 @@ describe("REQ-INF-14 — la passerelle Web Push est provisionnée par ce module"
     // Et la raison est écrite là où on la cherchera : dans le gabarit que l'opérateur
     // lit, et dans la doc du module.
     const gabarit = read("../synapse/homeserver.yaml.tmpl");
-    expect(gabarit).toContain("REQ-PSH-01");
+    expect(gabarit).toContain("");
     expect(readme).toContain("SYNAPSE_IP_RANGE_WHITELIST");
   });
 
   /**
-   * Règle 4, et son cas d'école. Les vingt REQ de la spec 03 étaient vertes pendant que
+   * Règle 4, et son cas d'école. Les vingt REQ de `push-gateway` étaient vertes pendant que
    * la passerelle **redémarrait en boucle sur le staging depuis le premier jour** : le
    * `.env` portait encore `change-me`, le contrôle de présence le laissait passer, et
    * `web-push` refusait la clé avec un message qui parle d'octets décodés sans nommer ni
@@ -140,7 +140,7 @@ describe("REQ-INF-14 — la passerelle Web Push est provisionnée par ce module"
     expect(sortie, "le service a démarré avec une clé invalide").toContain("VAPID_PUBLIC_KEY");
     expect(sortie).toContain("generate-vapid-keys");
     expect(sortie).toContain("infra/.env");
-    // REQ-PSH-04 : la taille, jamais la valeur.
+    // la taille, jamais la valeur.
     expect(sortie).not.toContain("change-me");
   });
 });

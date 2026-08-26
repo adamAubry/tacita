@@ -1,5 +1,5 @@
 /**
- * REQ-COR-09 — aucun contenu déchiffré dans les logs, la télémétrie ou les traces
+ * aucun contenu déchiffré dans les logs, la télémétrie ou les traces
  * d'erreur du module, y compris en dev.
  *
  * Le filtre est structurel, pas discipliné : `LogFields` n'accepte que des

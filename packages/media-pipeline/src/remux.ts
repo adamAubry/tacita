@@ -6,7 +6,7 @@ import { lireWebmOpus } from "./webm";
 export const WEBM_OPUS_MIME = "audio/webm";
 
 /**
- * REQ-MED-07, chemin Chrome/Edge — **remuxage**, pas transcodage.
+ * chemin Chrome/Edge — **remuxage**, pas transcodage.
  *
  * Le flux Opus produit par `MediaRecorder` est déjà celui qu'on veut envoyer : seul son
  * conteneur diffère. On change l'emballage, on ne touche pas à un échantillon — aucune

@@ -1,6 +1,6 @@
-# @tacita/messaging — domaine conversations (spec 05)
+# @tacita/messaging — domaine conversations
 
-Façade métier headless au-dessus de la Session (spec 04) : DM et groupes, envoi
+Façade métier headless au-dessus de la Session : DM et groupes, envoi
 chiffré, réponses, réactions, édition/suppression, épinglage, typing, mentions.
 Fonctions pures et fonctions prenant la `Session` en premier argument ; l'état
 n'existe que là où il est nécessaire (`createTypingIndicator`).
@@ -47,12 +47,12 @@ await setRoomNotificationLevel(session, roomId, "mentions");
 - **La liste des conversations est ordonnée par récence du dernier message.** C'est le
   seul signal disponible : `getRooms()` rend l'ordre d'insertion du store, et /sync ne
   définit aucun ordre entre salons. L'interdit de tri par `origin_server_ts` reste entier
-  là où il porte — **dans** une timeline (REQ-MSG-12), où rien n'a changé. La réserve est
-  écrite dans la spec 05 sous REQ-MSG-13, son motif dans `specs/ui/ESCALATIONS.md` § E-09.
+  là où il porte — **dans** une timeline, où rien n'a changé. La réserve est
+  écrite ici, son motif dans l'escalade E-09.
 - **`@everyone` devient `@room` dans le corps du message.** C'est ce littéral que
   la push rule native `.m.rule.roomnotif` cherche ; `m.mentions.room` est posé en
   parallèle pour `.m.rule.is_room_mention`. Le réaffichage en `@everyone` est du
-  rendu, donc spec 11.
+  rendu, donc `apps/web`.
 - **Seuls les pseudos sans espace sont résolus en mention.** `@luca` et
   `@luca:tacita.test` deviennent une mention, `@Jean Dupont` reste du texte —
   la syntaxe n'a pas de délimiteur de fin.
@@ -69,6 +69,6 @@ await setRoomNotificationLevel(session, roomId, "mentions");
   modifiées ailleurs peut se comporter autrement. Le niveau lu vient toujours de
   l'état réel du compte, jamais d'une mémoire locale.
 - **Le refus d'envoi en salon non chiffré est une vérification, pas la
-  garantie.** La garantie vient de la config Synapse (spec 01) ; `assertEncrypted`
+  garantie.** La garantie vient de la config Synapse ; `assertEncrypted`
   est là pour que la régression d'une config distante casse l'envoi au lieu de
   fuiter du clair.

@@ -17,7 +17,7 @@ interface OptionCardProps {
  * Composant 15 du wireframe : la carte d'option — titre, ligne d'état, chevron.
  *
  * **Un seul fichier pour les deux endroits qui en posent** : les options d'une
- * conversation (REQ-UIX-34) et les réglages de l'application (REQ-UIX-31). DESIGN.md :
+ * conversation et les réglages de l'application. DESIGN.md :
  * « un composant = un fichier nommé, réutilisé partout, variations par props » — les deux
  * listes avaient le même balisage à quinze lignes près, et deux copies dérivent.
  *

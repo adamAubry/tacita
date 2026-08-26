@@ -51,7 +51,7 @@ export interface NetworkInformation {
 const CONSTRAINED = new Set(["slow-2g", "2g", "3g"]);
 
 /**
- * REQ-MED-04 / D-04 — Network Information API. Absente sur Safari : le repli est
+ * / D-04 — Network Information API. Absente sur Safari : le repli est
  * « bon réseau », choisi pour ne pas dégrader par défaut ce qu'on ne sait pas mesurer.
  */
 export function detectProfile(connection?: NetworkInformation): NetworkProfile {
@@ -63,7 +63,7 @@ export function detectProfile(connection?: NetworkInformation): NetworkProfile {
 }
 
 /**
- * REQ-MED-04 / D-04 — **l'échelle de repli du profil H.264**, du meilleur au plus sûr.
+ * / D-04 — **l'échelle de repli du profil H.264**, du meilleur au plus sûr.
  *
  * High 4.0 d'abord : Baseline interdit CABAC et les images B, soit 15 à 25 % de débit
  * perdu à qualité perçue égale. La configuration retenue est la **première supportée**,
@@ -80,7 +80,7 @@ export const CODECS_H264 = ["avc1.640028", "avc1.4d401f", "avc1.42001f"] as cons
 const MARGE_DEBIT = 1.3;
 
 /**
- * REQ-MED-04 / E-18 — **le chemin rapide : une source déjà conforme se remuxe, elle ne
+ * / E-18 — **le chemin rapide : une source déjà conforme se remuxe, elle ne
  * se réencode pas.**
  *
  * Ce que le prédicat exige, et pourquoi :
@@ -92,7 +92,7 @@ const MARGE_DEBIT = 1.3;
  *   remuxer perdrait sans le dire ce que le conteneur ne sait pas porter.
  *
  * Le son d'une source à deux pistes **est** perdu, sur ce chemin comme sur celui du
- * réencodage : le muxeur n'écrit qu'une piste tant que REQ-MED-13 n'est pas livrée. Ce
+ * réencodage : le muxeur n'écrit qu'une piste tant que n'est pas livrée. Ce
  * n'est donc pas une régression du chemin rapide, c'est la lacune du muxeur — et elle est
  * la même des deux côtés.
  */

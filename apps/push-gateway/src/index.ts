@@ -18,7 +18,7 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
  * était un journal que personne ne lit tant que la pile a l'air debout.
  *
  * Une paire P-256 : 65 octets pour le point public non compressé, 32 pour le scalaire
- * privé. Seule la taille est journalisée, jamais la valeur (REQ-PSH-04).
+ * privé. Seule la taille est journalisée, jamais la valeur.
  */
 for (const [nom, attendus] of [
   ["VAPID_PUBLIC_KEY", 65],

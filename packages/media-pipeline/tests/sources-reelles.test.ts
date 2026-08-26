@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { ecrireMp4, lireMp4, PROFILES, remuxable, type Bytes } from "../src";
 
 /**
- * REQ-MED-04/13/14 — **des fichiers que nous n'avons pas écrits.**
+ * **des fichiers que nous n'avons pas écrits.**
  *
  * `demux.test.ts` relit notre propre muxeur : c'est un aller-retour, et un aller-retour
  * ne peut pas infirmer une hypothèse sur ce que les autres écrivent (règle 3). Ce qu'une
@@ -21,7 +21,7 @@ import { ecrireMp4, lireMp4, PROFILES, remuxable, type Bytes } from "../src";
 const fixture = (nom: string): Bytes =>
   new Uint8Array(readFileSync(fileURLToPath(new URL(`./fixtures/${nom}`, import.meta.url)))) as Bytes;
 
-describe("REQ-MED-04 — sources réelles : ce qu'une caméra écrit, et pas seulement nous", () => {
+describe("sources réelles : ce qu'une caméra écrit, et pas seulement nous", () => {
   it("un `.mov` d'iPhone (HEVC, AAC sous `wave`, matrice de rotation) se lit entièrement", async () => {
     const source = await lireMp4(fixture("iphone-hevc.mov"));
 
@@ -29,7 +29,7 @@ describe("REQ-MED-04 — sources réelles : ce qu'une caméra écrit, et pas seu
     expect(source.largeur).toBe(192);
     expect(source.hauteur).toBe(144);
     expect(source.echantillons.length).toBeGreaterThan(0);
-    // REQ-MED-14 — l'orientation vient de la matrice du `tkhd`, jamais devinée.
+    // l'orientation vient de la matrice du `tkhd`, jamais devinée.
     expect(source.rotation).toBe(270);
     /*
      * **Le défaut du 21/08/2026, tenu par cette ligne.** QuickTime range `esds` dans un
@@ -39,7 +39,7 @@ describe("REQ-MED-04 — sources réelles : ce qu'une caméra écrit, et pas seu
     expect(source.audio?.esds.length).toBeGreaterThan(0);
     expect(source.audio?.echantillons.length).toBeGreaterThan(0);
     expect(source.audioAbandonne).toBe(false);
-    // REQ-MED-04 — image et son : deux pistes de signal, la piste de métadonnées ne compte pas.
+    // image et son : deux pistes de signal, la piste de métadonnées ne compte pas.
     expect(source.pistes).toBe(2);
   });
 
@@ -49,7 +49,7 @@ describe("REQ-MED-04 — sources réelles : ce qu'une caméra écrit, et pas seu
 
     expect(source.echantillons.length).toBeGreaterThan(0);
     expect(source.audio).toBeUndefined();
-    // REQ-MED-13 — « il y avait du son et il ne part pas » se dit, quel qu'ait été le codec.
+    // « il y avait du son et il ne part pas » se dit, quel qu'ait été le codec.
     expect(source.audioAbandonne).toBe(true);
     // Deux pistes de signal : le chemin rapide doit savoir qu'un remuxage perdrait le son.
     expect(source.pistes).toBe(2);
@@ -72,11 +72,11 @@ describe("REQ-MED-04 — sources réelles : ce qu'une caméra écrit, et pas seu
       }),
     );
 
-    // REQ-MED-14 — l'orientation survit au changement de conteneur, sans toucher un pixel.
+    // l'orientation survit au changement de conteneur, sans toucher un pixel.
     expect(relu.rotation).toBe(source.rotation);
     expect(relu.rotation).not.toBe(0);
     expect(relu.echantillons).toHaveLength(source.echantillons.length);
-    // REQ-MED-13 — la piste sonore de QuickTime, recopiée octet pour octet jusque dans
+    // la piste sonore de QuickTime, recopiée octet pour octet jusque dans
     // son `esds` — celui qu'on ne savait pas trouver.
     expect(relu.audio?.echantillons).toHaveLength(source.audio!.echantillons.length);
     expect([...relu.audio!.esds]).toEqual([...source.audio!.esds]);

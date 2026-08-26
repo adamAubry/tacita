@@ -1,9 +1,9 @@
-# @tacita/calls — appels voix/vidéo (spec 10)
+# @tacita/calls — appels voix/vidéo
 
 Orchestration côté client des appels MatrixRTC : découverte du focus, URL du widget
 Element Call, état d'appel d'un salon, driver de l'API widget. **Aucun code RTC maison** —
 la négociation, les clés de média et l'appartenance à l'appel vivent entièrement dans
-Element Call. Zéro DOM : le shard UI (spec 11) monte l'iframe, ce package lui donne
+Element Call. Zéro DOM : le shard UI monte l'iframe, ce package lui donne
 l'URL et le driver.
 
 ```ts
@@ -30,18 +30,18 @@ erreur bruyante : le salon affichera simplement « aucun appel ».
 **Depuis E-14, cette bascule a un interrupteur nommé** : le `matrix_rtc_mode` servi dans
 `infra/rtc/element-call.json`. Ses trois valeurs (v0.23.0) sont `legacy`, `compatibility`
 et `matrix_2_0` ; seule la dernière active les événements *sticky*. Nous épinglons
-`compatibility`, et REQ-RTC-08 a un test qui refuse `matrix_2_0` — le jour où on voudra y
+`compatibility`, et a un test qui refuse `matrix_2_0` — le jour où on voudra y
 passer, c'est ce fichier-ci qu'il faudra changer d'abord.
 
 ## Limites assumées
 
-- **`attachCallWidget` prend une iframe, il n'en rend aucune.** La spec 10 dit « zéro DOM,
+- **`attachCallWidget` prend une iframe, il n'en rend aucune.** `@tacita/calls` dit « zéro DOM,
   le shard rend l'iframe » — c'est toujours vrai : le shard la rend, ce paquet branche le
-  pont postMessage dessus. Le pont est ici et non dans le shard parce que REQ-UI-02 tient
+  pont postMessage dessus. Le pont est ici et non dans le shard parce que tient
   une liste close de dépendances qui n'inclut pas `matrix-widget-api`, et n'a pas à
   l'inclure : c'est du protocole, pas de l'interface.
 - **Les paramètres d'URL sont relus dans la version épinglée, jamais de mémoire.** E-14
-  close : `infra/rtc/` épingle Element Call `v0.23.0` par digest (REQ-RTC-08), et
+  close : `infra/rtc/` épingle Element Call `v0.23.0` par digest, et
   `option.video` se traduit en `intent=start_call` / `start_call_voice` d'après
   `src/UrlParams.ts` de cette version. Le passage a corrigé deux paramètres qui ne
   faisaient rien — `video`, qui n'existe dans aucune version, et `hideHeader`, remplacé
@@ -50,9 +50,9 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
   rendrait `activeCall()` aveugle sans erreur.
 - **`skipLobby` n'est jamais envoyé.** Le lobby est le rattrapage : une intention partie
   de travers y est corrigeable avant d'entrer, caméra comprise.
-- **Le driver envoie directement, sans passer par la file d'envoi** (spec 07). Seul
+- **Le driver envoie directement, sans passer par la file d'envoi**. Seul
   endroit du dépôt, hors `messaging` et `outbox` lui-même, à appeler `client.sendEvent`.
-  C'est voulu et imposé par REQ-CAL-05 : `WidgetDriver.sendEvent` de `matrix-widget-api`
+  C'est voulu et : `WidgetDriver.sendEvent` de `matrix-widget-api`
   doit rendre l'`eventId` **à l'appelant, de façon synchrone**, et Element Call s'en sert
   pour suivre son propre état d'appartenance. Une file différée par nature ne peut pas
   tenir ce contrat — l'événement partirait plus tard, ou jamais.
@@ -80,5 +80,5 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
 - **Métadonnées d'appel visibles côté serveur** : qui appelle qui, quand, combien de temps.
   Le média est chiffré par participant (`perParticipantE2EE`), le SFU relaie sans
   déchiffrer. Voir `infra/rtc/README.md`.
-- **Pas de sonnerie, de refus ni d'appel manqué en V1** (YAGNI, spec 10) : l'état
+- **Pas de sonnerie, de refus ni d'appel manqué en V1** (YAGNI) : l'état
   d'appartenance dit déjà qui est là et depuis quand.

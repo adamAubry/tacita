@@ -16,7 +16,7 @@ import { fakeSession } from "./session-mock";
 
 const MIRA = "@mira:tacita.test";
 
-describe("REQ-MSG-16 — accepter, refuser, quitter : trois gestes, deux appels natifs", () => {
+describe("accepter, refuser, quitter : trois gestes, deux appels natifs", () => {
   it("accepter une demande d'ami est un join, et rend le salon à ouvrir", async () => {
     const { session, client } = fakeSession();
 
@@ -34,7 +34,7 @@ describe("REQ-MSG-16 — accepter, refuser, quitter : trois gestes, deux appels 
   });
 });
 
-describe("REQ-MSG-17 — blocage par m.ignored_user_list natif", () => {
+describe("blocage par m.ignored_user_list natif", () => {
   it("bloquer ajoute à la liste existante au lieu de l'écraser", async () => {
     const { session, client } = fakeSession({ ignored: ["@sam:tacita.test"] });
 
@@ -65,10 +65,10 @@ describe("REQ-MSG-17 — blocage par m.ignored_user_list natif", () => {
 
 /**
  * Le seul test de la bannière, et il porte sur ce qui pouvait silencieusement ne rien
- * faire : le champ **étendu**. Le reste de REQ-MSG-21 (le rendu) n'est pas prouvable en
+ * faire : le champ **étendu**. Le reste de (le rendu) n'est pas prouvable en
  * jsdom — c'est un `fetch` authentifié et une URL d'objet.
  */
-describe("REQ-MSG-21 — bannière : champ étendu, lu sans requête de plus", () => {
+describe("bannière : champ étendu, lu sans requête de plus", () => {
   it("la bannière voyage dans la réponse de profil, et une valeur non textuelle est ignorée", async () => {
     const { session, client } = fakeSession({
       profile: { displayname: "mira", [CHAMP_BANNIERE]: "mxc://tacita.test/banniere" },
@@ -98,7 +98,7 @@ describe("REQ-MSG-21 — bannière : champ étendu, lu sans requête de plus", (
   });
 });
 
-describe("REQ-MSG-18 — profil : lecture tolérante, écriture sélective", () => {
+describe("profil : lecture tolérante, écriture sélective", () => {
   it("un profil complet est rendu tel quel", async () => {
     const { session } = fakeSession({
       profile: { displayname: "mira", avatar_url: "mxc://tacita.test/abc" },
@@ -149,7 +149,7 @@ describe("REQ-MSG-18 — profil : lecture tolérante, écriture sélective", () 
   });
 });
 
-describe("REQ-MSG-19 — annuaire du homeserver, jamais /search", () => {
+describe("annuaire du homeserver, jamais /search", () => {
   it("les résultats sont normalisés en Profile", async () => {
     const { session, client } = fakeSession({
       annuaire: [
@@ -175,7 +175,7 @@ describe("REQ-MSG-19 — annuaire du homeserver, jamais /search", () => {
   });
 });
 
-describe("REQ-MSG-19 — un identifiant complet se résout par son profil", () => {
+describe("un identifiant complet se résout par son profil", () => {
   /**
    * Mesuré contre un vrai Synapse le 07/08/2026 : l'annuaire rend `results: []` pour un
    * compte qui existe, parce que `search_all_users` est faux par défaut. « Ajouter par
@@ -192,7 +192,7 @@ describe("REQ-MSG-19 — un identifiant complet se résout par son profil", () =
 
   it("un identifiant que le serveur ne connaît pas ne rend rien", async () => {
     // `profileOf` retombe sur l'identifiant lui-même quand le profil est introuvable
-    // (REQ-MSG-18) : proposer ce repli ferait « trouver » n'importe quelle saisie.
+    // proposer ce repli ferait « trouver » n'importe quelle saisie.
     const { session, client } = fakeSession();
     client.getProfileInfo.mockRejectedValueOnce(new Error("M_NOT_FOUND"));
     await expect(searchUsers(session, "@inconnu:tacita.test")).resolves.toEqual([]);
@@ -205,7 +205,7 @@ describe("REQ-MSG-19 — un identifiant complet se résout par son profil", () =
   });
 });
 
-describe("REQ-MSG-19 — le domaine ne se saisit pas", () => {
+describe("le domaine ne se saisit pas", () => {
   /**
    * Retour utilisateur : « rechercher un utilisateur pour l'ajouter en ami requiert son
    * identifiant complet ». C'était exact — seule une adresse entière empruntait le
@@ -246,7 +246,7 @@ describe("REQ-MSG-19 — le domaine ne se saisit pas", () => {
   });
 
   it("un nom d'affichage partiel remonte par l'annuaire", async () => {
-    // REQ-INF-18 (E-21, 21/08/2026) : l'annuaire couvre tous les comptes du serveur, donc
+    // (E-21, 21/08/2026) : l'annuaire couvre tous les comptes du serveur, donc
     // un fragment de nom aboutit. Avant, ce chemin était muet et seul l'identifiant exact
     // trouvait quelqu'un — c'est le « uniquement de l'exact match » signalé.
     const { session, client } = fakeSession({

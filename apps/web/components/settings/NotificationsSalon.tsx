@@ -11,7 +11,7 @@ import { useState } from "react";
 import { RadioList, RadioListItem, Text } from "../foundation/primitives";
 
 /**
- * REQ-UIX-36 — les trois niveaux, avec ce que chacun fait réellement. Les libellés du
+ * les trois niveaux, avec ce que chacun fait réellement. Les libellés du
  * wireframe seuls (« silencieux », « mentions uniquement », « tout ») laissent croire
  * que « silencieux » épargne les mentions ; la description dit que non.
  */
@@ -35,12 +35,12 @@ export const libelleNiveau = (niveau: RoomNotificationLevel) =>
 interface NotificationsSalonProps {
   session: Session;
   roomId: string;
-  /** Remonté au parent, qui affiche le niveau courant sous l'option (REQ-UIX-36). */
+  /** Remonté au parent, qui affiche le niveau courant sous l'option. */
   onChange?: (niveau: RoomNotificationLevel) => void;
 }
 
 /**
- * REQ-UIX-36 — le niveau de notification d'un salon.
+ * le niveau de notification d'un salon.
  *
  * Rien n'est stocké ici : le niveau **est** l'état des push rules du compte, lu au
  * montage et réécrit au choix. Une mémoire locale à côté finirait par diverger du

@@ -13,7 +13,7 @@ import {
 } from "@tacita/media-pipeline";
 
 /**
- * REQ-MED-04, côté shard — **l'encodage vit ici, le conteneur dans le paquet** (E-10).
+ * côté shard — **l'encodage vit ici, le conteneur dans le paquet** (E-10).
  *
  * Le paquet démuxe et muxe des octets ; `WebCodecs` décode et réencode. Aucun élément
  * `<video>`, aucun canvas dans le chemin nominal — c'est tout l'objet de la refonte.
@@ -27,7 +27,7 @@ import {
  */
 
 /**
- * REQ-MED-04 — pourquoi un échec de transcodage porte un motif et pas seulement un texte.
+ * pourquoi un échec de transcodage porte un motif et pas seulement un texte.
  *
  * « Ce navigateur ne sait pas encoder » et « ce navigateur ne sait pas **lire** ce
  * format » n'appellent pas la même conduite : le second se règle en changeant d'appareil
@@ -69,7 +69,7 @@ export function dimensionsCibles(largeur: number, hauteur: number, hauteurCible:
 }
 
 /**
- * REQ-MED-04 / D-04 — la première configuration supportée de l'échelle High → Main →
+ * / D-04 — la première configuration supportée de l'échelle High → Main →
  * Baseline. Rien n'est supposé : chaque cran est soumis au navigateur.
  */
 async function configuration(base: {
@@ -101,7 +101,7 @@ async function configuration(base: {
 
 /** Le calibre du fichier de sortie, tel que l'événement doit le décrire. */
 function calibre(largeur: number, hauteur: number, rotation: Rotation, dureeMs: number) {
-  // REQ-MED-14 — `info.w`/`info.h` décrivent ce que l'utilisateur **verra**. Une rotation
+  // `info.w`/`info.h` décrivent ce que l'utilisateur **verra**. Une rotation
   // d'un quart de tour échange les deux à l'écran sans toucher aux pixels codés.
   const pivote = rotation === 90 || rotation === 270;
   return { width: pivote ? hauteur : largeur, height: pivote ? largeur : hauteur, durationMs: dureeMs };
@@ -110,7 +110,7 @@ function calibre(largeur: number, hauteur: number, rotation: Rotation, dureeMs: 
 const enMp4 = (octets: Bytes): Blob => new Blob([octets as BlobPart], { type: "video/mp4" });
 
 /**
- * REQ-MED-03 — **l'image de la vignette vient du décodeur, pas d'un lecteur.**
+ * **l'image de la vignette vient du décodeur, pas d'un lecteur.**
  *
  * Le poster était extrait en rejouant le fichier dans un `<video>` sur le thread
  * principal : le mécanisme le plus faible des trois disponibles, employé y compris sur les
@@ -132,7 +132,7 @@ interface Poster {
 }
 
 /**
- * REQ-MED-14 — la toile du poster porte l'orientation **affichée**, pas les pixels codés.
+ * la toile du poster porte l'orientation **affichée**, pas les pixels codés.
  *
  * Le `<video>` appliquait la matrice du `tkhd` pour nous ; un décodeur rend la frame
  * codée, matrice non appliquée. Sans cette rotation, la vignette d'une vidéo filmée en
@@ -147,7 +147,7 @@ function ouvrirPoster(largeur: number, hauteur: number, rotation: Rotation): Pos
   const pivote = rotation === 90 || rotation === 270;
   const toile = new OffscreenCanvas(pivote ? hauteur : largeur, pivote ? largeur : hauteur);
   const pinceau = toile.getContext("2d", { alpha: false });
-  // Une vignette est un confort : son absence ne doit jamais coûter l'envoi (REQ-MED-03).
+  // Une vignette est un confort : son absence ne doit jamais coûter l'envoi.
   return pinceau ? { toile, pinceau, fige: false, peint: false } : undefined;
 }
 
@@ -183,14 +183,14 @@ async function attendre(pleine: () => boolean): Promise<void> {
 }
 
 /**
- * REQ-MED-03 — **une image clé, décodée seule, pour le chemin rapide.**
+ * **une image clé, décodée seule, pour le chemin rapide.**
  *
  * Le remuxage ne décode rien : c'est tout son intérêt, et c'est pourquoi il n'avait
  * aucune image à offrir à la vignette. Décoder la **première clé** coûte une frame, pas un
  * fichier — sans commune mesure avec le réencodage qu'on vient justement d'éviter.
  *
  * Rend `undefined` sur le moindre accroc : la vignette est un confort, et `remuxer` doit
- * rendre sa vidéo quoi qu'il arrive (REQ-MED-03).
+ * rendre sa vidéo quoi qu'il arrive.
  */
 async function posterDUneCle(source: SourceVideo): Promise<Blob | undefined> {
   const premiere = source.echantillons.find((echantillon) => echantillon.cle);
@@ -234,12 +234,12 @@ async function posterDUneCle(source: SourceVideo): Promise<Blob | undefined> {
 }
 
 /**
- * REQ-MED-04 / E-18 — **le chemin rapide** : une source déjà conforme change de
+ * / E-18 — **le chemin rapide** : une source déjà conforme change de
  * conteneur, pas de pixels. Zéro attente, zéro génération de perte.
  */
 async function remuxer(source: SourceVideo): Promise<Sortie> {
   return {
-    // REQ-MED-03 — une seule image clé décodée, pour la vignette et rien d'autre. Le
+    // une seule image clé décodée, pour la vignette et rien d'autre. Le
     // chemin rapide ne décode rien par construction ; c'est justement pourquoi il n'avait
     // aucune image à donner, et pourquoi la vignette retombait sur un lecteur.
     poster: await posterDUneCle(source),
@@ -250,7 +250,7 @@ async function remuxer(source: SourceVideo): Promise<Sortie> {
         description: source.description,
         echantillons: source.echantillons,
         rotation: source.rotation,
-        // REQ-MED-13 — la piste sonore suit **sans être touchée**, ce qui est tout
+        // la piste sonore suit **sans être touchée**, ce qui est tout
         // l'intérêt : sur ce chemin, rien n'est réencodé, ni l'image ni le son.
         audio: source.audio,
       }),
@@ -268,10 +268,10 @@ function echantillonDe(morceau: EncodedVideoChunk): EchantillonVideo {
 }
 
 /**
- * REQ-MED-04 — démuxeur → décodeur → encodeur → muxeur, sans lecteur et sans canvas.
+ * démuxeur → décodeur → encodeur → muxeur, sans lecteur et sans canvas.
  *
  * Lève quand ce navigateur ne sait pas encoder : c'est le message d'échec dédié de l'UI
- * qui prend le relais (REQ-MED-04), jamais un fichier approximatif.
+ * qui prend le relais, jamais un fichier approximatif.
  */
 type Sortie = Raster & { durationMs: number; sansSon: boolean; poster?: Blob };
 
@@ -331,7 +331,7 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
       echantillons.push(echantillonDe(morceau));
     },
     error: (cause) => {
-      // L'erreur ne cite jamais le média (REQ-MED-10) : seulement qu'il y en a eu une.
+      // L'erreur ne cite jamais le média : seulement qu'il y en a eu une.
       erreur ??= new Error(`encodage vidéo interrompu : ${cause.name}`);
     },
   });
@@ -350,7 +350,7 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
   if (!pinceau) throw new EchecTranscodage("autre", "contexte 2d indisponible : réduction impossible");
 
   /*
-   * REQ-MED-03 — **la vignette sort d'ici, et elle ne coûte rien.** Ce chemin décode déjà
+   * **la vignette sort d'ici, et elle ne coûte rien.** Ce chemin décode déjà
    * chaque image ; les jeter toutes puis rouvrir le fichier dans un `<video>` pour en
    * redemander une était le detour qui laissait les vidéos sans vignette quand ce lecteur
    * refusait le fichier. Deux dessins au plus : la première image comme repli, la première

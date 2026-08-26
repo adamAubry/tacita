@@ -3,12 +3,12 @@ import type { SearchFilters, SearchStats } from "@tacita/search";
 import { ecrireCle, lireCle } from "./preferences";
 
 /**
- * REQ-UIX-22 — la fenêtre de débounce. Une frappe ne déclenche pas une requête : on
+ * la fenêtre de débounce. Une frappe ne déclenche pas une requête : on
  * attend que la saisie se pose. 300 ms est la valeur de la spec, pas un réglage.
  */
 export const DEBOUNCE_MS = 300;
 
-/** Les champs de la barre (REQ-UIX-21). Les clés servent aussi de clés de tokens. */
+/** Les champs de la barre. Les clés servent aussi de clés de tokens. */
 export const CHAMP_TEXTE = "texte";
 export const CHAMP_PERSONNE = "personne";
 export const CHAMP_CONVERSATION = "conversation";
@@ -16,7 +16,7 @@ export const CHAMP_TYPE = "type";
 export const CHAMP_APRES = "apres";
 export const CHAMP_AVANT = "avant";
 /**
- * REQ-UIX-21 — le token pré-armé de l'onglet Mentions. Il est en lecture seule : c'est
+ * le token pré-armé de l'onglet Mentions. Il est en lecture seule : c'est
  * l'onglet lui-même, pas un filtre que l'utilisateur aurait ajouté et pourrait retirer.
  */
 export const CHAMP_MENTIONS = "mentions";
@@ -33,8 +33,8 @@ export interface Token {
 }
 
 /**
- * REQ-UIX-21 — les tokens de la barre deviennent les critères de `search()`. Chaque
- * champ a **un** critère d'index correspondant (REQ-SRC-11) : rien n'est traduit en
+ * les tokens de la barre deviennent les critères de `search()`. Chaque
+ * champ a **un** critère d'index correspondant : rien n'est traduit en
  * plein-texte, ce que l'escalade E-01 interdit explicitement.
  *
  * Les critères se composent en ET côté paquet ; deux tokens rendent donc l'intersection
@@ -64,12 +64,12 @@ export const termeDepuis = (tokens: readonly Token[]): string =>
     .trim();
 
 /**
- * REQ-UI-16 — le périmètre, dit en toutes lettres. La recherche ne couvre que
+ * le périmètre, dit en toutes lettres. La recherche ne couvre que
  * l'historique téléchargé sur cet appareil : le taire laisserait croire à une recherche
  * exhaustive, et un message introuvable passerait pour un bug plutôt que pour une borne
  * connue (interdit n°13).
  *
- * Les bornes viennent de `stats()` (REQ-SRC-06) et ne se dérivent pas d'ailleurs.
+ * Les bornes viennent de `stats()` et ne se dérivent pas d'ailleurs.
  */
 export function libellePerimetre(stats: SearchStats | null): string {
   const base = "Recherche dans l'historique téléchargé sur cet appareil";
@@ -81,7 +81,7 @@ export function libellePerimetre(stats: SearchStats | null): string {
 }
 
 /**
- * REQ-SRC-05 / D-01 — le plafond a mordu : les plus anciens messages sont sortis de
+ * / D-01 — le plafond a mordu : les plus anciens messages sont sortis de
  * l'index. Une seconde phrase, et seulement quand c'est vrai.
  */
 export const purgeAMordu = (stats: SearchStats | null): boolean =>
@@ -104,7 +104,7 @@ const echapper = (terme: string) => terme.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 const plier = (valeur: string) => valeur.normalize("NFD").replace(/\p{Diacritic}/gu, "");
 
 /**
- * REQ-UIX-20 — découpe un extrait en fragments, ceux qui correspondent à un terme étant
+ * découpe un extrait en fragments, ceux qui correspondent à un terme étant
  * marqués. Orama fait de l'OR sur les tokens (README du paquet) : chaque mot du terme
  * est cherché séparément, sinon « réunion demain » ne surlignerait rien dans un message
  * qui ne contient que « réunion ».
@@ -141,7 +141,7 @@ export function segmenter(texte: string, terme: string): Fragment[] {
 }
 
 /**
- * REQ-UIX-19 — les profils récemment recherchés, en **IndexedDB** (interdit n°2). Ce
+ * les profils récemment recherchés, en **IndexedDB** (interdit n°2). Ce
  * sont des identifiants d'utilisateur, pas du contenu déchiffré : rien de ce que
  * l'interdit n°8 protège n'entre ici — ni corps de message, ni terme cherché.
  */
@@ -161,5 +161,5 @@ export function empiler(recents: readonly string[], userId: string): string[] {
 export const ecrireRecents = (indexedDB: IDBFactory, recents: readonly string[]) =>
   ecrireCle(indexedDB, CLE_RECENTS, [...recents]);
 
-/** « Purgeable » (REQ-UIX-19) : l'utilisateur peut vider la liste, sans détour. */
+/** « Purgeable » : l'utilisateur peut vider la liste, sans détour. */
 export const purgerRecents = (indexedDB: IDBFactory) => ecrireCle(indexedDB, CLE_RECENTS, []);

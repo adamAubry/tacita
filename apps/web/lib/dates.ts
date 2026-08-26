@@ -1,5 +1,5 @@
 /**
- * Format de date des aperçus (REQ-UI-05) : heure:minute si c'est aujourd'hui, date
+ * Format de date des aperçus : heure:minute si c'est aujourd'hui, date
  * courte sinon.
  *
  * **Localisé, jamais codé en dur** — décision du design owner (ESCALATIONS) : le
@@ -13,7 +13,7 @@
 export const memeJour = (a: number, b: number) =>
   new Date(a).toDateString() === new Date(b).toDateString();
 
-/** L'heure d'un message (REQ-UI-06, REQ-UI-09). Chiffres tabulaires côté rendu. */
+/** L'heure d'un message. Chiffres tabulaires côté rendu. */
 export const heure = (horodatage: number): string =>
   new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(horodatage);
 

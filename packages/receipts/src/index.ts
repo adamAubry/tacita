@@ -9,8 +9,8 @@ import {
 } from "matrix-js-sdk";
 
 /**
- * REQ-RCP-03 — le niveau « délivré » n'existe pas dans Matrix : type préfixé maison.
- * REQ-RCP-06 — extension non standard, voir README.md.
+ * le niveau « délivré » n'existe pas dans Matrix : type préfixé maison.
+ * extension non standard, voir README.md.
  */
 export const DELIVERED_EVENT_TYPE = "org.tacita.delivered";
 
@@ -19,7 +19,7 @@ export type ReceiptStatus = "sending" | "sent" | "delivered" | "read";
 /** Le statut ne recule jamais : un `read` déjà connu n'est pas ramené à `delivered`. */
 const RANK: Record<ReceiptStatus, number> = { sending: 0, sent: 1, delivered: 2, read: 3 };
 
-/** REQ-RCP-09 — fenêtre de regroupement des « délivré ». */
+/** fenêtre de regroupement des « délivré ». */
 const DEBOUNCE_MS = 500;
 
 export interface Receipts {
@@ -28,13 +28,13 @@ export interface Receipts {
   /** Rend le désabonnement. Notifié à chaque changement de statut. */
   subscribe(listener: (eventId: string, status: ReceiptStatus) => void): () => void;
   /**
-   * REQ-RCP-08 — `true` tant qu'un message est à `sent` : de l'expéditeur, « pas
+   * `true` tant qu'un message est à `sent` : de l'expéditeur, « pas
    * encore délivré » et « destinataire en mode masqué » sont indiscernables, et un
-   * message vers un utilisateur masqué reste à `sent` indéfiniment. L'UI (spec 11)
+   * message vers un utilisateur masqué reste à `sent` indéfiniment. L'UI
    * rend l'ambiguïté explicite au lieu de promettre une progression.
    */
   deliveryUnknowable(eventId: string): boolean;
-  /** REQ-RCP-07 — `m.read`, ou `m.read.private` en mode masqué. */
+  /** `m.read`, ou `m.read.private` en mode masqué. */
   markRead(event: MatrixEvent): Promise<void>;
   setHiddenMode(hidden: boolean): void;
   stop(): void;
@@ -48,7 +48,7 @@ export function createReceipts(session: Session): Receipts {
   const statuses = new Map<string, ReceiptStatus>();
   const listeners = new Set<(eventId: string, status: ReceiptStatus) => void>();
 
-  /** REQ-RCP-09 — destinataire → événements reçus depuis le dernier envoi. */
+  /** destinataire → événements reçus depuis le dernier envoi. */
   const pending = new Map<string, Set<string>>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let hidden = false;
@@ -56,7 +56,7 @@ export function createReceipts(session: Session): Receipts {
   /** `seed` : seuls nos propres messages créent une entrée, un accusé isolé n'en crée pas. */
   function advance(eventId: string, next: ReceiptStatus, seed = false): void {
     const current = statuses.get(eventId);
-    // REQ-RCP-04 — les reçus « délivré » surnuméraires (N appareils par compte)
+    // les reçus « délivré » surnuméraires (N appareils par compte)
     // retombent ici et ne changent rien : le premier arrivé fait foi.
     if (current === undefined ? !seed : RANK[next] <= RANK[current]) return;
     statuses.set(eventId, next);
@@ -64,20 +64,20 @@ export function createReceipts(session: Session): Receipts {
   }
 
   /**
-   * REQ-RCP-01 — « envoyé » est dérivé de l'`event_id` rendu par le serveur : tant que
+   * « envoyé » est dérivé de l'`event_id` rendu par le serveur : tant que
    * le SDK porte un statut d'envoi, l'événement n'est qu'un écho local.
-   * Un envoi en échec reste `sending` : les reprises sont le domaine de l'outbox (spec 07).
+   * Un envoi en échec reste `sending` : les reprises sont le domaine de l'outbox.
    */
   const ownStatus = (event: MatrixEvent): ReceiptStatus =>
     event.status === null ? "sent" : "sending";
 
   function flush(): void {
     timer = undefined;
-    // REQ-RCP-08 — en mode masqué, aucune émission : le lot en attente est abandonné,
+    // en mode masqué, aucune émission : le lot en attente est abandonné,
     // pas mis en file (le destinataire ne doit rien apprendre a posteriori).
     if (!hidden) {
       for (const [userId, eventIds] of pending) {
-        // REQ-RCP-05 — `sendToDevice` en clair, délibérément : chiffrer un accusé
+        // `sendToDevice` en clair, délibérément : chiffrer un accusé
         // coûterait une session Megolm pour zéro contenu. Fuite de métadonnées assumée.
         // `*` = tous les appareils de l'expéditeur, il n'a pas à deviner lequel écoute.
         const content = new Map([[userId, new Map([["*", { event_ids: [...eventIds] }]])]]);
@@ -90,7 +90,7 @@ export function createReceipts(session: Session): Receipts {
   }
 
   /**
-   * REQ-RCP-03 — l'accusé part à l'entrée de l'événement dans le store local, pas à
+   * l'accusé part à l'entrée de l'événement dans le store local, pas à
    * son affichage : rien ici ne dépend du déchiffrement ni du rendu.
    */
   const onTimeline = (
@@ -111,12 +111,12 @@ export function createReceipts(session: Session): Receipts {
     }
 
     pending.set(sender, (pending.get(sender) ?? new Set()).add(eventId));
-    // REQ-RCP-09 — un sync de rattrapage insère N messages d'un coup : un seul envoi.
+    // un sync de rattrapage insère N messages d'un coup : un seul envoi.
     timer ??= setTimeout(flush, DEBOUNCE_MS);
   };
 
   /**
-   * REQ-RCP-01 — l'écho local reçoit son identifiant serveur. Le SDK réécrit l'id sur
+   * l'écho local reçoit son identifiant serveur. Le SDK réécrit l'id sur
    * le même `MatrixEvent` : l'UI suit sans que le module ait à tenir de table d'alias.
    */
   const onLocalEcho = (event: MatrixEvent, _room: unknown, oldEventId?: string): void => {
@@ -152,7 +152,7 @@ export function createReceipts(session: Session): Receipts {
     }
   }
 
-  /** REQ-RCP-02 — « lu » vient des reçus `m.read` natifs. */
+  /** « lu » vient des reçus `m.read` natifs. */
   const onReceipt = (event: MatrixEvent, room: Room): void => {
     const content = event.getContent() as Record<
       string,
@@ -167,7 +167,7 @@ export function createReceipts(session: Session): Receipts {
     }
   };
 
-  /** REQ-RCP-04 — premier appareil atteint : `advance` ignore les suivants. */
+  /** premier appareil atteint : `advance` ignore les suivants. */
   const onToDevice = ({ message }: ReceivedToDeviceMessage): void => {
     if (message.type !== DELIVERED_EVENT_TYPE) return;
     const eventIds = (message.content as { event_ids?: unknown }).event_ids;
@@ -193,7 +193,7 @@ export function createReceipts(session: Session): Receipts {
     deliveryUnknowable: (eventId) => statuses.get(eventId) === "sent",
 
     async markRead(event) {
-      // REQ-RCP-07 — pas de désactivation pure : le reçu privé continue de synchroniser
+      // pas de désactivation pure : le reçu privé continue de synchroniser
       // les compteurs de non-lus entre les appareils du compte.
       await client.sendReceipt(event, hidden ? ReceiptType.ReadPrivate : ReceiptType.Read);
     },

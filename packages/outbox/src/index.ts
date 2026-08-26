@@ -1,5 +1,5 @@
-// `NOT_ENCRYPTED` est un contrat de passation vers le shard UI (spec 11) : c'est
-// l'`errcode` que porte une entrée bloquée par REQ-OBX-09, et l'UI doit le distinguer
+// `NOT_ENCRYPTED` est un contrat de passation vers le shard UI : c'est
+// l'`errcode` que porte une entrée bloquée par, et l'UI doit le distinguer
 // d'un échec réseau. Il était défini mais pas réexporté — le shard aurait dû
 // recopier la chaîne en dur, ce qui n'est plus un contrat mais une coïncidence.
 export {

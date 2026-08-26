@@ -15,10 +15,10 @@ interface Mesure {
 }
 
 /**
- * REQ-UIX-31 — « stockage local » : ce que cet appareil garde, et de quoi le vider.
+ * « stockage local » : ce que cet appareil garde, et de quoi le vider.
  *
  * Deux chiffres, deux sources, et ils ne mesurent pas la même chose : `stats()` compte
- * les **messages indexés** (spec 09, plafond D-01), `navigator.storage.estimate()` rend
+ * les **messages indexés** (plafond D-01), `navigator.storage.estimate()` rend
  * les **octets de l'origine entière** — index, historique du SDK, clés, fonds d'écran.
  * Les additionner donnerait un nombre faux ; on les affiche côte à côte, chacun dit ce
  * qu'il est.

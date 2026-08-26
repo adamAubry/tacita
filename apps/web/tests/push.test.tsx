@@ -169,9 +169,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("REQ-UI-18 — abonnement Web Push, réveil, déchiffrement local, notification", () => {
+describe("abonnement Web Push, réveil, déchiffrement local, notification", () => {
   it("rend l'aperçu déchiffré localement à partir du seul couple {event_id, room_id}", () => {
-    // C'est tout ce que la passerelle a le droit d'envoyer (REQ-PSH-02) — le reste se
+    // C'est tout ce que la passerelle a le droit d'envoyer — le reste se
     // lit dans la timeline déjà déchiffrée par cette fenêtre.
     expect(apercuLocal(session(), SALON, EVENEMENT)).toEqual({
       expediteur: "mira",
@@ -229,7 +229,7 @@ describe("REQ-UI-18 — abonnement Web Push, réveil, déchiffrement local, noti
  * l'activation qui ne fait rien et le push qui n'arrive jamais ont quatre origines
  * distinctes, et une seule d'entre elles était visible depuis un poste de développement.
  */
-describe("REQ-UI-18 — la proposition est faite une fois, et une seule", () => {
+describe("la proposition est faite une fois, et une seule", () => {
   const permissionParDefaut = () =>
     vi.stubGlobal("Notification", { permission: "default", requestPermission: vi.fn() });
 
@@ -282,7 +282,7 @@ describe("REQ-UI-18 — la proposition est faite une fois, et une seule", () => 
   });
 });
 
-describe("REQ-UI-18 — la chaîne se répare seule, et se dit quand elle ne le peut pas", () => {
+describe("la chaîne se répare seule, et se dit quand elle ne le peut pas", () => {
   it("enregistre le pusher que Synapse ne porte pas encore, et le relit pour le croire", async () => {
     vi.stubGlobal("Notification", { permission: "granted", requestPermission: vi.fn() });
 
@@ -295,7 +295,7 @@ describe("REQ-UI-18 — la chaîne se répare seule, et se dit quand elle ne le 
     expect(enregistre.data).toMatchObject({
       url: PUSH_NOTIFY_URL,
       format: "event_id_only",
-      // Sans elles la passerelle rejette le pusher (REQ-PSH-01) : les enregistrer sans
+      // Sans elles la passerelle rejette le pusher : les enregistrer sans
       // les clés, c'est enregistrer une panne.
       p256dh: "p256dh-test",
       auth: "auth-test",
@@ -397,7 +397,7 @@ describe("REQ-UI-18 — la chaîne se répare seule, et se dit quand elle ne le 
   });
 });
 
-describe("REQ-UI-18 — les réglages disent l'état, et portent toujours l'action", () => {
+describe("les réglages disent l'état, et portent toujours l'action", () => {
   const reglages = () => rendre(<NotificationsPush />);
 
   it("affiche les trois maillons et laisse rebrancher une chaîne cassée", async () => {
@@ -530,7 +530,7 @@ async function pousser(sw: ReturnType<typeof chargerServiceWorker>, charge: unkn
   await attente;
 }
 
-describe("REQ-UIX-40 — le service worker n'écrit rien, ne journalise rien, ne devine rien", () => {
+describe("le service worker n'écrit rien, ne journalise rien, ne devine rien", () => {
   it("construit la notification à partir de l'aperçu rendu par la fenêtre", async () => {
     const sw = chargerServiceWorker();
     sw.fenetresOuvertes([fenetreQuiRepond({ expediteur: "mira", texte: "on se voit demain ?" })]);
@@ -609,7 +609,7 @@ describe("REQ-UIX-40 — le service worker n'écrit rien, ne journalise rien, ne
     // `userVisibleOnly` est un contrat : un réveil muet fait afficher au navigateur
     // « ce site a été mis à jour en arrière-plan », puis finit par lui retirer la
     // permission — une panne définitive que l'utilisateur ne peut pas diagnostiquer.
-    // La passerelle n'émet rien sans `room_id` (REQ-PSH-01) : ce cas est une anomalie,
+    // La passerelle n'émet rien sans `room_id` : ce cas est une anomalie,
     // et « Nouveau message » y est plus vrai que le silence.
     const sw = chargerServiceWorker();
     sw.fenetresOuvertes([]);
@@ -667,7 +667,7 @@ describe("REQ-UIX-40 — le service worker n'écrit rien, ne journalise rien, ne
   });
 });
 
-describe("REQ-INF-14 — le client vise les adresses que le déploiement expose vraiment", () => {
+describe("le client vise les adresses que le déploiement expose vraiment", () => {
   // `join` et non `new URL` : sous jsdom, le `URL` global est celui de jsdom, que
   // `node:fs` refuse (« The URL must be of scheme file »). Même lacune que celle déjà
   // documentée dans `tests/sources.ts`.

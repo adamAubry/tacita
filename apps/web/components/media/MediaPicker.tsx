@@ -13,7 +13,7 @@ import { Button, Text } from "../foundation/primitives";
  * cibles est **remuxée**, ce qui ne demande aucun encodeur : conditionner le choix
  * reviendrait à refuser d'avance des vidéos que l'appareil sait parfaitement traiter.
  *
- * Ce que ça déplace, et que REQ-MED-04 impose de traiter : l'échec devient un **résultat**
+ * Ce que ça déplace, et que impose de traiter : l'échec devient un **résultat**
  * et non plus un prédicat. Une source non conforme sur un appareil sans encodeur échoue,
  * et elle échoue avec sa phrase à elle (`erreur`), pas avec un bouton absent.
  */
@@ -25,7 +25,7 @@ interface MediaPickerProps {
   enCours?: boolean;
   onAnnuler?: () => void;
   /**
-   * REQ-MED-04 — l'échec dédié de la compression, quand il arrive. Distinct de l'absence
+   * l'échec dédié de la compression, quand il arrive. Distinct de l'absence
    * de bouton : « ça n'a pas marché ici » n'est pas « ce n'est pas proposé ».
    */
   erreur?: string;
@@ -33,10 +33,10 @@ interface MediaPickerProps {
 }
 
 /**
- * REQ-UI-14 — la sélection de pièces jointes.
+ * la sélection de pièces jointes.
  *
  * ponytail: état d'envoi binaire, pas de barre de progression. `uploadAttachment`
- * (spec 08) ne rapporte rien pendant la compression ni pendant le téléversement — une
+ * ne rapporte rien pendant la compression ni pendant le téléversement — une
  * barre serait une animation inventée, pas une mesure. Passer à une vraie barre le jour
  * où le paquet expose un rappel de progression.
  */

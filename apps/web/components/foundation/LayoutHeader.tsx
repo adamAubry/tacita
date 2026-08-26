@@ -14,7 +14,7 @@ interface LayoutHeaderProps {
 }
 
 /**
- * REQ-UIX-02 — header de layout : `Toolbar`, titre centré, retour à gauche.
+ * header de layout : `Toolbar`, titre centré, retour à gauche.
  *
  * Le retour suit **l'historique de navigation**, jamais une route codée en dur : la
  * même conversation s'ouvre depuis l'accueil, une recherche ou une mention, et un

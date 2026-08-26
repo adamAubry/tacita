@@ -23,7 +23,7 @@ beforeEach(async () => {
   cache = await ouvrirCacheChiffre(indexedDB, 1000);
 });
 
-describe("REQ-MED-16 — cache de ciphertext : ce qu'il garde, ce qu'il évince, ce qu'il oublie", () => {
+describe("cache de ciphertext : ce qu'il garde, ce qu'il évince, ce qu'il oublie", () => {
   it("ce qui a été écrit se relit à l'identique", async () => {
     await cache.ecrire("mxc://tacita.test/a", octets(10, 7));
     expect([...(await cache.lire("mxc://tacita.test/a"))!]).toEqual([...octets(10, 7)]);
@@ -75,7 +75,7 @@ describe("REQ-MED-16 — cache de ciphertext : ce qu'il garde, ce qu'il évince,
   });
 });
 
-describe("REQ-MED-16 / REQ-MED-08 — le cache ne voit que du chiffré, et ne dispense d'aucune vérification", () => {
+describe("le cache ne voit que du chiffré, et ne dispense d'aucune vérification", () => {
   it("un chiffré empoisonné dans le cache échoue au hash, comme en transit", async () => {
     const { ciphertext, keys } = await encryptAttachment(octets(64, 3), {
       subtle: globalThis.crypto.subtle,

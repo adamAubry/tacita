@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * Les quatre icônes de la navbar (REQ-UIX-01). Astryx en livre 26, mais ni « accueil »,
+ * Les quatre icônes de la navbar. Astryx en livre 26, mais ni « accueil »,
  * ni « mentions », ni « profil » — et sa liste de noms est un type fermé, donc on ne
  * peut pas l'étendre. `NavIcon` accepte n'importe quel nœud : on lui donne les nôtres.
  *
@@ -125,7 +125,7 @@ export const IconeCle: ReactNode = (
 );
 
 /**
- * Les deux actions de son propre profil (REQ-UIX-24). Astryx n'a ni crayon ni sortie, et
+ * Les deux actions de son propre profil. Astryx n'a ni crayon ni sortie, et
  * sa liste de noms reste un type fermé.
  *
  * Le trait du crayon traverse le corps de bord à bord — c'est la virole, et c'est elle
@@ -148,7 +148,7 @@ export const IconeDeconnexion: ReactNode = (
 );
 
 /**
- * Les trois icônes des Info buttons (M-H, REQ-UIX-33). Astryx n'a ni cloche, ni
+ * Les trois icônes des Info buttons (M-H). Astryx n'a ni cloche, ni
  * réglages, ni « ajouter quelqu'un », et sa liste de noms reste un type fermé.
  *
  * La cloche est **barrée** : le bouton ouvre le réglage de notification, et l'état

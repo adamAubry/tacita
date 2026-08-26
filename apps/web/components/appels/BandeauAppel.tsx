@@ -9,7 +9,7 @@ import { Banner, Button } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
 
 /**
- * REQ-UI-19 / REQ-CAL-03 — « Appel en cours — rejoindre ».
+ * « Appel en cours — rejoindre ».
  *
  * Persistant tant que l'appel l'est, absent sinon : comme le bandeau de connexion et la
  * bannière de demandes (M-A, M-C), il n'a pas de version vide. Un bandeau permanent

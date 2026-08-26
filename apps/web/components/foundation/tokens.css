@@ -18,7 +18,7 @@
 
 /*
  * Les trois tokens de DESIGN.md qui n'ont aucun logement chez Astryx (voir la table de
- * correspondance, specs/ui/M-A.md). Ils sont consommés par nos composants composés
+ * correspondance, `DESIGN.md`). Ils sont consommés par nos composants composés
  * uniquement — jamais par un composant Astryx, qui ne les connaît pas.
  *
  * `light-dark()` : même mécanisme que les tokens d'Astryx, donc même contrainte de
@@ -116,7 +116,7 @@
 /* Le sélecteur de vue (DESIGN.md l'impose comme primitive) : ses options tombaient à
    28 px — les plus petites cibles de toute l'app, et elles sont sur l'accueil. */
 .astryx-segmented-control-item,
-/* La barre de recherche (REQ-UI-16) : son `<input>` fait 21 px dans un champ de 32.
+/* La barre de recherche : son `<input>` fait 21 px dans un champ de 32.
    `astryx-field` est le conteneur du contrôle, et la seule classe stable de la chaîne —
    au-dessus c'est `astryx-power-search`, au-dessous des classes atomiques StyleX. */
 .astryx-field {
@@ -194,7 +194,7 @@
 }
 
 /*
- * REQ-UIX-01 — la navbar lit le maintien du doigt comme un survol (voir `Navbar.tsx`).
+ * la navbar lit le maintien du doigt comme un survol (voir `Navbar.tsx`).
  * Trois réglages que la plateforme impose de désactiver pour que ce maintien existe, et
  * qu'un `style` inline ne devrait pas porter puisqu'ils ne dépendent d'aucun état :
  *
@@ -212,7 +212,7 @@
 }
 
 /*
- * REQ-UIX-01 — la taille des icônes de la navbar. Les quatre SVG portent `width`/`height`
+ * la taille des icônes de la navbar. Les quatre SVG portent `width`/`height`
  * à 24 dans `icons.tsx`, parce que trois autres écrans les rendent à cette taille-là ;
  * une règle CSS bat l'attribut de présentation, et seule la navbar les grossit.
  *
@@ -225,7 +225,7 @@
 }
 
 /*
- * REQ-UIX-01 — l'onglet visé porte une icône plus grande : 28 px contre 24. Le saut de
+ * l'onglet visé porte une icône plus grande : 28 px contre 24. Le saut de
  * taille ne déplace rien, la boîte qui porte l'icône est de hauteur fixe et le libellé est
  * toujours plus large que le pictogramme.
  *
@@ -239,7 +239,7 @@
 }
 
 /*
- * REQ-UIX-01 — **à la souris, l'icône monte ; sous l'appui, elle s'enfonce.** Deux
+ * **à la souris, l'icône monte ; sous l'appui, elle s'enfonce.** Deux
  * gestes, deux retours, et c'est le navigateur qui tranche : `hover: hover` n'est vrai
  * que d'un pointeur capable de survoler sans appuyer, `pointer: fine` que d'un pointeur
  * précis. Un test de `pointerType` en JavaScript dirait la même chose *après* le premier

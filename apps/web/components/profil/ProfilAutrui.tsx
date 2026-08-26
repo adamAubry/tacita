@@ -11,9 +11,9 @@ import { Note } from "./Note";
 import { ProfileCard } from "./ProfileCard";
 
 /**
- * REQ-UIX-30 — les textes de confirmation, sortis du JSX pour être lisibles d'un coup.
+ * les textes de confirmation, sortis du JSX pour être lisibles d'un coup.
  *
- * **Ils disent l'effet réel, pas l'effet espéré** (interdit n°13, REQ-MSG-17) : bloquer
+ * **Ils disent l'effet réel, pas l'effet espéré** (interdit n°13) : bloquer
  * n'empêche personne d'écrire et ne prévient personne — le serveur cesse simplement de
  * nous envoyer ses messages. Promettre davantage serait dangereux : quelqu'un pourrait
  * s'en remettre à un blocage qui ne protège pas de ce qu'il croit.
@@ -48,15 +48,15 @@ interface ProfilAutruiProps {
   indexedDB: IDBFactory;
   onMessage: () => void;
   onAppel: () => void;
-  /** REQ-UIX-26 — envoyer une demande (V1 : invitation de DM). */
+  /** envoyer une demande (V1 : invitation de DM). */
   onInviter: () => Promise<void>;
   onAction: (action: ActionProfil) => Promise<void>;
-  /** REQ-UIX-25 — l'onglet Activity : `ConversationCollections` du DM partagé (M-E). */
+  /** l'onglet Activity : `ConversationCollections` du DM partagé (M-E). */
   activite?: ReactNode;
 }
 
 /**
- * REQ-UIX-25 et REQ-UIX-26 — le profil de quelqu'un d'autre, dans ses deux états.
+ * le profil de quelqu'un d'autre, dans ses deux états.
  *
  * **Un seul des deux s'affiche, jamais les deux** : ami → sélecteur Actions/Activity ;
  * non-ami → le grand bouton « Ajouter ». Proposer d'envoyer un message à quelqu'un avec

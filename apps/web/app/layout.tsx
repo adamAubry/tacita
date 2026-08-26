@@ -10,7 +10,7 @@ import { RegisterServiceWorker } from "./register-sw";
 
 export const metadata: Metadata = {
   title: "Tacita",
-  // REQ-UI-01 — le manifeste est un fichier statique : le service worker doit pouvoir
+  // le manifeste est un fichier statique : le service worker doit pouvoir
   // le précacher comme le reste de la coquille.
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Tacita", statusBarStyle: "default" },

@@ -1,4 +1,4 @@
-# @tacita/search — recherche locale (spec 09)
+# @tacita/search — recherche locale
 
 Index Orama construit et interrogé dans un Web Worker, persisté en IndexedDB.
 Alimenté au fil du déchiffrement des événements.
@@ -13,7 +13,7 @@ await search.stats(); // { size, max, oldestTs, newestTs }
 search.dispose(); // détache le hook et termine le worker
 ```
 
-## Recherche filtrée (REQ-SRC-11)
+## Recherche filtrée
 
 Les critères sont **combinables** et se composent en ET ; un critère absent ne
 restreint rien. Tous sont servis par l'index local — aucun n'ajoute d'appel réseau.
@@ -46,7 +46,7 @@ Rien à câbler : le module écoute le déchiffrement des événements **et les
 suppressions** sur le client, et tient l'index à jour tout seul. `index()` reste
 là pour un rattrapage manuel.
 
-## Cycle de vie des messages (REQ-SRC-10)
+## Cycle de vie des messages
 
 Un message supprimé sort de l'index — « supprimer » qui laisse le texte
 trouvable ne serait pas une suppression. Une édition remplace le document de sa
@@ -64,12 +64,12 @@ hors ligne est un bug, pas une dégradation.
 
 - **La recherche couvre l'historique téléchargé, pas celui du serveur.** Un
   message jamais synchronisé sur cet appareil est introuvable. `stats()` rend
-  `oldestTs`/`newestTs` précisément pour que l'UI (spec 11) l'affiche au lieu de
+  `oldestTs`/`newestTs` précisément pour que l'UI l'affiche au lieu de
   laisser croire à une recherche exhaustive.
 - **L'amorçage lit les timelines vives, pas tout le store.** À la création,
   `createSearch` indexe ce que le client tient déjà — ce que les écrans affichent.
   Ce qui n'est plus dans la fenêtre de `/sync` n'entre dans l'index que lorsque la
-  remontée d'historique (REQ-COR-13) le redescend, donc au fil du défilement.
+  remontée d'historique le redescend, donc au fil du défilement.
 - **Le proxy s'attache à une session, pas à un écran.** Il n'indexe que pendant
   qu'il est branché : un `createSearch` créé à l'ouverture d'un onglet et jeté à sa
   fermeture n'assiste à aucun déchiffrement et laisse l'index vide.
@@ -94,7 +94,7 @@ hors ligne est un bug, pas une dégradation.
 - **Un retrait qui échoue n'est pas retenté.** Si le worker rejette la
   suppression, le document reste trouvable jusqu'au prochain `wipe()`. Ce
   package n'a aucun canal d'erreur ; la reprise se branchera quand le shard UI
-  (spec 11) en exposera un.
+ en exposera un.
 - **Le snapshot est réécrit en entier à chaque appel d'`index()`.** Suffisant
   pour des vagues de sync ; à débattre par un timer si le coût devient visible
   sur un gros index.

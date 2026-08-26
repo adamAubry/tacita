@@ -23,7 +23,7 @@ interface MessagePreviewProps {
 }
 
 /**
- * REQ-UIX-20 — composant 19, « message preview » : nom de conversation en haut à
+ * composant 19, « message preview » : nom de conversation en haut à
  * gauche, date en haut à droite, extrait tronqué en bas.
  *
  * L'extrait est du **contenu déchiffré** : il vit dans le rendu et nulle part ailleurs

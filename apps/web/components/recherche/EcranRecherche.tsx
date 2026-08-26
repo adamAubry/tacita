@@ -27,7 +27,7 @@ export function EcranRecherche({ variation }: { variation?: "search" | "mentions
   const session = etat.phase === "prete" ? etat.session : null;
 
   /**
-   * REQ-UIX-33 — « Rechercher » depuis les informations d'une conversation (M-H) arrive
+   * « Rechercher » depuis les informations d'une conversation (M-H) arrive
    * par `?salon=`. Le token est **modifiable**, contrairement à celui des mentions :
    * c'est un point de départ, et l'élargir à tout l'historique est un geste légitime.
    *
@@ -82,7 +82,7 @@ export function EcranRecherche({ variation }: { variation?: "search" | "mentions
       }
       indexedDB={globalThis.indexedDB}
       onOuvrirConversation={(roomId) => router.push(routeConversation(roomId))}
-      // REQ-UIX-20 — « positionnée sur le message ». L'ancre passe par l'URL : la
+      // « positionnée sur le message ». L'ancre passe par l'URL : la
       // conversation sait s'y rendre seule, et le lien reste partageable et rejouable.
       onOuvrirMessage={({ roomId, eventId }) =>
         router.push(routeConversation(roomId, eventId))

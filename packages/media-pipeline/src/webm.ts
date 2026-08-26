@@ -2,7 +2,7 @@ import type { Bytes } from "./attachments";
 
 /**
  * Lecteur WebM réduit à un seul usage : sortir les paquets Opus et l'`OpusHead` d'un
- * enregistrement `MediaRecorder`. **Octets → octets, aucun DOM** (spec 08, § Méthode).
+ * enregistrement `MediaRecorder`. **Octets → octets, aucun DOM** (§ Méthode).
  *
  * Ce n'est pas un démuxeur Matroska : il ne lit ni la vidéo, ni les pistes multiples, ni
  * les sous-titres, et n'en a pas besoin. Ce que MediaRecorder produit pour un vocal est

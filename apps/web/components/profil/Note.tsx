@@ -14,7 +14,7 @@ interface NoteProps {
 }
 
 /**
- * REQ-UIX-27 — composant 23, la note privée.
+ * composant 23, la note privée.
  *
  * **Le libellé est celui de l'exigence, mot pour mot** (`LIBELLE_NOTE`) : « visible
  * uniquement par vous, sur cet appareil ». La seconde moitié n'est pas une précision de

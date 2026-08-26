@@ -15,7 +15,7 @@ import { registerDirect } from "./conversations";
  */
 
 /**
- * REQ-MSG-16 — accepter une demande d'ami. C'est un `join` sur le DM invité, pas une
+ * accepter une demande d'ami. C'est un `join` sur le DM invité, pas une
  * écriture dans un registre : D-09 fait de l'invitation de salon **la** demande d'ami.
  *
  * Rend l'identifiant du salon rejoint, celui que l'UI ouvre ensuite.
@@ -26,7 +26,7 @@ export async function acceptInvitation(session: Session, roomId: string): Promis
   const invitant = session.client.getRoom(roomId)?.getDMInviter();
   await session.client.joinRoom(roomId);
 
-  // REQ-MSG-15 — côté invité aussi, `m.direct` est à écrire : le drapeau `is_direct` de
+  // côté invité aussi, `m.direct` est à écrire : le drapeau `is_direct` de
   // l'invitation ne devient jamais de l'account data tout seul. Sans cela, accepter une
   // demande d'ami donne une conversation qui n'est un DM pour aucun des deux.
   if (invitant) await registerDirect(session, invitant, roomId);
@@ -34,7 +34,7 @@ export async function acceptInvitation(session: Session, roomId: string): Promis
 }
 
 /**
- * REQ-MSG-16 — refuser une demande, ou retirer un ami : dans les deux cas un `leave`.
+ * refuser une demande, ou retirer un ami : dans les deux cas un `leave`.
  *
  * Le geste est le même côté protocole ; ce qui diffère est ce que l'UI en dit, et c'est
  * à elle de le dire. Deux fonctions identiques ici ne feraient qu'inviter à les faire
@@ -45,7 +45,7 @@ export async function leaveConversation(session: Session, roomId: string): Promi
 }
 
 /**
- * REQ-MSG-17 — la liste d'ignorés du compte, telle que le serveur la porte.
+ * la liste d'ignorés du compte, telle que le serveur la porte.
  *
  * Le SDK la tient à jour depuis l'account data ; on ne la recopie pas ailleurs, sinon
  * deux sources répondraient « est-ce que je l'ai bloqué ? ».
@@ -53,7 +53,7 @@ export async function leaveConversation(session: Session, roomId: string): Promi
 export const ignoredUsers = (session: Session): string[] => session.client.getIgnoredUsers();
 
 /**
- * REQ-MSG-17 — bloquer et débloquer, par `m.ignored_user_list` natif.
+ * bloquer et débloquer, par `m.ignored_user_list` natif.
  *
  * **Ce que le blocage fait réellement**, et que l'UI doit dire sans l'embellir (interdit
  * n°13) : le serveur cesse de nous **envoyer** les événements de cette personne. Elle
@@ -76,7 +76,7 @@ export async function unignoreUser(session: Session, userId: string): Promise<vo
 }
 
 /**
- * REQ-MSG-21 — la bannière de profil, en champ **étendu** (MSC4133).
+ * la bannière de profil, en champ **étendu** (MSC4133).
  *
  * Matrix ne définit que `displayname` et `avatar_url` ; une bannière n'existe nulle part
  * dans la spec, donc elle vit dans un champ à nous, nommé dans notre espace. Vérifié
@@ -91,7 +91,7 @@ export async function unignoreUser(session: Session, userId: string): Promise<vo
  *   changer. `uk.tcpip.msc4133.stable` étant annoncé en dur, matrix-js-sdk part de
  *   lui-même sur le préfixe `v3` ;
  * - le nom doit suivre la *Common Namespaced Identifier Grammar*
- *   (`^[a-z][a-z0-9_.-]{0,254}$`, `synapse/util/stringutils.py`) : celui-ci la respecte.
+ * (`^[a-z][a-z0-9_.-]{0,254}$`, `synapse/util/stringutils.py`) : celui-ci la respecte.
  *
  * À revérifier au prochain bump de Synapse, comme les autres valeurs sensibles aux
  * versions : une route aujourd'hui inconditionnelle peut repasser derrière le drapeau.
@@ -105,12 +105,12 @@ export interface Profile {
   displayName: string;
   /** URL `mxc://`, à déchiffrer/résoudre par le pipeline média — jamais une URL http. */
   avatarUrl?: string;
-  /** REQ-MSG-21 — `mxc://` de la bannière, même nature que `avatarUrl` : public, non chiffré. */
+  /** `mxc://` de la bannière, même nature que `avatarUrl` : public, non chiffré. */
   bannerUrl?: string;
 }
 
 /**
- * REQ-MSG-18 — le profil public d'un utilisateur.
+ * le profil public d'un utilisateur.
  *
  * Un profil absent n'est pas une erreur : un compte peut n'avoir jamais posé de nom, et
  * le serveur répond alors `404`. On retombe sur l'identifiant, qui est toujours vrai et
@@ -135,12 +135,12 @@ export async function profileOf(session: Session, userId: string): Promise<Profi
 }
 
 /**
- * REQ-MSG-18 — modifier son propre profil. Deux écritures distinctes côté protocole ;
+ * modifier son propre profil. Deux écritures distinctes côté protocole ;
  * on ne pose que ce qui est fourni, pour qu'un formulaire qui ne change que le nom
  * n'efface pas la photo.
  *
  * `avatarUrl` et `bannerUrl` sont des `mxc://` déjà téléversés — le téléversement
- * appartient au pipeline média (spec 08), pas à ce paquet.
+ * appartient au pipeline média, pas à ce paquet.
  */
 export async function updateProfile(
   session: Session,
@@ -153,14 +153,14 @@ export async function updateProfile(
     await session.client.setAvatarUrl(changements.avatarUrl);
   }
   if (changements.bannerUrl !== undefined) {
-    // REQ-MSG-21 — champ étendu, pas un champ de la spec : voir `CHAMP_BANNIERE`.
+    // champ étendu, pas un champ de la spec : voir `CHAMP_BANNIERE`.
     await session.client.setExtendedProfileProperty(CHAMP_BANNIERE, changements.bannerUrl);
   }
 }
 
 /**
- * REQ-MSG-19 — le domaine de son propre identifiant, c'est-à-dire **le seul domaine du
- * déploiement** : la fédération est désactivée (REQ-INF-02, `federation_domain_whitelist:
+ * le domaine de son propre identifiant, c'est-à-dire **le seul domaine du
+ * déploiement** : la fédération est désactivée (`federation_domain_whitelist:
  * []`), donc tout compte joignable vit ici. C'est ce qui autorise à compléter un
  * identifiant partiel sans jamais se tromper de serveur.
  */
@@ -168,7 +168,7 @@ const domaineLocal = (session: Session): string | undefined =>
   session.client.getUserId()?.split(":")[1];
 
 /**
- * REQ-MSG-19 — la forme complète d'un identifiant Matrix, `@localpart:domaine`.
+ * la forme complète d'un identifiant Matrix, `@localpart:domaine`.
  *
  * La grammaire du localpart est celle de la spec (`a-z0-9._=/+-`) ; on ne l'élargit pas,
  * une saisie qui n'y entre pas n'est pas un identifiant et part à l'annuaire telle quelle.
@@ -177,7 +177,7 @@ const IDENTIFIANT_COMPLET = /^@[a-z0-9._=/+-]+:[^:\s]+$/;
 const LOCALPART_SEUL = /^@?[a-z0-9._=/+-]+$/;
 
 /**
- * REQ-MSG-19 — **la forme canonique de ce que l'utilisateur a tapé**, quand c'en est une.
+ * **la forme canonique de ce que l'utilisateur a tapé**, quand c'en est une.
  *
  * `@adam:chat.example.org`, `@adam` et `adam` désignent la même personne sur un
  * déploiement sans fédération, et l'utilisateur ne devrait pas avoir à écrire les deux
@@ -195,7 +195,7 @@ export function identifiantComplet(terme: string, domaine: string | undefined): 
 }
 
 /**
- * REQ-MSG-19 — recherche d'utilisateur dans l'**annuaire** du homeserver.
+ * recherche d'utilisateur dans l'**annuaire** du homeserver.
  *
  * À ne pas confondre avec la recherche de contenu : l'annuaire porte des identifiants et
  * des noms d'affichage, jamais de messages. `/search` de Synapse reste interdit
@@ -204,10 +204,10 @@ export function identifiantComplet(terme: string, domaine: string | undefined): 
  * Un terme vide ne part pas : l'annuaire rendrait un échantillon arbitraire du serveur,
  * ce qui n'est pas une réponse à « qui cherchez-vous ? ».
  *
- * **L'annuaire couvre tous les comptes du serveur depuis le 21/08/2026** (REQ-INF-18,
+ * **L'annuaire couvre tous les comptes du serveur depuis le 21/08/2026** (
  * escalade E-21 tranchée) : une recherche par nom d'affichage ou par fragment
  * d'identifiant aboutit, ce qui n'était pas le cas auparavant. La conséquence — tout
- * compte peut énumérer les autres — est assumée et écrite dans `infra/LIMITES.md` ;
+ * compte peut énumérer les autres — est assumée ;
  * l'écran d'ajout la dit aussi, parce qu'elle vaut pour l'utilisateur lui-même.
  */
 export async function searchUsers(
@@ -219,12 +219,12 @@ export async function searchUsers(
   if (recherche.length === 0) return [];
 
   /**
-   * REQ-MSG-19 — **une adresse exacte se résout par son profil, pas par l'annuaire.**
+   * **une adresse exacte se résout par son profil, pas par l'annuaire.**
    *
    * Mesuré contre un vrai Synapse le 07/08/2026 : `/user_directory/search` rendait
    * `results: []` pour un compte qui existe pourtant, tandis que `/profile/@…` rendait
    * son nom d'affichage — le défaut `search_all_users: false` ne montrant que les gens
-   * avec qui on partage déjà un salon. E-21 a depuis ouvert l'annuaire (REQ-INF-18), et
+   * avec qui on partage déjà un salon. E-21 a depuis ouvert l'annuaire, et
    * ce chemin **reste**, pour deux raisons qui n'ont rien d'historique :
    *
    * - l'index de l'annuaire est **construit en fond** et peut retarder — juste après un
@@ -243,7 +243,7 @@ export async function searchUsers(
    * `@adam:chat.example.org` en entier pour trouver qui que ce soit. Signalé par les
    * utilisateurs, et c'est bien ce que le code faisait.
    *
-   * Le domaine étant unique (fédération désactivée, REQ-INF-02), le compléter n'invente
+   * Le domaine étant unique (fédération désactivée), le compléter n'invente
    * rien : `@adam` ne peut désigner personne d'autre que `@adam:<notre serveur>`.
    */
   const complet = identifiantComplet(recherche, domaineLocal(session));
@@ -279,10 +279,10 @@ export async function searchUsers(
 }
 
 /**
- * REQ-MSG-19 — le profil résolu en tête, puis l'annuaire, sans doublon.
+ * le profil résolu en tête, puis l'annuaire, sans doublon.
  *
  * Un identifiant inexistant rend un profil de repli portant l'identifiant lui-même
- * (REQ-MSG-18) : le proposer ferait « trouver » n'importe quelle saisie, donc on ne
+ * le proposer ferait « trouver » n'importe quelle saisie, donc on ne
  * garde que ce que le serveur a vraiment reconnu.
  */
 function rendus(profil: Profile | undefined, annuaire: Profile[]): Profile[] {

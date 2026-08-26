@@ -23,7 +23,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("REQ-MSG-09 — m.typing éphémère, throttlé, avec arrêt automatique", () => {
+describe("m.typing éphémère, throttlé, avec arrêt automatique", () => {
   it("20 frappes en 1 s ne produisent qu'une seule émission", () => {
     const typing = createTypingIndicator(ctx.session);
     for (let i = 0; i < 20; i++) {
@@ -101,7 +101,7 @@ describe("REQ-MSG-09 — m.typing éphémère, throttlé, avec arrêt automatiqu
   });
 });
 
-describe("REQ-MSG-09 — lecture : qui écrit, et le signal qui le dit", () => {
+describe("lecture : qui écrit, et le signal qui le dit", () => {
   it("rend ceux qui écrivent, et jamais soi-même", () => {
     const salon = fakeSession({
       members: [

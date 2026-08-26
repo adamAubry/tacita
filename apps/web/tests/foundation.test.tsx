@@ -30,7 +30,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("REQ-UIX-01 — navbar : quatre onglets, actif surélevé, sans rechargement", () => {
+describe("navbar : quatre onglets, actif surélevé, sans rechargement", () => {
   it("rend les quatre onglets du wireframe, dans l'ordre", () => {
     render(<Navbar />);
     expect(ONGLETS.map((o) => o.libelle)).toEqual(["Accueil", "Recherche", "Mentions", "Profil"]);
@@ -207,7 +207,7 @@ describe("REQ-UIX-01 — navbar : quatre onglets, actif surélevé, sans recharg
   });
 });
 
-describe("REQ-UIX-02 — header : titre centré, retour par l'historique", () => {
+describe("header : titre centré, retour par l'historique", () => {
   it("affiche le titre et rend le bouton de retour", () => {
     render(<LayoutHeader titre="Réglages" />);
     expect(screen.getAllByText("Réglages").length).toBeGreaterThan(0);
@@ -226,7 +226,7 @@ describe("REQ-UIX-02 — header : titre centré, retour par l'historique", () =>
   });
 });
 
-describe("REQ-UIX-03 — Placeholder : pourquoi c'est vide, et quoi faire", () => {
+describe("Placeholder : pourquoi c'est vide, et quoi faire", () => {
   it("rend l'icône, le texte et l'action", () => {
     render(
       <Placeholder
@@ -249,7 +249,7 @@ describe("REQ-UIX-03 — Placeholder : pourquoi c'est vide, et quoi faire", () =
   });
 });
 
-describe("REQ-UIX-04 — skeletons et bandeau d'état de connexion", () => {
+describe("skeletons et bandeau d'état de connexion", () => {
   it("le squelette rend une géométrie, pas un spinner", () => {
     // DESIGN.md : « pas de spinner plein écran : skeletons localisés », de même
     // géométrie que le contenu final pour qu'il n'y ait aucun décalage à l'arrivée.
@@ -267,13 +267,13 @@ describe("REQ-UIX-04 — skeletons et bandeau d'état de connexion", () => {
   it("hors ligne, il tient une promesse plutôt que d'annoncer une panne", () => {
     render(<ConnectionBanner etat="hors-ligne" />);
     expect(screen.getByText("Hors ligne")).toBeTruthy();
-    // REQ-UI-17 : l'historique reste lisible et l'envoi est différé, pas perdu.
+    // l'historique reste lisible et l'envoi est différé, pas perdu.
     expect(screen.getByText(/consultables/)).toBeTruthy();
     expect(screen.getByText(/à la reconnexion/)).toBeTruthy();
   });
 });
 
-describe("REQ-UIX-05 — primitives partagées", () => {
+describe("primitives partagées", () => {
   it("le sélecteur de composant rend ses options et remonte le choix", () => {
     const choisir = vi.fn();
     render(
@@ -477,7 +477,7 @@ describe("DESIGN.md — un mot insécable ne doit pas élargir l'écran", () => 
   });
 });
 
-describe("REQ-UI-17 / REQ-UIX-04 — le bandeau de connexion est branché, pas seulement écrit", () => {
+describe("le bandeau de connexion est branché, pas seulement écrit", () => {
   it("il suit navigator.onLine et ses deux événements", async () => {
     // Mesuré au navigateur le 08/08/2026 : `ConnectionBanner` existait, avait ses tests,
     // et **aucun écran ne le montait**. Couper le réseau n'affichait rien. Un composant
@@ -510,7 +510,7 @@ describe("REQ-UI-17 / REQ-UIX-04 — le bandeau de connexion est branché, pas s
   });
 });
 
-describe("REQ-OBX-01 / REQ-UI-17 — la file d'envoi appartient à la session, pas à un écran", () => {
+describe("la file d'envoi appartient à la session, pas à un écran", () => {
   it("`createOutbox` n'est appelé que par le provider de session", () => {
     // Elle vivait dans `Conversation` : créée à l'ouverture d'un salon, `dispose()` au
     // démontage. Le bandeau hors ligne promet que « ce que vous écrivez partira à la

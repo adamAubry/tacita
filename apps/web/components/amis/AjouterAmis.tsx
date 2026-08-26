@@ -12,17 +12,17 @@ import { Suggestions } from "./FriendsList";
 
 interface AjouterAmisProps {
   /**
-   * REQ-MSG-19 — l'annuaire du homeserver, ouvert à tous les comptes locaux depuis E-21
-   * (REQ-INF-18). Rien à voir avec l'interdit n°3, qui vise la recherche de **contenu**.
+   * l'annuaire du homeserver, ouvert à tous les comptes locaux depuis E-21
+   * Rien à voir avec l'interdit n°3, qui vise la recherche de **contenu**.
    */
   chercher: (terme: string) => Promise<Profile[]>;
-  /** REQ-UIX-28 — crée puis partage un lien (spec 12). Rend ce qui s'est passé. */
+  /** crée puis partage un lien. Rend ce qui s'est passé. */
   onPartagerLien: () => Promise<"partage" | "copie" | "annule">;
   onOuvrirProfil: (userId: string) => void;
 }
 
 /**
- * REQ-UIX-28 — Add-friends.
+ * Add-friends.
  *
  * Deux chemins, dans l'ordre où ils servent : partager un lien (on connaît déjà la
  * personne, hors de Tacita), puis la chercher dans l'annuaire (elle y est déjà).
@@ -110,9 +110,9 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
       )}
 
       <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
-        {/* REQ-UIX-28 — « par identifiant » n'est plus le seul chemin depuis que
-            l'annuaire couvre tout le serveur (REQ-INF-18, E-21) : le libellé le dit,
-            sans quoi personne n'essaierait un prénom. REQ-UIX-42 — le domaine, lui, ne
+        {/* « par identifiant » n'est plus le seul chemin depuis que
+            l'annuaire couvre tout le serveur (E-21) : le libellé le dit,
+            sans quoi personne n'essaierait un prénom. le domaine, lui, ne
             se tape plus : `identifiantComplet` le remet. */}
         <TextInput
           label="Rechercher par nom ou identifiant"

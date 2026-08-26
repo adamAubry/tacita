@@ -34,7 +34,7 @@ beforeEach(() => {
   ({ crypto, client } = resetSdk());
 });
 
-describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscription", () => {
+describe("clé de récupération E2EE obligatoire à l'inscription", () => {
   it("setupRecoveryKey crée le backup et rend la clé à afficher à l'utilisateur", async () => {
     const session = await initSession(config);
     const key = await session.setupRecoveryKey();
@@ -232,7 +232,7 @@ describe("REQ-COR-06 — clé de récupération E2EE obligatoire à l'inscriptio
   });
 });
 
-describe("REQ-COR-08 — l'inscription franchit les étapes de l'UIA, et rien d'autre", () => {
+describe("l'inscription franchit les étapes de l'UIA, et rien d'autre", () => {
   /*
    * **Le défaut trouvé le 25/08/2026 en montant la pile.** `creerCompte` ne franchissait
    * qu'une étape et tenait le 401 suivant pour une panne : aucune inscription n'aboutissait.
@@ -298,7 +298,7 @@ describe("REQ-COR-08 — l'inscription franchit les étapes de l'UIA, et rien d'
   });
 });
 
-describe("REQ-COR-06 — recoveryState distingue l'inscription de la reconnexion", () => {
+describe("recoveryState distingue l'inscription de la reconnexion", () => {
   it("un appareil signé par son propriétaire est prêt, sans rien demander au serveur", async () => {
     const session = await initSession(config);
     await expect(session.recoveryState()).resolves.toBe("prete");
@@ -347,7 +347,7 @@ describe("REQ-COR-06 — recoveryState distingue l'inscription de la reconnexion
   });
 });
 
-describe("REQ-COR-06 — unlockRecovery : la deuxième connexion", () => {
+describe("unlockRecovery : la deuxième connexion", () => {
   it("signe cet appareil et rebranche la sauvegarde", async () => {
     const session = await initSession(config);
     await session.unlockRecovery(CLE);
@@ -385,7 +385,7 @@ describe("REQ-COR-06 — unlockRecovery : la deuxième connexion", () => {
   });
 });
 
-describe("REQ-COR-14 — la clé de récupération ouvre une session (D-14)", () => {
+describe("la clé de récupération ouvre une session (D-14)", () => {
   const CHEMIN = "/_synapse/client/tacita/login_recovery";
 
   /** Ce que le module rend quand la clé ouvre : un jeton de connexion, rien d'autre. */
@@ -544,7 +544,7 @@ describe("D-15 — se connecter avec son mot de passe suffit, sur un appareil ne
   });
 });
 
-describe("REQ-COR-15 — voir ses appareils, et pouvoir les déconnecter", () => {
+describe("voir ses appareils, et pouvoir les déconnecter", () => {
   /*
    * L'audit du 25/08/2026 : les jetons de ce déploiement n'expirent pas, le changement de
    * mot de passe ne déconnecte personne (D-12), et la clé ouvre une session à elle seule

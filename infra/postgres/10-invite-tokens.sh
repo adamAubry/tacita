@@ -1,5 +1,5 @@
 #!/bin/sh
-# REQ-INF-15 — base **dédiée** au service de liens (spec 12), jamais une table dans
+# base **dédiée** au service de liens, jamais une table dans
 # celle de Synapse : un service qui n'a aucun pouvoir Matrix ne doit pas partager la
 # base de celui qui en a tous.
 #
@@ -9,6 +9,6 @@
 #   docker compose exec postgres createdb -U "$POSTGRES_USER" invite_tokens
 #
 # `createdb` et non `psql -c` : il hérite du template et des paramètres de locale C
-# posés par POSTGRES_INITDB_ARGS (REQ-INF-01).
+# posés par POSTGRES_INITDB_ARGS.
 set -e
 createdb -U "$POSTGRES_USER" invite_tokens

@@ -3,7 +3,7 @@ import type { Session } from "@tacita/client-core";
 import { ecrireCle, lireCle, viderStore } from "./preferences";
 
 /**
- * REQ-UIX-27 — la note privée sur un profil.
+ * la note privée sur un profil.
  *
  * **Locale à l'appareil, jamais synchronisée** (D-09, escalade E-02 tranchée le
  * 05/08/2026). Le mécanisme naturel — l'account data Matrix — est en clair côté serveur :
@@ -18,7 +18,7 @@ const BASE = "tacita-notes";
 const STORE = "notes";
 
 /**
- * Le libellé est **exigé mot pour mot** par REQ-UIX-27. Il vit ici, en constante, pour
+ * Le libellé est **exigé mot pour mot** par. Il vit ici, en constante, pour
  * qu'aucun écran ne le reformule : « visible uniquement par vous » sans « sur cet
  * appareil » serait une promesse de synchronisation que rien ne tient (interdit n°13).
  */
@@ -34,7 +34,7 @@ export const ecrireNote = (indexedDB: IDBFactory, userId: string, note: string) 
   ecrireCle(indexedDB, userId, note.trim(), BASE, STORE);
 
 /**
- * REQ-UIX-27 / REQ-COR-10 — enregistré au registre de wipe : la déconnexion efface les
+ * enregistré au registre de wipe : la déconnexion efface les
  * notes comme elle efface l'index de recherche. Les laisser derrière ferait qu'un
  * appareil partagé rend au suivant ce que le précédent pensait de ses contacts.
  */

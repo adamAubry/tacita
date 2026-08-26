@@ -55,12 +55,12 @@ const TITRES: Record<Panneau, string> = {
 };
 
 /**
- * Layout Conversation info (REQ-UIX-33, 34, 37) — une seule implémentation pour les deux
+ * Layout Conversation info (34, 37) — une seule implémentation pour les deux
  * variantes.
  *
  * Ce qui distingue le 1:1 du groupe tient en deux listes : le jeu d'Info buttons et le
  * jeu d'Options. Tout le reste — en-tête, galeries, panneaux — est identique, comme
- * REQ-UIX-37 l'exige. Deux composants auraient dérivé au premier changement d'un côté.
+ * l'exige. Deux composants auraient dérivé au premier changement d'un côté.
  */
 export function InfosConversation({ roomId }: { roomId: string }) {
   const { etat } = useSession();
@@ -89,7 +89,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
 
   const rechercher = () => router.push(`/recherche?salon=${encodeURIComponent(roomId)}`);
 
-  /** REQ-UIX-33 — quatre boutons, et le premier change avec la variante. */
+  /** quatre boutons, et le premier change avec la variante. */
   const boutons = [
     direct
       ? {
@@ -144,7 +144,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
         <Text type="display-3" as="h1">
           {nom}
         </Text>
-        {/* REQ-UI-05 / REQ-MSG-11 — le compteur de membres, dans l'info groupe. */}
+        {/* le compteur de membres, dans l'info groupe. */}
         <Text type="supporting" color="secondary" hasTabularNumbers>
           {direct
             ? (salon?.peerId ?? "")
@@ -162,7 +162,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
         />
       </div>
 
-      {/* REQ-UIX-37 — dernière section, identique dans les deux variantes. */}
+      {/* dernière section, identique dans les deux variantes. */}
       <div style={{ padding: "var(--spacing-3)" }}>
         <ConversationCollections
           evenements={session ? listerMessages(session, roomId) : []}
@@ -173,7 +173,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
       </div>
 
       {/* La création de groupe réutilise la feuille de M-C, pré-armée sur cette
-          personne : REQ-UIX-34 demande « avec cette personne (+ autres) », donc la
+          personne : demande « avec cette personne (+ autres) », donc la
           sélection de départ est une prop, pas un second composant. */}
       <NewConversationSheet
         ouvert={panneau === "groupe"}
@@ -227,22 +227,22 @@ export function InfosConversation({ roomId }: { roomId: string }) {
 }
 
 /**
- * REQ-UIX-33 — « ajouter un membre » : par identifiant Matrix, le chemin natif de D-09.
- * Il **ne passe pas par le service de liens** (REQ-INV-16) — un service indisponible ne
+ * « ajouter un membre » : par identifiant Matrix, le chemin natif de D-09.
+ * Il **ne passe pas par le service de liens** — un service indisponible ne
  * doit jamais empêcher d'ajouter quelqu'un.
  */
 function AjouterMembre({
   domaine,
   onInviter,
 }: {
-  /** REQ-MSG-19 — le domaine du déploiement, pour compléter une saisie sans domaine. */
+  /** le domaine du déploiement, pour compléter une saisie sans domaine. */
   domaine: string | undefined;
   onInviter: (userId: string) => void;
 }) {
   const [identifiant, setIdentifiant] = useState("");
   /*
-   * REQ-UIX-42 — **le domaine ne se tape plus.** `@adam` est une adresse complète ici
-   * (fédération désactivée, REQ-INF-02) ; l'exiger en entier faisait recopier à la main
+   * **le domaine ne se tape plus.** `@adam` est une adresse complète ici
+   * (fédération désactivée) ; l'exiger en entier faisait recopier à la main
    * la partie que personne ne choisit. `identifiantComplet` rend la forme canonique, ou
    * `undefined` quand la saisie n'est pas un identifiant — c'est notre seule validation.
    * Le serveur reste seul juge de l'existence du compte.

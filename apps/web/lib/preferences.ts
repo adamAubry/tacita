@@ -9,8 +9,8 @@ const VERSION = 1;
  * fermé aux données utilisateur, et un réglage en est une — il dit quelque chose de la
  * personne, et sa petite taille ne lui vaut pas d'exception).
  *
- * Une seule base pour toutes : le thème (REQ-UI-03) et le refus de l'écran d'éducation
- * iOS (REQ-UI-18) n'ont aucune raison d'avoir chacun la leur.
+ * Une seule base pour toutes : le thème et le refus de l'écran d'éducation
+ * iOS n'ont aucune raison d'avoir chacun la leur.
  *
  * Ce store ne contient **jamais de contenu déchiffré** : que des choix d'affichage.
  */
@@ -70,7 +70,7 @@ export async function ecrireCle(
   }
 }
 
-/** Vide un store entier. REQ-COR-10 : ce que la déconnexion doit pouvoir effacer. */
+/** Vide un store entier. : ce que la déconnexion doit pouvoir effacer. */
 export async function viderStore(
   indexedDB: IDBFactory,
   nomBase: string,
@@ -110,7 +110,7 @@ const drapeau = (cle: string) =>
     (indexedDB: IDBFactory, valeur: boolean) => ecrireCle(indexedDB, cle, valeur),
   ] as const;
 
-/** REQ-UI-03 — une valeur inattendue est ignorée, pas propagée : on retombe au défaut. */
+/** une valeur inattendue est ignorée, pas propagée : on retombe au défaut. */
 export async function lireTheme(indexedDB: IDBFactory): Promise<ThemeMode | undefined> {
   const valeur = await lireCle(indexedDB, "theme");
   return estMode(valeur) ? valeur : undefined;
@@ -120,7 +120,7 @@ export const ecrireTheme = (indexedDB: IDBFactory, mode: ThemeMode) =>
   ecrireCle(indexedDB, "theme", mode);
 
 /**
- * REQ-UI-18 — l'écran d'éducation iOS n'est **jamais** re-présenté après un refus
+ * l'écran d'éducation iOS n'est **jamais** re-présenté après un refus
  * explicite. Insister est le plus court chemin vers un utilisateur qui n'écoute plus.
  */
 const [lireRefusEducationIOS] = drapeau("education-ios-refusee");
@@ -131,7 +131,7 @@ export const ecrireRefusEducationIOS = (indexedDB: IDBFactory) =>
   ecrireCle(indexedDB, "education-ios-refusee", true);
 
 /**
- * REQ-UI-18 — **la proposition d'activer les notifications n'est faite qu'une fois.**
+ * **la proposition d'activer les notifications n'est faite qu'une fois.**
  *
  * Elle n'était mémorisée nulle part : l'abonnement de `messaging` rappelait le
  * déclencheur à chaque `/sync`, et la feuille revenait indéfiniment — y compris après
@@ -154,14 +154,14 @@ export const ecrireDemandePushFaite = (indexedDB: IDBFactory) =>
 /*
  * `recuperation-faite` vivait ici — une trace « cet appareil a déjà mené ce compte au
  * bout de l'étape », posée le 08/08/2026 pour que la porte ne se referme pas hors ligne.
- * Elle est **supprimée** : `recoveryState()` (spec 04) lit désormais le magasin crypto,
+ * Elle est **supprimée** : `recoveryState()` lit désormais le magasin crypto,
  * ce qui répond sans réseau et n'a donc plus rien à mémoriser. Et surtout la trace ne
  * savait rien du `device_id` : après une déconnexion/reconnexion dans le même navigateur,
  * elle laissait passer un appareil neuf, non signé, que D-08 rend muet et sourd.
  */
 
 /**
- * REQ-UI-13 / REQ-RCP-07 — le mode masqué. **Un réglage d'appareil**, pas de compte :
+ * le mode masqué. **Un réglage d'appareil**, pas de compte :
  * le rendre synchronisé le poserait en account data, que le serveur lit en clair.
  *
  * Le défaut est `false` : les reçus normaux. Un mode masqué activé par défaut donnerait
@@ -170,7 +170,7 @@ export const ecrireDemandePushFaite = (indexedDB: IDBFactory) =>
 export const [lireModeMasque, ecrireModeMasque] = drapeau("mode-masque");
 
 /**
- * REQ-UIX-35 / REQ-UI-20 — le fond d'écran d'une conversation, **sur cet appareil**.
+ * le fond d'écran d'une conversation, **sur cet appareil**.
  *
  * Non synchronisé, et le libellé de l'écran le dit — un fond retrouvé sur un seul
  * téléphone n'est pas un bug si on l'a annoncé. Une clé par salon, pour que la remise à
@@ -202,15 +202,15 @@ export const ecrireFondEcran = async (indexedDB: IDBFactory, roomId: string, ima
     type: image.type,
   } satisfies FondEnregistre);
 
-/** La réinitialisation exigée par REQ-UIX-35 : la clé retombe à `undefined`. */
+/** La réinitialisation exigée par : la clé retombe à `undefined`. */
 export const effacerFondEcran = (indexedDB: IDBFactory, roomId: string) =>
   ecrireCle(indexedDB, cleFond(roomId), undefined);
 
 /**
- * REQ-UI-22 — **le parcours d'accueil est en cours sur cet appareil.**
+ * **le parcours d'accueil est en cours sur cet appareil.**
  *
  * Il n'existe qu'un seul instant où « ce compte vient d'être créé » est une information
- * disponible : `recoveryState()` vaut `creation` (spec 04), et il ne le vaut qu'une fois
+ * disponible : `recoveryState()` vaut `creation`, et il ne le vaut qu'une fois
  * dans la vie du compte. Passée l'étape de la clé, ce signal a disparu — un rechargement
  * au milieu du parcours retomberait alors sur une application vide, sans conversation et
  * sans avoir jamais proposé quoi que ce soit.

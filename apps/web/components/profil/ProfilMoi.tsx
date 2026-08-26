@@ -19,20 +19,20 @@ export { AVERTISSEMENT_PHOTO } from "./FormulaireIdentite";
 
 interface ProfilMoiProps {
   profil: Profile;
-  /** REQ-UIX-24 — n'écrit que ce qui a changé (REQ-MSG-18). */
+  /** n'écrit que ce qui a changé. */
   onEnregistrer: (changements: Changements) => Promise<void>;
   /**
-   * REQ-UI-20 — téléverse une image de profil par l'unique chemin public du pipeline et
+   * téléverse une image de profil par l'unique chemin public du pipeline et
    * rend son `mxc://`. Injecté plutôt qu'appelé ici : le shard ne connaît pas la
-   * `Session`, et c'est le câblage (M-G) qui tient le site d'appel unique de REQ-MED-11.
+   * `Session`, et c'est le câblage (M-G) qui tient le site d'appel unique de.
    *
    * **Le même callback pour la photo et pour la bannière** : ce sont deux images
    * publiques compressées de la même façon, et leur donner deux chemins ferait deux
-   * sites d'appel du chemin public là où le contrat de REQ-MED-11 en autorise un.
+   * sites d'appel du chemin public là où le contrat de en autorise un.
    */
   onPhoto: (fichier: File) => Promise<string>;
   /**
-   * REQ-UIX-06 — la déconnexion, posée à droite de « Modifier le profil ».
+   * la déconnexion, posée à droite de « Modifier le profil ».
    *
    * Un `ReactNode` et non un callback : `LogoutButton` porte sa propre confirmation, et
    * celle-ci a besoin de la `Session` — que ce composant ne connaît pas, et ne doit pas
@@ -42,14 +42,14 @@ interface ProfilMoiProps {
 }
 
 /**
- * REQ-UIX-24 — son propre profil : nom et identifiant juxtaposés, et le « Form edit »
+ * son propre profil : nom et identifiant juxtaposés, et le « Form edit »
  * (composant 22) — un bouton accentué centré qui ouvre le formulaire.
  *
  * Le formulaire est une feuille et non une page : modifier son nom est une action de
  * quelques secondes, et lui donner une route ajouterait une entrée d'historique dont le
  * retour renverrait au profil qu'on n'a jamais quitté.
  *
- * REQ-UIX-31 — **c'est aussi le seul endroit d'où l'on règle l'application** : `/reglages`
+ * **c'est aussi le seul endroit d'où l'on règle l'application** : `/reglages`
  * n'existe plus, et les réglages sont une section de cet écran. Le même raisonnement que
  * ci-dessus, un cran plus loin — l'ancienne route commençait par une carte de profil dont
  * le chevron ramenait ici, et un écran dont le premier élément mène ailleurs est un
@@ -68,7 +68,7 @@ export function ProfilMoi({ profil, onEnregistrer, onPhoto, deconnexion }: Profi
         bannerUrl={profil.bannerUrl}
       />
 
-      {/* Composant 22 : les deux actions de son propre profil, centrées (REQ-UIX-24).
+      {/* Composant 22 : les deux actions de son propre profil, centrées.
           **Une seule des deux est accentuée** — modifier son profil est ce qu'on vient
           faire ici ; se déconnecter est ce qu'on cherche quand on ne le trouve nulle part
           ailleurs, et c'était le cas jusqu'ici (`LogoutButton` n'était rendu par aucun
@@ -104,7 +104,7 @@ export function ProfilMoi({ profil, onEnregistrer, onPhoto, deconnexion }: Profi
         {deconnexion}
       </div>
 
-      {/* REQ-UIX-31 — les réglages sont une section de cet écran, plus une route. */}
+      {/* les réglages sont une section de cet écran, plus une route. */}
       <Reglages />
 
       <Sheet
@@ -112,7 +112,7 @@ export function ProfilMoi({ profil, onEnregistrer, onPhoto, deconnexion }: Profi
         onFermer={() => setEdition(false)}
         nom="Modifier le profil"
       >
-        {/* REQ-UIX-24 — **le même formulaire qu'à l'accueil** (M-B), à un autre moment.
+        {/* **le même formulaire qu'à l'accueil** (M-B), à un autre moment.
             Deux copies auraient divergé au premier champ ajouté, et une seule des deux
             aurait porté l'avertissement le jour où on l'aurait déplacé. */}
         <div style={{ padding: "var(--spacing-4)" }}>

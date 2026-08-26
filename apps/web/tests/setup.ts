@@ -31,7 +31,7 @@ globalThis.CSS ??= {
 
 /**
  * jsdom n'implémente pas `Blob.arrayBuffer()` — pourtant standard depuis 2019, et le
- * seul chemin pour poser une image dans IndexedDB (REQ-UIX-35). Quatrième lacune de
+ * seul chemin pour poser une image dans IndexedDB. Quatrième lacune de
  * l'environnement, même traitement que les trois autres : on la comble ici plutôt que
  * de tordre le code produit pour l'éviter.
  */
@@ -69,7 +69,7 @@ globalThis.matchMedia ??= ((requete: string) =>
 /**
  * jsdom n'implémente pas `HTMLCanvasElement.getContext` : il journalise une erreur « not
  * implemented » et rend `null`. Le `Spinner` d'Astryx dessine son anneau au canvas, donc
- * chaque attente du parcours d'accueil (REQ-UI-22) faisait une pile d'erreur dans la
+ * chaque attente du parcours d'accueil faisait une pile d'erreur dans la
  * sortie de test, sans qu'aucun test échoue — le pire des deux, parce qu'on finit par ne
  * plus lire une sortie qui crie sans raison.
  *

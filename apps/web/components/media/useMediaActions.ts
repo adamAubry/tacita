@@ -17,7 +17,7 @@ import type { Media, Telecharger } from "./media";
 
 /**
  * Les deux gestes que tout écran portant des médias doit savoir faire : déchiffrer pour
- * afficher, et écrire sur l'appareil (REQ-MED-05).
+ * afficher, et écrire sur l'appareil.
  *
  * Ici plutôt que trois fois : `Conversation`, `InfosConversation` et `EcranProfil`
  * portaient la même closure `telecharger`, recopiée à l'identique. Aucun des trois
@@ -33,7 +33,7 @@ import type { Media, Telecharger } from "./media";
  */
 export function useMediaActions(session: Session | null) {
   /**
-   * REQ-MED-13 — la dernière chose que le pipeline a dû abandonner, déposée ici.
+   * la dernière chose que le pipeline a dû abandonner, déposée ici.
    *
    * Une boîte plutôt qu'un état React : l'avis se lit **juste après** l'appel qui l'a
    * produit, dans la même fonction, et n'a aucune raison de provoquer un rendu par
@@ -46,7 +46,7 @@ export function useMediaActions(session: Session | null) {
   );
 
   /**
-   * REQ-MED-16 — le cache de chiffré, ouvert une fois et **inscrit au registre de wipe**.
+   * le cache de chiffré, ouvert une fois et **inscrit au registre de wipe**.
    *
    * L'inscription est la moitié qui compte : sans elle, un demi-gigaoctet de chiffré
    * survivrait à la déconnexion. Inerte sans les clés Megolm, donc pas une fuite de
@@ -91,7 +91,7 @@ export function useMediaActions(session: Session | null) {
        * Le type est celui que l'UI attend pour l'affichage, pas celui du blob chiffré :
        * le pipeline rend des octets nus, sans en-tête de contenu.
        *
-       * REQ-MED-12 — **et c'est le dernier verrou avant `URL.createObjectURL`.** Un type
+       * **et c'est le dernier verrou avant `URL.createObjectURL`.** Un type
        * hors liste close ne devient jamais le type d'un Blob, quel que soit l'appelant :
        * la garde est ici, à l'endroit unique par où passent la timeline, la galerie et le
        * viewer, et non dans chacun des trois. Un appelant qui demanderait `text/html`
@@ -106,7 +106,7 @@ export function useMediaActions(session: Session | null) {
   );
 
   /**
-   * REQ-MED-08 (b) — le **chiffré**, pour la lecture progressive : c'est le lecteur qui
+   * (b) — le **chiffré**, pour la lecture progressive : c'est le lecteur qui
    * demande les plages, et chacune est vérifiée puis déchiffrée à la demande. Le clair
    * n'existe donc jamais en entier, ni en mémoire ni ailleurs.
    */
@@ -119,7 +119,7 @@ export function useMediaActions(session: Session | null) {
   );
 
   /**
-   * REQ-MED-05 / REQ-MED-15 — le déchiffrement puis le choix de destination, délégué au
+   * le déchiffrement puis le choix de destination, délégué au
    * pipeline. **Par tranches quand la plateforme le permet** : sur une vidéo de 400 Mo
    * reçue d'un client tiers, le chemin d'un seul bloc fait coexister le chiffré, le clair
    * et le Blob — trois fois la taille du fichier, et l'onglet meurt sur mobile.

@@ -11,16 +11,16 @@ if (!DATABASE_URL || !HOMESERVER_URL) {
 
 /**
  * Aucun jeton d'administration Synapse ici, et il n'y en aura pas : le service n'exécute
- * aucune action Matrix (spec 12). Il lit `whoami`, l'`m.ignored_user_list` et le profil
+ * aucune action Matrix. Il lit `whoami`, l'`m.ignored_user_list` et le profil
  * **avec le jeton de l'appelant**, jamais avec un pouvoir à lui. Un test de configuration
- * asserte l'absence de secret d'administration dans son environnement (REQ-INF-15).
+ * asserte l'absence de secret d'administration dans son environnement.
  */
 const pool = new pg.Pool({ connectionString: DATABASE_URL });
 await pool.query(SCHEMA);
 
 const store = createPostgresStore((text, params) => pool.query(text, params));
 
-// REQ-INV-18 — les lignes expirées sont purgées : une trace de lien n'a aucune raison de
+// les lignes expirées sont purgées : une trace de lien n'a aucune raison de
 // survivre à sa validité. `unref` pour que le minuteur ne retienne pas le processus.
 setInterval(() => {
   void store.purge(Date.now()).catch(() => console.warn("purge", { outcome: "rejected" }));

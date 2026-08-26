@@ -4,13 +4,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresStore, SCHEMA, type Store } from "../../apps/invite-tokens/src/store.ts";
 
 /**
- * REQ-INV-07 — **l'atomicité, contre un vrai PostgreSQL.**
+ * **l'atomicité, contre un vrai PostgreSQL.**
  *
  * Par la règle des deux portes : `apps/invite-tokens/tests/store.test.ts` asserte la
  * *forme* de l'instruction, ce qui attrape une régression de structure. Il ne prouve pas
  * le comportement — l'imitation en mémoire de la suite est monothread, donc atomique par
  * construction, et une imitation qui confirme l'hypothèse par construction ne l'éprouve
- * pas (règle 3 de `specs/00-conventions.md`).
+ * pas (règle 3 de `CLAUDE.md`).
  *
  * Ce que ce fichier prouve, et que 56 tests ne prouvaient pas : que le SQL est valide,
  * et qu'une seule de deux résolutions concurrentes du dernier usage réussit **quand
@@ -31,7 +31,7 @@ let store: Store;
 beforeAll(async () => {
   pool = new pg.Pool({ connectionString: DATABASE_URL });
   // La base dédiée est créée par `infra/postgres/10-invite-tokens.sh` à l'initialisation
-  // du volume (REQ-INF-15) ; le schéma l'est par le service à son démarrage.
+  // du volume ; le schéma l'est par le service à son démarrage.
   await pool.query(SCHEMA);
   await pool.query("TRUNCATE links CASCADE");
   store = createPostgresStore((text, params) => pool.query(text, params));
@@ -51,7 +51,7 @@ const lien = (maxUses: number, tokenHash: string) =>
     maxUses,
   });
 
-describe("REQ-INV-07 — la consommation est atomique contre un vrai PostgreSQL", () => {
+describe("la consommation est atomique contre un vrai PostgreSQL", () => {
   it("deux résolutions concurrentes du dernier usage : une seule réussit", async () => {
     await lien(1, "empreinte-dernier-usage");
 
@@ -78,10 +78,10 @@ describe("REQ-INV-07 — la consommation est atomique contre un vrai PostgreSQL"
   it("le garde refuse l'émetteur et la répétition dans la même instruction", async () => {
     await lien(2, "empreinte-gardes");
 
-    // REQ-INV-12 — son propre lien : rien n'est consommé.
+    // son propre lien : rien n'est consommé.
     expect(await store.consume("empreinte-gardes", LUCA, MAINTENANT)).toBeUndefined();
 
-    // REQ-INV-13 — le même porteur deux fois : le second n'obtient rien de plus, et
+    // le même porteur deux fois : le second n'obtient rien de plus, et
     // `find` le voit comme une reprise.
     expect(await store.consume("empreinte-gardes", "@mira:tacita.test", MAINTENANT)).toBeDefined();
     expect(await store.consume("empreinte-gardes", "@mira:tacita.test", MAINTENANT)).toBeUndefined();
@@ -90,7 +90,7 @@ describe("REQ-INV-07 — la consommation est atomique contre un vrai PostgreSQL"
     expect(repris).toMatchObject({ repeated: true, link: { usesLeft: 1 } });
   });
 
-  it("REQ-INV-17 — l'expiration est comparée à l'horloge fournie par le serveur", async () => {
+  it("l'expiration est comparée à l'horloge fournie par le serveur", async () => {
     await lien(1, "empreinte-expirée");
 
     expect(await store.find("empreinte-expirée", "@x:tacita.test", MAINTENANT + 86_400_001)).toBeUndefined();

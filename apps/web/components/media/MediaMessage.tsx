@@ -73,10 +73,10 @@ const HAUTEUR_TUILE_MAX = 320;
 interface MediaMessageProps {
   media: Media;
   telecharger: Telecharger;
-  /** Ouvre le viewer plein écran (REQ-UIX-16). Absent sur audio et fichier. */
+  /** Ouvre le viewer plein écran. Absent sur audio et fichier. */
   onOuvrir?: () => void;
   /**
-   * REQ-MED-05 — sauvegarde sur l'appareil, déléguée au pipeline par le câblage.
+   * sauvegarde sur l'appareil, déléguée au pipeline par le câblage.
    *
    * Elle n'existait **que** dans le viewer plein écran, qui ne s'ouvre que sur une image
    * ou une vidéo : un PDF, un ZIP ou un document reçu s'affichait en tuile, sans une
@@ -85,7 +85,7 @@ interface MediaMessageProps {
    */
   onSauvegarder?: () => void;
   /**
-   * REQ-UIX-17 — la tuile **remplit sa cellule, en carré**, pour la grille de la galerie.
+   * la tuile **remplit sa cellule, en carré**, pour la grille de la galerie.
    *
    * Deux contextes, deux géométries : dans la timeline une photo garde le cadrage de son
    * auteur, parce qu'elle *est* le message ; dans une galerie elle devient une planche
@@ -97,11 +97,11 @@ interface MediaMessageProps {
 }
 
 /**
- * REQ-UI-14 — le rendu d'une pièce jointe dans la timeline.
+ * le rendu d'une pièce jointe dans la timeline.
  *
  * **La vignette vient du blob déchiffré**, jamais de l'endpoint `thumbnail` du serveur
  * (interdit n°5) : il ne peut pas redimensionner ce qu'il ne déchiffre pas, et le
- * pipeline a chiffré une vignette séparée pour ça (REQ-MED-03).
+ * pipeline a chiffré une vignette séparée pour ça.
  *
  * Un média qu'on n'a pas encore déchiffré rend un Skeleton **de la même géométrie**, pour
  * que l'arrivée de l'image ne déplace pas la timeline (DESIGN.md).
@@ -116,7 +116,7 @@ export function MediaMessage({
   // La vignette d'abord : c'est elle qui est petite. Le média entier n'est déchiffré
   // qu'à l'ouverture du viewer.
   // Le type vient de `thumbnail_info` : la vignette est en WebP depuis qu'elle a doublé
-  // de côté, et en JPEG là où l'expéditeur ne savait pas l'encoder (REQ-MED-03).
+  // de côté, et en JPEG là où l'expéditeur ne savait pas l'encoder.
   const visuel = useBlob(media.vignette ?? undefined, telecharger, media.vignetteMime ?? "image/jpeg");
   // Le type du blob vient de l'événement : un `<audio>` dont la source est un blob
   // `application/octet-stream` ne sait pas ce qu'il lit (voir `Media.mime`).

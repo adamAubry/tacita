@@ -17,7 +17,7 @@ beforeEach(() => {
   });
 });
 
-describe("REQ-MSG-10 — mentions type Discord, @everyone mappé sur @room", () => {
+describe("mentions type Discord, @everyone mappé sur @room", () => {
   it("« salut @everyone » produit un contenu de mention room conforme", () => {
     expect(parseMentions("salut @everyone")).toEqual({
       body: "salut @room",

@@ -8,10 +8,10 @@ import { useSession } from "../onboarding/SessionProvider";
 /**
  * Un `mxc://` **public** (photo de profil, bannière) → une URL d'objet affichable.
  *
- * C'est la pièce qui manquait pour que REQ-UI-20 se voie : la photo partait bien par le
+ * C'est la pièce qui manquait pour que se voie : la photo partait bien par le
  * chemin public du pipeline, `setAvatarUrl` la posait bien sur le compte, et le profil la
  * relisait bien — mais rien dans le shard ne savait la **rendre**. Les endpoints média
- * anonymes répondent 404 depuis Synapse v1.146 (REQ-INF-12), et une balise `img` ne sait
+ * anonymes répondent 404 depuis Synapse v1.146, et une balise `img` ne sait
  * pas porter d'en-tête `Authorization` : il faut passer par un `fetch` authentifié, donc
  * par un blob, donc par une URL d'objet.
  *

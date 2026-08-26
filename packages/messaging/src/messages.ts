@@ -15,13 +15,13 @@ import { assertEncrypted } from "./rooms";
 
 export interface SendOptions {
   /**
-   * REQ-MSG-03 — identifiant de transaction. La déduplication est celle du SDK et
+   * identifiant de transaction. La déduplication est celle du SDK et
    * du serveur : rejouer la même requête avec le même `txnId` rend le même
    * `event_id`. Omis, c'est `MatrixClient.makeTxnId` qui en fabrique un — ce
    * package n'en génère jamais et n'empile aucun cache par-dessus.
    */
   txnId?: string;
-  /** Candidats d'autocomplétion pour résoudre les `@pseudo` du texte (REQ-MSG-10). */
+  /** Candidats d'autocomplétion pour résoudre les `@pseudo` du texte. */
   mentions?: MentionCandidate[];
 }
 
@@ -52,7 +52,7 @@ function textContent(text: string, opts: SendOptions): TextContent {
   return content;
 }
 
-/** REQ-MSG-01 — message texte chiffré (`m.room.message` en salon chiffré). */
+/** message texte chiffré (`m.room.message` en salon chiffré). */
 export function sendText(
   session: Session,
   roomId: string,
@@ -63,10 +63,10 @@ export function sendText(
 }
 
 /**
- * REQ-MSG-04 — la relation de réponse, **telle qu'elle s'écrit**.
+ * la relation de réponse, **telle qu'elle s'écrit**.
  *
  * Exportée parce que deux chemins la posent : `reply` ici, et la file d'envoi du shard,
- * qui met en file un contenu déjà formé (REQ-OBX-05). Deux littéraux recopiés auraient
+ * qui met en file un contenu déjà formé. Deux littéraux recopiés auraient
  * dérivé, et la lecture d'en face n'aurait plus reconnu que l'un des deux.
  */
 export const replyRelation = (inReplyToEventId: string) => ({
@@ -74,10 +74,10 @@ export const replyRelation = (inReplyToEventId: string) => ({
 });
 
 /**
- * REQ-MSG-04, côté **lecture** — l'événement auquel ce contenu répond, s'il y en a un.
+ * côté **lecture** — l'événement auquel ce contenu répond, s'il y en a un.
  *
  * Sans ce membre, le shard ne pouvait pas dire à quel message une réponse répond : le
- * `body` porte bien une citation en `> `, mais `messageText` la retire (REQ-MSG-07) et
+ * `body` porte bien une citation en `> `, mais `messageText` la retire et
  * elle ne dit de toute façon ni qui, ni quoi quand le cité est une photo. Signalé par les
  * utilisateurs : « rien ne montre à quel message on fait référence ».
  *
@@ -91,10 +91,10 @@ export function replyToOf(content: unknown): string | undefined {
   return typeof eventId === "string" ? eventId : undefined;
 }
 
-/** REQ-MSG-04 — la même lecture, sur un événement de la timeline. */
+/** la même lecture, sur un événement de la timeline. */
 export const replyTo = (event: MatrixEvent): string | undefined => replyToOf(event.getContent());
 
-/** REQ-MSG-04 — réponse via la relation `m.in_reply_to`. */
+/** réponse via la relation `m.in_reply_to`. */
 export function reply(
   session: Session,
   roomId: string,
@@ -110,7 +110,7 @@ export function reply(
 }
 
 /**
- * REQ-MSG-06 — modification via `m.replace`. Le `body` de premier niveau est le
+ * modification via `m.replace`. Le `body` de premier niveau est le
  * fallback affiché par les clients qui n'agrègent pas les éditions ; `m.new_content`
  * porte le texte réel.
  */
@@ -131,7 +131,7 @@ export function edit(
   return send(session, roomId, EventType.RoomMessage, content, opts.txnId);
 }
 
-/** REQ-MSG-06 — suppression par redaction. */
+/** suppression par redaction. */
 export async function redact(
   session: Session,
   roomId: string,
@@ -143,7 +143,7 @@ export async function redact(
 }
 
 /**
- * REQ-MSG-05 — les réactions circulent **en clair** en salon chiffré. Ce n'est pas
+ * les réactions circulent **en clair** en salon chiffré. Ce n'est pas
  * un oubli : l'agrégation des annotations est faite par le serveur, qui doit donc
  * lire la clé. Le serveur voit qui réagit à quoi, et avec quel emoji.
  */
@@ -154,7 +154,7 @@ export const REACTIONS_METADATA = {
     "la clé. Chiffrer casserait l'agrégation. Le serveur voit qui réagit à quoi.",
 } as const;
 
-/** REQ-MSG-05 — une réaction agrégée : l'emoji, combien, et si j'en fais partie. */
+/** une réaction agrégée : l'emoji, combien, et si j'en fais partie. */
 export interface ReactionTally {
   key: string;
   count: number;
@@ -182,7 +182,7 @@ const cleDe = (event: MatrixEvent): string | undefined => {
 };
 
 /**
- * REQ-MSG-05, côté **lecture** — les réactions d'un message, déjà agrégées.
+ * côté **lecture** — les réactions d'un message, déjà agrégées.
  *
  * L'agrégation est celle du SDK (`relations`), pas une reconstruction : c'est le serveur
  * qui groupe les annotations, et le SDK qui tient le résultat à jour. Sans ce membre, le
@@ -217,7 +217,7 @@ export function reactions(session: Session, roomId: string, eventId: string): Re
 }
 
 /**
- * REQ-MSG-05 — **une réaction est une bascule, pas une pile.** Réagir avec un emoji déjà
+ * **une réaction est une bascule, pas une pile.** Réagir avec un emoji déjà
  * posé le retire ; c'est ce que rend `mine`, et ce qu'attend le `ToggleButton` de la
  * timeline, qui appelait jusqu'ici un envoi de plus à chaque appui.
  *
@@ -245,7 +245,7 @@ export function react(
 }
 
 /**
- * REQ-MSG-12 — l'ordre vient de `OrderedTimeline` (spec 04). Filtrer n'est pas
+ * l'ordre vient de `OrderedTimeline`. Filtrer n'est pas
  * trier : la séquence rendue est celle de /sync, amputée des événements qui ne
  * sont pas des messages.
  */
@@ -256,14 +256,14 @@ export function messages(session: Session, roomId: string): MatrixEvent[] {
       .events()
       .filter((event) => event.getType() === EventType.RoomMessage)
       /*
-       * REQ-MSG-06 — **une modification remplace, elle ne s'ajoute pas.** Un `m.replace`
+       * **une modification remplace, elle ne s'ajoute pas.** Un `m.replace`
        * est lui aussi un `m.room.message` : il restait donc dans la liste, à côté de
        * l'original dont le SDK a déjà réécrit le contenu sur place. Résultat mesuré au
        * navigateur le 08/08/2026 : un message modifié s'affichait **deux fois**, avec le
        * même texte. Et supprimer n'en effaçait qu'un — la redaction vise l'original, la
        * bulle du remplacement survivait, message compris.
        *
-       * Filtrer n'est pas trier (REQ-MSG-12) : l'ordre reste celui du flux, on en retire
+       * Filtrer n'est pas trier : l'ordre reste celui du flux, on en retire
        * des événements qui ne sont pas des messages à afficher.
        */
       .filter((event) => !event.isRelation(RelationType.Replace))
@@ -271,7 +271,7 @@ export function messages(session: Session, roomId: string): MatrixEvent[] {
 }
 
 /**
- * REQ-MSG-07 — texte destiné au presse-papiers (fonction pure ; l'accès au
+ * texte destiné au presse-papiers (fonction pure ; l'accès au
  * presse-papiers est dans l'UI). Rend le texte édité s'il y en a un, et retire le
  * bloc de citation que Matrix préfixe aux réponses.
  */
@@ -287,7 +287,7 @@ export function messageText(event: MatrixEvent): string {
     .trim();
 }
 
-/** REQ-MSG-06 — modifiable : seul l'auteur édite, et il doit pouvoir poster. */
+/** modifiable : seul l'auteur édite, et il doit pouvoir poster. */
 export function canEdit(session: Session, roomId: string, event: MatrixEvent): boolean {
   const userId = session.client.getUserId();
   const room = session.client.getRoom(roomId);
@@ -295,7 +295,7 @@ export function canEdit(session: Session, roomId: string, event: MatrixEvent): b
   return room.currentState.maySendEvent(EventType.RoomMessage, userId);
 }
 
-/** REQ-MSG-06 — supprimable : droits de redaction du SDK (auteur ou power level). */
+/** supprimable : droits de redaction du SDK (auteur ou power level). */
 export function canRedact(session: Session, roomId: string, event: MatrixEvent): boolean {
   const userId = session.client.getUserId();
   const room = session.client.getRoom(roomId);
@@ -304,7 +304,7 @@ export function canRedact(session: Session, roomId: string, event: MatrixEvent):
 }
 
 /**
- * Signal de changement pour le shard UI (spec 11), branché sur l'émetteur du SDK :
+ * Signal de changement pour le shard UI, branché sur l'émetteur du SDK :
  * pas de store ni de bus maison par-dessus.
  */
 export function subscribe(session: Session, roomId: string, listener: () => void): () => void {
@@ -321,7 +321,7 @@ export function subscribe(session: Session, roomId: string, listener: () => void
    *
    * En conversation vive, l'événement suivant masquait le défaut. Au rechargement, non :
    * mesuré au navigateur le 08/08/2026, une conversation rouverte affichait « 13:57 » et
-   * un nom, sans une ligne de texte. Même famille que `ClientEvent.Room` (REQ-MSG-15) —
+   * un nom, sans une ligne de texte. Même famille que `ClientEvent.Room` —
    * un événement de moins que ce que la vie réelle exige.
    */
   const surDechiffrement = (event: MatrixEvent): void => {
@@ -331,7 +331,7 @@ export function subscribe(session: Session, roomId: string, listener: () => void
   /*
    * **Une suppression n'est pas non plus un événement de timeline.** Le SDK émet
    * `Room.redaction` et vide l'événement d'origine sur place ; `Room.timeline` ne dit
-   * rien. Sans cet écouteur, REQ-MSG-06 ne tenait qu'à moitié : l'auteur voyait son
+   * rien. Sans cet écouteur, ne tenait qu'à moitié : l'auteur voyait son
    * message partir, le destinataire continuait de le lire jusqu'au message suivant.
    * Mesuré au navigateur le 08/08/2026, entre deux sessions réelles.
    */

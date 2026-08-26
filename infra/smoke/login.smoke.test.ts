@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { HOMESERVER } from "./harness";
 
 /**
- * REQ-INF-09, critère de comportement du 03/08/2026 : « une connexion aboutit ». Les
+ * critère de comportement du 03/08/2026 : « une connexion aboutit ». Les
  * tests de config attestent les fichiers, la fumée atteste le comportement.
  *
  * **Réécrit le 25/08/2026** : ce fichier vérifiait que Synapse redirigeait vers le realm
@@ -12,7 +12,7 @@ import { HOMESERVER } from "./harness";
  * qui échoue pour une raison qu'on connaît et qu'on accepte n'atteste plus rien : il
  * apprend seulement à ignorer le rouge.
  */
-describe("REQ-INF-09 — l'identité est portée par Synapse, et le mot de passe est offert", () => {
+describe("l'identité est portée par Synapse, et le mot de passe est offert", () => {
   it("`/login` annonce `m.login.password`", async () => {
     const reponse = await fetch(`${HOMESERVER}/_matrix/client/v3/login`);
     const { flows } = (await reponse.json()) as { flows: { type: string }[] };

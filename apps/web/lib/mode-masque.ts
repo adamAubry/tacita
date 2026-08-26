@@ -3,7 +3,7 @@ import type { Receipts } from "@tacita/receipts";
 import { ecrireModeMasque, lireModeMasque } from "./preferences";
 
 /**
- * REQ-UI-13 / REQ-RCP-07 — le mode masqué se règle dans un écran (M-H) et s'applique
+ * le mode masqué se règle dans un écran (M-H) et s'applique
  * dans un autre (la conversation, M-D). Ce module est le seul lien entre les deux.
  *
  * Le service d'accusés porte l'état en mémoire (`setHiddenMode`) et la préférence le

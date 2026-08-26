@@ -9,20 +9,20 @@ import { etatDe, type EtatSession } from "../../lib/session";
 interface Contexte {
   etat: EtatSession;
   /**
-   * REQ-UI-04 — appelé par l'étape de récupération une fois la clé confirmée (création)
+   * appelé par l'étape de récupération une fois la clé confirmée (création)
    * ou l'appareil déverrouillé (reconnexion). Les deux gestes finissent au même endroit :
    * cet appareil est désormais signé, la porte s'ouvre.
    */
   recuperationConfirmee: () => void;
   /**
-   * REQ-UI-22 — le parcours d'accueil est terminé (ou n'a jamais commencé). C'est la
+   * le parcours d'accueil est terminé (ou n'a jamais commencé). C'est la
    * seule chose qui rende l'app atteignable une fois la clé confirmée sur un compte neuf.
    */
   onboardingTermine: () => void;
-  /** REQ-UIX-06 — wipe complet (REQ-COR-10), après confirmation explicite. */
+  /** wipe complet, après confirmation explicite. */
   deconnecter: (session: Session) => Promise<void>;
   /**
-   * REQ-UIX-06 — une session que l'écran de connexion vient d'ouvrir (D-12). C'est lui qui
+   * une session que l'écran de connexion vient d'ouvrir (D-12). C'est lui qui
    * parle au réseau ; le provider ne fait que router l'état qui en sort.
    */
   sessionOuverte: (session: Session) => void;
@@ -41,12 +41,12 @@ export const useSession = () => useContext(ContexteSession);
 interface SessionProviderProps {
   children: ReactNode;
   homeserverUrl: string;
-  /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
+  /** surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }
 
 /**
- * REQ-UIX-06 — la reprise de session, réduite à deux cas depuis D-12 :
+ * la reprise de session, réduite à deux cas depuis D-12 :
  *
  * 1. une session restaurable en IndexedDB → arrivée directe sur l'Accueil, sans réseau ni
  *    écran intermédiaire ;
@@ -72,7 +72,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
 
         if (annule) return;
         if (!session) {
-          // REQ-UIX-06 — plus de redirection : la porte rend le formulaire (D-12).
+          // plus de redirection : la porte rend le formulaire (D-12).
           setEtat({ phase: "hors-session" });
           return;
         }
@@ -91,7 +91,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
   }, [homeserverUrl, base]);
 
   /*
-   * REQ-UIX-06 — un jeton que le serveur refuse ne doit pas survivre à l'écran.
+   * un jeton que le serveur refuse ne doit pas survivre à l'écran.
    *
    * Mesuré au navigateur le 08/08/2026 : session révoquée côté serveur, page rechargée,
    * et l'application se rouvrait comme si de rien n'était — les credentials locaux
@@ -107,7 +107,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
     if (etat.phase !== "recuperation-requise") return;
 
     /*
-     * REQ-UI-22 — **le seul endroit du produit où « le compte vient d'être créé » est une
+     * **le seul endroit du produit où « le compte vient d'être créé » est une
      * information disponible.** `mode` vaut `creation` quand le compte n'a aucune identité
      * cross-signing, c'est-à-dire à la toute première ouverture et à ce moment-là
      * seulement ; toute reconnexion passe par `deverrouillage`.
@@ -145,7 +145,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
   }, [etat, base]);
 
   /*
-   * REQ-UIX-06 / REQ-COR-10 — **la déconnexion redevient locale, et c'est tout** (D-12).
+   * **la déconnexion redevient locale, et c'est tout** (D-12).
    *
    * Elle traînait un défaut tant que Keycloak existait : `logout()` révoquait le jeton
    * Matrix, mais le cookie de session du fournisseur y survivait, et le retour vers

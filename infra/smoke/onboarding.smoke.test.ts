@@ -29,7 +29,7 @@ beforeAll(async () => {
   identifiant = uniqueLocalpart("parcours");
 });
 
-describe("D-13 / REQ-COR-06 — l'inscription pose une identité, pas seulement une clé", () => {
+describe("D-13 / l'inscription pose une identité, pas seulement une clé", () => {
   it("créer un compte puis sa clé rend l'appareil prêt à chiffrer", async () => {
     const session = await creerCompte({
       homeserverUrl: HOMESERVER,
@@ -54,7 +54,7 @@ describe("D-13 / REQ-COR-06 — l'inscription pose une identité, pas seulement 
   });
 });
 
-describe("REQ-UI-04 — se connecter avec son identifiant et son mot de passe suffit", () => {
+describe("se connecter avec son identifiant et son mot de passe suffit", () => {
   it("une deuxième connexion, sur un appareil neuf, entre dans l'application", async () => {
     /*
      * Le défaut remonté le 25/08/2026 : « j'ai tenté de me connecter et j'ai eu un écran
@@ -86,7 +86,7 @@ describe("D-14 — la porte de secours ouvre une session, avec la clé seule", (
   });
 });
 
-describe("REQ-COR-06 — « j'ai perdu ma clé » remplace la clé et l'identité", () => {
+describe("« j'ai perdu ma clé » remplace la clé et l'identité", () => {
   it("la réinitialisation aboutit, mot de passe à l'appui", async () => {
     /*
      * **Le constat critique de l'audit du 25/08/2026.** Remplacer une identité
@@ -115,7 +115,7 @@ describe("REQ-COR-06 — « j'ai perdu ma clé » remplace la clé et l'identit�
   });
 });
 
-describe("REQ-COR-15 — les appareils se listent et se déconnectent", () => {
+describe("les appareils se listent et se déconnectent", () => {
   it("la session voit les autres, et les ferme avec le mot de passe", async () => {
     /*
      * Sans ce chemin, une fuite de jeton n'avait aucune réponse : les jetons n'expirent

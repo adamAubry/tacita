@@ -16,7 +16,7 @@ const ebml = (docType: string): Uint8Array =>
 
 const avec = (...tete: number[]): Uint8Array => new Uint8Array([...tete, ...Array<number>(16).fill(0)]);
 
-describe("REQ-MED-12 — liste close des types rendus", () => {
+describe("liste close des types rendus", () => {
   /**
    * Le point de sécurité de la REQ, et le seul qui compte vraiment : `info.mimetype` est
    * protégé par Megolm, donc non falsifiable par le serveur et **parfaitement falsifiable
@@ -62,7 +62,7 @@ describe("REQ-MED-12 — liste close des types rendus", () => {
   });
 });
 
-describe("REQ-MED-12 — reniflement, quand l'événement ne déclare rien", () => {
+describe("reniflement, quand l'événement ne déclare rien", () => {
   it("sans type déclaré et sans octets, la résolution réclame les octets", () => {
     expect(resoudreType(undefined)).toEqual({ rendable: false, motif: "octets-requis" });
   });

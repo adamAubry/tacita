@@ -1,14 +1,14 @@
 /**
  * Les trois seules requêtes Matrix du service. Toutes sont des **lectures faites au nom
  * de l'appelant, avec le jeton de l'appelant** : le service ne détient aucun jeton
- * d'administration, aucun droit d'inviter, aucun droit de créer un salon (spec 12).
+ * d'administration, aucun droit d'inviter, aucun droit de créer un salon.
  */
 export interface MatrixReader {
-  /** REQ-INV-01/06 — l'identité vient de Synapse, jamais du corps de la requête. */
+  /** l'identité vient de Synapse, jamais du corps de la requête. */
   whoami(accessToken: string): Promise<string | undefined>;
-  /** REQ-INV-14 — l'appelant a-t-il mis `other` dans son `m.ignored_user_list` ? */
+  /** l'appelant a-t-il mis `other` dans son `m.ignored_user_list` ? */
   ignores(accessToken: string, self: string, other: string): Promise<boolean>;
-  /** REQ-INV-15 — un compte désactivé n'a plus de profil lisible. */
+  /** un compte désactivé n'a plus de profil lisible. */
   accountExists(accessToken: string, userId: string): Promise<boolean>;
 }
 

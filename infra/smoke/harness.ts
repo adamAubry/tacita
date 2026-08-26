@@ -6,7 +6,7 @@ import { request as httpsRequest } from "node:https";
  * nos packages, pas ce fichier.
  */
 
-/** Synapse en direct : l'API d'admin est bloquée au proxy (REQ-INF-11). */
+/** Synapse en direct : l'API d'admin est bloquée au proxy. */
 export const HOMESERVER = process.env.SMOKE_HOMESERVER ?? "http://127.0.0.1:8008";
 
 export interface Account {
@@ -16,13 +16,13 @@ export interface Account {
 }
 
 /**
- * Crée un compte et rend un jeton d'accès, par le secret partagé de REQ-INF-04.
+ * Crée un compte et rend un jeton d'accès, par le secret partagé de.
  *
  * Pas par le flux OIDC : il ne fonctionne pas en local (trois causes documentées
  * dans infra/README.md), et l'arbitrage PM du 03/08/2026 a tranché qu'un tronçon
  * bloqué ne prend pas en otage la validation de sept modules. Ce que cette cible
  * ne couvre donc **pas** : `initSession()` et le jeton `m.login.token`. Le ticket
- * OIDC les couvrira sous un describe REQ-INF-09.
+ * OIDC les couvrira sous un describe.
  */
 export async function registerAccount(localpart: string): Promise<Account> {
   const endpoint = `${HOMESERVER}/_synapse/admin/v1/register`;
@@ -89,7 +89,7 @@ export function getViaProxy(
         rejectUnauthorized: false,
       },
       (response) => {
-        // Le corps est collecté au lieu d'être jeté : REQ-INF-14 doit prouver que
+        // Le corps est collecté au lieu d'être jeté : doit prouver que
         // `/push/config` rend la clé du `.env`, pas seulement qu'il répond 200.
         let corps = "";
         response.setEncoding("utf8");
@@ -109,7 +109,7 @@ export function getViaProxy(
 }
 
 /**
- * POST à travers le proxy TLS. Nécessaire pour REQ-INF-14 : l'endpoint de notification
+ * POST à travers le proxy TLS. Nécessaire pour : l'endpoint de notification
  * de la passerelle est un POST, et un GET dessus rend un 404 même quand la route existe
  * — l'assertion « pas exposé » passerait alors au vert sans rien prouver.
  */

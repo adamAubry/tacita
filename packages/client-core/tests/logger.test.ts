@@ -10,7 +10,7 @@ const spy = () => {
   return { calls, logger: createLogger(sink) };
 };
 
-describe("REQ-COR-09 — aucun contenu déchiffré dans les logs, y compris en dev", () => {
+describe("aucun contenu déchiffré dans les logs, y compris en dev", () => {
   it("un corps d'événement passé par erreur n'atteint jamais le sink", () => {
     const { calls, logger } = spy();
 

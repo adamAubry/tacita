@@ -12,11 +12,11 @@ import {
 } from "matrix-widget-api";
 
 /**
- * REQ-CAL-05 — le pont entre Element Call et la Session, et rien d'autre : chaque méthode
+ * le pont entre Element Call et la Session, et rien d'autre : chaque méthode
  * délègue au client Matrix. Aucune logique RTC n'est réimplémentée ici — la négociation,
  * les clés de média et l'appartenance à l'appel restent entièrement dans le widget.
  *
- * REQ-CAL-06 — aucune méthode ne journalise : elles manipulent des jetons OpenID, des
+ * aucune méthode ne journalise : elles manipulent des jetons OpenID, des
  * identifiants de salle SFU et des credentials TURN.
  */
 export class CallWidgetDriver extends WidgetDriver {
@@ -124,8 +124,8 @@ export class CallWidgetDriver extends WidgetDriver {
   }
 
   /**
-   * REQ-CAL-01 — l'échange qui autorise le SFU : le widget obtient un jeton OpenID, le
-   * présente à `lk-jwt-service` (spec 02) et reçoit un jeton LiveKit. Aucun credential
+   * l'échange qui autorise le SFU : le widget obtient un jeton OpenID, le
+   * présente à `lk-jwt-service` et reçoit un jeton LiveKit. Aucun credential
    * LiveKit ne transite par ce module.
    */
   public askOpenID(observer: SimpleObservable<IOpenIDUpdate>): void {

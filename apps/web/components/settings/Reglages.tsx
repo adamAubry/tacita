@@ -26,9 +26,9 @@ import { StockageLocal } from "./StockageLocal";
 import { routeInfos } from "../../lib/routes";
 
 /**
- * Les options de REQ-UIX-31. Chacune ouvre une modal, aucune ne navigue.
+ * Les options de. Chacune ouvre une modal, aucune ne navigue.
  *
- * « Appareils » est arrivée le 25/08/2026 (REQ-UI-25), juste sous le mot de passe : les
+ * « Appareils » est arrivée le 25/08/2026, juste sous le mot de passe : les
  * deux sont les gestes qu'on cherche au même moment, quand on soupçonne que quelqu'un
  * d'autre est entré. Changer son mot de passe sans pouvoir fermer les sessions ouvertes
  * ne reprend rien.
@@ -67,7 +67,7 @@ const DETAILS: Record<Exclude<Option, "theme">, string> = {
   limites: "Ce que Tacita ne promet pas",
 };
 
-/** REQ-UI-03 — les trois modes du mécanisme Astryx, dans l'ordre du plus passif. */
+/** les trois modes du mécanisme Astryx, dans l'ordre du plus passif. */
 const MODES: { valeur: ThemeMode; libelle: string; effet: string }[] = [
   { valeur: "system", libelle: "Comme le système", effet: "Suit le réglage de votre appareil." },
   { valeur: "light", libelle: "Clair", effet: "Le thème de référence de Tacita." },
@@ -75,7 +75,7 @@ const MODES: { valeur: ThemeMode; libelle: string; effet: string }[] = [
 ];
 
 /**
- * REQ-UIX-31 — les réglages, **une section de son propre profil** (amendé le 10/08/2026).
+ * les réglages, **une section de son propre profil** (amendé le 10/08/2026).
  *
  * `/reglages` n'existe plus. L'écran commençait par une carte de profil dont le chevron
  * ramenait au profil — un écran dont le premier élément mène ailleurs est un couloir, et
@@ -91,7 +91,7 @@ const MODES: { valeur: ThemeMode; libelle: string; effet: string }[] = [
  * des destinations. Une seule est ouverte à la fois, et aucune n'en ouvre une autre.
  *
  * Le shard ne calcule rien ici : le thème vient du provider de M-A, le mode masqué du
- * service d'accusés (spec 06), les niveaux de notification des push rules natives.
+ * service d'accusés, les niveaux de notification des push rules natives.
  */
 export function Reglages() {
   const { etat } = useSession();
@@ -104,7 +104,7 @@ export function Reglages() {
   const libelleMode = MODES.find(({ valeur }) => valeur === mode)?.libelle ?? "Clair";
 
   /**
-   * REQ-UIX-36 — les conversations dont le niveau n'est pas « tout ». C'est le seul
+   * les conversations dont le niveau n'est pas « tout ». C'est le seul
    * réglage de notification que M-H tient : l'abonnement push global appartient à M-I,
    * et rien ne l'annonce ici tant qu'il n'existe pas.
    */
@@ -169,7 +169,7 @@ export function Reglages() {
             vérifier, et l'écran n'aurait rien à changer. */}
         {option === "motdepasse" && session && <MotDePasse session={session} />}
 
-        {/* REQ-UI-25 — la session est requise : la liste et la révocation sont des
+        {/* la session est requise : la liste et la révocation sont des
             appels authentifiés, il n'y a rien à montrer sans compte. */}
         {option === "appareils" && session && <Appareils session={session} />}
 
@@ -177,7 +177,7 @@ export function Reglages() {
 
         {option === "notifications" && (
           <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
-            {/* REQ-UI-18 — l'abonnement push et son rattrapage (M-I) : d'abord savoir
+            {/* l'abonnement push et son rattrapage (M-I) : d'abord savoir
                 si l'appareil prévient, ensuite quelle conversation est en silence. */}
             <NotificationsPush />
 

@@ -10,16 +10,16 @@ import { Badge, Button, Icon, Text } from "../foundation/primitives";
 
 interface ProfileCardProps {
   nom: string;
-  /** L'identifiant Matrix, affiché sous le nom sur son propre profil (REQ-UIX-24). */
+  /** L'identifiant Matrix, affiché sous le nom sur son propre profil. */
   userId?: string;
-  /** REQ-UI-20 — le `mxc://` de la photo. Absent → initiales. */
+  /** le `mxc://` de la photo. Absent → initiales. */
   avatarUrl?: string;
-  /** REQ-UIX-41 — le `mxc://` de la bannière. Absent → l'aplat d'accent doux. */
+  /** le `mxc://` de la bannière. Absent → l'aplat d'accent doux. */
   bannerUrl?: string;
   /** Actions de droite : réglages pour soi, options relatives à la personne sinon. */
   actions?: ReactNode;
   /**
-   * REQ-UIX-23 — le statut ami/non-ami, **avant** les options. Absent sur son propre
+   * le statut ami/non-ami, **avant** les options. Absent sur son propre
    * profil : la question ne s'y pose pas.
    */
   statut?: "ami" | "non-ami" | "bloque";
@@ -131,7 +131,7 @@ function fonduDoux(debut: string, longueur: number): string {
 const RAIL = "var(--spacing-3)";
 
 /**
- * REQ-UIX-23 / REQ-UIX-41 — composant 21, la « profile card ».
+ * composant 21, la « profile card ».
  *
  * Trois couches, dans cet ordre de profondeur :
  *
@@ -355,7 +355,7 @@ export function ProfileCard({
           paddingInlineEnd: RAIL,
         }}
       >
-        {/* REQ-UIX-24 — nom et identifiant **juxtaposés avec des styles distincts** :
+        {/* nom et identifiant **juxtaposés avec des styles distincts** :
             l'un est choisi et change, l'autre est l'adresse et ne change jamais. Les
             rendre semblables laisserait croire qu'on peut éditer les deux. */}
         {/* `display-2` porte le pas `display-large` de DESIGN.md — 28/32/600, un cran
@@ -364,7 +364,7 @@ export function ProfileCard({
         <Text type="display-2" weight="bold">
           {nom}
         </Text>
-        {/* REQ-UIX-42 — l'identifiant, sans le domaine : il est le même pour tout le
+        {/* l'identifiant, sans le domaine : il est le même pour tout le
             monde (fédération désactivée) et n'apprend rien à personne. */}
         {userId && (
           <Text type="supporting" color="secondary">

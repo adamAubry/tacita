@@ -3,10 +3,10 @@ import type { Link, NewLink, Store } from "../src/store.ts";
 /**
  * Imitation de PostgreSQL pour la suite : mêmes règles, mêmes refus.
  *
- * **Ce qu'elle ne prouve pas** : l'atomicité de REQ-INV-07. En JavaScript, une section
+ * **Ce qu'elle ne prouve pas** : l'atomicité de. En JavaScript, une section
  * sans `await` est atomique par construction — une file d'attente qui se confirme
  * elle-même. Ce qui la prouve est ailleurs : `store.test.ts` asserte que la consommation
- * est **une seule instruction SQL** avec son garde dans le `WHERE`, et LIMITES.md dit
+ * est **une seule instruction SQL** avec son garde dans le `WHERE`, et le README dit
  * que le comportement concurrent réel ne se vérifie que contre un vrai PostgreSQL.
  *
  * Ce que la course modélisée ci-dessous prouve, en revanche : que `resolve()` ne

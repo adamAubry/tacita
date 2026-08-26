@@ -1,6 +1,6 @@
 #!/bin/sh
 # Certificat auto-signé pour le dev local uniquement. En prod, remplacer par des
-# certs Let's Encrypt (getUserMedia exige un contexte sécurisé — REQ-INF-10).
+# certs Let's Encrypt (getUserMedia exige un contexte sécurisé —).
 set -eu
 mkdir -p "$(dirname "$0")/certs"
 
@@ -20,12 +20,12 @@ TURN_DOMAIN="${TURN_DOMAIN:-$(lire_env TURN_DOMAIN)}"
 
 NAME="${SERVER_NAME:-localhost}"
 # `.env` déclare TURN_DOMAIN comme devant être un SAN du certificat monté
-# (rtc/README.md) : on l'ajoute quand il est défini, sinon la spec 02 hérite d'un
+# (rtc/README.md) : on l'ajoute quand il est défini, sinon `infra/rtc` hérite d'un
 # certificat qui ne couvre pas son propre domaine.
 #
-# REQ-RTC-08 — `call.<domaine>` de même : Element Call est servi sous son propre nom
+# `call.<domaine>` de même : Element Call est servi sous son propre nom
 # d'hôte par l'overlay RTC, et sans ce SAN l'iframe d'appel échoue au TLS. Le shard
-# n'affiche alors que son délai de chargement (REQ-UIX-38), sans pouvoir en dire la
+# n'affiche alors que son délai de chargement, sans pouvoir en dire la
 # cause — une panne muette de plus, pour un nom oublié dans une liste.
 ALT="DNS:${NAME},DNS:call.${NAME}${TURN_DOMAIN:+,DNS:$TURN_DOMAIN}"
 

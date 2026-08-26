@@ -70,16 +70,16 @@ export interface Raster {
 
 /**
  * Toutes les APIs navigateur du pipeline, injectées : le package reste sans DOM et
- * testable, et l'app (spec 11) décide où elles tournent — les opérations lourdes
+ * testable, et l'app décide où elles tournent — les opérations lourdes
  * (transcodage, compression vidéo) en Web Worker, jamais sur le thread principal.
  */
 export interface MediaEnvironment extends CryptoEnvironment {
   /** Canvas/OffscreenCanvas. Sert aussi aux vignettes : même code, cibles différentes. */
   resizeImage(blob: Blob, targets: ImageTargets): Promise<Raster>;
   /**
-   * WebCodecs, dans un Worker. `sansSon` remonte le cas de REQ-MED-13.
+   * WebCodecs, dans un Worker. `sansSon` remonte le cas de.
    *
-   * REQ-MED-03 — **`poster` quand le transcodeur a pu peindre une image.** Les deux
+   * **`poster` quand le transcodeur a pu peindre une image.** Les deux
    * chemins qui décodent (réencodage, et remuxage via une seule image clé) tiennent déjà
    * une frame : la rendre ici évite de rouvrir le fichier dans un lecteur pour redemander
    * ce qu'on avait sous la main. Absent sur le seul chemin qui ne décode rien — l'envoi
@@ -90,7 +90,7 @@ export interface MediaEnvironment extends CryptoEnvironment {
     targets: VideoTargets,
   ): Promise<Raster & { durationMs: number; sansSon?: boolean; poster?: Blob }>;
   /**
-   * Une image extraite de la vidéo par un lecteur, **en dernier recours** (REQ-MED-03).
+   * Une image extraite de la vidéo par un lecteur, **en dernier recours**.
    *
    * Le mécanisme le plus faible des trois : il rejoue le fichier dans un `<video>`, donc
    * il dépend de ce que la plateforme sait lire, et il échoue en silence là où un décodeur
@@ -99,33 +99,33 @@ export interface MediaEnvironment extends CryptoEnvironment {
    * lecteur ouvre le fichier, puisqu'il vient d'en donner les dimensions.
    */
   extractPoster(blob: Blob): Promise<Blob>;
-  /** REQ-MED-07 — encodeur Opus WASM. */
+  /** encodeur Opus WASM. */
   transcodeAudio(blob: Blob): Promise<Blob>;
   /** AudioContext.decodeAudioData, ramené au mono. */
   decodeAudio(blob: Blob): Promise<{ samples: Float32Array; durationMs: number }>;
-  /** REQ-MED-05 — File System Access API, absente de Firefox et Safari. */
+  /** File System Access API, absente de Firefox et Safari. */
   saveViaFilePicker?(blob: Blob, filename: string): Promise<void>;
   /**
-   * REQ-MED-15 — le **flux** d'écriture de la même API, quand elle est là.
+   * le **flux** d'écriture de la même API, quand elle est là.
    *
    * `saveViaFilePicker` prend un Blob, donc le fichier entier en clair et en mémoire :
    * c'est précisément ce qu'on veut éviter sur 400 Mo. Celui-ci rend de quoi écrire
    * tranche par tranche. Absent ⇒ chemin tout-ou-rien, borné par `SEUILS.dur`.
    */
   ouvrirEcriture?(filename: string): Promise<Ecrivain>;
-  /** REQ-MED-05 — repli : téléchargement classique. */
+  /** repli : téléchargement classique. */
   saveViaDownload(blob: Blob, filename: string): Promise<void>;
   /** D-04 — `navigator.connection`, absente sur Safari. */
   connection?: NetworkInformation;
   /**
-   * REQ-MED-16 — le cache de chiffré, quand le câblage en fournit un.
+   * le cache de chiffré, quand le câblage en fournit un.
    *
    * Optionnel, et sans repli à écrire : son absence rend simplement chaque téléchargement
    * au réseau, ce qui était le comportement d'avant.
    */
   cache?: CacheChiffre;
   /**
-   * REQ-MED-13 — ce que le pipeline a dû abandonner en route, et que l'UI doit dire.
+   * ce que le pipeline a dû abandonner en route, et que l'UI doit dire.
    *
    * Un rappel plutôt qu'une valeur de retour : `uploadAttachment` rend un contenu
    * d'événement, et une vidéo partie sans son n'a rien à y écrire — c'est une information
@@ -139,26 +139,26 @@ export interface MediaEnvironment extends CryptoEnvironment {
 }
 
 /**
- * Audit des jonctions — **`type` et non `interface`, délibérément.** La spec 08 promet
- * que « le pipeline produit un contenu prêt à `enqueue` » (spec 07), or `enqueue` prend
+ * Audit des jonctions — **`type` et non `interface`, délibérément.** `@tacita/media-pipeline` promet
+ * que « le pipeline produit un contenu prêt à `enqueue` », or `enqueue` prend
  * un `Record<string, unknown>` : une `interface` n'a pas d'index signature implicite,
  * un alias de type si. En `interface`, la passation déclarée **ne compilait pas**, et
  * personne ne pouvait le voir — aucun paquet ne dépend des deux, il n'existait aucun
- * site de compilation. Le shard de la spec 11 l'aurait découvert au premier envoi de
+ * site de compilation. Le shard de `apps/web` l'aurait découvert au premier envoi de
  * photo. `packages/outbox/tests/jonction-media.test-d.ts` est ce site.
  */
 export type AttachmentContent = {
   msgtype: "m.image" | "m.video" | "m.audio" | "m.file";
   body: string;
   info: Record<string, unknown>;
-  /** REQ-MED-01 — clés du blob principal. */
+  /** clés du blob principal. */
   file: EncryptedFile;
   /**
-   * REQ-MED-08 (b) — les empreintes par bloc du **fichier principal**, dans l'ordre.
+   * (b) — les empreintes par bloc du **fichier principal**, dans l'ordre.
    *
    * Extension à nous, namespacée, jamais présentée comme du Matrix natif : un client tiers
    * l'ignore et retombe sur `hashes.sha256`, que nous continuons d'écrire. C'est ce qui
-   * rend la lecture progressive possible sans rien céder de REQ-MED-08 et sans régression
+   * rend la lecture progressive possible sans rien céder de et sans régression
    * d'interop.
    */
   [CHAMP_BLOCS]?: string[];
@@ -167,7 +167,7 @@ export type AttachmentContent = {
 };
 
 /**
- * REQ-MED-17 — un blob chiffré qui attend son URL, et l'endroit du contenu où l'écrire.
+ * un blob chiffré qui attend son URL, et l'endroit du contenu où l'écrire.
  *
  * Le chemin plutôt qu'un nom de champ : la vignette vit deux niveaux plus bas que le
  * fichier principal, et une file d'envoi qui ne connaît rien aux médias doit pouvoir
@@ -198,7 +198,7 @@ const kindOf = (mimeType: string): Kind => {
  * gestionnaires de fichiers, `.mkv` sous Windows, partages Android passant par un
  * fournisseur qui ne mappe pas l'extension. Le fichier partait alors en `m.file` — donc
  * ni compressé, ni vignetté, et affiché comme une pièce jointe quelconque au lieu d'une
- * vidéo. Les octets, eux, savent ce qu'ils sont : `typeSniffe` les lit (REQ-MED-12).
+ * vidéo. Les octets, eux, savent ce qu'ils sont : `typeSniffe` les lit.
  */
 async function typeDuFichier(file: File): Promise<string> {
   if (file.type) return file.type;
@@ -207,15 +207,15 @@ async function typeDuFichier(file: File): Promise<string> {
 }
 
 /**
- * REQ-MED-01/02 — **le** chemin d'upload. Photos, vidéos, vocaux, ZIP, PDF, bureautique :
+ * **le** chemin d'upload. Photos, vidéos, vocaux, ZIP, PDF, bureautique :
  * tout passe ici, aucun canal parallèle. Le nom du fichier n'est pas envoyé au serveur,
  * il ne vit que dans l'événement chiffré.
  */
 /**
- * REQ-MED-17 — un blob chiffré, **et rangé en attente de téléversement**.
+ * un blob chiffré, **et rangé en attente de téléversement**.
  *
  * L'URL est vide à ce stade : c'est la file d'envoi qui la posera, au chemin indiqué,
- * quand elle aura réussi le téléversement (REQ-OBX-10). Séparer les deux est ce qui rend
+ * quand elle aura réussi le téléversement. Séparer les deux est ce qui rend
  * une reprise possible sans rechiffrer.
  */
 async function chiffrerEnAttente(
@@ -229,16 +229,16 @@ async function chiffrerEnAttente(
   return { ...keys, url: "" };
 }
 
-/** REQ-MED-08 (b) — les empreintes par bloc du chiffré qui vient d'être rangé en attente. */
+/** (b) — les empreintes par bloc du chiffré qui vient d'être rangé en attente. */
 async function blocsDe(env: MediaEnvironment, enAttente: Televersement[]): Promise<string[]> {
   return hachesParBloc(enAttente.at(-1)!.ciphertext, env.subtle);
 }
 
 /**
- * REQ-MED-17 — **l'étape de téléversement, exposée à part, idempotente, sans retry propre.**
+ * **l'étape de téléversement, exposée à part, idempotente, sans retry propre.**
  *
  * Rejouée avec le même chiffré, elle ne rechiffre rien et ne régénère rien : ni clé, ni
- * IV, ni empreinte. C'est ce qui permet à la file d'envoi (spec 07, REQ-OBX-10) de
+ * IV, ni empreinte. C'est ce qui permet à la file d'envoi () de
  * reprendre un téléversement interrompu sans repasser par la compression.
  *
  * **Le pipeline ne retente jamais de lui-même** : une erreur remonte telle quelle, et
@@ -252,10 +252,10 @@ async function blocsDe(env: MediaEnvironment, enAttente: Televersement[]): Promi
  * écrit, sinon « idempotent » se lit comme une propriété de bout en bout.
  */
 /**
- * REQ-MED-19 — **ce que le serveur accepte, demandé au serveur.**
+ * **ce que le serveur accepte, demandé au serveur.**
  *
  * `m.upload.size` de `/_matrix/media/v3/config`. Pas de constante en dur : le plafond
- * appartient au déploiement (REQ-INF-06), et un client qui le devine se trompera le jour
+ * appartient au déploiement, et un client qui le devine se trompera le jour
  * où il change. Rend `undefined` quand le serveur ne l'annonce pas — c'est la seule
  * réponse honnête, et l'appelant laisse alors passer.
  */
@@ -272,7 +272,7 @@ export async function plafondTeleversement(session: Session): Promise<number | u
 }
 
 /**
- * REQ-MED-19 — le refus **avant** le téléversement, avec de quoi le dire.
+ * le refus **avant** le téléversement, avec de quoi le dire.
  *
  * Mesuré le 20/08/2026 : une vidéo de onze minutes sort à environ 206 Mo aux cibles D-04,
  * au-dessus du plafond de 200 Mo du déploiement. Sans ce contrôle, le client téléversait
@@ -299,7 +299,7 @@ export async function uploadCiphertext(session: Session, ciphertext: Bytes): Pro
 }
 
 /**
- * REQ-MED-03 — vignette chiffrée séparément : deux blobs opaques, deux jeux de clés.
+ * vignette chiffrée séparément : deux blobs opaques, deux jeux de clés.
  *
  * Rend `{}` quand la source d'image n'a pas pu être produite. **La vignette est un
  * confort, l'envoi est la fonction** : une vidéo dont le navigateur ne sait pas extraire
@@ -345,7 +345,7 @@ async function thumbnailOf(
   };
 }
 
-/** REQ-MED-06 — pics par tranche, normalisés sur l'échelle MSC1767. */
+/** pics par tranche, normalisés sur l'échelle MSC1767. */
 export function waveform(samples: Float32Array, buckets = WAVEFORM_BUCKETS): number[] {
   const width = Math.max(1, Math.ceil(samples.length / buckets));
   return Array.from({ length: buckets }, (_unused, bucket) => {
@@ -357,7 +357,7 @@ export function waveform(samples: Float32Array, buckets = WAVEFORM_BUCKETS): num
 }
 
 /**
- * REQ-MED-07 — l'aiguillage des trois chemins d'entrée vers l'unique format de sortie.
+ * l'aiguillage des trois chemins d'entrée vers l'unique format de sortie.
  *
  * L'ordre compte : le moins cher d'abord. Un vocal Firefox ne coûte rien, un vocal Chrome
  * coûte une recopie d'octets, et seul Safari paie un encodage — que `transcodeAudio` porte,
@@ -375,8 +375,8 @@ async function versOggOpus(env: MediaEnvironment, file: File, type: string): Pro
 }
 
 /**
- * Chiffre, téléverse et rend un contenu d'événement prêt à `enqueue` (spec 07).
- * REQ-MED-04 — le profil réseau est détecté ici, une fois, et fixe les cibles D-04.
+ * Chiffre, téléverse et rend un contenu d'événement prêt à `enqueue`.
+ * le profil réseau est détecté ici, une fois, et fixe les cibles D-04.
  */
 export async function prepareAttachment(
   env: MediaEnvironment,
@@ -388,7 +388,7 @@ export async function prepareAttachment(
 }
 
 /**
- * REQ-MED-01/02 — le contenu d'événement, **sans réseau** : tout est compressé, chiffré,
+ * le contenu d'événement, **sans réseau** : tout est compressé, chiffré,
  * et ce qui reste à téléverser est rangé dans `enAttente`.
  */
 async function construireContenu(
@@ -402,7 +402,7 @@ async function construireContenu(
 
   switch (kindOf(type)) {
     case "image": {
-      // REQ-MED-04 — compression avant chiffrement : chiffrer d'abord rendrait le blob
+      // compression avant chiffrement : chiffrer d'abord rendrait le blob
       // incompressible.
       const raster = await env.resizeImage(file, targets.image);
       return {
@@ -422,7 +422,7 @@ async function construireContenu(
 
     case "video": {
       const video = await env.transcodeVideo(file, targets.video);
-      // REQ-MED-13 — la vidéo part quand même, et l'UI le dit. Ne pas l'envoyer serait
+      // la vidéo part quand même, et l'UI le dit. Ne pas l'envoyer serait
       // pire ; l'envoyer en silence serait malhonnête (interdit n°13).
       if (video.sansSon) env.signaler?.("video-sans-son");
       return {
@@ -434,7 +434,7 @@ async function construireContenu(
            * rendre la source telle quelle quand ce navigateur ne sait pas la recompresser :
            * annoncer `video/mp4` sur un `.mov` ou un `.webm` ferait mentir l'événement sur
            * ses propres octets, et c'est `info.mimetype` qui décide du rendu chez le
-           * destinataire (REQ-MED-12). Même règle que la vignette, pour la même raison.
+           * destinataire. Même règle que la vignette, pour la même raison.
            */
           mimetype: video.blob.type || targets.video.mimeType,
           w: video.width,
@@ -443,7 +443,7 @@ async function construireContenu(
           size: video.blob.size,
           ...(await vignetteEventuelle(
             env,
-            // REQ-MED-03 — l'image du décodeur d'abord, le lecteur seulement s'il n'y en a
+            // l'image du décodeur d'abord, le lecteur seulement s'il n'y en a
             // pas : si on a su décoder la vidéo, on n'a aucune raison de la rouvrir.
             async () => video.poster ?? (await env.extractPoster(video.blob)),
             enAttente,
@@ -455,7 +455,7 @@ async function construireContenu(
     }
 
     case "audio": {
-      // REQ-MED-07 / D-03 — un seul format sort d'ici, quel que soit ce qui entre. Trois
+      // / D-03 — un seul format sort d'ici, quel que soit ce qui entre. Trois
       // chemins, trois coûts (E-10) : Firefox rend déjà de l'Ogg/Opus, Chrome rend le même
       // flux Opus dans un conteneur WebM — un remuxage suffit, sans encodeur ni perte —,
       // et Safari rend du MP4/AAC, seul cas qui demande un vrai encodage.
@@ -473,7 +473,7 @@ async function construireContenu(
     }
 
     default:
-      // REQ-MED-02 — ZIP, PDF, bureautique : pas de compression, mais exactement le même
+      // ZIP, PDF, bureautique : pas de compression, mais exactement le même
       // chiffrement et le même upload que le reste.
       return {
         msgtype: "m.file",
@@ -486,13 +486,13 @@ async function construireContenu(
 }
 
 /**
- * REQ-MED-01/02 — **le** chemin d'upload, version « tout de suite » : prépare puis
+ * **le** chemin d'upload, version « tout de suite » : prépare puis
  * téléverse dans la foulée.
  *
  * Conservé pour les appelants qui n'ont pas de file derrière eux — et parce que c'est lui
  * qui porte la promesse de l'interdit n°11 : un seul pipeline, quel que soit le type.
  * `Conversation` passe désormais par `prepareAttachment`, la file possédant la reprise
- * (REQ-OBX-10).
+ *
  */
 export async function uploadAttachment(
   session: Session,
@@ -514,14 +514,14 @@ export function poserUrl(contenu: Record<string, unknown>, chemin: string[], url
 }
 
 /**
- * REQ-MED-11 — **le seul chemin de ce paquet qui téléverse en clair, et il le dit dans
+ * **le seul chemin de ce paquet qui téléverse en clair, et il le dit dans
  * son nom.**
  *
  * Un avatar Matrix est un `mxc://` nu : tout client doit pouvoir l'afficher sans clé.
  * Chiffré, il n'est un avatar nulle part — un carré cassé chez tous les correspondants.
  * Le chiffrer serait donc une non-feature, pas une garantie (E-12, voie A) : le seul
  * choix honnête est de le poser en clair et de le **dire**, comme les réactions et les
- * épingles (REQ-MSG-05/08).
+ * épingles.
  *
  * Ce qui reste commun avec le reste du pipeline, et pourquoi l'interdit n°11 tient : même
  * compression, mêmes cibles D-04, même module. Ce qui diffère tient en une ligne — pas de
@@ -550,7 +550,7 @@ export async function uploadPublicProfileImage(
 }
 
 /**
- * REQ-MED-05 — sauvegarde locale de l'original **non compressé**, volontairement séparée
+ * sauvegarde locale de l'original **non compressé**, volontairement séparée
  * de l'envoi : le destinataire ne reçoit jamais que la version compressée.
  */
 export async function saveOriginal(
@@ -566,9 +566,9 @@ export async function saveOriginal(
 }
 
 /**
- * REQ-MED-08/09 — récupération, vérification du hash, déchiffrement local.
+ * récupération, vérification du hash, déchiffrement local.
  * Les endpoints média non authentifiés répondent 404 depuis Synapse v1.146
- * (infra/README.md, REQ-INF-12) : aucune URL publique n'est supposée, et aucune vignette
+ * (infra/README.md) : aucune URL publique n'est supposée, et aucune vignette
  * n'est demandée au serveur — il ne saurait pas redimensionner un blob opaque.
  */
 export async function downloadAttachment(
@@ -580,14 +580,14 @@ export async function downloadAttachment(
 }
 
 /**
- * REQ-MED-16 — le chiffré **tel quel**, du cache s'il y est, du réseau sinon.
+ * le chiffré **tel quel**, du cache s'il y est, du réseau sinon.
  *
- * Public depuis REQ-MED-08 (b) : la lecture progressive a besoin du chiffré, pas du clair
+ * Public depuis (b) : la lecture progressive a besoin du chiffré, pas du clair
  * — c'est elle qui déchiffre, bloc par bloc, à mesure que le lecteur demande des plages.
  *
  * Le cache est interrogé **avant** le réseau et rempli après, et il ne voit que du
  * chiffré : ce qui en sort repart vers `decryptAttachment` exactement comme ce qui vient
- * du réseau, avec la même vérification d'intégrité (REQ-MED-08). Un cache empoisonné
+ * du réseau, avec la même vérification d'intégrité. Un cache empoisonné
  * échoue donc au hash, comme un blob corrompu en transit.
  */
 export async function downloadCiphertext(session: Session, env: MediaEnvironment, url: string): Promise<Bytes> {
@@ -602,9 +602,9 @@ export async function downloadCiphertext(session: Session, env: MediaEnvironment
 }
 
 /**
- * REQ-MED-15 — **le téléchargement d'un média, sans jamais tenir son clair en entier.**
+ * **le téléchargement d'un média, sans jamais tenir son clair en entier.**
  *
- * Le chiffré descend et se vérifie d'un bloc (REQ-MED-08, mécanisme (a) : rien n'est
+ * Le chiffré descend et se vérifie d'un bloc (mécanisme (a) : rien n'est
  * déchiffré avant que l'empreinte du tout soit bonne), puis le clair sort par tranches,
  * chacune écrite et relâchée. Le pic passe d'environ trois fois la taille du fichier à
  * « le chiffré, plus une tranche ».
@@ -641,11 +641,11 @@ export async function downloadAttachmentToFile(
 }
 
 /**
- * REQ-MED-11 — **le pendant en lecture du chemin public.** Un `mxc://` non chiffré (photo
+ * **le pendant en lecture du chemin public.** Un `mxc://` non chiffré (photo
  * de profil, bannière) rendu en `Blob`, prêt pour un `URL.createObjectURL`.
  *
  * Pourquoi une fonction et pas un `<img src>` : depuis Synapse v1.146 les endpoints média
- * anonymes répondent 404 (REQ-INF-12), et une balise `img` ne sait pas porter d'en-tête
+ * anonymes répondent 404, et une balise `img` ne sait pas porter d'en-tête
  * `Authorization`. Sans ce chemin, une photo de profil correctement téléversée et
  * correctement posée sur le compte reste invisible — c'était le cas.
  *
@@ -659,7 +659,7 @@ export async function downloadPublicImage(session: Session, mxcUrl: string): Pro
 
 /**
  * Les endpoints média non authentifiés répondent 404 depuis Synapse v1.146
- * (infra/README.md, REQ-INF-12) : aucune URL publique n'est supposée, et aucune vignette
+ * (infra/README.md) : aucune URL publique n'est supposée, et aucune vignette
  * n'est demandée au serveur — il ne saurait pas redimensionner un blob opaque.
  */
 async function recupererMedia(session: Session, mxcUrl: string): Promise<Response> {

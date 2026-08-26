@@ -35,7 +35,7 @@ beforeEach(() => {
   });
 });
 
-describe("REQ-MSG-02 — DM et groupes, chiffrés dès la création", () => {
+describe("DM et groupes, chiffrés dès la création", () => {
   it("un DM est un salon à 2 marqué is_direct et chiffré à la création", async () => {
     await createDirectMessage(ctx.session, "@adam:tacita.test");
     const [opts] = ctx.client.createRoom.mock.calls[0]!;
@@ -65,7 +65,7 @@ describe("REQ-MSG-02 — DM et groupes, chiffrés dès la création", () => {
   });
 });
 
-describe("REQ-MSG-08 — épinglage via m.room.pinned_events, état non chiffré", () => {
+describe("épinglage via m.room.pinned_events, état non chiffré", () => {
   it("écrit la liste dans l'événement d'état", async () => {
     await setPinnedEvents(ctx.session, ROOM, ["$a", "$b"]);
     expect(ctx.client.sendStateEvent).toHaveBeenCalledWith(
@@ -88,7 +88,7 @@ describe("REQ-MSG-08 — épinglage via m.room.pinned_events, état non chiffré
   });
 });
 
-describe("REQ-MSG-11 — power levels numériques, aucun rôle nommé", () => {
+describe("power levels numériques, aucun rôle nommé", () => {
   it("lit le power level d'un membre tel quel", () => {
     expect(powerLevelOf(ctx.session, ROOM, "@luca:tacita.test")).toBe(100);
     expect(powerLevelOf(ctx.session, ROOM, "@adam:tacita.test")).toBe(0);
@@ -155,7 +155,7 @@ describe("REQ-MSG-11 — power levels numériques, aucun rôle nommé", () => {
   });
 });
 
-describe("REQ-UIX-36 — trois niveaux de notification, en push rules natives", () => {
+describe("trois niveaux de notification, en push rules natives", () => {
   /** Une règle telle que `/sync` la rend : muette si ses actions ne notifient pas. */
   const regle = (ruleId: string, notifie: boolean): IPushRule => ({
     rule_id: ruleId,
@@ -227,7 +227,7 @@ describe("REQ-UIX-36 — trois niveaux de notification, en push rules natives", 
   });
 });
 
-describe("REQ-MSG-20 — le sas d'entrée : knock, et l'invitation native qui le clôt", () => {
+describe("le sas d'entrée : knock, et l'invitation native qui le clôt", () => {
   it("un salon sans règle d'accès lisible compte comme `invite` : dans le doute, fermé", () => {
     // Le cas réel : `Preset.PrivateChat` n'écrit pas toujours l'événement, et l'état
     // n'est pas encore là avant le premier /sync. Lire « knock » par défaut ouvrirait un
@@ -289,7 +289,7 @@ describe("REQ-MSG-20 — le sas d'entrée : knock, et l'invitation native qui le
   it("un groupe créé n'est pas en knock : la bascule suit les liens, pas la création", async () => {
     await createGroupChat(ctx.session, "équipe");
     const [opts] = ctx.client.createRoom.mock.calls[0]!;
-    // spec 05 « inchangée par défaut » (plan de route E-13) : pas de knock permanent
+    // `@tacita/messaging` « inchangée par défaut » (plan de route E-13) : pas de knock permanent
     // sur tous les groupes.
     expect(JSON.stringify(opts)).not.toContain("knock");
   });

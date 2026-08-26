@@ -8,7 +8,7 @@
 name: tacita
 
 services:
-  # REQ-INV-07 — la cible de fumée parle à la base du service de liens directement :
+  # la cible de fumée parle à la base du service de liens directement :
   # l'atomicité de la consommation d'un usage est une propriété de PostgreSQL, et une
   # imitation monothread la confirmerait par construction au lieu de l'éprouver.
   # Lié à la boucle locale, jamais exposé sur une interface publique, et présent dans
@@ -49,7 +49,7 @@ services:
       SYNAPSE_IP_RANGE_WHITELIST: '["172.16.0.0/12"]'
     volumes:
       - ./proxy/certs/fullchain.pem:/conf/dev-ca.pem:ro
-    # L'API d'admin est bloquée au proxy (REQ-INF-11) : la cible crée son compte de
+    # L'API d'admin est bloquée au proxy : la cible crée son compte de
     # test en parlant directement à Synapse. Lié à la boucle locale — jamais exposé
     # sur une interface publique — et présent dans ce seul overlay.
     ports:

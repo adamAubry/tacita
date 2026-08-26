@@ -9,7 +9,7 @@ import { Sheet } from "../foundation/Sheet";
 import { useSession } from "./SessionProvider";
 
 /**
- * REQ-UIX-06 / REQ-COR-10 — la déconnexion **efface tout localement**, et la confirmation
+ * la déconnexion **efface tout localement**, et la confirmation
  * dit quoi, précisément. « Voulez-vous vraiment vous déconnecter ? » ne permet à personne
  * de décider : ici, la déconnexion détruit l'historique déchiffré, l'index de recherche et
  * la file d'envoi de cet appareil.
@@ -24,7 +24,7 @@ export function LogoutButton({ session }: { session: Session }) {
   return (
     <>
       {/* `secondary` et non `ghost` : depuis qu'il est posé à côté de « Modifier le
-          profil » (REQ-UIX-24), il forme une paire avec un bouton plein, et un fantôme
+          profil », il forme une paire avec un bouton plein, et un fantôme
           dans cette paire se lit comme du texte plutôt que comme une action. Il reste
           plus clair que l'accentué — c'est l'écart qui dit lequel des deux est l'action
           courante. Le destructif est dans la feuille, là où il détruit vraiment. */}

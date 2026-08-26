@@ -34,7 +34,7 @@ interface PhotoCaptureProps {
   ouvert: boolean;
   onFermer: () => void;
   /**
-   * REQ-UI-15 — deux gestes distincts sur la **même** prise : l'original non compressé
+   * deux gestes distincts sur la **même** prise : l'original non compressé
    * reste sur l'appareil, la version compressée part au correspondant.
    */
   onEnregistrer: (original: Blob, nom: string) => Promise<void> | void;
@@ -42,13 +42,13 @@ interface PhotoCaptureProps {
 }
 
 /**
- * REQ-UI-15 — capture photo in-app.
+ * capture photo in-app.
  *
  * **La permission est demandée au moment de l'usage**, jamais à l'avance (DESIGN.md), et
  * un refus est expliqué et rattrapable : il n'y a pas d'écran mort.
  *
  * ponytail: photo seulement, pas de vidéo. La capture vidéo produirait du WebM ou du
- * MP4/AAC selon l'appareil, qu'il faudrait transcoder pour envoyer (spec 08, D-04) — et
+ * MP4/AAC selon l'appareil, qu'il faudrait transcoder pour envoyer (D-04) — et
  * ce transcodage n'existe pas dans le shard (ESCALATIONS § E-10). Le bouton n'existe donc
  * pas non plus.
  */
@@ -131,7 +131,7 @@ export function PhotoCapture({ ouvert, onFermer, onEnregistrer, onEnvoyer }: Pho
           <>
             <img src={prise.url} alt="Photo prise" style={APERCU} />
 
-            {/* REQ-UI-15 — les deux libellés sont **distincts et explicites** : ce qui
+            {/* les deux libellés sont **distincts et explicites** : ce qui
                 reste sur l'appareil est l'original, ce qui part est compressé. Confondre
                 les deux ferait croire que le correspondant reçoit la pleine qualité.
 

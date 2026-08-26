@@ -9,19 +9,19 @@ const compose = parse(
   readFileSync(new URL("../docker-compose.yml", import.meta.url), "utf-8"),
 );
 
-describe("REQ-INF-02 — fédération désactivée", () => {
+describe("fédération désactivée", () => {
   it("federation_domain_whitelist est un tableau vide", () => {
     expect(homeserver.federation_domain_whitelist).toEqual([]);
   });
 });
 
-describe("REQ-INF-03 — chiffrement par défaut sur tout salon", () => {
+describe("chiffrement par défaut sur tout salon", () => {
   it("encryption_enabled_by_default_for_room_type vaut 'all'", () => {
     expect(homeserver.encryption_enabled_by_default_for_room_type).toBe("all");
   });
 });
 
-describe("REQ-INF-04 — inscription ouverte, sans garde (D-13)", () => {
+describe("inscription ouverte, sans garde (D-13)", () => {
   it("l'inscription est ouverte : le produit fait créer son compte depuis l'app", () => {
     expect(homeserver.enable_registration).toBe(true);
   });
@@ -31,7 +31,7 @@ describe("REQ-INF-04 — inscription ouverte, sans garde (D-13)", () => {
      * Règle 7 — une valeur retirée est indétectable si rien ne la relit. Remettre
      * `registration_requires_token` remettrait un code d'invitation dans le parcours sans
      * qu'aucun écran ne change : ce test est le seul endroit qui s'en apercevrait.
-     * L'exposition assumée en échange est dans infra/LIMITES.md (D-13).
+     * L'exposition assumée en échange est tranchée par D-13.
      */
     expect(homeserver.registration_requires_token).toBeUndefined();
   });
@@ -55,7 +55,7 @@ describe("REQ-INF-04 — inscription ouverte, sans garde (D-13)", () => {
   });
 });
 
-describe("REQ-INF-05 — rate limiting desserré (>= 10x les défauts)", () => {
+describe("rate limiting desserré (>= 10x les défauts)", () => {
   const defaults = {
     rc_message: { per_second: 0.2, burst_count: 10 },
     "rc_login.address": { per_second: 0.003, burst_count: 5 },
@@ -105,13 +105,13 @@ describe("REQ-INF-05 — rate limiting desserré (>= 10x les défauts)", () => {
   });
 });
 
-describe("REQ-INF-06 — taille d'upload maximale", () => {
+describe("taille d'upload maximale", () => {
   it("max_upload_size vaut 200M", () => {
     expect(homeserver.max_upload_size).toBe("200M");
   });
 });
 
-describe("REQ-INF-07 — rétention illimitée, définie explicitement", () => {
+describe("rétention illimitée, définie explicitement", () => {
   // `toEqual` et non `toMatchObject` : c'est l'assertion qui compte. Elle dit à la fois
   // que le bloc existe (pas d'absence par omission), que la rétention est désactivée, et
   // que rien d'autre ne traîne dedans. Un `purge_jobs: []` réintroduit par quelqu'un qui
@@ -122,20 +122,20 @@ describe("REQ-INF-07 — rétention illimitée, définie explicitement", () => {
   });
 });
 
-describe("REQ-INF-08 — backend média S3", () => {
+describe("backend média S3", () => {
   it("media_storage_providers utilise s3_storage_provider.S3StorageProviderBackend", () => {
     const [provider] = homeserver.media_storage_providers;
     expect(provider.module).toBe("s3_storage_provider.S3StorageProviderBackend");
     expect(provider.config.bucket).toBeTruthy();
   });
 
-  it("SSE-S3 est activé au niveau du bucket (défense en profondeur, cf LIMITES.md)", () => {
+  it("SSE-S3 est activé au niveau du bucket (défense en profondeur)", () => {
     const initCommand = compose.services["minio-init"].command.join(" ");
     expect(initCommand).toContain("mc encrypt set sse-s3");
   });
 });
 
-describe("REQ-INF-09 — identifiant + mot de passe, portés par Synapse", () => {
+describe("identifiant + mot de passe, portés par Synapse", () => {
   it("l'authentification par mot de passe native est active", () => {
     // Réécrite le 25/08/2026 (D-12) : Keycloak supprimé, Matrix porte l'identité.
     expect(homeserver.password_config.enabled).toBe(true);
@@ -166,7 +166,7 @@ describe("REQ-INF-09 — identifiant + mot de passe, portés par Synapse", () =>
   });
 });
 
-describe("REQ-INF-18 — annuaire ouvert à tous les comptes locaux", () => {
+describe("annuaire ouvert à tous les comptes locaux", () => {
   /**
    * E-21, tranchée le 21/08/2026. Le défaut de Synapse (`false`) ne liste que les
    * comptes avec qui on partage déjà un salon ; ce déploiement n'a aucun salon public,

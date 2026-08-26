@@ -16,7 +16,7 @@ import { Button } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
 
 /**
- * REQ-CAL-02 — la cause, en clair. Les trois `reason` n'appellent pas le même geste :
+ * la cause, en clair. Les trois `reason` n'appellent pas le même geste :
  * l'une se retente, les deux autres se règlent côté déploiement. Un « appel impossible »
  * unique ferait ressembler une pile sans SFU (E-08, cas fréquent en développement) à une
  * panne réseau passagère.
@@ -31,7 +31,7 @@ export function messageFocusManquant(cause: unknown): string {
 }
 
 /**
- * Au-delà, le widget est considéré comme ne chargeant pas (REQ-UIX-38). Le compte
+ * Au-delà, le widget est considéré comme ne chargeant pas. Le compte
  * s'arrête quand Element Call **nous parle**, pas quand l'iframe charge : le `load` d'une
  * iframe se déclenche pour n'importe quel document, y compris une page d'erreur — s'y
  * fier ferait passer un déploiement en panne pour un appel qui démarre.
@@ -40,12 +40,12 @@ export const DELAI_CHARGEMENT_MS = 15_000;
 
 interface EcranAppelProps {
   roomId: string;
-  /** REQ-UIX-38 — le point d'entrée : « appel vidéo » plutôt qu'« appel audio ». */
+  /** le point d'entrée : « appel vidéo » plutôt qu'« appel audio ». */
   video: boolean;
 }
 
 /**
- * REQ-UI-19 / REQ-UIX-38 — **le shell d'appel, et rien de plus.**
+ * **le shell d'appel, et rien de plus.**
  *
  * Ce qui est à nous : le conteneur plein écran avec ses safe-areas, la découverte du
  * focus et son message d'erreur, la sortie de secours tant que le widget n'a pas chargé.
@@ -147,7 +147,7 @@ export function EcranAppel({ roomId, video }: EcranAppelProps) {
             style={{ border: 0, width: "100%", height: "100%" }}
           />
 
-          {/* La sortie de secours de REQ-UIX-38. Elle disparaît dès qu'Element Call est
+          {/* La sortie de secours de. Elle disparaît dès qu'Element Call est
               là : c'est lui qui porte le raccrochage, et deux boutons de sortie
               concurrents dans le même écran est exactement ce que E-07 refuse. */}
           {!charge && (

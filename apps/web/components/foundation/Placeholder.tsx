@@ -14,7 +14,7 @@ interface PlaceholderProps {
 }
 
 /**
- * REQ-UIX-03 — **le** composant d'état vide de l'app. Un seul, paramétrable : « aucun
+ * **le** composant d'état vide de l'app. Un seul, paramétrable : « aucun
  * état vide brut ailleurs » (M-A) ne tient que s'il n'y a rien d'autre à utiliser.
  *
  * Il explique toujours *pourquoi* c'est vide. Un écran vide sans phrase laisse croire à

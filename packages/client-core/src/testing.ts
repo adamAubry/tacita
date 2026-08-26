@@ -10,7 +10,7 @@ import type { Session } from "./session";
  * `Partial<Omit<Session, "client">>` puis un double cast. Un membre **ajouté** au
  * contrat n'apparaissait donc nulle part — `Partial` l'accepte absent, le cast
  * éteint le reste — et sortait en `undefined is not a function` chez le seul
- * consommateur qui compose les sept paquets : le shard UI (spec 11).
+ * consommateur qui compose les sept paquets : le shard UI.
  * `identityResetOf` et `confirmIdentityOf`, ajoutés le 04/08/2026, sont passés
  * exactement par là.
  *

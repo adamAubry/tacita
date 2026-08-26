@@ -1,12 +1,12 @@
 import type { SearchHit, SearchStats } from "./engine";
 
 /**
- * `@room` dans `mentions` (REQ-SRC-11) : une mention de salon mentionne tout le monde
+ * `@room` dans `mentions` : une mention de salon mentionne tout le monde
  * mais ne porte aucun identifiant. Le littéral vient du protocole (`m.mentions.room`),
  * pas d'un contrat Tacita — aucun paquet n'importe `@tacita/messaging` en production.
  *
  * Il vit ici et non dans `engine.ts` : le thread principal en a besoin pour indexer,
- * et importer une valeur du moteur tirerait Orama dans son bundle (REQ-SRC-01).
+ * et importer une valeur du moteur tirerait Orama dans son bundle.
  */
 export const ROOM_MENTION = "@room";
 

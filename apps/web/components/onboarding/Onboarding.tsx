@@ -10,7 +10,7 @@ import { ETAPES, type EtapeOnboarding } from "./etapes";
 import { useSession } from "./SessionProvider";
 
 /**
- * REQ-UI-22 — **le parcours d'accueil**, du compte tout juste créé au premier message
+ * **le parcours d'accueil**, du compte tout juste créé au premier message
  * écrit.
  *
  * Ce fichier ne connaît aucune étape : il connaît une **liste** d'étapes, qu'il compte,
@@ -33,7 +33,7 @@ interface OnboardingProps {
   session: Session;
   /**
    * Le rang de départ. `0` sur un compte qui vient d'être créé — l'étape bloquante de la
-   * clé (REQ-UI-04) est la première du parcours ; `1` quand elle est déjà franchie, ce
+   * clé est la première du parcours ; `1` quand elle est déjà franchie, ce
    * qui est le cas après un rechargement. Les étapes suivantes étant toutes idempotentes,
    * reprendre à la première d'entre elles est sans conséquence.
    */
@@ -84,7 +84,7 @@ export function Onboarding({
   return (
     <EcranDePorte>
       {/*
-        REQ-UI-22 — **où l'on en est, dit en toutes lettres.** Une barre seule fait voir
+        **où l'on en est, dit en toutes lettres.** Une barre seule fait voir
         une avancée sans jamais dire combien il reste ; le libellé d'Astryx est au-dessus
         d'elle et porte le compte, ce qui répond à la seule question qu'on se pose sur un
         parcours qu'on n'a pas choisi d'ouvrir : « c'est encore long ? ».
@@ -104,7 +104,7 @@ export function Onboarding({
       <Contenu key={etape.cle} session={session} avancer={avancer} />
 
       {/*
-        REQ-UI-22 — **ce qui est facultatif se passe, et le dit.** Une étape obligatoire
+        **ce qui est facultatif se passe, et le dit.** Une étape obligatoire
         n'affiche rien ici : un bouton grisé serait une promesse non tenue (interdit n°13),
         et un bouton absent se comprend sans explication.
 
@@ -121,7 +121,7 @@ export function Onboarding({
 }
 
 /**
- * REQ-UI-22 — **une étape qui prépare quelque chose le montre.**
+ * **une étape qui prépare quelque chose le montre.**
  *
  * Certaines étapes ont du travail à faire avant d'avoir quoi que ce soit à afficher :
  * dessiner et téléverser deux images, créer une conversation. Sans ce crochet, l'écran

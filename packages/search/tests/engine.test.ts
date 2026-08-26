@@ -40,7 +40,7 @@ beforeEach(async () => {
   engine = await createEngine({ indexedDB });
 });
 
-describe("REQ-SRC-01 — index Orama alimenté par les événements déchiffrés", () => {
+describe("index Orama alimenté par les événements déchiffrés", () => {
   it("indexe un lot et le retrouve par mot-clé", async () => {
     await engine.index([event(1, "rendez-vous au parc"), event(2, "courses ce soir")]);
     const hits = await engine.search("parc");
@@ -49,7 +49,7 @@ describe("REQ-SRC-01 — index Orama alimenté par les événements déchiffrés
   });
 });
 
-describe("REQ-SRC-02 — index persisté, rechargé sans réindexation", () => {
+describe("index persisté, rechargé sans réindexation", () => {
   it("une recherche donne le même résultat après rechargement du module", async () => {
     await engine.index([event(1, "rendez-vous au parc")]);
     engine.close();
@@ -64,7 +64,7 @@ describe("REQ-SRC-02 — index persisté, rechargé sans réindexation", () => {
     await engine.index([event(1, "rendez-vous au parc")]);
     engine.close();
 
-    // Ce que laisserait une version d'avant REQ-SRC-11 : les mêmes octets, sans les
+    // Ce que laisserait une version d'avant : les mêmes octets, sans les
     // index `msgtype` et `mentions`. Le charger donnerait une base qui échoue au
     // premier filtre — et laisserait du clair illisible en IndexedDB.
     const db = await new Promise<IDBDatabase>((resolve) => {
@@ -102,7 +102,7 @@ describe("REQ-SRC-02 — index persisté, rechargé sans réindexation", () => {
   });
 });
 
-describe("REQ-SRC-04 — recherche globale et par salon", () => {
+describe("recherche globale et par salon", () => {
   beforeEach(async () => {
     await engine.index([
       event(1, "réunion demain", ROOM),
@@ -126,7 +126,7 @@ describe("REQ-SRC-04 — recherche globale et par salon", () => {
   });
 });
 
-describe("REQ-SRC-11 — recherche filtrée, critères combinables et locaux", () => {
+describe("recherche filtrée, critères combinables et locaux", () => {
   const LUCA = "@luca:tacita.test";
   const MIRA = "@mira:tacita.test";
 
@@ -192,7 +192,7 @@ describe("REQ-SRC-11 — recherche filtrée, critères combinables et locaux", (
   });
 });
 
-describe("REQ-SRC-05 — plafond D-01 et éviction des plus anciens", () => {
+describe("plafond D-01 et éviction des plus anciens", () => {
   it("le plafond par défaut est celui de la décision D-01", () => {
     expect(MAX_EVENTS).toBe(200_000);
   });
@@ -239,7 +239,7 @@ describe("REQ-SRC-05 — plafond D-01 et éviction des plus anciens", () => {
   });
 });
 
-describe("REQ-SRC-10 — l'index suit le cycle de vie des messages", () => {
+describe("l'index suit le cycle de vie des messages", () => {
   it("un événement retiré n'est plus trouvable", async () => {
     await engine.index([event(1, "secret"), event(2, "anodin")]);
     await engine.remove(["$e1"]);
@@ -294,7 +294,7 @@ describe("REQ-SRC-10 — l'index suit le cycle de vie des messages", () => {
   });
 });
 
-describe("REQ-SRC-07 — la rotation Megolm n'est pas un événement pour l'index", () => {
+describe("la rotation Megolm n'est pas un événement pour l'index", () => {
   it("aucun code ne réagit à une rotation de session ni ne réindexe", () => {
     expect(packageCode()).not.toMatch(/megolm|RoomKey|sessionId|reindex|réindex/i);
   });
@@ -307,7 +307,7 @@ describe("REQ-SRC-07 — la rotation Megolm n'est pas un événement pour l'inde
   });
 });
 
-describe("REQ-SRC-08 — wipe détruit l'index et son snapshot", () => {
+describe("wipe détruit l'index et son snapshot", () => {
   it("après wipe, plus aucun résultat et le store est vide au rechargement", async () => {
     await engine.index([event(1, "rendez-vous au parc")]);
     await engine.wipe();
@@ -321,7 +321,7 @@ describe("REQ-SRC-08 — wipe détruit l'index et son snapshot", () => {
   });
 });
 
-describe("REQ-SRC-09 — indexation par lots avec rendu de la main", () => {
+describe("indexation par lots avec rendu de la main", () => {
   it("rend la main entre chaque lot, une fois de moins que de lots", async () => {
     let yields = 0;
     const parLots = await createEngine({

@@ -73,7 +73,7 @@ const trouver = (boites: Boite[], chemin: string[]): Boite => {
 const u32De = (contenu: Bytes, rang: number) =>
   new DataView(contenu.buffer, contenu.byteOffset).getUint32(rang);
 
-describe("REQ-MED-04 — muxeur MP4 : les échantillons encodés deviennent un fichier lisible", () => {
+describe("muxeur MP4 : les échantillons encodés deviennent un fichier lisible", () => {
   const echantillons = [echantillon(0, true), echantillon(1), echantillon(2), echantillon(3, true)];
   const fichier = ecrireMp4({ largeur: 640, hauteur: 480, description: DESCRIPTION, echantillons });
   const boites = lireBoites(fichier);

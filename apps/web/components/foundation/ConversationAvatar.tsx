@@ -35,7 +35,7 @@ interface ConversationAvatarProps {
  * recoder — DESIGN.md interdit de recoder ce qu'Astryx livre.
  *
  * L'image passe par `useImageMxc` et non par `src={mxc}` : un `mxc://` n'est pas une URL
- * que le navigateur sait suivre, et l'endpoint média demande le jeton (REQ-INF-12). C'est
+ * que le navigateur sait suivre, et l'endpoint média demande le jeton. C'est
  * ce chaînon qui manquait — jusqu'ici ce composant ne rendait que des initiales, et une
  * photo de profil pouvait être téléversée, posée et relue sans jamais s'afficher.
  */

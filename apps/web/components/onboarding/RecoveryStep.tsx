@@ -25,7 +25,7 @@ const EN_SAVOIR_PLUS =
   "https://www.google.com/search?q=a+quoi+sert+une+cle+de+recuperation";
 
 /**
- * REQ-UI-04 — **l'étape bloquante.** Elle n'est ni sautable, ni différable, et il n'y a
+ * **l'étape bloquante.** Elle n'est ni sautable, ni différable, et il n'y a
  * pas d'URL qui la contourne : ce n'est pas une route, c'est ce que le shell rend tant
  * que `recoveryRequired()` est vrai (voir `RecoveryGate`). Un garde de route se contourne
  * en tapant une adresse ; un écran qui remplace l'app, non.
@@ -57,7 +57,7 @@ const groupesDe4 = (cle: string) =>
 interface RecoveryStepProps {
   session: Session;
   /**
-   * REQ-UI-04 — le chemin « je n'ai plus ma clé » (`RecoveryUnlock`). Le même écran, mais
+   * le chemin « je n'ai plus ma clé » (`RecoveryUnlock`). Le même écran, mais
    * **il détruit** : la sauvegarde et l'identité existantes sont remplacées, et tout ce
    * qui était chiffré sous l'ancienne clé devient définitivement illisible.
    *
@@ -69,7 +69,7 @@ interface RecoveryStepProps {
 }
 
 /**
- * REQ-UI-04 — **la ré-authentification que le serveur exige** pour *remplacer* une
+ * **la ré-authentification que le serveur exige** pour *remplacer* une
  * identité cross-signing (réécrit le 25/08/2026).
  *
  * Deux choses à ne pas confondre, et elles ont changé le même jour. **L'inscription ne

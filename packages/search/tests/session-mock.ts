@@ -27,7 +27,7 @@ export function matrixEvent(
     type?: string;
     ts?: number;
     replaces?: string;
-    /** REQ-SRC-11 — ce que porte l'événement réel, pas ce que l'index en fait. */
+    /** ce que porte l'événement réel, pas ce que l'index en fait. */
     msgtype?: string;
     mentions?: { user_ids?: unknown; room?: boolean };
     sender?: string;
@@ -39,7 +39,7 @@ export function matrixEvent(
     ...(options.mentions && { "m.mentions": options.mentions }),
   };
 
-  // REQ-SRC-10 — une édition porte la relation `m.replace` et le texte réel dans
+  // une édition porte la relation `m.replace` et le texte réel dans
   // `m.new_content` ; le `body` de premier niveau n'est qu'un repli « * texte ».
   const content = options.replaces
     ? {
@@ -101,7 +101,7 @@ export function fakeSession() {
   const listenersOf = (name: string) => listeners.get(name) ?? listeners.set(name, []).get(name)!;
 
   /**
-   * REQ-SRC-01 — ce que le client tient déjà quand le proxy se branche. Vide par défaut :
+   * ce que le client tient déjà quand le proxy se branche. Vide par défaut :
    * les tests qui parlent de l'amorçage le disent, les autres ne doivent pas voir un
    * index se peupler tout seul.
    */
@@ -123,7 +123,7 @@ export function fakeSession() {
 
   const session = {
     client,
-    // REQ-COR-12 — la recherche n'envoie rien, mais elle consomme le même contrat.
+    // la recherche n'envoie rien, mais elle consomme le même contrat.
     isEncrypted: vi.fn(async (_roomId: string) => true),
     registerWipe: vi.fn((name: string, wipe: () => Promise<void> | void) => {
       wipes.set(name, wipe);

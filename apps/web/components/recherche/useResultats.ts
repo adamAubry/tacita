@@ -11,7 +11,7 @@ export interface Resultats {
 }
 
 /**
- * REQ-UIX-22 — la recherche débouncée, exécutée dans le worker du paquet.
+ * la recherche débouncée, exécutée dans le worker du paquet.
  *
  * Le `clearTimeout` du nettoyage est **tout le mécanisme** : chaque changement annule le
  * minuteur du précédent avant d'en poser un neuf, donc une rafale de changements ne

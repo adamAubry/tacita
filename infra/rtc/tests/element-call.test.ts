@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
-// `logLevel: silent` — le compose porte le tag `!override` (spec 02, port 443 du proxy),
+// `logLevel: silent` — le compose porte le tag `!override` (port 443 du proxy),
 // inconnu du parseur YAML générique.
 const overlaySource = readFileSync(new URL("../docker-compose.yml", import.meta.url), "utf-8");
 const overlay = parse(overlaySource, { logLevel: "silent" });
@@ -17,7 +17,7 @@ const config = readFileSync(new URL("../element-call.json", import.meta.url), "u
 
 const IMAGE = overlay.services["element-call"].image as string;
 
-describe("REQ-RTC-08 — Element Call auto-hébergé, épinglé, et sa version consignée", () => {
+describe("Element Call auto-hébergé, épinglé, et sa version consignée", () => {
   it("aucune image de l'overlay n'est référencée par un tag mutable", () => {
     // Par défaut de refus : un service ajouté demain échoue ici sans avoir été nommé.
     const images = Object.values(overlay.services)
@@ -59,7 +59,7 @@ describe("REQ-RTC-08 — Element Call auto-hébergé, épinglé, et sa version c
   });
 
   it("la pile de base ne sert aucun Element Call", () => {
-    // Même règle que REQ-RTC-05 (E-08) : sans SFU derrière, un client d'appel qui se
+    // Même règle que (E-08) : sans SFU derrière, un client d'appel qui se
     // charge est un appel qui meurt à la connexion. Rien ne vaut mieux que presque.
     expect(base.services["element-call"]).toBeUndefined();
     expect(baseCallConf).not.toMatch(/^\s*(server|location|proxy_pass)\b/m);

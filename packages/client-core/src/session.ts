@@ -25,10 +25,10 @@ export type CryptoApi = NonNullable<ReturnType<MatrixClient["getCrypto"]>>;
 export type RecoveryKey = Awaited<ReturnType<CryptoApi["createRecoveryKeyFromPassphrase"]>>;
 
 export interface SessionConfig {
-  /** Homeserver Synapse (spec 01), derrière le proxy TLS. */
+  /** Homeserver Synapse, derrière le proxy TLS. */
   homeserverUrl: string;
   /**
-   * REQ-COR-08 — **identifiant et mot de passe**, réécrit le 25/08/2026 (D-12).
+   * **identifiant et mot de passe**, réécrit le 25/08/2026 (D-12).
    *
    * Le module recevait ici un `loginToken` émis par un fournisseur OIDC externe, et se
    * targuait de ne connaître aucun secret utilisateur. Keycloak supprimé, l'identité est
@@ -42,11 +42,11 @@ export interface SessionConfig {
    */
   identifiant: string;
   motDePasse: string;
-  /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
+  /** surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }
 
-/** REQ-COR-11 — ce qu'il faut pour rouvrir la session, et rien de plus. */
+/** ce qu'il faut pour rouvrir la session, et rien de plus. */
 interface StoredCredentials {
   accessToken: string;
   userId: string;
@@ -54,7 +54,7 @@ interface StoredCredentials {
 }
 
 /**
- * REQ-COR-06 — l'état de la clé de récupération **du point de vue de cet appareil-ci**,
+ * l'état de la clé de récupération **du point de vue de cet appareil-ci**,
  * en trois cas et pas deux. C'est la distinction qui manquait : un booléen « clé requise »
  * confond « ce compte n'a pas de clé » et « ce compte en a une, que cet appareil n'a pas
  * reçue ». Le second est le cas normal de toute reconnexion — chaque `m.login.token`
@@ -62,14 +62,14 @@ interface StoredCredentials {
  * à quelqu'un qui en a déjà une, donc d'écraser sa sauvegarde.
  *
  * - `prete` — cet appareil est signé par l'identité de son propriétaire ; il peut chiffrer.
- * - `creation` — le compte n'a aucune sauvegarde : c'est l'inscription (REQ-UI-04).
+ * - `creation` — le compte n'a aucune sauvegarde : c'est l'inscription.
  * - `deverrouillage` — la sauvegarde existe ; cet appareil attend la clé (`unlockRecovery`).
  */
 export type RecoveryState = "prete" | "creation" | "deverrouillage";
 
 /** Les deux cas de `setupRecoveryKey`. Voir le membre de `Session` pour le contrat. */
 /**
- * REQ-COR-15 — un appareil connecté au compte, tel que l'écran de réglages le montre.
+ * un appareil connecté au compte, tel que l'écran de réglages le montre.
  *
  * `derniereActivite` est en millisecondes, et **peut manquer** : Synapse ne la connaît
  * que si l'appareil a parlé depuis qu'il la retient. L'écran doit donc savoir ne rien
@@ -87,7 +87,7 @@ export interface Appareil {
 export interface SetupRecoveryOptions {
   reinitialiser?: boolean;
   /**
-   * REQ-COR-06 — **le mot de passe, quand le serveur le redemande pour remplacer une
+   * **le mot de passe, quand le serveur le redemande pour remplacer une
    * identité** (réécrit le 25/08/2026).
    *
    * Deux choses ont changé le même jour, et il faut les tenir séparées. **Le premier
@@ -118,7 +118,7 @@ export interface SetupRecoveryOptions {
  * sans même appeler l'écran de confirmation. Une porte de secours fermée en silence.
  *
  * Lu en canard plutôt que par `instanceof MatrixError` : la suite mocke `matrix-js-sdk`
- * (spec 04) et n'exporte que ce que le module utilise vraiment. On ne fait ici que lire
+ * et n'exporte que ce que le module utilise vraiment. On ne fait ici que lire
  * la forme documentée de la réponse 401.
  *
  * Un flow à plusieurs étapes est ignoré volontairement : rejouer la session après le seul
@@ -166,12 +166,12 @@ export const LONGUEUR_MINIMALE_MOT_DE_PASSE = 12;
 
 export interface OrderedTimeline {
   /**
-   * REQ-COR-04 — ordre canonique du flux /sync, tel que le SDK l'a accumulé.
+   * ordre canonique du flux /sync, tel que le SDK l'a accumulé.
    * Aucun tri par `origin_server_ts` : l'horodatage est indicatif seulement.
    */
   events(): MatrixEvent[];
   /**
-   * REQ-COR-13 — **remonte l'historique d'un cran, au serveur.**
+   * **remonte l'historique d'un cran, au serveur.**
    *
    * Sans elle, ce qu'un salon affiche est exactement ce que /sync a laissé dans
    * l'accumulateur du store, c'est-à-dire une fenêtre courte et **glissante** : les
@@ -194,8 +194,8 @@ export interface Session {
   readonly client: MatrixClient;
   timeline(roomId: string): OrderedTimeline;
   /**
-   * REQ-COR-12 — état de chiffrement du salon, en **prédicat** : il rend `false`,
-   * il ne lève jamais. Les gardes d'envoi des specs 05 et 07 s'appuient dessus.
+   * état de chiffrement du salon, en **prédicat** : il rend `false`,
+   * il ne lève jamais. Les gardes d'envoi de `@tacita/messaging` et 07 s'appuient dessus.
    *
    * `false` tant que l'état est inconnu — avant le premier `/sync` abouti, ou si la
    * crypto n'est pas là. C'est le sens qu'on veut : dans le doute, on n'envoie pas.
@@ -203,7 +203,7 @@ export interface Session {
    */
   isEncrypted(roomId: string): Promise<boolean>;
   /**
-   * REQ-COR-06 — l'état de la porte d'onboarding (spec 11). Voir {@link RecoveryState}
+   * l'état de la porte d'onboarding. Voir {@link RecoveryState}
    * pour ce que chaque valeur engage.
    *
    * La question qu'il pose est **locale** : cet appareil porte-t-il la signature de son
@@ -213,8 +213,8 @@ export interface Session {
    */
   recoveryState(): Promise<RecoveryState>;
   /**
-   * REQ-COR-06 — l'inscription : une clé neuve, la sauvegarde amorcée, le cross-signing
-   * en place. Rend la clé **une seule fois**, à afficher (spec 11) ; elle n'est jamais
+   * l'inscription : une clé neuve, la sauvegarde amorcée, le cross-signing
+   * en place. Rend la clé **une seule fois**, à afficher ; elle n'est jamais
    * persistée.
    *
    * `reinitialiser` est le cas « j'ai perdu ma clé » : il remplace le secret storage et
@@ -227,7 +227,7 @@ export interface Session {
    */
   setupRecoveryKey(options?: SetupRecoveryOptions): Promise<RecoveryKey>;
   /**
-   * REQ-COR-06 — **la deuxième connexion.** Déverrouille le secret storage avec la clé
+   * **la deuxième connexion.** Déverrouille le secret storage avec la clé
    * que l'utilisateur a conservée, signe cet appareil de son identité cross-signing (sans
    * quoi D-08 le laisse muet *et* sourd), et rebranche la sauvegarde de clés.
    *
@@ -237,7 +237,7 @@ export interface Session {
    */
   unlockRecovery(encodedKey: string): Promise<void>;
   /**
-   * REQ-COR-15 — **les appareils connectés au compte**, celui d'où l'on regarde compris.
+   * **les appareils connectés au compte**, celui d'où l'on regarde compris.
    *
    * Sans cette liste, une fuite de jeton n'a aucune réponse : les jetons de ce
    * déploiement n'expirent pas, et le changement de mot de passe ne déconnecte
@@ -247,7 +247,7 @@ export interface Session {
    */
   appareils(): Promise<Appareil[]>;
   /**
-   * REQ-COR-15 — **révoque des appareils**, donc leurs jetons d'accès.
+   * **révoque des appareils**, donc leurs jetons d'accès.
    *
    * Le serveur exige une ré-authentification, et c'est heureux : c'est le geste qu'un
    * intrus retournerait contre le titulaire. Le mot de passe de la session courante est
@@ -259,31 +259,31 @@ export interface Session {
    */
   revoquerAppareils(ids: string[], motDePasse?: string): Promise<void>;
   /**
-   * REQ-COR-07 / D-08 — `true` quand cet utilisateur a **changé d'identité** depuis
+   * / D-08 — `true` quand cet utilisateur a **changé d'identité** depuis
    * qu'on l'a vue pour la première fois. Ses anciennes signatures ne valent alors plus
-   * rien, et l'UI (spec 11) doit exiger une confirmation explicite avant tout nouvel
+   * rien, et l'UI doit exiger une confirmation explicite avant tout nouvel
    * envoi vers lui — pas un avertissement ignorable.
    *
-   * Le membre existe pour que le shard n'ait **rien à dériver lui-même** : la spec 00
+   * Le membre existe pour que le shard n'ait **rien à dériver lui-même** : `CLAUDE.md`
    * lui interdit toute logique métier, et lire `needsUserApproval` sur le crypto en
    * serait.
    */
   identityResetOf(userId: string): Promise<boolean>;
   /**
-   * REQ-COR-07 / D-08 — la confirmation explicite que l'exigence demande à l'UI, rendue
+   * / D-08 — la confirmation explicite que l'exigence demande à l'UI, rendue
    * effective : elle épingle la nouvelle identité de cet utilisateur comme authentique,
    * et les envois vers lui repartent.
    *
    * Le pendant de `identityResetOf`. Sans lui, le shard détecterait la réinitialisation
    * sans pouvoir la lever autrement qu'en appelant le crypto lui-même — de la logique
-   * métier dans la spec 11, que la spec 00 interdit.
+   * métier dans `apps/web`, que `CLAUDE.md` interdit.
    *
    * **Lève**, contrairement à `identityResetOf` : sur notre propre identifiant, ou sur
    * un utilisateur dont on n'a aucune identité. Une confirmation qui échoue en silence
    * ferait débloquer l'UI alors que le chiffrement refusera toujours.
    */
   confirmIdentityOf(userId: string): Promise<void>;
-  /** REQ-COR-10 — un package déclare ici comment effacer ses propres stores. */
+  /** un package déclare ici comment effacer ses propres stores. */
   registerWipe(name: string, wipe: () => Promise<void> | void): void;
   logout(): Promise<void>;
 }
@@ -293,7 +293,7 @@ const CREDENTIALS_STORE = "credentials";
 const CREDENTIALS_KEY = "current";
 
 /**
- * REQ-COR-11 — les credentials en IndexedDB, seul stockage autorisé (interdit n°2).
+ * les credentials en IndexedDB, seul stockage autorisé (interdit n°2).
  *
  * Ils y sont **en clair** : `initRustCrypto` tourne sans clé de pickle, donc l'état
  * crypto voisin — clés Megolm comprises — l'est déjà. Chiffrer le seul jeton en
@@ -363,7 +363,7 @@ function requireCrypto(client: MatrixClient): CryptoApi {
 type DeviceIsolationMode = Parameters<CryptoApi["setDeviceIsolationMode"]>[0];
 
 /**
- * REQ-COR-07 (D-08) — les clés Megolm ne sont partagées qu'avec les appareils que
+ * (D-08) — les clés Megolm ne sont partagées qu'avec les appareils que
  * leur propriétaire a signés de son identité cross-signing. Le mode est posé puis
  * verrouillé : toute tentative de le desserrer lève, plutôt que d'échouer en silence.
  *
@@ -383,7 +383,7 @@ function lockSignedDevicesOnly(crypto: CryptoApi): void {
   Object.defineProperty(crypto, "setDeviceIsolationMode", {
     value: (mode: DeviceIsolationMode) => {
       if (!(mode instanceof OnlySignedDevicesIsolationMode)) {
-        throw new Error("REQ-COR-07 : le mode d'isolation des appareils est verrouillé");
+        throw new Error(" : le mode d'isolation des appareils est verrouillé");
       }
     },
     configurable: false,
@@ -413,7 +413,7 @@ async function buildSession(
 ): Promise<Session> {
   const log = createLogger();
 
-  // REQ-COR-03 — IndexedDB est le seul store de persistance : historique consultable
+  // IndexedDB est le seul store de persistance : historique consultable
   // hors ligne. localStorage/sessionStorage ne sont jamais touchés.
   const store = new IndexedDBStore({
     indexedDB: config.indexedDB ?? globalThis.indexedDB,
@@ -421,7 +421,7 @@ async function buildSession(
   });
 
   /**
-   * REQ-COR-06 — la clé de récupération que `setupRecoveryKey()` vient de générer.
+   * la clé de récupération que `setupRecoveryKey()` vient de générer.
    * Le SDK ne la conserve pas : il rappelle l'application chaque fois qu'il doit
    * déverrouiller le secret storage pour y écrire. Sans ce rappel,
    * `bootstrapSecretStorage` lève « No getSecretStorageKey callback supplied » et
@@ -454,11 +454,11 @@ async function buildSession(
   // « must be called after assigning it to the client » quand il relit un store
   // existant. Sur une base vierge l'ordre inverse passe — c'est pourquoi ni la
   // suite sur mocks ni un premier lancement ne le voyaient, et pourquoi seule la
-  // reprise de session (REQ-COR-11) échouait, à chaque fois.
+  // reprise de session échouait, à chaque fois.
   await store.startup();
 
-  // REQ-COR-01 — vodozemac via le SDK (`initRustCrypto`), libolm interdit.
-  // REQ-COR-02 — la crypto est prête avant que quoi que ce soit puisse être envoyé :
+  // vodozemac via le SDK (`initRustCrypto`), libolm interdit.
+  // la crypto est prête avant que quoi que ce soit puisse être envoyé :
   // le client n'est rendu à l'appelant qu'après cette étape, donc aucun contenu ne
   // peut sortir en clair. Olm pour la négociation entre appareils, Megolm pour les
   // salons, rotation des sessions : gérés nativement par le SDK, rien à réécrire.
@@ -474,11 +474,11 @@ async function buildSession(
   });
   lockSignedDevicesOnly(requireCrypto(client));
 
-  // REQ-COR-05 — ouvre la boucle /sync, du long-polling HTTP.
+  // ouvre la boucle /sync, du long-polling HTTP.
   await client.startClient({ initialSyncLimit: 20 });
 
   /*
-   * REQ-UI-17 — **forcer l'écriture du store quand la page s'en va.**
+   * **forcer l'écriture du store quand la page s'en va.**
    *
    * `IndexedDBStore` du SDK n'écrit son accumulateur de sync qu'une fois toutes les cinq
    * minutes (`WRITE_DELAY_MS`). Tout ce qui est arrivé depuis la dernière écriture n'est
@@ -527,7 +527,7 @@ async function buildSession(
       };
     },
 
-    // REQ-COR-12 — prédicat, pas assertion : un salon dont on ne sait rien est traité
+    // prédicat, pas assertion : un salon dont on ne sait rien est traité
     // comme non chiffré. Le SDK peut lever si l'état n'est pas encore chargé, d'où le
     // `catch` — c'est le seul endroit où une exception vaut « je ne sais pas ».
     async isEncrypted(roomId) {
@@ -804,7 +804,7 @@ async function buildSession(
 
     confirmIdentityOf(userId) {
       // `pinCurrentUserIdentity` — « accepting it as genuine » côté SDK. C'est le geste
-      // qui rend effective la confirmation exigée par REQ-COR-07 ; sans lui, l'UI
+      // qui rend effective la confirmation exigée par ; sans lui, l'UI
       // pourrait détecter la réinitialisation sans jamais la lever.
       //
       // **Ce n'est pas un prédicat, et il ne rattrape rien.** Une confirmation qui
@@ -818,7 +818,7 @@ async function buildSession(
       wipes.set(name, wipe);
     },
 
-    // REQ-COR-10 — déconnexion = wipe complet : stores SDK + tout store applicatif
+    // déconnexion = wipe complet : stores SDK + tout store applicatif
     // enregistré. L'effacement local ne dépend d'aucune réussite réseau, et l'échec
     // d'un store n'empêche pas les autres d'être effacés.
     async logout() {
@@ -827,7 +827,7 @@ async function buildSession(
       globalThis.removeEventListener?.("pagehide", persister);
       globalThis.document?.removeEventListener("visibilitychange", surVisibilite);
 
-      // REQ-COR-11 — les credentials partent en premier : si tout le reste échoue,
+      // les credentials partent en premier : si tout le reste échoue,
       // mieux vaut une session locale morte qu'un jeton qui survit à la déconnexion.
       try {
         await saved.clear();
@@ -874,7 +874,7 @@ async function relireIdentite(crypto: CryptoApi): Promise<void> {
 
 export async function initSession(config: SessionConfig): Promise<Session> {
   /*
-   * REQ-COR-08 — `loginWithPassword` est déprécié dans le SDK pour la même raison que
+   * `loginWithPassword` est déprécié dans le SDK pour la même raison que
    * `loginWithToken` l'était : il pose les credentials sur un client déjà construit, dont
    * la crypto n'a pas démarré avec la bonne identité d'appareil. On fait la requête sur un
    * client jetable, puis on construit le client définitif avec les credentials complets.
@@ -961,10 +961,10 @@ async function deverrouillerAvecMotDePasse(session: Session, motDePasse: string)
 }
 
 /**
- * REQ-COR-14 / D-14 — **la porte de secours : ouvrir une session avec la clé de
+ * / D-14 — **la porte de secours : ouvrir une session avec la clé de
  * récupération, quand le mot de passe est perdu.**
  *
- * C'est une mesure exceptionnelle et le produit la présente comme telle (spec 11). Elle
+ * C'est une mesure exceptionnelle et le produit la présente comme telle. Elle
  * existe parce que D-12 a fermé la seule autre issue : sans e-mail, sans SSO, et avec
  * `POST /account/password` bloqué au proxy, un mot de passe oublié faisait un compte mort
  * — et la clé de récupération, que l'utilisateur a pourtant en main, n'y pouvait rien.
@@ -1028,7 +1028,7 @@ export async function connexionParCle(
 
   /*
    * **Et on déverrouille dans la foulée.** Cet appareil est neuf, donc non signé : sans
-   * ce geste, la porte (spec 11) redemanderait aussitôt la clé qu'on vient de taper.
+   * ce geste, la porte redemanderait aussitôt la clé qu'on vient de taper.
    * Deux saisies du même secret à trente secondes d'intervalle, ce serait l'écran qui
    * demande à l'utilisateur de compenser une couture interne.
    */
@@ -1049,13 +1049,13 @@ export async function connexionParCle(
 }
 
 /**
- * REQ-COR-11 — rouvre la session précédente sans réseau : c'est ce qui rend
- * exploitables l'historique hors ligne (REQ-COR-03), la file d'envoi réhydratée
- * (spec 07) et l'index de recherche persisté (spec 09), qui survivent tous à un
+ * rouvre la session précédente sans réseau : c'est ce qui rend
+ * exploitables l'historique hors ligne, la file d'envoi réhydratée
+ * et l'index de recherche persisté, qui survivent tous à un
  * rechargement mais qu'aucun chemin ne savait rouvrir.
  *
  * `null` n'est pas une erreur : c'est « aucune session locale, passe par l'OIDC »
- * (spec 11). Le jeton n'est pas validé ici — le valider demanderait le réseau, ce que
+ * Le jeton n'est pas validé ici — le valider demanderait le réseau, ce que
  * cette fonction existe précisément pour éviter. Un jeton révoqué se manifeste par un
  * `M_UNKNOWN_TOKEN` au premier appel, que le shard UI route vers l'OIDC.
  */
@@ -1070,7 +1070,7 @@ export async function restoreSession(
     const session = await buildSession(credentials, config, saved);
 
     /*
-     * REQ-UIX-06 — **valider le jeton avant de rendre la session.**
+     * **valider le jeton avant de rendre la session.**
      *
      * Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée,
      * et l'application se rouvrait entièrement — liste des conversations comprise. Les
@@ -1081,7 +1081,7 @@ export async function restoreSession(
      * `whoami` est la question exacte, et sa réponse distingue les deux cas qui comptent :
      * un `M_UNKNOWN_TOKEN` est un refus, tout le reste est un serveur qu'on n'atteint pas.
      * Traiter le second comme le premier jetterait dehors quelqu'un qui a seulement perdu
-     * le réseau — ce que REQ-UI-17 promet précisément de ne pas faire.
+     * le réseau — ce que promet précisément de ne pas faire.
      */
     try {
       await session.client.whoami();
@@ -1109,7 +1109,7 @@ export async function restoreSession(
     //
     // Mais un `null` muet est indiagnosticable : côté appelant il ne se distingue
     // pas d'un premier lancement. On journalise la raison — c'est un message
-    // d'erreur technique, jamais du contenu déchiffré (REQ-COR-09).
+    // d'erreur technique, jamais du contenu déchiffré.
     createLogger().error("reprise de session impossible, retour à l'OIDC", {
       raison: error instanceof Error ? error.message : "erreur inconnue",
     });
@@ -1118,7 +1118,7 @@ export async function restoreSession(
 }
 
 /**
- * REQ-UIX-06 / REQ-COR-11 — **un jeton révoqué doit sortir de la session, pas la hanter.**
+ * **un jeton révoqué doit sortir de la session, pas la hanter.**
  *
  * Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée —
  * l'application se rouvrait normalement et continuait de rendre une session morte. Rien
@@ -1130,7 +1130,7 @@ export async function restoreSession(
  * pas : c'est exactement la distinction qui manquait, et sans elle on jetait dehors
  * quelqu'un qui n'avait perdu que sa connexion.
  *
- * Le wipe reste celui de REQ-COR-10 : ce n'est pas à l'appelant de le réinventer.
+ * Le wipe reste celui de : ce n'est pas à l'appelant de le réinventer.
  */
 export function onSessionInvalidee(session: Session, rappel: () => void): () => void {
   const surRefus = (): void => {
@@ -1145,11 +1145,11 @@ export function onSessionInvalidee(session: Session, rappel: () => void): () => 
 }
 
 /**
- * REQ-COR-08 / REQ-INF-04 — **créer un compte**, un identifiant et un mot de passe.
+ * **créer un compte**, un identifiant et un mot de passe.
  *
  * `registration_requires_token` a été retiré du serveur (D-13) : il n'y a plus de code
  * d'invitation à saisir, et donc plus rien à demander hors de l'app. Ce que ça expose est
- * assumé et écrit dans `infra/LIMITES.md` — le client n'a rien à en compenser.
+ * assumé — le client n'a rien à en compenser.
  *
  * L'UIA reste : le protocole veut une première requête sans `auth`, qui prend un 401
  * portant la `session`, puis un rejeu par stage. On ne devine pas la session — on la lit

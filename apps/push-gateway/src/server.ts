@@ -12,12 +12,12 @@ export function createGateway(vapidPublicKey: string) {
   return createServer((req, res) => {
     const json = (status: number, body: unknown) => {
       res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
-      // REQ-PSH-04 : méthode, chemin, statut. Jamais le corps de la requête.
+      // méthode, chemin, statut. Jamais le corps de la requête.
       console.info("request", { method: req.method, url: req.url, status });
     };
 
     if (req.method === "GET" && req.url === "/config") {
-      // REQ-PSH-03 : clé publique VAPID, seule valeur nécessaire au client pour s'abonner.
+      // clé publique VAPID, seule valeur nécessaire au client pour s'abonner.
       return json(200, { vapid_public_key: vapidPublicKey });
     }
 

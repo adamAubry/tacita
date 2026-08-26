@@ -14,7 +14,7 @@ interface MembresGroupeProps {
 }
 
 /**
- * REQ-UIX-34 / REQ-MSG-11 — la liste des membres d'un groupe, avec l'exclusion **là où
+ * la liste des membres d'un groupe, avec l'exclusion **là où
  * elle est permise**.
  *
  * « Les boutons non autorisés n'apparaissent pas » (M-H) : pas d'item grisé, pas de
@@ -22,7 +22,7 @@ interface MembresGroupeProps {
  * boutons. Le droit vient du paquet (`canKick`), qui croise le seuil du salon et les
  * deux power levels — le shard ne le recalcule pas.
  *
- * Le power level est affiché **en nombre**, tel que Matrix le porte : la spec 05 refuse
+ * Le power level est affiché **en nombre**, tel que Matrix le porte : `@tacita/messaging` refuse
  * les rôles nommés, et inventer « modérateur » à l'affichage serait la même invention un
  * cran plus bas.
  *

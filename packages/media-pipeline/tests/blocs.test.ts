@@ -28,7 +28,7 @@ const sourceDe = (ciphertext: Bytes): SourceChiffree => ({
   tranche: async (debut, fin) => ciphertext.subarray(debut, fin) as Bytes,
 });
 
-describe("REQ-MED-08 (b) — hachage par blocs : chaque octet servi a été vérifié", () => {
+describe(" (b) — hachage par blocs : chaque octet servi a été vérifié", () => {
   it("une plage se déchiffre à l'identique du fichier entier", async () => {
     const octets = clair(200);
     const { ciphertext, keys } = await encryptAttachment(octets, env);

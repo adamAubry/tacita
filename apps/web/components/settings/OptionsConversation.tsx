@@ -3,7 +3,7 @@
 import { OptionCard } from "../foundation/OptionCard";
 
 /**
- * REQ-UIX-34 — les options d'une conversation.
+ * les options d'une conversation.
  *
  * **« Messages éphémères » n'existe pas** : E-03 l'a abandonné, pas reporté (D-09). Il
  * est donc absent du DOM, et surtout pas grisé — une option grisée est une promesse non
@@ -14,7 +14,7 @@ export type OptionConversation = "theme" | "notifications" | "groupe" | "lien" |
 
 interface OptionsConversationProps {
   direct: boolean;
-  /** REQ-UIX-36 — l'état courant se lit sous l'option, sans avoir à l'ouvrir. */
+  /** l'état courant se lit sous l'option, sans avoir à l'ouvrir. */
   niveauLibelle: string;
   onOuvrir: (option: OptionConversation) => void;
 }
@@ -26,12 +26,12 @@ interface Carte {
 }
 
 /**
- * REQ-UIX-34 — composant 15 du wireframe : les Options, en `OptionCard`.
+ * composant 15 du wireframe : les Options, en `OptionCard`.
  *
  * Deux jeux, une seule liste : les variations sont des props, jamais des copies (règle
  * du plan frontend). Ce qui change entre 1:1 et groupe est l'appartenance à la liste,
  * pas le rendu d'une carte — lequel vit dans `OptionCard`, partagé avec les réglages de
- * l'application (REQ-UIX-31), qui posent exactement la même carte.
+ * l'application, qui posent exactement la même carte.
  */
 export function OptionsConversation({
   direct,

@@ -16,7 +16,7 @@ interface DemandesProps {
 }
 
 /**
- * REQ-UIX-29 — Friend request.
+ * Friend request.
  *
  * **Les deux réponses sont optimistes** : la ligne disparaît au clic, avant la
  * confirmation du serveur. Une demande sur laquelle on vient de statuer n'a plus rien à

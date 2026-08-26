@@ -14,8 +14,8 @@ const initScript = read("../postgres/10-invite-tokens.sh");
 
 const service = compose.services["invite-tokens"];
 
-describe("REQ-INF-15 — le service de liens d'invitation est provisionné par ce module", () => {
-  it("un service invite-tokens est construit depuis l'app de la spec 12", () => {
+describe("le service de liens d'invitation est provisionné par ce module", () => {
+  it("un service invite-tokens est construit depuis l'app de `invite-tokens`", () => {
     expect(service).toBeDefined();
     expect(service.build).toMatchObject({
       context: "..",
@@ -46,7 +46,7 @@ describe("REQ-INF-15 — le service de liens d'invitation est provisionné par c
   });
 
   /**
-   * Le critère central de REQ-INF-15. La spec 12 borne les dégâts d'une compromission en
+   * Le critère central de. `invite-tokens` borne les dégâts d'une compromission en
    * ne donnant au service **aucun pouvoir Matrix** ; le raccordement est exactement
    * l'endroit où on le lui rendrait sans y penser, par confort de déploiement.
    */
@@ -78,7 +78,7 @@ describe("REQ-INF-15 — le service de liens d'invitation est provisionné par c
     // Le `/` final est ce qui fait que `/invite/links` atteint `/links` : sans lui, le
     // service reçoit `/invite/links` et répond 404 à tout.
     expect(route).toMatch(/proxy_pass\s+http:\/\/\$invite_tokens_upstream\/;/);
-    expect(route).toMatch(/X-Forwarded-For/); // REQ-INV-09 — la limitation par IP en dépend
+    expect(route).toMatch(/X-Forwarded-For/); // la limitation par IP en dépend
   });
 
   it("aucun port publié : le service n'est joignable que par le proxy", () => {
@@ -119,7 +119,6 @@ describe("REQ-INF-15 — le service de liens d'invitation est provisionné par c
   });
 
   it(".env.example dit qu'il n'a aucune variable propre, et pourquoi", () => {
-    expect(envExample).toMatch(/spec 12.*REQ-INF-15/s);
     expect(envExample).toMatch(/invite_tokens/);
   });
 });

@@ -1,14 +1,14 @@
 import type { Bytes } from "./attachments";
 
 /**
- * REQ-MED-16 — **le cache de ciphertext, et rien d'autre que du ciphertext.**
+ * **le cache de ciphertext, et rien d'autre que du ciphertext.**
  *
  * Ouvrir puis refermer trois fois la même vidéo, c'était trois téléchargements et trois
  * déchiffrements complets. Un `mxc://` désigne un blob immuable : ce qui a été téléchargé
  * une fois n'a aucune raison de l'être à nouveau.
  *
  * **Le clair ne touche jamais ce store**, ni aucun autre stockage persistant (interdit
- * n°8, REQ-MED-10). Le chiffré, lui, est inerte sans les clés Megolm — ce n'est pas une
+ * n°8). Le chiffré, lui, est inerte sans les clés Megolm — ce n'est pas une
  * fuite de contenu. Ça reste une trace de qui a échangé quoi et quand sur une machine
  * partagée, et c'est pour ça que le store s'inscrit au registre de wipe.
  */
@@ -38,7 +38,7 @@ interface Entree {
 export interface CacheChiffre {
   lire(url: string): Promise<Bytes | undefined>;
   ecrire(url: string, octets: Bytes): Promise<void>;
-  /** REQ-COR-10 — ce que la déconnexion appelle. */
+  /** ce que la déconnexion appelle. */
   vider(): Promise<void>;
   fermer(): void;
 }

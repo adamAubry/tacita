@@ -42,7 +42,7 @@ export const useModeTheme = () => useContext(ContexteTheme);
 export function Providers({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>(MODE_DEFAUT);
 
-  // REQ-UI-03 — réhydratation depuis IndexedDB. Asynchrone par nature : le premier
+  // réhydratation depuis IndexedDB. Asynchrone par nature : le premier
   // rendu se fait au défaut, ce qui est assumé (M-A). Un échec de lecture n'est pas une
   // panne : on reste au défaut plutôt que de bloquer l'app sur un réglage d'apparence.
   useEffect(() => {
@@ -82,17 +82,17 @@ export function Providers({ children }: { children: ReactNode }) {
             background: "var(--color-background-body)",
           }}
         >
-          {/* REQ-UI-04 — la porte est **dans** le thème et **autour** de tout le contenu :
+          {/* la porte est **dans** le thème et **autour** de tout le contenu :
             aucune route ne rend quoi que ce soit tant que la clé n'est pas confirmée. */}
-          {/* REQ-UI-17 / REQ-UIX-04 — au-dessus de tout, porte de récupération comprise :
+          {/* au-dessus de tout, porte de récupération comprise :
             perdre le réseau pendant l'onboarding mérite la même explication qu'ailleurs. */}
           <ConnectionBannerLive />
           <SessionProvider homeserverUrl={HOMESERVER}>
-            {/* REQ-OBX-01 — la file d'envoi est **au-dessus** de la porte et des écrans :
+            {/* la file d'envoi est **au-dessus** de la porte et des écrans :
               ce qui a été écrit doit partir à la reconnexion quel que soit l'écran ouvert,
               y compris quand aucune conversation n'est affichée. */}
             <OutboxProvider>
-              {/* REQ-SRC-01 — l'index de recherche est **au-dessus des écrans**, pour la
+              {/* l'index de recherche est **au-dessus des écrans**, pour la
                 même raison que la file : il n'indexe que ce qui se déchiffre pendant
                 qu'il est branché, et branché à l'ouverture d'un onglet il ne voyait
                 jamais passer un message. */}
@@ -100,7 +100,7 @@ export function Providers({ children }: { children: ReactNode }) {
                 <RecoveryGate>{children}</RecoveryGate>
               </RechercheProvider>
             </OutboxProvider>
-            {/* REQ-UI-18 — la chaîne push est **hors** de la porte de récupération : elle
+            {/* la chaîne push est **hors** de la porte de récupération : elle
               ne rend rien tant qu'un message n'est pas arrivé, et elle doit pouvoir
               répondre au service worker quel que soit l'écran affiché. */}
             <PushNotifications />

@@ -34,19 +34,19 @@ interface SearchBarProps {
   /** Ce qui alimente les filtres « personne » et « conversation ». */
   contacts: readonly Contact[];
   salons: readonly { roomId: string; nom: string }[];
-  /** REQ-UI-16 — les bornes réellement couvertes. `null` tant que `stats()` n'a pas rendu. */
+  /** les bornes réellement couvertes. `null` tant que `stats()` n'a pas rendu. */
   stats: SearchStats | null;
   /** Nombre de résultats courants, affiché par la primitive. */
   resultats?: number;
   hasAutoFocus?: boolean;
-  /** REQ-UIX-21 — l'onglet Mentions : un token `@me` pré-armé et non retirable. */
+  /** l'onglet Mentions : un token `@me` pré-armé et non retirable. */
   mentionFixe?: boolean;
 }
 
 /**
- * REQ-UI-16 — la barre de recherche globale, et **le périmètre dit sous elle**.
+ * la barre de recherche globale, et **le périmètre dit sous elle**.
  *
- * Les tokens de la primitive sont configurés ici, un par critère de REQ-SRC-11 : chaque
+ * Les tokens de la primitive sont configurés ici, un par critère de : chaque
  * filtre de l'UI a un critère d'index correspondant, et aucun ne se replie sur du
  * plein-texte (E-01). Le champ libre est `texte` — `contentSearchFieldKey` route la
  * saisie non structurée vers lui.

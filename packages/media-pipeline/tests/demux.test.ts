@@ -27,7 +27,7 @@ const echantillons = (nombre = 30): EchantillonVideo[] =>
     cle: rang % 15 === 0,
   }));
 
-describe("REQ-MED-04 — démuxage : ce qu'une bibliothèque indépendante lit de notre conteneur", () => {
+describe("démuxage : ce qu'une bibliothèque indépendante lit de notre conteneur", () => {
   it("relit les dimensions, le codec, la durée et tous les échantillons", async () => {
     const fichier = ecrireMp4({ largeur: 640, hauteur: 360, description: DESCRIPTION, echantillons: echantillons() });
     const source = await lireMp4(fichier);
@@ -59,7 +59,7 @@ describe("REQ-MED-04 — démuxage : ce qu'une bibliothèque indépendante lit d
     expect([...source.description]).toEqual([...DESCRIPTION]);
   });
 
-  /** REQ-MED-14 — l'aller-retour de la rotation, le seul garde-fou sans navigateur. */
+  /** l'aller-retour de la rotation, le seul garde-fou sans navigateur. */
   it.each([0, 90, 180, 270] as const)("la rotation %s survit à l'écriture puis à la relecture", async (rotation) => {
     const fichier = ecrireMp4({
       largeur: 640,
@@ -84,7 +84,7 @@ describe("REQ-MED-04 — démuxage : ce qu'une bibliothèque indépendante lit d
   });
 });
 
-describe("REQ-MED-04 — `ctts` : l'ordre de présentation survit aux images B", () => {
+describe("`ctts` : l'ordre de présentation survit aux images B", () => {
   /**
    * Prérequis bloquant du profil High. Sans la table, un lecteur affiche les images dans
    * l'ordre où elles sont rangées, et la vidéo saute en arrière à chaque groupe.
@@ -122,7 +122,7 @@ describe("REQ-MED-04 — `ctts` : l'ordre de présentation survit aux images B",
   });
 });
 
-describe("REQ-MED-04 — faststart : `moov` avant `mdat`", () => {
+describe("faststart : `moov` avant `mdat`", () => {
   const positionDe = (fichier: Bytes, type: string): number =>
     new TextDecoder("latin1").decode(fichier).indexOf(type);
 
@@ -164,7 +164,7 @@ describe("REQ-MED-04 — faststart : `moov` avant `mdat`", () => {
 });
 
 /**
- * REQ-MED-13 — **la seconde piste, de bout en bout.**
+ * **la seconde piste, de bout en bout.**
  *
  * L'`esds` est fabriqué ici à la main parce qu'aucun encodeur n'existe dans Node : ce que
  * le test prouve, c'est que le muxeur écrit une piste sonore qu'une implémentation
@@ -172,7 +172,7 @@ describe("REQ-MED-04 — faststart : `moov` avant `mdat`", () => {
  * pistes entrelacées. Ce qu'il ne prouve pas — qu'un lecteur réel rende le son — se mesure
  * au navigateur et se consigne avec sa date.
  */
-describe("REQ-MED-13 — piste audio : recopiée, entrelacée, relue", () => {
+describe("piste audio : recopiée, entrelacée, relue", () => {
   /** Un `esds` minimal mais conforme : ES → DecoderConfig → AudioSpecificConfig AAC-LC. */
   const ESDS = new Uint8Array([
     0, 0, 0, 0x27, ...[..."esds"].map((c) => c.charCodeAt(0)),

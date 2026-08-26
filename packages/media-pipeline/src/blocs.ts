@@ -7,7 +7,7 @@ import {
 } from "./attachments";
 
 /**
- * REQ-MED-08, mécanisme (b) — **le hachage par blocs, et la lecture qu'il autorise.**
+ * mécanisme (b) — **le hachage par blocs, et la lecture qu'il autorise.**
  *
  * Le hash global exige le fichier entier avant qu'un seul octet ne soit déchiffré :
  * `crypto.subtle.digest` est one-shot. Pour 60 Mo reçus d'un client tiers, c'est plusieurs
@@ -19,7 +19,7 @@ import {
  *
  * **Le modèle de confiance ne change pas non plus** : la liste des empreintes voyage dans
  * le contenu de l'événement, donc sous Megolm, exactement comme `hashes.sha256`. Ce qui
- * authentifie reste l'enveloppe (voir la note de REQ-MED-08).
+ * authentifie reste l'enveloppe.
  */
 
 /** 1 MiB : un multiple de 16 — donc alignable sur les blocs AES — et une seconde de vidéo. */
@@ -34,7 +34,7 @@ export const TAILLE_BLOC = 1024 * 1024;
  */
 export const CHAMP_BLOCS = "org.tacita.media.block_sha256";
 
-/** REQ-MED-08 — une empreinte par bloc de chiffré, dans l'ordre du fichier. */
+/** une empreinte par bloc de chiffré, dans l'ordre du fichier. */
 export async function hachesParBloc(
   ciphertext: Bytes,
   subtle: SubtleCrypto,
@@ -58,7 +58,7 @@ export interface SourceChiffree {
 }
 
 /**
- * REQ-MED-08 — **déchiffre une plage, en n'ayant vérifié que ce qu'elle traverse.**
+ * **déchiffre une plage, en n'ayant vérifié que ce qu'elle traverse.**
  *
  * Chaque bloc couvert est haché puis comparé **avant** d'être déchiffré ; un bloc invalide
  * lève, et rien de ce bloc ni des suivants n'est rendu. La plage demandée est ensuite
@@ -66,7 +66,7 @@ export interface SourceChiffree {
  *
  * AES-CTR n'est pas chaîné : un bloc se déchiffre depuis son seul compteur, ce qui rend
  * l'accès par plage possible. C'est la même propriété que le téléchargement par tranches
- * de REQ-MED-15, appliquée cette fois à la lecture.
+ * de, appliquée cette fois à la lecture.
  */
 export async function dechiffrerPlage(
   source: SourceChiffree,

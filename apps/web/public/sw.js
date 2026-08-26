@@ -1,5 +1,5 @@
 /*
- * REQ-UI-01 — service worker de **coquille applicative**, et rien d'autre.
+ * service worker de **coquille applicative**, et rien d'autre.
  *
  * Interdit n°8 : aucun contenu déchiffré dans le cache du service worker, y compris en
  * développement. Ici, la règle est tenue par construction plutôt que par vigilance :
@@ -52,7 +52,7 @@ self.addEventListener("activate", (event) => {
 });
 
 /**
- * REQ-MED-08 (b) — le préfixe des URL virtuelles de lecture progressive.
+ * (b) — le préfixe des URL virtuelles de lecture progressive.
  *
  * **Ce worker ne déchiffre rien et ne détient aucune clé.** Il demande les octets à une
  * fenêtre vivante, qui vérifie le bloc et le déchiffre. C'est la forme la plus forte des
@@ -118,14 +118,14 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(requete.url);
   const memeOrigine = url.origin === self.location.origin;
 
-  // REQ-MED-08 (b) — la lecture progressive, avant toute considération de cache : ce
+  // (b) — la lecture progressive, avant toute considération de cache : ce
   // chemin ne passe **jamais** par `caches`, ni en lecture ni en écriture.
   if (memeOrigine && url.pathname.startsWith(PREFIXE_MEDIA)) {
     event.respondWith(servirMedia(requete, url.pathname.slice(PREFIXE_MEDIA.length)));
     return;
   }
 
-  // Seuls les assets versionnés du build entrent au cache. Le test de REQ-UI-01 relit
+  // Seuls les assets versionnés du build entrent au cache. Le test de relit
   // cette condition : l'élargir est ce qui ferait entrer des données utilisateur.
   const cachable = memeOrigine && requete.method === "GET" && url.pathname.startsWith("/_next/static/");
 
@@ -146,7 +146,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // REQ-UI-17 — hors ligne, une navigation retombe sur la coquille précachée : l'app
+  // hors ligne, une navigation retombe sur la coquille précachée : l'app
   // s'ouvre et lit son historique local au lieu d'afficher le dinosaure du navigateur.
   if (requete.mode === "navigate") {
     // `ignoreSearch` : `/c?room=!salon` doit retrouver la coquille précachée `/c`. Sans
@@ -164,9 +164,9 @@ self.addEventListener("fetch", (event) => {
 });
 
 /*
- * REQ-UI-18 / REQ-UIX-40 — les notifications.
+ * les notifications.
  *
- * Le payload reçu ne porte que `{event_id, room_id}` (REQ-PSH-02) : le serveur n'a
+ * Le payload reçu ne porte que `{event_id, room_id}` : le serveur n'a
  * jamais rien d'autre à donner. Le contenu, lui, se déchiffre **ici**, au sens de « sur
  * cet appareil » — mais pas dans ce fichier : les clés Megolm vivent dans le store
  * crypto d'une fenêtre, hors de portée du service worker. Une fenêtre ouverte est donc
@@ -244,7 +244,7 @@ self.addEventListener("push", (event) => {
      * diagnostiquer.
      *
      * Le cas ne devrait pas se produire : la passerelle n'émet **rien** sans `event_id`
-     * ni `room_id` (REQ-PSH-01), badges de Synapse compris. S'il se produit quand même,
+     * ni `room_id`, badges de Synapse compris. S'il se produit quand même,
      * c'est un réveil dont on ne sait rien dire — et « Nouveau message » est alors plus
      * vrai que le silence.
      */
@@ -258,7 +258,7 @@ self.addEventListener("push", (event) => {
     demanderApercu(roomId, charge.event_id)
       .catch(() => null)
       .then((apercu) =>
-        // REQ-UIX-40 — clés absentes, événement pas encore synchronisé, aucune fenêtre
+        // clés absentes, événement pas encore synchronisé, aucune fenêtre
         // ouverte : notification **générique**, sans contenu et sans erreur bruyante.
         self.registration.showNotification(
           apercu ? apercu.expediteur : "Nouveau message",
@@ -274,7 +274,7 @@ self.addEventListener("notificationclick", (event) => {
   if (!roomId) return;
 
   // Même gabarit que `lib/routes.ts`, recopié parce qu'un service worker n'importe pas
-  // le bundle de l'app. Le test de REQ-UI-18 compare les deux : c'est lui qui tient la
+  // le bundle de l'app. Le test de compare les deux : c'est lui qui tient la
   // paire, pas la vigilance.
   const cible = `/c?room=${encodeURIComponent(roomId)}`;
   event.waitUntil(

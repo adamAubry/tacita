@@ -21,9 +21,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 /**
- * Les paquets 04–10 sont mockés à leurs interfaces (spec 11). Ce fichier en voit plus
- * qu'avant : le parcours d'accueil traverse le profil (REQ-MSG-18/22), la création de la
- * conversation personnelle (REQ-MSG-02/15) et la chaîne push.
+ * Les paquets 04–10 sont mockés à leurs interfaces. Ce fichier en voit plus
+ * qu'avant : le parcours d'accueil traverse le profil, la création de la
+ * conversation personnelle et la chaîne push.
  */
 const profil = vi.fn(async (_session: unknown, userId: string) => ({
   userId,
@@ -81,7 +81,7 @@ vi.mock("@tacita/client-core", async (original) => ({
 /**
  * `asSession` de `client-core/testing` plutôt qu'un `as unknown as Session` : un membre
  * ajouté au contrat de `Session` doit casser la compilation d'un seul fichier, pas
- * disparaître en `undefined is not a function` à l'exécution (specs/00-conventions.md).
+ * disparaître en `undefined is not a function` à l'exécution.
  */
 function fausseSession(options: { recuperation?: RecoveryState } = {}) {
   const setupRecoveryKey = vi.fn(
@@ -122,7 +122,7 @@ const monter = (
   );
 };
 
-/** REQ-UI-22 — franchir l'étape bloquante, qui est la première du parcours. */
+/** franchir l'étape bloquante, qui est la première du parcours. */
 const franchirLaCle = async () => {
   await waitFor(() => expect(screen.getByText("Continuer")).toBeTruthy());
   fireEvent.click(screen.getByText("Continuer"));
@@ -152,7 +152,7 @@ afterEach(() => {
   updateProfile.mockClear();
 });
 
-describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () => {
+describe("l'étape de clé de récupération est bloquante", () => {
   it("tant que la récupération est requise, aucun contenu d'app n'est rendu", async () => {
     const { session } = fausseSession({ recuperation: "creation" });
     monter(session);
@@ -190,7 +190,7 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
 
     /*
      * La confirmation ne rend plus l'app : elle rend l'étape suivante du parcours
-     * (REQ-UI-22). Ce qu'elle libère est le chiffrement, pas la porte — et la porte reste
+     * Ce qu'elle libère est le chiffrement, pas la porte — et la porte reste
      * fermée jusqu'au bout du parcours, qui se termine dans une conversation ouverte.
      */
     fireEvent.click(screen.getByText("J'ai sauvegardé ma clé"));
@@ -254,7 +254,7 @@ describe("REQ-UI-04 — l'étape de clé de récupération est bloquante", () =>
   });
 });
 
-describe("REQ-UIX-06 — reprise de session, connexion, déconnexion", () => {
+describe("reprise de session, connexion, déconnexion", () => {
   it("une session valide arrive directement sur le contenu", async () => {
     const { session } = fausseSession();
     monter(session);
@@ -336,7 +336,7 @@ describe("REQ-UIX-06 — reprise de session, connexion, déconnexion", () => {
   });
 });
 
-describe("REQ-UI-18 — éducation iOS, au bon moment et une seule fois", () => {
+describe("éducation iOS, au bon moment et une seule fois", () => {
   const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15";
 
   const simuler = (userAgent: string, standalone: boolean) => {
@@ -390,7 +390,7 @@ describe("REQ-UI-18 — éducation iOS, au bon moment et une seule fois", () => 
   });
 });
 
-describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé, elle n'en refait pas une", () => {
+describe("à la reconnexion, la porte demande la clé, elle n'en refait pas une", () => {
   const saisir = (valeur: string) =>
     fireEvent.change(screen.getByLabelText(/Clé de récupération/), { target: { value: valeur } });
 
@@ -473,7 +473,7 @@ describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé,
   /*
    * La ré-authentification que Synapse exige pour **remplacer** une identité cross-signing
    * (v1.155.0 : le premier dépôt passe sans UIA, pas le second). Sans mot de passe natif
-   * (REQ-INF-09), elle se joue chez Keycloak, dans une fenêtre, et se termine par un
+   * elle se joue chez Keycloak, dans une fenêtre, et se termine par un
    * `postMessage` de la page de repli du serveur.
    *
    * Le défaut du 09/08/2026 : rien de tout ça n'existait. L'écran appelait, prenait un 401
@@ -545,7 +545,7 @@ describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé,
     expect(screen.getByText("Créer une nouvelle clé")).toBeTruthy();
   });
 
-  it("hors ligne, un appareil déjà signé n'a plus rien à prouver : REQ-UI-17 tient", async () => {
+  it("hors ligne, un appareil déjà signé n'a plus rien à prouver : tient", async () => {
     // Mesuré au navigateur le 08/08/2026 : sans réseau, « une sauvegarde est-elle
     // active ? » rendait `true` pour un compte parfaitement configuré, et la porte —
     // qui *remplace* l'app — emportait l'historique promis consultable. `recoveryState()`
@@ -558,7 +558,7 @@ describe("REQ-UI-04 / REQ-UI-17 — à la reconnexion, la porte demande la clé,
   });
 });
 
-describe("REQ-UI-22 — le parcours d'accueil, de la clé au premier message", () => {
+describe("le parcours d'accueil, de la clé au premier message", () => {
   it("enchaîne ses étapes et n'ouvre l'application qu'à la fin", async () => {
     const { session } = fausseSession({ recuperation: "creation" });
     monter(session);
@@ -723,7 +723,7 @@ describe("REQ-UI-22 — le parcours d'accueil, de la clé au premier message", (
   });
 });
 
-describe("REQ-UI-23 — la première conversation, pour que l'application ne s'ouvre pas vide", () => {
+describe("la première conversation, pour que l'application ne s'ouvre pas vide", () => {
   const allerAuBout = async () => {
     await franchirLaCle();
     await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
@@ -784,7 +784,7 @@ describe("REQ-UI-23 — la première conversation, pour que l'application ne s'o
   });
 });
 
-describe("REQ-UI-04 — l'écran de connexion dit ce que le serveur a fait, pas autre chose", () => {
+describe("l'écran de connexion dit ce que le serveur a fait, pas autre chose", () => {
   /*
    * **Défaut vécu le 25/08/2026, juste après D-13.** Le serveur tournait encore sur sa
    * configuration d'avant et redemandait un code d'invitation ; l'écran affichait « Le
@@ -801,7 +801,7 @@ describe("REQ-UI-04 — l'écran de connexion dit ce que le serveur a fait, pas 
     fireEvent.click(screen.getByText("Créer un compte"));
 
     fireEvent.change(screen.getByLabelText("Identifiant"), { target: { value: "mira" } });
-    // Douze caractères au moins : le plancher de REQ-INF-20 vaut aussi pour les tests,
+    // Douze caractères au moins : le plancher de vaut aussi pour les tests,
     // sinon ils prouvent le refus du garde et rien du chemin qu'ils visent.
     fireEvent.change(screen.getByLabelText("Mot de passe"), {
       target: { value: "un-mot-de-passe-assez-long" },
@@ -809,7 +809,7 @@ describe("REQ-UI-04 — l'écran de connexion dit ce que le serveur a fait, pas 
     fireEvent.click(screen.getByText("Créer mon compte"));
   };
 
-  it("REQ-INF-20 — un mot de passe trop court est refusé avant d'être envoyé", async () => {
+  it("un mot de passe trop court est refusé avant d'être envoyé", async () => {
     /*
      * **Mesuré le 25/08/2026 : un compte s'était créé avec le mot de passe « a ».** Le
      * plancher existait dans le module de changement et dans son écran — c'est-à-dire
@@ -867,7 +867,7 @@ describe("REQ-UI-04 — l'écran de connexion dit ce que le serveur a fait, pas 
   });
 });
 
-describe("REQ-UI-24 — la clé de récupération ouvre une session, en dernier recours (D-14)", () => {
+describe("la clé de récupération ouvre une session, en dernier recours (D-14)", () => {
   /*
    * D-12 a fermé la seule autre issue : ni e-mail ni SSO sur ce déploiement, et le
    * changement de mot de passe exige déjà la clé. Sans cette porte, un mot de passe oublié

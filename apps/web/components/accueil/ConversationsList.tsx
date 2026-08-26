@@ -10,7 +10,7 @@ export type Tri = "recentes" | "anciennes";
 
 interface ConversationsListProps {
   conversations: Conversation[];
-  /** Skeletons tant que le premier /sync n'a rien rendu (REQ-UIX-04). */
+  /** Skeletons tant que le premier /sync n'a rien rendu. */
   chargement?: boolean;
   tri?: Tri;
   onOuvrir: (roomId: string) => void;
@@ -34,7 +34,7 @@ export function ordonner(conversations: Conversation[], tri: Tri): Conversation[
 }
 
 /**
- * REQ-UI-05 — la liste des conversations (composant 3).
+ * la liste des conversations (composant 3).
  *
  * ponytail: rendu intégral, sans virtualisation. Astryx `0.2.0` n'expose aucune liste
  * virtualisée (ses 123 sous-chemins ont été relus) et la contrainte M-C prévoyait ce

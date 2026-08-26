@@ -6,7 +6,7 @@
  * *dynamique*. Next va chercher sa charge RSC sur le réseau à chaque navigation, et le
  * service worker ne peut pas précacher un ensemble d'URL non borné. Hors ligne, le
  * résultat était sans appel — la conversation apparaissait dans la liste, et rester
- * dessus était tout ce qu'on pouvait faire : ni l'ouvrir, ni recharger son lien. REQ-UI-17
+ * dessus était tout ce qu'on pouvait faire : ni l'ouvrir, ni recharger son lien.
  * promet l'historique consultable sans réseau ; il ne l'était qu'avant le premier
  * rechargement.
  *
@@ -22,6 +22,6 @@ export const routeConversation = (roomId: string, eventId?: string) =>
 
 export const routeInfos = (roomId: string) => avecSalon("/c/infos", roomId);
 
-/** REQ-UI-19 — l'écran d'appel (M-I). `video=1` distingue vidéo de voix. */
+/** l'écran d'appel (M-I). `video=1` distingue vidéo de voix. */
 export const routeAppel = (roomId: string, video = false) =>
   avecSalon("/c/appel", roomId, video ? "&video=1" : "");

@@ -1,5 +1,5 @@
 {
-  "_commentaire": "REQ-RTC-08 — config d'Element Call v0.23.0, dérivée de config/config.sample.json de cette version (relue le 2026-08-07). __SERVER_NAME__ est substitué au démarrage par l'entrypoint de l'overlay. Aucun secret : ces valeurs sont publiques dès le premier appel réseau du client.",
+  "_commentaire": "config d'Element Call v0.23.0, dérivée de config/config.sample.json de cette version (relue le 2026-08-07). __SERVER_NAME__ est substitué au démarrage par l'entrypoint de l'overlay. Aucun secret : ces valeurs sont publiques dès le premier appel réseau du client.",
 
   "default_server_config": {
     "m.homeserver": {

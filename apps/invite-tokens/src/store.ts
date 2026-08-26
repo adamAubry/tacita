@@ -1,7 +1,7 @@
 export type LinkKind = "friend" | "group";
 
 /**
- * REQ-INV-18 — tout ce que le service retient d'un lien. Aucun nom d'affichage, aucun
+ * tout ce que le service retient d'un lien. Aucun nom d'affichage, aucun
  * libellé de salon, aucun contenu : ce qui n'est pas là ne peut pas fuiter.
  */
 export interface Link {
@@ -9,7 +9,7 @@ export interface Link {
   issuer: string;
   kind: LinkKind;
   roomId: string | null;
-  /** Epoch ms. Comparé à l'horloge du serveur, jamais à une date fournie (REQ-INV-17). */
+  /** Epoch ms. Comparé à l'horloge du serveur, jamais à une date fournie. */
   expiresAt: number;
   usesLeft: number;
 }
@@ -25,30 +25,30 @@ export interface NewLink {
 
 export interface Found {
   link: Link;
-  /** REQ-INV-13 — ce porteur a déjà résolu ce lien : la reprise ne consomme rien. */
+  /** ce porteur a déjà résolu ce lien : la reprise ne consomme rien. */
   repeated: boolean;
 }
 
 export interface Store {
   create(link: NewLink): Promise<Link>;
-  /** REQ-INV-04 — les liens actifs d'un émetteur, jamais ceux d'un autre. */
+  /** les liens actifs d'un émetteur, jamais ceux d'un autre. */
   listByIssuer(issuer: string, now: number): Promise<Link[]>;
-  /** REQ-INV-05 — rend `false` si le lien n'est pas à cet émetteur : rien ne le distingue d'un lien inexistant. */
+  /** rend `false` si le lien n'est pas à cet émetteur : rien ne le distingue d'un lien inexistant. */
   revoke(id: string, issuer: string): Promise<boolean>;
-  /** Lecture seule : de quoi appliquer REQ-INV-12 à REQ-INV-15 **avant** de consommer. */
+  /** Lecture seule : de quoi appliquer à **avant** de consommer. */
   find(tokenHash: string, bearer: string, now: number): Promise<Found | undefined>;
-  /** REQ-INV-07 — décrément et lecture dans la même instruction. `undefined` = perdu ou épuisé. */
+  /** décrément et lecture dans la même instruction. `undefined` = perdu ou épuisé. */
   consume(tokenHash: string, bearer: string, now: number): Promise<Link | undefined>;
-  /** REQ-INV-18 — une trace de lien n'a aucune raison de survivre à sa validité. */
+  /** une trace de lien n'a aucune raison de survivre à sa validité. */
   purge(now: number): Promise<number>;
 }
 
 /**
- * REQ-INV-18 — le schéma **est** la liste de ce que le service sait. Y ajouter une
+ * le schéma **est** la liste de ce que le service sait. Y ajouter une
  * colonne, c'est ajouter à ce qu'une saisie de la base apprendrait : ça se discute avec
  * le PM, pas dans une migration.
  *
- * `link_resolutions` porte l'idempotence de REQ-INV-13 ; son unicité est ce qui fait
+ * `link_resolutions` porte l'idempotence de ; son unicité est ce qui fait
  * qu'une reprise ne consomme pas un second usage.
  */
 export const SCHEMA = `
@@ -85,7 +85,7 @@ const toLink = (row: Record<string, unknown>): Link => ({
 });
 
 /**
- * REQ-INV-07 — **une seule instruction** consomme. Un `SELECT` suivi d'un `UPDATE`
+ * **une seule instruction** consomme. Un `SELECT` suivi d'un `UPDATE`
  * laisserait deux porteurs franchir le dernier usage : entre les deux, chacun voit
  * `uses_left = 1`. Ici le garde `uses_left > 0` vit dans le `WHERE` de l'`UPDATE` ;
  * PostgreSQL réévalue la condition après avoir pris le verrou de ligne, donc le second
@@ -164,8 +164,8 @@ export function createPostgresStore(sql: Sql): Store {
     },
 
     /**
-     * REQ-INV-18 — **l'expiration seule** purge. Un lien épuisé reste jusqu'à sa date :
-     * c'est lui qui porte l'idempotence de REQ-INV-13, et l'effacer ferait échouer la
+     * **l'expiration seule** purge. Un lien épuisé reste jusqu'à sa date :
+     * c'est lui qui porte l'idempotence de, et l'effacer ferait échouer la
      * reprise d'un porteur qui rouvre son lien. Un lien révoqué part avec les autres à
      * son échéance ; `find` l'ignore déjà, il n'est joignable par personne entre-temps.
      */

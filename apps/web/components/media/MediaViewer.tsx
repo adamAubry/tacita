@@ -26,19 +26,19 @@ interface MediaViewerProps {
   depart: number;
   telecharger: Telecharger;
   /**
-   * REQ-MED-08 (b) — le chiffré, pour la lecture progressive. Absent ⇒ chemin d'un seul
+   * (b) — le chiffré, pour la lecture progressive. Absent ⇒ chemin d'un seul
    * bloc, inchangé : c'est ce qui garde le viewer testable sans service worker.
    */
   telechargerChiffre?: (url: string) => Promise<Uint8Array>;
   onFermer: () => void;
-  /** REQ-MED-05 — sauvegarde locale, déléguée au pipeline par le câblage. */
+  /** sauvegarde locale, déléguée au pipeline par le câblage. */
   onSauvegarder: (media: Media) => void;
 }
 
 const ZOOM_MAX = 3;
 
 /**
- * REQ-MED-12 — les trois façons dont un média peut ne pas s'afficher, et ce qu'on en dit.
+ * les trois façons dont un média peut ne pas s'afficher, et ce qu'on en dit.
  *
  * Un seul écran pour les trois, mais **trois phrases distinctes** : « on ne rend pas ce
  * format », « on n'a pas su l'identifier » et « ce navigateur-ci ne sait pas le lire » ne
@@ -50,7 +50,7 @@ const REFUS = {
   "hors-liste": "Tacita n'affiche pas ce format de fichier.",
   inconnu: "Le format de ce fichier n'a pas pu être identifié.",
   codec: "Ce navigateur ne sait pas lire cette vidéo.",
-  // REQ-MED-15 — les deux plafonds. Le premier est un inconfort qu'on laisse forcer, le
+  // les deux plafonds. Le premier est un inconfort qu'on laisse forcer, le
   // second un onglet qui meurt : deux phrases, parce que ce ne sont pas deux degrés du
   // même problème.
   lourd: "Ce fichier est trop lourd pour être lu dans l'application.",
@@ -66,7 +66,7 @@ type Etat =
   | { phase: "refus"; motif: Refus };
 
 /**
- * REQ-UIX-16 — viewer plein écran : zoom, navigation entre les médias du salon,
+ * viewer plein écran : zoom, navigation entre les médias du salon,
  * sauvegarde, fermeture par geste vers le bas.
  *
  * Le média entier n'est déchiffré **qu'ici** : la timeline se contente des vignettes. Un
@@ -84,7 +84,7 @@ export function MediaViewer({
   const [rang, setRang] = useState(depart);
   const [zoom, setZoom] = useState<number>(1);
   const [etat, setEtat] = useState<Etat>({ phase: "chargement" });
-  /** REQ-MED-15 — « ouvrir quand même », et **sur ce média-là** : le forçage ne se
+  /** « ouvrir quand même », et **sur ce média-là** : le forçage ne se
    *  transporte pas au suivant, qui n'a aucune raison d'hériter d'un choix qui ne le
    *  concernait pas. */
   const [forceSur, setForceSur] = useState<string>();
@@ -112,7 +112,7 @@ export function MediaViewer({
     setEtat({ phase: "chargement" });
 
     /*
-     * REQ-MED-15 — la taille décide avant tout le reste, et sans réseau : `info.size` est
+     * la taille décide avant tout le reste, et sans réseau : `info.size` est
      * dans l'événement. Au-delà du premier plafond il n'y a pas de lecteur ; au-delà du
      * second, et seulement faute de flux d'écriture, il n'y a rien du tout à proposer.
      */
@@ -125,7 +125,7 @@ export function MediaViewer({
     }
 
     /*
-     * REQ-MED-12 — la résolution du type précède le téléchargement, et peut le rendre
+     * la résolution du type précède le téléchargement, et peut le rendre
      * inutile. `info.mimetype` est protégé par Megolm : non falsifiable par le serveur,
      * **parfaitement falsifiable par l'expéditeur**. Un type hors liste close est donc
      * refusé ici, avant qu'un seul octet ne descende — le fichier reste téléchargeable,
@@ -139,7 +139,7 @@ export function MediaViewer({
 
     void (async () => {
       /*
-       * REQ-MED-08 (b) — **la lecture progressive, quand les trois conditions sont là** :
+       * (b) — **la lecture progressive, quand les trois conditions sont là** :
        * une vidéo, des empreintes par bloc dans l'événement, et un worker qui contrôle la
        * page. Le lecteur réclame alors des plages, chacune vérifiée puis déchiffrée à la
        * demande : première image après un bloc au lieu du fichier entier.
@@ -284,7 +284,7 @@ export function MediaViewer({
 
       <div style={{ display: "grid", placeItems: "center", overflow: "auto" }}>
         {etat.phase === "refus" ? (
-          /* REQ-MED-12 — un état explicite, jamais un lecteur muet ou un rectangle noir :
+          /* un état explicite, jamais un lecteur muet ou un rectangle noir :
              ce qui n'est pas rendable se dit, et propose la seule action qui reste. */
           <div style={{ display: "grid", gap: "var(--spacing-3)", justifyItems: "center", padding: "var(--spacing-4)" }}>
             <Text type="body">{REFUS[etat.motif]}</Text>
@@ -293,7 +293,7 @@ export function MediaViewer({
                 ? "Ouvrez-le sur un appareil disposant de plus de mémoire."
                 : "Vous pouvez le télécharger pour l'ouvrir avec une autre application."}
             </Text>
-            {/* REQ-MED-15 — le poids est dans le libellé : « télécharger 412 Mo » et
+            {/* le poids est dans le libellé : « télécharger 412 Mo » et
                 « télécharger » ne demandent pas la même décision, surtout en mobilité. */}
             {etat.motif !== "trop-lourd" && (
               <Button

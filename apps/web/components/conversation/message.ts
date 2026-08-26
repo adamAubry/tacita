@@ -6,7 +6,7 @@ import type { Media } from "../media/media";
 
 /**
  * Un message tel que la timeline le rend — venu du flux `/sync` **ou** de la file
- * d'envoi (spec 07). Les deux origines se rendent pareil : c'est tout l'intérêt de
+ * d'envoi. Les deux origines se rendent pareil : c'est tout l'intérêt de
  * l'envoi optimiste, l'utilisateur voit son message avant que le serveur le confirme.
  */
 export interface MessageAffiche {
@@ -29,12 +29,12 @@ export interface MessageAffiche {
   /** `undefined` tant que le serveur n'a pas attribué d'identifiant. */
   eventId?: string;
   moi: boolean;
-  /** REQ-MSG-06 — droits exposés par le paquet, jamais dérivés ici. */
+  /** droits exposés par le paquet, jamais dérivés ici. */
   modifiable?: boolean;
   supprimable?: boolean;
-  /** REQ-UI-14 — la pièce jointe, quand le message en porte une (M-E). */
+  /** la pièce jointe, quand le message en porte une (M-E). */
   media?: Media;
-  /** REQ-UI-08 — le message cité, quand celui-ci est une réponse. */
+  /** le message cité, quand celui-ci est une réponse. */
   repondA?: Citation;
 }
 
@@ -67,7 +67,7 @@ export function depuisFile(
 }
 
 /**
- * REQ-UI-08 — **une ligne pour dire de quoi on parle.**
+ * **une ligne pour dire de quoi on parle.**
  *
  * Une pièce jointe n'a pas de texte : son `body` est un nom de fichier, et citer
  * « IMG_4417.HEIC » ne dit à personne de quelle photo il s'agit. On nomme donc la nature
@@ -92,7 +92,7 @@ export function apercu(message: MessageAffiche): string {
 }
 
 /**
- * REQ-UI-08 — la citation d'un message, ou le repli quand il n'est pas chargé.
+ * la citation d'un message, ou le repli quand il n'est pas chargé.
  *
  * Le repli est **explicite** et ne prétend rien (interdit n°13) : remonter chercher
  * l'événement au serveur serait un aller-retour réseau par ligne de timeline, et une
@@ -102,17 +102,17 @@ export const citation = (cible: MessageAffiche | undefined): Citation =>
   cible ? { nom: cible.nom, extrait: apercu(cible) } : { extrait: "Message plus ancien" };
 
 /**
- * REQ-MSG-10 dit que le corps porte `@room` — c'est ce littéral que la push rule native
+ * dit que le corps porte `@room` — c'est ce littéral que la push rule native
  * cherche. L'utilisateur, lui, a tapé `@everyone` et doit le relire tel quel : le rendu
- * inverse est explicitement à la charge de l'UI (spec 05).
+ * inverse est explicitement à la charge de l'UI.
  */
 export const texteAffiche = (texte: string) => texte.replaceAll(ROOM_MENTION, EVERYONE);
 
-/** REQ-UIX-12 — la fenêtre de regroupement Discord. */
+/** la fenêtre de regroupement Discord. */
 export const FENETRE_GROUPE_MS = 5 * 60 * 1000;
 
 /**
- * REQ-UI-06 — un séparateur de date à **chaque changement de jour**, et un avant le
+ * un séparateur de date à **chaque changement de jour**, et un avant le
  * premier message : sans lui, le haut de la timeline est le seul endroit où l'on ne sait
  * pas quel jour on lit.
  */
@@ -124,7 +124,7 @@ export function nouveauJour(
 }
 
 /**
- * REQ-UIX-12 — l'en-tête (avatar + nom) se rend au premier message, au changement
+ * l'en-tête (avatar + nom) se rend au premier message, au changement
  * d'auteur, au changement de jour, et après cinq minutes de silence du même auteur.
  *
  * Fonction **pure** de deux messages voisins, comme la spec l'exige. « Sans activité

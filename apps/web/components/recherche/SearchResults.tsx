@@ -14,9 +14,9 @@ interface SearchResultsProps {
   messages: ResultatMessage[];
   terme: string;
   chargement?: boolean;
-  /** REQ-UI-16 — rappelé dans l'état vide : « rien ici » n'est pas « rien nulle part ». */
+  /** rappelé dans l'état vide : « rien ici » n'est pas « rien nulle part ». */
   perimetre: string;
-  /** REQ-UIX-21 — « Mentions » au lieu de « Messages » sur l'onglet dédié. */
+  /** « Mentions » au lieu de « Messages » sur l'onglet dédié. */
   titreMessages?: string;
   onOuvrirConversation: (roomId: string) => void;
   onOuvrirMessage: (resultat: ResultatMessage) => void;
@@ -66,7 +66,7 @@ function Section({ titre, children }: { titre: string; children: React.ReactNode
 }
 
 /**
- * REQ-UIX-20 — l'état résultats : deux sections titrées, « Conversations » puis
+ * l'état résultats : deux sections titrées, « Conversations » puis
  * « Messages ». L'ordre n'est pas neutre — on cherche plus souvent un fil qu'une phrase,
  * et la section des conversations est courte, donc elle ne repousse pas l'autre.
  *
@@ -87,7 +87,7 @@ export function SearchResults({
 }: SearchResultsProps) {
   if (chargement) {
     return (
-      // REQ-UIX-22 — skeletons pendant la requête, à la géométrie des cartes finales :
+      // skeletons pendant la requête, à la géométrie des cartes finales :
       // zéro décalage à l'arrivée des résultats (DESIGN.md).
       <div
         aria-label="Recherche en cours"

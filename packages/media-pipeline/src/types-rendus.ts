@@ -1,5 +1,5 @@
 /**
- * REQ-MED-12 — **la liste close des types rendus, et la résolution qui y mène.**
+ * **la liste close des types rendus, et la résolution qui y mène.**
  *
  * Octets → type : aucun DOM, donc ce module vit ici et non dans le shard. Le shard en
  * consomme le verdict, il ne le recalcule pas.
@@ -14,7 +14,7 @@
 const normaliser = (valeur: string): string => (valeur.split(";")[0] ?? "").trim().toLowerCase();
 
 /**
- * REQ-MED-12 — les types que l'application accepte de **rendre**. Tout le reste se
+ * les types que l'application accepte de **rendre**. Tout le reste se
  * télécharge, ne s'affiche pas.
  *
  * L'audio a sa ligne parce que le shard rend trois `msgtype`, pas deux : `m.audio` passe
@@ -30,7 +30,7 @@ export const TYPES_RENDUS: Readonly<Record<"video" | "image" | "audio", readonly
 
 const RENDUS = new Set(Object.values(TYPES_RENDUS).flat());
 
-/** REQ-MED-12 — le prédicat de la liste close. `application/octet-stream` en est absent, et c'est le point. */
+/** le prédicat de la liste close. `application/octet-stream` en est absent, et c'est le point. */
 export function estRendable(type: string | undefined): boolean {
   return type !== undefined && RENDUS.has(normaliser(type));
 }
@@ -48,7 +48,7 @@ const commence = (octets: Uint8Array, ...signature: number[]): boolean =>
   signature.every((octet, rang) => octets[rang] === octet);
 
 /**
- * REQ-MED-12 — **le repli quand l'événement ne déclare rien** (vieux clients, ponts).
+ * **le repli quand l'événement ne déclare rien** (vieux clients, ponts).
  *
  * Reniflement des octets d'en-tête du **clair**, jamais du chiffré : un blob chiffré est
  * du bruit, il n'a pas de signature. Rend `undefined` quand rien ne correspond — et
@@ -91,7 +91,7 @@ export type Resolution =
   | { rendable: false; motif: "hors-liste" | "inconnu" | "octets-requis" };
 
 /**
- * REQ-MED-12 — la résolution, dans son ordre : le champ déclaré, puis les octets.
+ * la résolution, dans son ordre : le champ déclaré, puis les octets.
  *
  * **Un type déclaré hors liste ne redescend pas au reniflement.** C'est délibéré : un
  * expéditeur qui annonce `image/svg+xml` a dit ce qu'il voulait qu'on rende, et lui

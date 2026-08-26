@@ -7,8 +7,8 @@ import { IconeEnvoyer } from "../foundation/icons";
 import { Button, ChatComposerInput, Text, createStaticSource } from "../foundation/primitives";
 
 /**
- * Ce que le composer est en train de faire à un message existant : répondre (REQ-UI-08)
- * ou modifier (REQ-UI-07). **Un seul bandeau pour les deux** — ce sont deux fois la même
+ * Ce que le composer est en train de faire à un message existant : répondre
+ * ou modifier. **Un seul bandeau pour les deux** — ce sont deux fois la même
  * chose du point de vue de l'écran : un message cité, un moyen d'annuler.
  */
 export interface ContexteComposer {
@@ -18,24 +18,24 @@ export interface ContexteComposer {
 }
 
 interface ComposerProps {
-  /** REQ-UI-12 — membres du salon + `@everyone`, tels que le paquet les fournit. */
+  /** membres du salon + `@everyone`, tels que le paquet les fournit. */
   mentions: MentionCandidate[];
   contexte?: ContexteComposer;
   /** Texte de départ — le corps du message quand on le modifie. */
   texteInitial?: string;
   onEnvoyer: (texte: string) => void;
-  /** REQ-UI-11 — une frappe, pas une émission : le throttling vit dans le paquet. */
+  /** une frappe, pas une émission : le throttling vit dans le paquet. */
   onFrappe: () => void;
-  /** REQ-UI-11 — qui écrit en face, déjà filtré par le paquet. */
+  /** qui écrit en face, déjà filtré par le paquet. */
   ecrivent?: string[];
-  /** REQ-UI-14 — les pièces jointes, **à gauche du champ**. Fourni par M-E. */
+  /** les pièces jointes, **à gauche du champ**. Fourni par M-E. */
   actions?: ReactNode;
-  /** REQ-UI-15 — la capture photo, entre le champ et l'envoi. Fournie par M-E. */
+  /** la capture photo, entre le champ et l'envoi. Fournie par M-E. */
   actionsEnvoi?: ReactNode;
 }
 
 /**
- * REQ-UIX-15 — Conversation input (composant 9).
+ * Conversation input (composant 9).
  *
  * **Une seule rangée** — `[+] [champ] [photo] [envoyer]` —, parce que c'est la forme
  * qu'ont WhatsApp, Discord, iMessage et Telegram, et qu'elle n'est pas un goût : dans une
@@ -44,7 +44,7 @@ interface ComposerProps {
  * Le champ grandit vers le haut jusqu'à `maxRows` puis défile, et les boutons restent
  * alignés sur sa dernière ligne (`flex-end`) — sinon ils flottent au milieu d'un pavé.
  *
- * **Pourquoi pas `ChatComposer`** (escalade E-16, `specs/ui/ESCALATIONS.md`) : son corps
+ * **Pourquoi pas `ChatComposer`** (escalade E-16) : son corps
  * est une colonne `[en-tête] [champ] [rangée d'actions]`, et la rangée d'actions est
  * rendue **inconditionnellement**, bouton d'envoi compris. C'est la forme d'un composer
  * d'assistant — ChatGPT, Claude —, pas celle d'une messagerie, et aucun de ses props ne
@@ -95,7 +95,7 @@ export function Composer({
         borderTop: "1px solid var(--color-border)",
       }}
     >
-      {/* REQ-UI-11 — l'indicateur est au-dessus du composer, là où l'œil revient entre
+      {/* l'indicateur est au-dessus du composer, là où l'œil revient entre
           deux phrases. Les identifiants ne sont pas jolis, mais ils sont exacts : le nom
           d'affichage se résout dans la timeline, pas ici. */}
       {ecrivent.length > 0 && (

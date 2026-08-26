@@ -17,7 +17,7 @@ const nextConfig = readFileSync(
 );
 const readme = readFileSync(new URL("../staging/README.md", import.meta.url), "utf-8");
 
-describe("REQ-INF-16 — le shard est servi par le proxy, sur le domaine du homeserver", () => {
+describe("le shard est servi par le proxy, sur le domaine du homeserver", () => {
   it("nginx route / vers le shard, par variable d'amont", () => {
     const bloc = nginxConf.match(/location\s+\/\s*{([^}]*)}/s)?.[1];
     expect(bloc).toBeTruthy();
@@ -50,7 +50,7 @@ describe("REQ-INF-16 — le shard est servi par le proxy, sur le domaine du home
     // Défaut du serveur `standalone` : `localhost`, donc la seule boucle locale du
     // conteneur. Le proxy ne l'atteint jamais et le symptôme est un 502 sur `/` seul.
     expect(dockerfile).toMatch(/HOSTNAME=0\.0\.0\.0/);
-    // REQ-UI-01 — `public/` n'est pas copié par la sortie autonome. Sans cette ligne,
+    // `public/` n'est pas copié par la sortie autonome. Sans cette ligne,
     // `/sw.js` répond 404 et la PWA ne s'installe pas, sans rien dans les logs.
     expect(dockerfile).toMatch(/apps\/web\/public/);
   });
@@ -65,9 +65,9 @@ describe("REQ-INF-16 — le shard est servi par le proxy, sur le domaine du home
   });
 });
 
-describe("REQ-INF-17 — le staging est un overlay, jamais une modification du socle", () => {
+describe("le staging est un overlay, jamais une modification du socle", () => {
   it("le service du shard vit dans l'overlay, pas dans la pile de base", () => {
-    // Règle 6 de la spec 00 (D-07) : les écarts d'environnement sont des overlays
+    // Règle 6 de `CLAUDE.md` (D-07) : les écarts d'environnement sont des overlays
     // chargés volontairement. Le socle reste le backend, déployable seul.
     expect(base.services.web).toBeUndefined();
     expect(staging.services.web.build.dockerfile).toBe("apps/web/Dockerfile");

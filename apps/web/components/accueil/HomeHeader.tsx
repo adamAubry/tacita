@@ -52,7 +52,7 @@ function BoutonIcone({
 }
 
 /**
- * REQ-UIX-07 — l'en-tête de l'accueil : le sélecteur (composant 1) et la rangée de
+ * l'en-tête de l'accueil : le sélecteur (composant 1) et la rangée de
  * boutons (composant 7).
  *
  * Le sélecteur ne « filtre » pas la liste : « Ajouter des amis » **change de layout**

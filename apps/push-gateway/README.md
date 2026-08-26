@@ -1,11 +1,11 @@
-# Passerelle Web Push (spec 03)
+# Passerelle Web Push
 
 Service Node autonome qui implémente l'interface Matrix Push Gateway et relaie
 les notifications de Synapse vers les navigateurs en **Web Push standard
 (VAPID)**. Sygnal ne couvre qu'APNs et FCM : pour une PWA auto-hébergée, il
 fallait cette passerelle.
 
-Limites assumées : `LIMITES.md` — **à lire avant d'intégrer côté client**
+Limites assumées : voir plus bas — **à lire avant d'intégrer côté client**
 (sur iOS, rien ne fonctionne hors PWA installée).
 
 ## Endpoints
@@ -13,7 +13,7 @@ Limites assumées : `LIMITES.md` — **à lire avant d'intégrer côté client**
 | Méthode | Chemin | Rôle |
 | --- | --- | --- |
 | `POST` | `/_matrix/push/v1/notify` | Appelé par Synapse. Répond `{"rejected": [pushkeys]}` — Synapse supprime les pushers listés. |
-| `GET` | `/config` | `{"vapid_public_key": "..."}` pour l'abonnement client (spec 11). |
+| `GET` | `/config` | `{"vapid_public_key": "..."}` pour l'abonnement client. |
 
 Le payload envoyé au navigateur contient **exactement** `event_id` et
 `room_id`. Aucun contenu, aucun expéditeur : le serveur n'en a pas, et le
@@ -27,7 +27,7 @@ Générées **une fois au déploiement**, jamais commitées :
 pnpm --filter push-gateway exec web-push generate-vapid-keys
 ```
 
-Une rotation invalide toutes les subscriptions existantes (voir `LIMITES.md`).
+Une rotation invalide toutes les subscriptions existantes.
 
 ## Démarrage
 
@@ -37,7 +37,7 @@ VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... PORT=8008 \
 pnpm --filter push-gateway start
 ```
 
-## Contrat d'enregistrement du pusher (côté client, spec 11)
+## Contrat d'enregistrement du pusher (côté client)
 
 `POST /_matrix/client/v3/pushers` avec `kind: "http"`, `pushkey` = l'endpoint
 Web Push, et dans `data` : `url` (celle de cette passerelle), `format:
@@ -63,5 +63,5 @@ immédiatement dans `rejected`.
 ## Non couvert ici
 
 Abonnement navigateur, demande de permission, affichage et déchiffrement des
-notifications : spec 11. Pas de base de données, pas de file d'attente — un
+notifications : `apps/web`. Pas de base de données, pas de file d'attente — un
 push perdu est rattrapé par le `/sync` suivant.

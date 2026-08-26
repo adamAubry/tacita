@@ -5,7 +5,7 @@ import { Suspense } from "react";
 
 import { InfosConversation } from "../../../components/settings/InfosConversation";
 
-/** Layout Conversation info — M-H, REQ-UIX-33 à 37. Salon en `?room=` (`lib/routes.ts`). */
+/** Layout Conversation info — M-H, à 37. Salon en `?room=` (`lib/routes.ts`). */
 function Contenu() {
   const roomId = useSearchParams()?.get("room") ?? "";
   return roomId ? <InfosConversation roomId={roomId} /> : null;

@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { Button, Text, TextInput } from "../foundation/primitives";
 
 /**
- * REQ-MED-11 / REQ-UI-20 — la phrase d'honnêteté du choix de photo (E-12, voie A).
+ * la phrase d'honnêteté du choix de photo (E-12, voie A).
  *
  * Exportée parce que le test la lit : c'est la condition qui rend le chemin public
  * acceptable, pas une décoration. Même registre que les « limites connues » — on dit ce
@@ -32,19 +32,19 @@ export interface Changements {
 interface FormulaireIdentiteProps {
   profil: Profile;
   /**
-   * REQ-UIX-24 — reçoit **ce qui a changé, et rien d'autre** (REQ-MSG-18). Un patch vide
+   * reçoit **ce qui a changé, et rien d'autre**. Un patch vide
    * est une issue légitime : « valider sans rien avoir touché » est un geste courant à
    * l'accueil, et c'est à l'appelant de ne pas écrire pour rien.
    */
   onEnregistrer: (changements: Changements) => Promise<void>;
   /**
-   * REQ-UI-20 — téléverse une image de profil par l'unique chemin public du pipeline et
+   * téléverse une image de profil par l'unique chemin public du pipeline et
    * rend son `mxc://`. Injecté plutôt qu'appelé ici : le shard ne connaît pas la
-   * `Session`, et c'est le câblage qui tient le site d'appel unique de REQ-MED-11.
+   * `Session`, et c'est le câblage qui tient le site d'appel unique de.
    *
    * **Le même callback pour la photo et pour la bannière** : ce sont deux images
    * publiques compressées de la même façon, et leur donner deux chemins ferait deux
-   * sites d'appel du chemin public là où le contrat de REQ-MED-11 en autorise un.
+   * sites d'appel du chemin public là où le contrat de en autorise un.
    */
   onPhoto: (fichier: File) => Promise<string>;
   /** Le bouton qui écrit. « Enregistrer » sur le profil, « Continuer » à l'accueil. */
@@ -54,7 +54,7 @@ interface FormulaireIdentiteProps {
 }
 
 /**
- * REQ-UIX-24 / REQ-UI-20 / REQ-UIX-41 — **le formulaire d'identité, un seul dans l'app.**
+ * **le formulaire d'identité, un seul dans l'app.**
  *
  * Il est rendu à deux endroits : la feuille « Modifier le profil » (M-G) et l'étape
  * d'identité du parcours d'accueil (M-B). Ce sont deux moments, pas deux écrans — nom,
@@ -120,7 +120,7 @@ export function FormulaireIdentite({
     <div style={{ display: "grid", gap: "var(--spacing-3)" }}>
       <TextInput label="Nom d'affichage" value={nom} onChange={setNom} />
 
-      {/* REQ-UI-20 / REQ-UIX-41 — les deux images, livrées depuis E-12. Elles sont
+      {/* les deux images, livrées depuis E-12. Elles sont
           **là**, et non grisées : une option grisée est une promesse non tenue
           affichée (interdit n°13). */}
       <div style={{ display: "grid", gap: "var(--spacing-2)" }}>

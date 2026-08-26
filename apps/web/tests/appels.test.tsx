@@ -102,7 +102,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("REQ-UI-19 — appel voix/vidéo, bandeau d'appel en cours, erreur explicite", () => {
+describe("appel voix/vidéo, bandeau d'appel en cours, erreur explicite", () => {
   it("monte le widget Element Call avec les seules permissions nécessaires", async () => {
     rendreAvecSession(<EcranAppel roomId={SALON} video={false} />);
 
@@ -157,7 +157,7 @@ describe("REQ-UI-19 — appel voix/vidéo, bandeau d'appel en cours, erreur expl
   });
 });
 
-describe("REQ-UIX-38 — shell minimal : conteneur, sortie de secours, paramètres de lancement", () => {
+describe("shell minimal : conteneur, sortie de secours, paramètres de lancement", () => {
   it("passe le paramètre du point d'entrée, audio par défaut", async () => {
     const { rerender } = rendreAvecSession(<EcranAppel roomId={SALON} video={false} />);
     const audio = (await screen.findByTitle("Appel")) as HTMLIFrameElement;
@@ -223,7 +223,7 @@ describe("REQ-UIX-38 — shell minimal : conteneur, sortie de secours, paramètr
   });
 });
 
-describe("REQ-UIX-39 — l'appel des Friends interaction buttons prend le même chemin", () => {
+describe("l'appel des Friends interaction buttons prend le même chemin", () => {
   it("la route d'appel est construite à un seul endroit, jamais recopiée", () => {
     // « Même chemin que le header 1:1 » n'est tenable que si c'est le même code : trois
     // gabarits d'URL recopiés divergent au premier changement de route, et personne ne

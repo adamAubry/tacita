@@ -10,7 +10,7 @@ interface RecentSearchesProps {
   /** Les profils récemment recherchés, du plus récent au plus ancien. */
   profils: Contact[];
   onChoisir: (contact: Contact) => void;
-  /** REQ-UIX-19 — « purgeable ». Absent = pas de bouton, liste non vidable. */
+  /** « purgeable ». Absent = pas de bouton, liste non vidable. */
   onPurger?: () => void;
 }
 
@@ -18,7 +18,7 @@ interface RecentSearchesProps {
 const LARGEUR_PROFIL = 72;
 
 /**
- * REQ-UIX-19 — composant 17, « Recent searches » : un scroller horizontal de profils
+ * composant 17, « Recent searches » : un scroller horizontal de profils
  * avec **content peek**, c'est-à-dire un dernier élément volontairement coupé quand la
  * liste déborde.
  *

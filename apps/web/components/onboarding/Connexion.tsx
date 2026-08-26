@@ -13,7 +13,7 @@ import { IconeCle } from "../foundation/icons";
 import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitives";
 
 /**
- * REQ-UI-04 / REQ-UIX-06 — **l'écran de connexion**, réécrit le 25/08/2026 (D-12, D-13).
+ * **l'écran de connexion**, réécrit le 25/08/2026 (D-12, D-13).
  *
  * Il n'existait pas : la connexion partait chez un fournisseur OIDC externe, et cet
  * écran-ci était une phrase d'attente pendant la redirection. Keycloak supprimé, l'identité
@@ -28,7 +28,7 @@ import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitive
  * **Deux champs, et deux seulement** (D-13, même jour) : créer un compte demande un
  * identifiant et un mot de passe. Le code d'invitation qu'exigeait la première version a
  * été retiré du serveur, donc de l'écran — ce que ça ouvre est assumé et écrit dans
- * `infra/LIMITES.md`, ce n'est pas au formulaire de le compenser.
+ * C'est une limite assumée ; ce n'est pas au formulaire de la compenser.
  *
  * **Un troisième mode, et c'est une porte de secours** (D-14) : la clé de récupération
  * ouvre une session quand le mot de passe est perdu. Elle n'est pas offerte à côté des
@@ -66,7 +66,7 @@ function classer(erreur: unknown, mode: Mode): Echec {
   /*
    * D-14 — le module refuse d'un seul message pour quatre causes : compte inconnu,
    * désactivé, sans clé, ou clé fausse. Les distinguer donnerait un oracle de comptes à
-   * qui interroge cette porte ouverte (même jurisprudence que REQ-INV-08), et l'écran ne
+   * qui interroge cette porte ouverte (même jurisprudence que), et l'écran ne
    * peut donc rien dire de plus honnête que « l'un des deux est faux ».
    */
   if (mode === "cle" && errcode === "M_FORBIDDEN") return "cle";
@@ -90,7 +90,7 @@ export function Connexion({
 }: {
   homeserverUrl: string;
   onSession: (session: Session) => void;
-  /** REQ-COR-03 — surchargeable en test ; `globalThis.indexedDB` en navigateur. */
+  /** surchargeable en test ; `globalThis.indexedDB` en navigateur. */
   indexedDB?: IDBFactory;
 }) {
   const [mode, setMode] = useState<Mode>("connexion");

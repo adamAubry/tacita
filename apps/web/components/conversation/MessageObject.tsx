@@ -15,12 +15,12 @@ import { texteAffiche, type MessageAffiche } from "./message";
 
 interface MessageObjectProps {
   message: MessageAffiche;
-  /** REQ-UIX-12 — calculé par `shouldShowHeader`, jamais deviné ici. */
+  /** calculé par `shouldShowHeader`, jamais deviné ici. */
   entete: boolean;
-  /** REQ-UI-09 — la timeline entière révèle ses heures, pas une ligne isolée. */
+  /** la timeline entière révèle ses heures, pas une ligne isolée. */
   heureVisible: boolean;
   reactions?: ReactionTally[];
-  /** REQ-UI-13 — fourni sur le dernier message envoyé, et sur lui seul. */
+  /** fourni sur le dernier message envoyé, et sur lui seul. */
   recu?: { statut: ReceiptStatus; indecidable: boolean };
   onRepondre: () => void;
   onHold: () => void;
@@ -28,10 +28,10 @@ interface MessageObjectProps {
   onReagir?: (emoji: string) => void;
   onRenvoyer?: () => void;
   onAbandonner?: () => void;
-  /** REQ-UI-14 — déchiffrement d'une pièce jointe, injecté par le câblage (M-E). */
+  /** déchiffrement d'une pièce jointe, injecté par le câblage (M-E). */
   telecharger?: Telecharger;
   onOuvrirMedia?: () => void;
-  /** REQ-MED-05 — écrire la pièce jointe sur l'appareil. Rendu sur les fichiers, qui
+  /** écrire la pièce jointe sur l'appareil. Rendu sur les fichiers, qui
    *  n'ouvrent pas de viewer et n'avaient donc aucune sortie. */
   onSauvegarderMedia?: (media: Media) => void;
 }
@@ -40,9 +40,9 @@ interface MessageObjectProps {
 const COCHE = { sent: "✓", delivered: "✓✓", read: "✓✓" } as const;
 
 /**
- * REQ-UI-13 — les accusés, et **ce qu'ils ne disent pas**.
+ * les accusés, et **ce qu'ils ne disent pas**.
  *
- * « Délivré » est une extension à nous (REQ-RCP-06) : Matrix ne définit que `m.read`.
+ * « Délivré » est une extension à nous : Matrix ne définit que `m.read`.
  * L'aide contextuelle le dit au lieu de laisser croire à du standard. Et quand le
  * destinataire est en mode masqué, l'état reste `sent` pour toujours : `deliveryUnknowable`
  * distingue « pas encore » de « on ne saura jamais », que rien à l'écran ne séparerait.
@@ -75,7 +75,7 @@ function Recu({ statut, indecidable }: { statut: ReceiptStatus; indecidable: boo
   );
 }
 
-/** REQ-UI-06 — une entrée bloquée par le chiffrement ne se réessaie pas : elle s'explique. */
+/** une entrée bloquée par le chiffrement ne se réessaie pas : elle s'explique. */
 function EtatEnvoi({
   message,
   onRenvoyer,
@@ -107,12 +107,12 @@ function EtatEnvoi({
 }
 
 /**
- * REQ-UIX-12 — Message object (composant 11), regroupement Discord.
+ * Message object (composant 11), regroupement Discord.
  *
  * DESIGN.md : timeline **sans bulles**. Un message groupé s'appende sous le précédent,
  * sans avatar ni nom — c'est le blanc qui sépare, pas un cadre.
  *
- * REQ-UI-08 / REQ-UI-09 — glissement gauche pour répondre, glissement droit pour révéler
+ * glissement gauche pour répondre, glissement droit pour révéler
  * les heures, avec la zone morte de 20 px au bord gauche.
  */
 export function MessageObject({
@@ -178,7 +178,7 @@ export function MessageObject({
           </div>
         )}
 
-        {/* REQ-UI-08 — **à quel message celui-ci répond.** Sans cette ligne, une réponse
+        {/* **à quel message celui-ci répond.** Sans cette ligne, une réponse
             était un message comme un autre : le lien vers ce qu'elle vise existait dans
             l'événement, et n'était rendu nulle part.
 
@@ -203,7 +203,7 @@ export function MessageObject({
           </div>
         )}
 
-        {/* REQ-UI-14 — une pièce jointe remplace le corps de texte : le `body` d'un
+        {/* une pièce jointe remplace le corps de texte : le `body` d'un
             média est son nom de fichier, que la tuile porte déjà. */}
         {media && telecharger && (
           <MediaMessage
@@ -227,7 +227,7 @@ export function MessageObject({
         >
           {!message.media && <TexteMessage texte={texteAffiche(message.texte)} />}
 
-          {/* REQ-UI-09 — révélées par le geste, jamais affichées en permanence : une
+          {/* révélées par le geste, jamais affichées en permanence : une
               heure sur chaque ligne, c'est une colonne de bruit. */}
           {heureVisible && !entete && (
             <Text type="supporting" color="secondary" hasTabularNumbers>

@@ -79,7 +79,7 @@ beforeEach(() => {
   session = asSession({ client });
 });
 
-describe("REQ-RCP-01 — « envoyé » dérivé de l'event_id serveur, `sending` avant", () => {
+describe("« envoyé » dérivé de l'event_id serveur, `sending` avant", () => {
   it("passe de sending à sent quand l'écho local reçoit son identifiant", () => {
     const receipts = createReceipts(session);
     const seen: [string, ReceiptStatus][] = [];
@@ -117,7 +117,7 @@ describe("REQ-RCP-01 — « envoyé » dérivé de l'event_id serveur, `sending`
   });
 });
 
-describe("REQ-RCP-02 — « lu » dérivé des reçus m.read natifs", () => {
+describe("« lu » dérivé des reçus m.read natifs", () => {
   it("passe à read sur reçu d'un autre utilisateur, ignore le sien", () => {
     const receipts = createReceipts(session);
     insert(client, fakeEvent("$a", MOI));
@@ -149,13 +149,13 @@ describe("REQ-RCP-02 — « lu » dérivé des reçus m.read natifs", () => {
   });
 });
 
-describe("REQ-RCP-03 — « délivré » émis à l'entrée en store, pas à l'affichage", () => {
+describe("« délivré » émis à l'entrée en store, pas à l'affichage", () => {
   it("émet un accusé pour un message entrant, jamais pour les siens", async () => {
     createReceipts(session);
 
     insert(client, fakeEvent("$deToi", TOI));
     insert(client, fakeEvent("$deMoi", MOI));
-    // Rien n'est parti avant l'échéance du lot (REQ-RCP-09).
+    // Rien n'est parti avant l'échéance du lot.
     expect(client.sendToDevice).not.toHaveBeenCalled();
 
     await vi.runAllTimersAsync();
@@ -168,7 +168,7 @@ describe("REQ-RCP-03 — « délivré » émis à l'entrée en store, pas à l'a
   });
 });
 
-describe("REQ-RCP-04 — « délivré » au premier appareil atteint, surnuméraires idempotents", () => {
+describe("« délivré » au premier appareil atteint, surnuméraires idempotents", () => {
   it("ne notifie qu'une fois pour deux accusés de deux appareils du même compte", () => {
     const receipts = createReceipts(session);
     const seen: ReceiptStatus[] = [];
@@ -193,7 +193,7 @@ describe("REQ-RCP-04 — « délivré » au premier appareil atteint, surnuméra
   });
 });
 
-describe("REQ-RCP-05 — reçu « délivré » volontairement non chiffré", () => {
+describe("reçu « délivré » volontairement non chiffré", () => {
   it("remet au SDK une charge lisible, sans enveloppe chiffrée", async () => {
     createReceipts(session);
     insert(client, fakeEvent("$deToi", TOI));
@@ -205,7 +205,7 @@ describe("REQ-RCP-05 — reçu « délivré » volontairement non chiffré", () 
   });
 });
 
-describe("REQ-RCP-06 — extension non standard documentée, jamais présentée comme native", () => {
+describe("extension non standard documentée, jamais présentée comme native", () => {
   it("le README nomme la limite au lieu de la masquer", () => {
     const readme = readFileSync(fileURLToPath(new URL("../README.md", import.meta.url)), "utf8");
     expect(readme).toContain("Matrix ne définit aucun accusé « délivré »");
@@ -214,7 +214,7 @@ describe("REQ-RCP-06 — extension non standard documentée, jamais présentée 
   });
 });
 
-describe("REQ-RCP-07 — mode masqué : bascule vers m.read.private, pas de coupure", () => {
+describe("mode masqué : bascule vers m.read.private, pas de coupure", () => {
   it("choisit le type de reçu selon le mode", async () => {
     const receipts = createReceipts(session);
     const event = fakeEvent("$deToi", TOI);
@@ -229,7 +229,7 @@ describe("REQ-RCP-07 — mode masqué : bascule vers m.read.private, pas de coup
   });
 });
 
-describe("REQ-RCP-08 — mode masqué : « délivré » suspendu, expéditeur bloqué à sent", () => {
+describe("mode masqué : « délivré » suspendu, expéditeur bloqué à sent", () => {
   it("n'émet aucun accusé et abandonne le lot en attente", async () => {
     const receipts = createReceipts(session);
     insert(client, fakeEvent("$deToi", TOI));
@@ -256,7 +256,7 @@ describe("REQ-RCP-08 — mode masqué : « délivré » suspendu, expéditeur bl
   });
 });
 
-describe("REQ-RCP-09 — anti-tempête : « délivré » émis par lot", () => {
+describe("anti-tempête : « délivré » émis par lot", () => {
   it("groupe un sync de rattrapage en un envoi par destinataire", async () => {
     createReceipts(session);
 

@@ -10,7 +10,7 @@ const ContexteRecherche = createContext<Search | null>(null);
 export const useRecherche = () => useContext(ContexteRecherche);
 
 /**
- * REQ-SRC-01 / REQ-UI-16 — **l'index de recherche appartient à la session, pas à un
+ * **l'index de recherche appartient à la session, pas à un
  * écran.** Même défaut, même remède qu'`OutboxProvider`.
  *
  * `createSearch` n'indexe pas l'historique : il écoute `MatrixEventEvent.Decrypted` et
@@ -22,7 +22,7 @@ export const useRecherche = () => useContext(ContexteRecherche);
  * exact, l'index était vide et le restait.
  *
  * Ici il vit tant que la session vit : les messages qui arrivent, ceux qu'on écrit, et
- * ceux que la remontée d'historique (REQ-UI-21) redescend du serveur entrent tous dans
+ * ceux que la remontée d'historique redescend du serveur entrent tous dans
  * l'index quel que soit l'écran affiché.
  */
 export function RechercheProvider({ children }: { children: ReactNode }) {

@@ -21,14 +21,14 @@ const encryptionState = {
 };
 
 /**
- * REQ-MSG-02 — garde unique de tout ce que ce package envoie. Le chiffrement est
- * déjà garanti côté serveur (spec 01, `encryption_enabled_by_default_for_room_type`),
+ * garde unique de tout ce que ce package envoie. Le chiffrement est
+ * déjà garanti côté serveur (`encryption_enabled_by_default_for_room_type`),
  * mais un envoi en clair est une fuite irréversible : on vérifie côté client avant
  * chaque écriture plutôt que de faire confiance à une config distante.
  */
 export async function assertEncrypted(session: Session, roomId: string): Promise<void> {
-  // Le prédicat vit dans la Session (spec 04, REQ-COR-12) : la file d'envoi de la
-  // spec 07 a besoin de la même garde, et deux copies d'un contrôle de sécurité
+  // Le prédicat vit dans la Session () : la file d'envoi de la
+  // `@tacita/outbox` a besoin de la même garde, et deux copies d'un contrôle de sécurité
   // dérivent. Ici on lève, parce que c'est ce que les appelants de ce package
   // attendent ; l'outbox, elle, consulte le prédicat directement.
   if (!(await session.isEncrypted(roomId))) {
@@ -36,7 +36,7 @@ export async function assertEncrypted(session: Session, roomId: string): Promise
   }
 }
 
-/** REQ-MSG-02 — DM : salon à 2, `is_direct`, chiffré dès la création. */
+/** DM : salon à 2, `is_direct`, chiffré dès la création. */
 export function createDirectMessage(session: Session, userId: string): Promise<{ room_id: string }> {
   return session.client.createRoom({
     is_direct: true,
@@ -46,7 +46,7 @@ export function createDirectMessage(session: Session, userId: string): Promise<{
   });
 }
 
-/** REQ-MSG-02 — group chat, chiffré dès la création lui aussi. */
+/** group chat, chiffré dès la création lui aussi. */
 export function createGroupChat(
   session: Session,
   name: string,
@@ -61,7 +61,7 @@ export function createGroupChat(
 }
 
 /**
- * REQ-MSG-08 — l'épinglage passe par `m.room.pinned_events`, un événement d'**état**.
+ * l'épinglage passe par `m.room.pinned_events`, un événement d'**état**.
  * Les événements d'état ne sont jamais chiffrés en Matrix : le serveur voit la liste
  * des messages épinglés d'un salon. Exposé ici, documenté dans README.md.
  */
@@ -95,7 +95,7 @@ export async function setPinnedEvents(
 }
 
 /**
- * REQ-MSG-11 — l'échelle de power levels Matrix est exposée telle quelle : des
+ * l'échelle de power levels Matrix est exposée telle quelle : des
  * entiers. Aucun rôle nommé, aucune catégorie, aucun héritage — la traduction en
  * libellés, si l'UI en veut, est l'affaire de l'UI.
  */
@@ -121,7 +121,7 @@ export function members(session: Session, roomId: string): RoomMember[] {
 }
 
 /**
- * REQ-MSG-11 — le droit d'exclure quelqu'un, **lu dans l'état du salon**, jamais deviné.
+ * le droit d'exclure quelqu'un, **lu dans l'état du salon**, jamais deviné.
  *
  * Deux conditions, et les deux comptent : atteindre le niveau exigé pour l'action `kick`,
  * et être **strictement au-dessus** de la personne visée. Matrix refuse la seconde même
@@ -130,7 +130,7 @@ export function members(session: Session, roomId: string): RoomMember[] {
  *
  * Le prédicat vit ici parce que l'UI doit **masquer** le bouton non autorisé plutôt que
  * de le griser (M-H) : sans lui, le shard referait ce calcul de power levels, ce que la
- * spec 00 lui interdit.
+ * `CLAUDE.md` le lui interdit.
  */
 export function canKick(session: Session, roomId: string, userId: string): boolean {
   const room = session.client.getRoom(roomId);
@@ -154,13 +154,13 @@ export function kick(
   return session.client.kick(roomId, userId, reason);
 }
 
-/** REQ-MSG-11 — inviter dans un salon existant. Le chemin natif de D-09, sans détour. */
+/** inviter dans un salon existant. Le chemin natif de D-09, sans détour. */
 export function invite(session: Session, roomId: string, userId: string): Promise<EmptyObject> {
   return session.client.invite(roomId, userId);
 }
 
 /**
- * REQ-MSG-20 — le sas d'entrée d'un groupe (E-13, voie A).
+ * le sas d'entrée d'un groupe (E-13, voie A).
  *
  * Un lien de groupe ne peut pas faire entrer tout seul : son porteur ne peut ni s'inviter
  * (il faut être membre) ni rejoindre un salon en `join_rule: invite`. Le `knock` natif
@@ -175,7 +175,7 @@ export function invite(session: Session, roomId: string, userId: string): Promis
 export type JoinRule = "invite" | "knock";
 
 /**
- * Le SDK a son propre enum ; le shard, lui, n'importe pas matrix-js-sdk (spec 00). On
+ * Le SDK a son propre enum ; le shard, lui, n'importe pas matrix-js-sdk. On
  * expose donc une union de littéraux et on traduit ici — une table de deux entrées, pas
  * un cast : si un jour l'enum d'amont change de valeur, c'est cette ligne qui casse à la
  * compilation plutôt qu'un `join_rule` silencieusement invalide.
@@ -226,7 +226,7 @@ export function knockers(session: Session, roomId: string): RoomMember[] {
 }
 
 /**
- * REQ-UIX-36 — les trois niveaux de notification d'un salon. Ce sont des **push rules
+ * les trois niveaux de notification d'un salon. Ce sont des **push rules
  * Matrix natives**, pas un réglage maison : le serveur les évalue, elles suivent le
  * compte sur tous ses appareils, et rien n'est à synchroniser de notre côté.
  */
@@ -247,7 +247,7 @@ const ruleFor = (session: Session, kind: PushRuleKind, roomId: string): IPushRul
   session.client.pushRules?.global?.[kind]?.find((rule) => rule.rule_id === roomId);
 
 /**
- * REQ-UIX-36 — l'état actuel, tel que le compte le porte.
+ * l'état actuel, tel que le compte le porte.
  *
  * L'ordre de lecture est celui de l'évaluation côté serveur : une règle `override`
  * l'emporte sur une règle `room`, donc « silencieux » se teste avant « mentions
@@ -260,7 +260,7 @@ export function roomNotificationLevel(session: Session, roomId: string): RoomNot
 }
 
 /**
- * REQ-UIX-36 — poser le niveau.
+ * poser le niveau.
  *
  * Les deux règles sont retirées avant d'en écrire une : un salon ne porte qu'un niveau,
  * et laisser l'ancienne à côté de la nouvelle ferait dépendre le résultat de l'ordre

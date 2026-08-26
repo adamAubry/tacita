@@ -74,7 +74,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("REQ-UIX-12 — regroupement Discord : la table de cas de shouldShowHeader", () => {
+describe("regroupement Discord : la table de cas de shouldShowHeader", () => {
   const adam = message({ auteur: "@adam:tacita.test", horodatage: LUNDI_10H });
 
   it("le premier message porte toujours son en-tête", () => {
@@ -149,7 +149,7 @@ describe("REQ-UIX-12 — regroupement Discord : la table de cas de shouldShowHea
   });
 });
 
-describe("REQ-UI-06 — l'ordre du paquet, les séparateurs de date, la file d'envoi", () => {
+describe("l'ordre du paquet, les séparateurs de date, la file d'envoi", () => {
   const rendreTimeline = (messages: MessageAffiche[]) =>
     render(
       <Timeline
@@ -217,7 +217,7 @@ describe("REQ-UI-06 — l'ordre du paquet, les séparateurs de date, la file d'e
             eventId: undefined,
             moi: true,
             envoi: "failed",
-            // Importé, jamais recopié : c'est un contrat de passation (spec 11), et une
+            // Importé, jamais recopié : c'est un contrat de passation, et une
             // chaîne recopiée n'est plus qu'une coïncidence.
             errcode: NOT_ENCRYPTED,
           }),
@@ -234,7 +234,7 @@ describe("REQ-UI-06 — l'ordre du paquet, les séparateurs de date, la file d'e
   });
 });
 
-describe("REQ-UI-08 — une réponse montre le message qu'elle vise", () => {
+describe("une réponse montre le message qu'elle vise", () => {
   /**
    * Le défaut signalé : « lorsqu'on répond à un message, une photo, une vidéo, un
    * document ou autre, il n'y a pas d'UI spécifique montrant à quel message on fait
@@ -314,7 +314,7 @@ describe("REQ-UI-08 — une réponse montre le message qu'elle vise", () => {
   });
 });
 
-describe("REQ-UI-06 — les liens d'un message se voient et se cliquent", () => {
+describe("les liens d'un message se voient et se cliquent", () => {
   /**
    * Le défaut signalé : « les liens n'apparaissent pas en bleu et on ne peut pas les
    * cliquer ». Le corps était rendu tel quel, donc une URL restait de l'encre ordinaire.
@@ -383,7 +383,7 @@ describe("REQ-UI-06 — les liens d'un message se voient et se cliquent", () => 
   });
 });
 
-describe("REQ-UI-08 — glissement gauche : répondre", () => {
+describe("glissement gauche : répondre", () => {
   it("au-delà du seuil, la réponse est armée", () => {
     const { onRepondre } = rendreMessage();
     glisser(carteMessage(), 200, 200 - SEUIL_GLISSEMENT);
@@ -413,7 +413,7 @@ describe("REQ-UI-08 — glissement gauche : répondre", () => {
   });
 });
 
-describe("REQ-UI-08 — le glissement survit à sa propre durée, et se voit pendant", () => {
+describe("le glissement survit à sa propre durée, et se voit pendant", () => {
   /**
    * Le défaut signalé : « slider pour répondre ne marche pas ».
    *
@@ -489,7 +489,7 @@ describe("REQ-UI-08 — le glissement survit à sa propre durée, et se voit pen
   });
 });
 
-describe("REQ-UI-09 — glissement droit : les heures, et la zone morte du bord", () => {
+describe("glissement droit : les heures, et la zone morte du bord", () => {
   it("révèle les heures", () => {
     const { onRevelerHeures } = rendreMessage();
     glisser(carteMessage(), 100, 100 + SEUIL_GLISSEMENT);
@@ -526,7 +526,7 @@ describe("REQ-UI-09 — glissement droit : les heures, et la zone morte du bord"
   });
 });
 
-describe("REQ-UI-13 — accusés : trois niveaux, et ce qu'ils ne promettent pas", () => {
+describe("accusés : trois niveaux, et ce qu'ils ne promettent pas", () => {
   const recuDe = (statut: "sent" | "delivered" | "read", indecidable = false) => {
     cleanup();
     rendreMessage({ message: message({ moi: true }), recu: { statut, indecidable } });
@@ -556,7 +556,7 @@ describe("REQ-UI-13 — accusés : trois niveaux, et ce qu'ils ne promettent pas
   });
 });
 
-describe("REQ-UI-07 / REQ-UIX-14 — hold menu : réactions, actions, et droits", () => {
+describe("hold menu : réactions, actions, et droits", () => {
   const rendreMenu = (droits: { modifiable?: boolean; supprimable?: boolean } = {}) => {
     const actions = {
       ouvert: true,
@@ -612,7 +612,7 @@ describe("REQ-UI-07 / REQ-UIX-14 — hold menu : réactions, actions, et droits"
   });
 });
 
-describe("REQ-UIX-13 — conversation starter : premier élément, actions selon le salon", () => {
+describe("conversation starter : premier élément, actions selon le salon", () => {
   it("il est rendu au-dessus du premier message", () => {
     render(
       <Timeline
@@ -673,7 +673,7 @@ describe("REQ-UIX-13 — conversation starter : premier élément, actions selon
   });
 });
 
-describe("REQ-UI-11 / REQ-UI-12 — typing en lecture, mentions à la saisie", () => {
+describe("typing en lecture, mentions à la saisie", () => {
   const rendreComposer = (props: Partial<Parameters<typeof Composer>[0]> = {}) => {
     const onFrappe = vi.fn();
     const actions = { mentions: [], onEnvoyer: vi.fn(), ...props, onFrappe };
@@ -706,18 +706,18 @@ describe("REQ-UI-11 / REQ-UI-12 — typing en lecture, mentions à la saisie", (
   });
 
   it("`@room` du corps se relit `@everyone`, jamais l'inverse à l'écran", () => {
-    // REQ-MSG-10 : le corps porte le littéral que la push rule cherche ; l'utilisateur
+    // le corps porte le littéral que la push rule cherche ; l'utilisateur
     // a tapé `@everyone` et doit le relire tel quel.
     expect(texteAffiche("salut @room")).toBe("salut @everyone");
   });
 });
 
 /**
- * REQ-UIX-15 / REQ-UI-14 / REQ-UI-15 — la barre d'écriture, telle qu'on l'attend d'une
+ * la barre d'écriture, telle qu'on l'attend d'une
  * messagerie : joindre à gauche, capture contre le bouton d'envoi, et la barre au bas de
  * l'écran plutôt qu'accrochée au dernier message.
  */
-describe("REQ-UIX-15 — la barre d'écriture : une seule rangée, et le bas de l'écran", () => {
+describe("la barre d'écriture : une seule rangée, et le bas de l'écran", () => {
   /**
    * Le cœur du composant : **quatre éléments sur une ligne, dans cet ordre**. Le défaut
    * qu'il ferme n'était pas une absence — les boutons étaient bien là, et bien à gauche
@@ -781,7 +781,7 @@ describe("REQ-UIX-15 — la barre d'écriture : une seule rangée, et le bas de 
 });
 
 /**
- * REQ-MED-05 — **la sortie d'un fichier reçu, de bout en bout.**
+ * **la sortie d'un fichier reçu, de bout en bout.**
  *
  * Le viewer plein écran ne s'ouvre que sur une image ou une vidéo : un PDF, un ZIP ou un
  * document restait une tuile sans aucune façon d'en écrire les octets sur l'appareil.
@@ -791,7 +791,7 @@ describe("REQ-UIX-15 — la barre d'écriture : une seule rangée, et le bas de 
  * `MessageObject` → `MediaMessage` : en oublier une compile, et le bouton disparaît en
  * silence. D'où le rendu jusqu'à la timeline, et la source pour le maillon du dessus.
  */
-describe("REQ-MED-05 — un fichier reçu se télécharge sur l'appareil", () => {
+describe("un fichier reçu se télécharge sur l'appareil", () => {
   const fichier = mediaDe({
     getId: () => "$fic",
     getContent: () => ({
@@ -824,21 +824,21 @@ describe("REQ-MED-05 — un fichier reçu se télécharge sur l'appareil", () =>
   it("le câblage de l'écran fournit le geste, et le pipeline en est le propriétaire", () => {
     const ecran = lire("components/conversation/Conversation.tsx");
     expect(ecran).toContain("onSauvegarderMedia={sauvegarder}");
-    // `saveOriginal` (spec 08) et pas un `<a download>` maison : le choix de destination
+    // `saveOriginal` et pas un `<a download>` maison : le choix de destination
     // appartient au pipeline, qui sait ce que le navigateur supporte.
     expect(lire("components/media/useMediaActions.ts")).toContain("saveOriginal(env, blob, media.nom)");
   });
 });
 
-describe("REQ-UIX-08 — lire une conversation fait retomber son badge de non-lus", () => {
+describe("lire une conversation fait retomber son badge de non-lus", () => {
   /**
    * Le défaut signalé : « le compteur de messages non lus ne fait que monter malgré leur
-   * lecture ». Le badge est le compteur natif du serveur (REQ-MSG-13) ; il ne retombe que
-   * sur un reçu `m.read`, et `markRead` — exposé par la spec 06 dès son premier jour —
+   * lecture ». Le badge est le compteur natif du serveur ; il ne retombe que
+   * sur un reçu `m.read`, et `markRead` — exposé par `@tacita/receipts` dès son premier jour —
    * n'avait **aucun appelant** dans tout le dépôt.
    *
-   * Structurel, et c'est le bon niveau : la spec 06 prouve déjà que `markRead` émet le
-   * bon reçu, la spec 05 que le badge suit `RoomEvent.Receipt`. Ce qui manquait est le
+   * Structurel, et c'est le bon niveau : `@tacita/receipts` prouve déjà que `markRead` émet le
+   * bon reçu que le badge suit `RoomEvent.Receipt`. Ce qui manquait est le
    * fil entre les deux, et c'est un fil qu'aucun des deux paquets ne peut voir — règle 7,
    * une valeur écrite là où rien ne la lit est indétectable.
    */
@@ -849,7 +849,7 @@ describe("REQ-UIX-08 — lire une conversation fait retomber son badge de non-lu
   });
 });
 
-describe("REQ-UI-21 — la timeline remonte l'historique quand on approche du haut", () => {
+describe("la timeline remonte l'historique quand on approche du haut", () => {
   /**
    * jsdom ne fait aucune mise en page : `scrollTop` et `scrollHeight` y valent zéro et
    * ne bougent pas. On les remplace par des accesseurs adossés à des variables — c'est
@@ -943,7 +943,7 @@ describe("REQ-UI-21 — la timeline remonte l'historique quand on approche du ha
   });
 });
 
-describe("REQ-UI-06 — une conversation s'ouvre sur son dernier message", () => {
+describe("une conversation s'ouvre sur son dernier message", () => {
   /**
    * Rien ne positionnait la zone défilante : elle s'ouvrait à zéro, donc sur le message
    * le **plus ancien** de la fenêtre chargée, et il fallait défiler jusqu'en bas pour

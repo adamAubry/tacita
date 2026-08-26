@@ -35,7 +35,7 @@ vi.mock("@tacita/client-core", async (original) => ({
   restoreSession: () => restoreSession(),
 }));
 
-/** Les paquets 04–10 sont mockés à leurs interfaces (spec 11). */
+/** Les paquets 04–10 sont mockés à leurs interfaces. */
 const conversation = (partiel: Partial<Conversation> = {}): Conversation => ({
   roomId: "!dm:t",
   name: "adam",
@@ -64,7 +64,7 @@ const exclure = vi.fn(async () => ({}));
 const inviter = vi.fn(async () => ({}));
 
 vi.mock("@tacita/messaging", async (original) => ({
-  // REQ-MSG-19 — `identifiantComplet` est une fonction **pure** du paquet : la mocker
+  // `identifiantComplet` est une fonction **pure** du paquet : la mocker
   // reviendrait à éprouver l'écran contre une règle de saisie qu'il n'a pas.
   identifiantComplet: (await original<typeof import("@tacita/messaging")>()).identifiantComplet,
   conversations: () => salons(),
@@ -99,7 +99,7 @@ vi.mock("@tacita/media-pipeline", async (original) => ({
 const stats = vi.fn<() => Promise<SearchStats>>();
 const purger = vi.fn(async () => {});
 /**
- * REQ-UI-16 — l'index vient du provider de session, pas de l'écran : c'est lui qu'on
+ * l'index vient du provider de session, pas de l'écran : c'est lui qu'on
  * mocke, et non `createSearch`. Le vrai provider construirait un `Worker`, que jsdom
  * n'a pas — et l'écran de stockage n'est de toute façon qu'un lecteur de cet index.
  */
@@ -130,7 +130,7 @@ const session = () =>
       getUserId: () => "@luca:t",
       getUser: () => ({ displayName: "luca" }),
       getAccessToken: () => "jeton",
-      // REQ-UIX-06 — le provider écoute le refus de jeton du SDK depuis le 08/08/2026.
+      // le provider écoute le refus de jeton du SDK depuis le 08/08/2026.
       on: vi.fn(),
       off: vi.fn(),
     },
@@ -158,7 +158,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("REQ-UIX-31 — les réglages sont une section du profil, en cartes d'option", () => {
+describe("les réglages sont une section du profil, en cartes d'option", () => {
   it("l'écran `/reglages` n'existe plus — aucune route, aucun lien vers lui", () => {
     // La condition qui rend l'amendement vrai : tant qu'un fichier de route subsiste,
     // Next la sert, et un lien oublié y mène sans que rien ne rougisse.
@@ -223,7 +223,7 @@ describe("REQ-UIX-31 — les réglages sont une section du profil, en cartes d'o
   });
 });
 
-describe("REQ-UI-13 — mode masqué : la bascule agit, et l'effet symétrique est écrit", () => {
+describe("mode masqué : la bascule agit, et l'effet symétrique est écrit", () => {
   it("la bascule appelle setHiddenMode sur le service d'accusés", async () => {
     const receipts = { setHiddenMode: vi.fn() };
     brancherModeMasque(indexedDB, receipts);
@@ -254,14 +254,14 @@ describe("REQ-UI-13 — mode masqué : la bascule agit, et l'effet symétrique e
   it("l'explication dit que l'effet va dans les deux sens", () => {
     render(<Confidentialite indexedDB={indexedDB} />);
 
-    // REQ-RCP-07 : ce n'est pas un réglage à sens unique, et le taire serait une
+    // ce n'est pas un réglage à sens unique, et le taire serait une
     // promesse implicite fausse.
     expect(screen.getByText(/ne verront plus « délivré » ni « lu » de votre part/)).toBeTruthy();
     expect(screen.getByText(/vous ne verrez plus les leurs/)).toBeTruthy();
   });
 });
 
-describe("REQ-UIX-32 — limites connues : sobre, et complet sur les sept sujets", () => {
+describe("limites connues : sobre, et complet sur les sept sujets", () => {
   it("nomme les réactions, les épinglés, « délivré », les métadonnées, l'annuaire et la recherche", () => {
     render(<LimitesConnues />);
 
@@ -270,8 +270,8 @@ describe("REQ-UIX-32 — limites connues : sobre, et complet sur les sept sujets
     expect(screen.getByText(/« Délivré » est une extension à nous/)).toBeTruthy();
     expect(screen.getByText(/voit qui parle à qui/i)).toBeTruthy();
     expect(screen.getByText(/recherche porte sur cet appareil/i)).toBeTruthy();
-    // REQ-INF-18 (E-21) : l'annuaire ouvert est une exposition, donc une limite. Elle
-    // est écrite dans `infra/LIMITES.md` ; cet écran est l'endroit où l'utilisateur la lit.
+    // (E-21) : l'annuaire ouvert est une exposition, donc une limite. Elle
+    // est une limite assumée ; cet écran est l'endroit où l'utilisateur la lit.
     expect(screen.getByText(/trouvable par tous les comptes de ce serveur/i)).toBeTruthy();
   });
 
@@ -279,7 +279,7 @@ describe("REQ-UIX-32 — limites connues : sobre, et complet sur les sept sujets
     /*
      * Interdit n°13, et le cas le plus dur du produit : la promesse E2EE se lit plus large
      * qu'elle ne l'est si on ne dit pas qu'un changement de mot de passe confie au serveur
-     * le secret qui déchiffre tout. `infra/LIMITES.md` le porte pour l'opérateur ; cet
+     * le secret qui déchiffre tout. C'est une limite assumée ; cet
      * écran est le seul endroit où l'utilisateur peut le lire.
      *
      * **Deux faits depuis D-14, et le second est nouveau** : la clé est transmise, et elle
@@ -300,7 +300,7 @@ describe("REQ-UIX-32 — limites connues : sobre, et complet sur les sept sujets
   });
 });
 
-describe("REQ-UIX-33 — Info buttons : quatre boutons, et le premier suit la variante", () => {
+describe("Info buttons : quatre boutons, et le premier suit la variante", () => {
   it("en 1:1 : profil, rechercher, muter, options", async () => {
     rendreAvecSession(<InfosConversation roomId="!dm:t" />);
 
@@ -319,7 +319,7 @@ describe("REQ-UIX-33 — Info buttons : quatre boutons, et le premier suit la va
     expect(groupe.getByRole("button", { name: "Ajouter" })).toBeTruthy();
     expect(groupe.queryByRole("button", { name: "Profil" })).toBeNull();
 
-    // REQ-UI-05 / REQ-MSG-11 — le compteur vient du paquet.
+    // le compteur vient du paquet.
     expect(await screen.findByText("4 membres")).toBeTruthy();
   });
 
@@ -341,14 +341,14 @@ describe("REQ-UIX-33 — Info buttons : quatre boutons, et le premier suit la va
     });
     fireEvent.click(screen.getByRole("button", { name: "Inviter" }));
 
-    // REQ-INV-16 : ce parcours n'émet aucun appel vers le service de liens.
+    // ce parcours n'émet aucun appel vers le service de liens.
     await waitFor(() =>
       expect(inviter).toHaveBeenCalledWith(expect.anything(), "!g:t", "@mira:t"),
     );
     expect(reseau).not.toHaveBeenCalled();
   });
 
-  it("REQ-UIX-42 — un identifiant sans domaine suffit, et part complété", async () => {
+  it("un identifiant sans domaine suffit, et part complété", async () => {
     salons.mockReturnValue([conversation({ roomId: "!g:t", name: "équipe", direct: false, peerId: undefined })]);
     rendreAvecSession(<InfosConversation roomId="!g:t" />);
 
@@ -367,7 +367,7 @@ describe("REQ-UIX-33 — Info buttons : quatre boutons, et le premier suit la va
   });
 });
 
-describe("REQ-UIX-34 — Options : les éphémères n'existent pas, le kick se mérite", () => {
+describe("Options : les éphémères n'existent pas, le kick se mérite", () => {
   it("l'option « messages éphémères » est absente du DOM, jamais grisée", () => {
     for (const direct of [true, false]) {
       cleanup();
@@ -390,7 +390,7 @@ describe("REQ-UIX-34 — Options : les éphémères n'existent pas, le kick se m
     expect(screen.queryByText("Créer un groupe avec cette personne")).toBeNull();
   });
 
-  it("le niveau de notification courant se lit sans ouvrir l'option (REQ-UIX-36)", () => {
+  it("le niveau de notification courant se lit sans ouvrir l'option", () => {
     render(<OptionsConversation direct niveauLibelle="Mentions uniquement" onOuvrir={vi.fn()} />);
     expect(screen.getByText("Mentions uniquement")).toBeTruthy();
   });
@@ -424,7 +424,7 @@ describe("REQ-UIX-34 — Options : les éphémères n'existent pas, le kick se m
     };
     render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://tacita.test" />);
 
-    // REQ-INV-15 amendée, interdit n°13 : ce que le lien fait vraiment est dit au-dessus
+    // amendée, interdit n°13 : ce que le lien fait vraiment est dit au-dessus
     // du bouton. Depuis E-13 ce n'est plus « l'invitation échouera » mais « un membre
     // confirmera » — le texte a suivi le mécanisme, au lieu de rester juste par accident.
     expect(screen.getByText(/frappe à la porte/i)).toBeTruthy();
@@ -438,7 +438,7 @@ describe("REQ-UIX-34 — Options : les éphémères n'existent pas, le kick se m
   });
 });
 
-describe("REQ-UIX-35 — fond d'écran : aperçu, application sur cet appareil, réinitialisation", () => {
+describe("fond d'écran : aperçu, application sur cet appareil, réinitialisation", () => {
   const choisir = () => {
     const champ = screen.getByLabelText("Choisir une image") as HTMLInputElement;
     fireEvent.change(champ, {
@@ -487,7 +487,7 @@ describe("REQ-UIX-35 — fond d'écran : aperçu, application sur cet appareil, 
   });
 });
 
-describe("REQ-UIX-36 — trois niveaux de notification, en push rules natives", () => {
+describe("trois niveaux de notification, en push rules natives", () => {
   it("« mentions uniquement » appelle la push rule correspondante", async () => {
     render(<NotificationsSalon session={session()} roomId="!g:t" />);
 
@@ -519,7 +519,7 @@ describe("REQ-UIX-36 — trois niveaux de notification, en push rules natives", 
   });
 });
 
-describe("REQ-UIX-37 — les galeries closent le layout info, dans les deux variantes", () => {
+describe("les galeries closent le layout info, dans les deux variantes", () => {
   it("le 1:1 rend ConversationCollections", async () => {
     rendreAvecSession(<InfosConversation roomId="!dm:t" />);
     expect(await screen.findByLabelText("Contenus partagés")).toBeTruthy();
@@ -532,7 +532,7 @@ describe("REQ-UIX-37 — les galeries closent le layout info, dans les deux vari
   });
 });
 
-describe("REQ-MSG-20 / REQ-INV-15 — le sas d'un groupe suit ses liens, et se referme", () => {
+describe("le sas d'un groupe suit ses liens, et se referme", () => {
   const liensAvec = (actifs: { id: string; kind: "friend" | "group"; expiresAt: number; usesLeft: number }[]) => ({
     lister: vi.fn(async () => actifs),
     emettreGroupe: vi.fn(async () => ({ id: "l1", token: "jeton", expiresAt: 0 })),
@@ -602,7 +602,7 @@ describe("REQ-MSG-20 / REQ-INV-15 — le sas d'un groupe suit ses liens, et se r
   });
 });
 
-describe("REQ-UI-25 — voir ses appareils, et pouvoir en fermer un", () => {
+describe("voir ses appareils, et pouvoir en fermer un", () => {
   /*
    * **Ce que l'audit du 25/08/2026 a nommé** : les jetons de ce déploiement n'expirent
    * pas, le changement de mot de passe ne déconnecte personne (D-12) et la clé ouvre une

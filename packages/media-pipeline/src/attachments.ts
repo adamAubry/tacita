@@ -25,8 +25,8 @@ const AES = { name: "AES-CTR", length: 256 } as const;
 const COUNTER_BITS = 64;
 
 /**
- * REQ-MED-08 — rejet explicite d'un blob dont l'empreinte ne correspond pas.
- * REQ-MED-10 — l'erreur ne porte ni clé, ni octets, ni URL : elle est destinée aux logs.
+ * rejet explicite d'un blob dont l'empreinte ne correspond pas.
+ * l'erreur ne porte ni clé, ni octets, ni URL : elle est destinée aux logs.
  */
 export class MediaIntegrityError extends Error {
   constructor() {
@@ -70,7 +70,7 @@ export interface CryptoEnvironment {
 }
 
 /**
- * REQ-MED-01 — chiffrement avant tout contact avec le réseau : le serveur et S3 ne
+ * chiffrement avant tout contact avec le réseau : le serveur et S3 ne
  * reçoivent qu'un blob opaque, la clé ne quitte l'appareil que dans l'événement chiffré.
  */
 export async function encryptAttachment(
@@ -99,7 +99,7 @@ export async function encryptAttachment(
 }
 
 /**
- * REQ-MED-15 — la tranche de déchiffrement. 1 MiB : assez grand pour que le coût par
+ * la tranche de déchiffrement. 1 MiB : assez grand pour que le coût par
  * appel soit négligeable, assez petit pour que le pic mémoire du clair le soit aussi.
  */
 export const TAILLE_TRANCHE = 1024 * 1024;
@@ -124,7 +124,7 @@ function compteurDecale(iv: Bytes, blocs: number): Bytes {
   return decale;
 }
 
-/** REQ-MED-08 — l'empreinte est vérifiée *avant* de déchiffrer, pas après. */
+/** l'empreinte est vérifiée *avant* de déchiffrer, pas après. */
 export async function decryptAttachment(
   ciphertext: Bytes,
   keys: FileKeys,
@@ -145,9 +145,9 @@ export async function decryptAttachment(
 }
 
 /**
- * REQ-MED-15 — **vérification globale une fois, puis déchiffrement par tranches.**
+ * **vérification globale une fois, puis déchiffrement par tranches.**
  *
- * Conforme à REQ-MED-08 à la lettre, et par le mécanisme (a) qu'elle nomme : l'empreinte
+ * Conforme à à la lettre, et par le mécanisme (a) qu'elle nomme : l'empreinte
  * du chiffré **entier** est vérifiée avant qu'un seul octet ne soit déchiffré. Ce que la
  * découpe change, ce n'est pas la vérification — c'est le clair, qui n'existe plus jamais
  * en entier : une tranche vit le temps d'être écrite, puis disparaît.
@@ -156,14 +156,14 @@ export async function decryptAttachment(
  * taille du fichier — chiffré, clair, Blob — à « le chiffré, plus une tranche ».
  *
  * Le chiffré, lui, reste entier en mémoire, et il n'y a pas d'échappatoire en phase 2 :
- * WebCrypto n'expose aucun hash incrémental. C'est ce que les plafonds de REQ-MED-15
+ * WebCrypto n'expose aucun hash incrémental. C'est ce que les plafonds de
  * bornent, et ce que le hachage par blocs lèvera.
  */
 /**
  * Déchiffre une tranche de chiffré **prise à un décalage aligné sur 16 octets**.
  *
  * Le cœur du déchiffrement par plage, partagé par le téléchargement par tranches
- * (REQ-MED-15) et la lecture progressive (REQ-MED-08, mécanisme (b)). Il ne vérifie
+ * et la lecture progressive (mécanisme (b)). Il ne vérifie
  * rien : la vérification appartient à l'appelant, qui sait ce que couvre la tranche.
  */
 export async function dechiffrerA(

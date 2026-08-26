@@ -1,7 +1,7 @@
 import { ReceptionLien } from "../../../components/amis/ReceptionLien";
 
 /**
- * La route que `urlDInvitation` fabrique (spec 12, REQ-INV-03). Le chemin est écrit à un
+ * La route que `urlDInvitation` fabrique (). Le chemin est écrit à un
  * seul endroit dans le dépôt — ici il est **imposé par Next**, et un test de M-G vérifie
  * que les deux correspondent.
  *

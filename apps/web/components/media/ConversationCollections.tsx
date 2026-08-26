@@ -24,7 +24,7 @@ const ONGLETS: { cle: Onglet; libelle: string; vide: string }[] = [
 ];
 
 /**
- * REQ-UIX-17 — **la planche contact : trois carrés par ligne**, comme Instagram.
+ * **la planche contact : trois carrés par ligne**, comme Instagram.
  *
  * Trois colonnes et pas un nombre calculé : c'est le compte qui garde une vignette
  * reconnaissable sur la largeur d'un téléphone, et le même sur un écran large — où la
@@ -48,22 +48,22 @@ const LISTE = { display: "grid", gap: "var(--spacing-2)", listStyle: "none" } as
 interface ConversationCollectionsProps {
   /** L'historique **déjà téléchargé**, tel que le paquet le rend. */
   evenements: EvenementLu[];
-  /** REQ-MSG-08 — les identifiants épinglés, lus par le câblage. */
+  /** les identifiants épinglés, lus par le câblage. */
   epingles: string[];
   telecharger: Telecharger;
   onOuvrirMedia?: (rang: number) => void;
-  /** REQ-MED-05 — écrire un fichier sur l'appareil, depuis l'onglet Fichiers. */
+  /** écrire un fichier sur l'appareil, depuis l'onglet Fichiers. */
   onSauvegarder?: (media: Media) => void;
 }
 
 /**
- * REQ-UIX-17 — **un seul** composant de galeries, à quatre onglets, consommé par le
+ * **un seul** composant de galeries, à quatre onglets, consommé par le
  * layout info (M-H) et l'onglet Activity du profil (M-G). Les variations sont des props,
  * jamais des copies (règle du plan frontend).
  *
  * Le périmètre est affiché, pas sous-entendu : ce qui est listé est ce que cet appareil a
  * synchronisé, et rien d'autre. Une galerie muette laisserait croire à un historique
- * complet — c'est la même honnêteté que le périmètre de recherche (REQ-UI-16).
+ * complet — c'est la même honnêteté que le périmètre de recherche.
  */
 export function ConversationCollections({
   evenements,
@@ -99,7 +99,7 @@ export function ConversationCollections({
         Contenu de l'historique téléchargé sur cet appareil.
       </Text>
 
-      {/* REQ-UIX-18 — la liste d'épinglage est un événement d'état, et Matrix ne chiffre
+      {/* la liste d'épinglage est un événement d'état, et Matrix ne chiffre
           pas l'état : le serveur voit quels messages sont épinglés. La phrase vient de la
           métadonnée du paquet, elle n'est pas recopiée. */}
       {onglet === "epingles" && PINNED_EVENTS_METADATA.cleartext && (

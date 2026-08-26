@@ -60,7 +60,7 @@ export function contactsDeLaSession(session: Session): Contacts {
     conversations(session).find((conversation) => conversation.peerId === userId);
 
   /**
-   * REQ-UI-23 — **on n'est pas son propre ami.** La conversation personnelle du parcours
+   * **on n'est pas son propre ami.** La conversation personnelle du parcours
    * d'accueil est inscrite dans `m.direct` sous son propre identifiant, ce qui la fait
    * lire comme une conversation et non comme un groupe d'une personne. Sans cette ligne,
    * elle entrerait aussi dans la liste d'amis et dans la feuille « nouvelle

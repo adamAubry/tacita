@@ -4,22 +4,22 @@
  * qu'un `process.env` recopié dans trois composants diverge au premier renommage.
  */
 
-/** Homeserver Synapse (spec 01), derrière le proxy TLS. */
+/** Homeserver Synapse, derrière le proxy TLS. */
 export const HOMESERVER = process.env.NEXT_PUBLIC_HOMESERVER_URL ?? "https://chat.example.org";
 
 /**
- * Notre déploiement Element Call, embarqué en widget (spec 10, M-I). Servi sous son
- * propre nom d'hôte par l'overlay RTC (REQ-RTC-08) — le défaut suit `call.<SERVER_NAME>`
+ * Notre déploiement Element Call, embarqué en widget (M-I). Servi sous son
+ * propre nom d'hôte par l'overlay RTC — le défaut suit `call.<SERVER_NAME>`
  * de `infra/.env.example`, pas une adresse inventée.
  */
 export const ELEMENT_CALL_URL =
   process.env.NEXT_PUBLIC_ELEMENT_CALL_URL ?? "https://call.chat.example.org";
 
 /**
- * Passerelle Web Push (spec 03) — **deux adresses distinctes, et c'est voulu.**
+ * Passerelle Web Push — **deux adresses distinctes, et c'est voulu.**
  *
  * La clé publique VAPID sort par le proxy, sur `<homeserver>/push/config` : c'est la
- * seule chose de la passerelle qui soit publique (REQ-INF-14). Il n'y a donc pas
+ * seule chose de la passerelle qui soit publique. Il n'y a donc pas
  * d'« origine de la passerelle » à configurer côté client — elle vit derrière le
  * homeserver.
  *

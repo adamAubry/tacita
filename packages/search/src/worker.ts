@@ -3,7 +3,7 @@ import { createEngine, type SearchEngine } from "./engine";
 import type { SearchRequest, SearchResponse } from "./protocol";
 
 /**
- * REQ-SRC-01 — tout ce qui coûte (indexation, requêtes) vit ici : le thread
+ * tout ce qui coûte (indexation, requêtes) vit ici : le thread
  * principal ne fait que poster des messages.
  *
  * Le module est importable tel quel côté test ; c'est le branchement sur
@@ -27,7 +27,7 @@ export function serve(
       const call = ready[method] as (...rest: unknown[]) => Promise<SearchResponse["result"]>;
       response.result = await call(...args);
     } catch (error) {
-      // REQ-SRC-09 — rien du texte indexé ne remonte : seul le message de l'erreur,
+      // rien du texte indexé ne remonte : seul le message de l'erreur,
       // et le module n'écrit dans aucun log.
       response.error = error instanceof Error ? error.message : "erreur inconnue";
     }
@@ -35,7 +35,7 @@ export function serve(
   };
 
   /**
-   * REQ-SRC-08 — les requêtes se sérialisent. Un `wipe` qui s'exécutait entre deux lots
+   * les requêtes se sérialisent. Un `wipe` qui s'exécutait entre deux lots
    * d'un `index` en cours laissait la boucle reprendre et `persist()` réécrire ce que
    * le wipe venait d'effacer. Elles se disputaient déjà une seule base Orama : il n'y a
    * aucun parallélisme réel à perdre.

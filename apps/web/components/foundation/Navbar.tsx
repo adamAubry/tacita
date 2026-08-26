@@ -12,7 +12,7 @@ import {
 } from "./icons";
 import { Text } from "./primitives";
 
-/** REQ-UIX-01 — quatre onglets, icône et libellé, dans l'ordre du wireframe. */
+/** quatre onglets, icône et libellé, dans l'ordre du wireframe. */
 export const ONGLETS = [
   { href: "/", libelle: "Accueil", icone: IconeAccueil },
   { href: "/recherche", libelle: "Recherche", icone: IconeRecherche },
@@ -38,7 +38,7 @@ const LISERE = 4;
 const SEUIL_GLISSEMENT = 8;
 
 /**
- * REQ-UIX-01 — navbar fixée en bas, navigation **sans rechargement** (`next/link`).
+ * navbar fixée en bas, navigation **sans rechargement** (`next/link`).
  *
  * ## L'onglet courant
  *
@@ -71,7 +71,7 @@ const SEUIL_GLISSEMENT = 8;
  * Icône en haut, libellé en dessous, en permanence. Ce que ça remplace : un tooltip qui
  * n'apparaissait qu'au survol ou au maintien. Une information permanente n'a pas besoin
  * d'être révélée, et un libellé visible **est** la cible de 44 px plutôt que d'être posé
- * au-dessus d'elle. C'est aussi le motif des Info buttons (REQ-UIX-33) : une icône a le
+ * au-dessus d'elle. C'est aussi le motif des Info buttons : une icône a le
  * même poids visuel où qu'elle se trouve dans l'app.
  *
  * ## La pastille se déplace au doigt

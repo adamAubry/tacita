@@ -40,7 +40,7 @@ ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
 # `standalone/apps/web/server.js` — d'où les chemins ci-dessous.
 COPY --from=build /repo/apps/web/.next/standalone ./
 COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
-# Le service worker (REQ-UI-01) vit dans `public/` : sans cette copie, `/sw.js` répond
+# Le service worker vit dans `public/` : sans cette copie, `/sw.js` répond
 # 404, la PWA ne s'installe pas, et rien dans les logs ne le dit.
 COPY --from=build /repo/apps/web/public ./apps/web/public
 

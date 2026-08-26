@@ -19,7 +19,7 @@ const REACTIONS_ETENDUES = [
 interface HoldMenuProps {
   ouvert: boolean;
   onFermer: () => void;
-  /** Conditionnés aux droits exposés par le package (REQ-MSG-06). */
+  /** Conditionnés aux droits exposés par le package. */
   modifiable: boolean;
   supprimable: boolean;
   epingle: boolean;
@@ -32,14 +32,14 @@ interface HoldMenuProps {
 }
 
 /**
- * REQ-UI-07 / REQ-UIX-14 — Hold menu (composant 12) : les réactions en haut, les actions
+ * Hold menu (composant 12) : les réactions en haut, les actions
  * ensuite.
  *
  * **Les items absents ne sont pas grisés, ils n'existent pas.** DESIGN.md interdit
  * l'option grisée sans explication, et « modifier » sur le message de quelqu'un d'autre
  * n'a pas d'explication à donner — elle n'a simplement pas lieu d'être.
  *
- * La mention sur le non-chiffrement des réactions (REQ-UI-10) est discrète mais présente,
+ * La mention sur le non-chiffrement des réactions est discrète mais présente,
  * et elle vient de `REACTIONS_METADATA` : la recopier ici la ferait mentir le jour où le
  * paquet changerait d'avis.
  */

@@ -2,7 +2,7 @@ import { jourSeparateur } from "../../lib/dates";
 import { Text } from "../foundation/primitives";
 
 /**
- * REQ-UI-06 — Date separator (composant 13).
+ * Date separator (composant 13).
  *
  * DESIGN.md en fait « l'élévation zéro incarnée » : filet — caption — filet, centré.
  * Pas de pilule, pas de fond, pas d'ombre — le séparateur situe, il ne s'annonce pas.

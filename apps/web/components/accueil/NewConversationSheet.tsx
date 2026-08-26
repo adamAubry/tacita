@@ -14,11 +14,11 @@ interface NewConversationSheetProps {
   ouvert: boolean;
   onFermer: () => void;
   contacts: Contact[];
-  /** REQ-UIX-11 — le DM, existant ou créé. La déduplication vit dans le package. */
+  /** le DM, existant ou créé. La déduplication vit dans le package. */
   onConversation: (userId: string) => void;
   onGroupe: (nom: string, userIds: string[]) => void;
   /**
-   * REQ-UIX-34 — « créer un groupe avec cette personne » ouvre la même feuille, mais
+   * « créer un groupe avec cette personne » ouvre la même feuille, mais
    * directement sur l'étape groupe et avec la personne déjà cochée. Deux props plutôt
    * qu'une copie du composant : c'est la règle du plan frontend, et le premier
    * changement d'étape aurait dérivé entre les deux exemplaires.
@@ -28,12 +28,12 @@ interface NewConversationSheetProps {
 }
 
 /**
- * REQ-UIX-11 — le « + » de l'accueil : « nouvelle conversation » ou « nouveau groupe ».
+ * le « + » de l'accueil : « nouvelle conversation » ou « nouveau groupe ».
  *
  * Trois étapes dans **une** feuille plutôt que trois écrans : la création est un aller
  * simple, et une pile de navigation pour deux taps coûterait un retour à gérer partout.
  *
- * Le doublon de DM n'est pas évité ici mais dans `openDirectMessage` (REQ-MSG-15) : deux
+ * Le doublon de DM n'est pas évité ici mais dans `openDirectMessage` : deux
  * écrans peuvent ouvrir une conversation, et une règle recopiée dérive.
  */
 export function NewConversationSheet({

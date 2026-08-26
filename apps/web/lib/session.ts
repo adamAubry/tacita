@@ -4,14 +4,14 @@ import { lireOnboardingEnCours } from "./preferences";
 
 /**
  * L'état d'entrée dans l'app, tel que l'UI a besoin de le connaître. Rien de plus :
- * la logique vit dans `client-core` (spec 04), le shard ne fait que router dessus.
+ * la logique vit dans `client-core`, le shard ne fait que router dessus.
  */
 export type EtatSession =
   | { phase: "chargement" }
-  /** Aucune session restaurable : REQ-UIX-06 renvoie à l'OIDC, sans écran intermédiaire. */
+  /** Aucune session restaurable : renvoie à l'OIDC, sans écran intermédiaire. */
   | { phase: "hors-session" }
   /**
-   * REQ-COR-06 / REQ-UI-04 — cet appareil ne peut pas encore chiffrer. Bloquant.
+   * cet appareil ne peut pas encore chiffrer. Bloquant.
    *
    * `mode` dit **laquelle des deux étapes** : fabriquer la clé (inscription) ou recevoir
    * celle qui existe déjà (toute reconnexion). Les confondre était le défaut : chaque
@@ -23,7 +23,7 @@ export type EtatSession =
       session: Session;
       mode: Exclude<RecoveryState, "prete">;
       /**
-       * REQ-UI-22 — **un parcours d'accueil resté en plan sur cet appareil**, lu avant de
+       * **un parcours d'accueil resté en plan sur cet appareil**, lu avant de
        * savoir laquelle des deux étapes de clé s'impose.
        *
        * Il est porté ici et pas seulement dans `prete` parce que `mode` ne suffit pas à le
@@ -34,7 +34,7 @@ export type EtatSession =
       onboarding: boolean;
     }
   /**
-   * REQ-UI-22 — l'app est atteignable. `onboarding` dit qu'elle ne s'ouvre pas encore :
+   * l'app est atteignable. `onboarding` dit qu'elle ne s'ouvre pas encore :
    * le parcours d'accueil est commencé et n'est pas fini, sur cet appareil.
    */
   | { phase: "prete"; session: Session; onboarding?: boolean };
@@ -51,7 +51,7 @@ export type EtatSession =
  */
 
 /**
- * REQ-COR-06 / REQ-UI-04 — la porte. `recoveryState()` est la source ; le shard ne dérive
+ * la porte. `recoveryState()` est la source ; le shard ne dérive
  * rien lui-même — il ne fait que router les trois cas sur deux phases.
  *
  * Sans identité cross-signing sur cet appareil, **le compte ne peut pas chiffrer du
@@ -67,7 +67,7 @@ export type EtatSession =
  */
 export async function etatDe(session: Session, indexedDB?: IDBFactory): Promise<EtatSession> {
   /*
-   * REQ-UI-22 — la reprise du parcours d'accueil. Elle est lue **ici** et non dans un
+   * la reprise du parcours d'accueil. Elle est lue **ici** et non dans un
    * écran : la porte montre déjà une géométrie d'attente pendant que cette fonction
    * répond, et une lecture faite plus tard ferait clignoter l'accueil avant le parcours.
    *

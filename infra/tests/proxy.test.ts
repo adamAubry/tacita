@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const nginxConf = readFileSync(new URL("../proxy/nginx.conf", import.meta.url), "utf-8");
 
-describe("REQ-INF-10 — reverse proxy TLS avec routes /_matrix, /livekit/jwt, /livekit/sfu", () => {
+describe("reverse proxy TLS avec routes /_matrix, /livekit/jwt, /livekit/sfu", () => {
   it("écoute en TLS", () => {
     expect(nginxConf).toMatch(/listen\s+443\s+ssl/);
     expect(nginxConf).toMatch(/ssl_certificate\s+\S+/);
@@ -33,7 +33,7 @@ describe("REQ-INF-10 — reverse proxy TLS avec routes /_matrix, /livekit/jwt, /
   });
 });
 
-describe("REQ-INF-09 — plus aucune route d'authentification externe", () => {
+describe("plus aucune route d'authentification externe", () => {
   it("`/auth` a disparu du proxy avec Keycloak", () => {
     /*
      * D-12, 25/08/2026. L'assertion porte sur l'absence : une route laissée derrière un
@@ -55,7 +55,7 @@ describe("REQ-INF-09 — plus aucune route d'authentification externe", () => {
   });
 });
 
-describe("REQ-INF-11 — API d'admin de join forcé bloquée au proxy", () => {
+describe("API d'admin de join forcé bloquée au proxy", () => {
   it("/_synapse/admin/ répond 404, placé avant la route /_matrix générique", () => {
     const adminBlockIndex = nginxConf.indexOf("location ^~ /_synapse/admin/");
     const matrixBlockIndex = nginxConf.indexOf("location /_matrix");
@@ -67,14 +67,14 @@ describe("REQ-INF-11 — API d'admin de join forcé bloquée au proxy", () => {
   });
 });
 
-describe("REQ-INF-14 — le certificat de dev couvre le nom que Synapse appelle", () => {
+describe("le certificat de dev couvre le nom que Synapse appelle", () => {
   const script = readFileSync(new URL("../proxy/generate-dev-certs.sh", import.meta.url), "utf-8");
 
   it("le script lit SERVER_NAME dans .env, au lieu de retomber sur localhost", () => {
     // Le README fait lancer le script juste après `cp .env.example .env`, sans rien
     // exporter. Sans cette lecture, le certificat portait `CN=localhost` alors que
     // Synapse appelle `chat.example.org` : un subjectAltName juste, sur le mauvais nom
-    // — la panne que REQ-INF-14 venait de corriger, revenue par la porte d'à côté.
+    // — la panne que venait de corriger, revenue par la porte d'à côté.
     // ponytail: garde par chaîne ; la preuve réelle est le certificat régénéré, que
     // seule la cible de fumée exerce. Celui-ci empêche la régression silencieuse.
     expect(script).toMatch(/ENV_FILE=/);
@@ -89,7 +89,7 @@ describe("REQ-INF-14 — le certificat de dev couvre le nom que Synapse appelle"
 });
 
 /**
- * REQ-INF-06 — **le plafond de téléversement doit être annonçable au client.**
+ * **le plafond de téléversement doit être annonçable au client.**
  *
  * Un rejet produit par nginx n'atteint jamais Synapse, donc ne porte aucun en-tête CORS :
  * le navigateur masque le statut au JavaScript et ne rend qu'une erreur d'origine. Le
@@ -97,7 +97,7 @@ describe("REQ-INF-14 — le certificat de dev couvre le nom que Synapse appelle"
  * une file d'envoi réessaie en boucle. Mesuré le 20/08/2026, avec un envoi de plus de
  * 200 Mo.
  */
-describe("REQ-INF-06 — un 413 reste lisible par le navigateur", () => {
+describe("un 413 reste lisible par le navigateur", () => {
   const bloc = /location @televersement_trop_gros \{([^}]*)\}/s.exec(nginxConf)?.[1];
 
   it("le 413 est routé vers un bloc qui pose les en-têtes CORS", () => {

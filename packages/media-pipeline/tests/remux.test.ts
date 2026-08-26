@@ -7,7 +7,7 @@ import { crc32Ogg, echantillonsOpus, lireWebmOpus, remuxWebmOpusVersOgg, type By
  * lecteur : identifiants réels, vints réels, blocs réels, y compris la taille « inconnue »
  * que `MediaRecorder` écrit sur Segment et Cluster parce qu'il diffuse.
  *
- * Limite assumée, à ne pas masquer (spec 00, règle 4 — « module terminé » et « produit qui
+ * Limite assumée, à ne pas masquer (règle 4 — « module terminé » et « produit qui
  * marche » sont deux portes) : ceci prouve la transformation, pas qu'un vrai blob de
  * `MediaRecorder` la traverse. Cette seconde porte demande un navigateur, que l'interdit
  * n°12 ferme à la suite de tests. Elle s'ouvrira au spike E-10, sur appareil réel.
@@ -114,7 +114,7 @@ function lirePagesOgg(flux: Bytes) {
   return pages;
 }
 
-describe("REQ-MED-07 — remuxage WebM → Ogg : le flux Opus traverse intact", () => {
+describe("remuxage WebM → Ogg : le flux Opus traverse intact", () => {
   it("extrait l'OpusHead et les paquets du WebM, dans l'ordre du fichier", () => {
     const lu = lireWebmOpus(webmDeTest([paquetOpus(0xaa), paquetOpus(0xbb)]));
 

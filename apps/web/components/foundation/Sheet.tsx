@@ -66,7 +66,7 @@ function BoutonFermer({ onFermer }: { onFermer: () => void }) {
 }
 
 /**
- * REQ-UIX-05 — la modale et le bottom-sheet de l'app, un seul composant.
+ * la modale et le bottom-sheet de l'app, un seul composant.
  *
  * **La géométrie est portée ici, parce qu'Astryx la porte pour un dialogue de bureau.**
  * Ses défauts sont `width: 400px` et `maxWidth: 90vw` ; avec `left: 0` et `right: 0`, une

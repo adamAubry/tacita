@@ -23,7 +23,7 @@ interface LienInvitationProps {
 const dateLisible = (ms: number) => new Date(ms).toLocaleString();
 
 /**
- * REQ-UIX-34 / spec 12 — les liens d'invitation d'un groupe : émettre, voir l'expiration,
+ * Les liens d'invitation d'un groupe : émettre, voir l'expiration,
  * révoquer.
  *
  * **Le sas d'entrée suit le cycle de vie des liens** (E-13, voie A). Un lien de groupe ne
@@ -32,18 +32,18 @@ const dateLisible = (ms: number) => new Date(ms).toLocaleString();
  * lien actif** et revient à `invite` **à la révocation du dernier** — pas de knock
  * permanent sur tous les groupes, et pas de porte qui reste entrouverte après coup.
  *
- * La bascule est ici et non dans `createGroupChat` (spec 05 inchangée par défaut) parce
+ * La bascule est ici et non dans `createGroupChat` (`@tacita/messaging` inchangée par défaut) parce
  * que c'est ici qu'on sait combien de liens sont actifs. Elle est **idempotente** : on ne
  * réécrit l'état que s'il diffère, un `m.room.join_rules` inutile étant un événement de
  * plus dans un salon partagé.
  *
  * **La limite est écrite au-dessus du bouton, pas en bas de page** (interdit n°13,
- * REQ-INV-15 amendée) : le service de liens n'a aucun pouvoir Matrix, il ne peut donc pas
+ * amendée) : le service de liens n'a aucun pouvoir Matrix, il ne peut donc pas
  * voir que l'émetteur a quitté le groupe. Depuis E-13 la conséquence a changé de nature —
  * le porteur frappe, et ce sont **les membres restants** qui confirment. Un lien dont
  * l'émetteur est parti n'est plus une impasse tant qu'il reste quelqu'un dans le groupe.
  *
- * Le token n'est lisible **qu'à l'émission** — le service le stocke haché (REQ-INV-02).
+ * Le token n'est lisible **qu'à l'émission** — le service le stocke haché.
  * La liste des liens actifs ne peut donc montrer que leur identifiant et leur échéance ;
  * un lien qu'on n'a pas copié tout de suite se révoque et se réémet.
  */
@@ -98,7 +98,7 @@ export function LienInvitation({
 
   return (
     <div style={{ display: "grid", gap: "var(--spacing-3)", padding: "var(--spacing-3)" }}>
-      {/* REQ-INV-15 — dit avant d'émettre, et dit ce qui se passe **vraiment** depuis
+      {/* dit avant d'émettre, et dit ce qui se passe **vraiment** depuis
           E-13 : ce n'est plus « l'invitation échouera », c'est « un membre confirmera ». */}
       <Banner
         status="info"

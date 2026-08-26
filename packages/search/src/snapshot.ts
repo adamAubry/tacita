@@ -7,7 +7,7 @@ const VERSION = 1;
 /**
  * Génération du **schéma d'index**, distincte de la version du store IndexedDB.
  * `load()` restaure les index internes d'Orama tels qu'ils ont été sauvegardés : un
- * snapshot d'avant REQ-SRC-11 n'a pas d'index `msgtype` ni `mentions`, et un `where`
+ * snapshot d'avant n'a pas d'index `msgtype` ni `mentions`, et un `where`
  * dessus échouerait sur une base pourtant « chargée ». On préfère repartir vide.
  *
  * Un snapshot périmé est **effacé**, pas ignoré : c'est du contenu déchiffré, il n'a
@@ -34,7 +34,7 @@ export interface Snapshot {
 }
 
 /**
- * REQ-SRC-02 — l'index sérialisé vit en IndexedDB, sous une seule clé. Rien
+ * l'index sérialisé vit en IndexedDB, sous une seule clé. Rien
  * d'autre : le contenu déchiffré n'a pas à traîner dans un stockage synchrone.
  */
 export async function openSnapshot(
@@ -51,7 +51,7 @@ export async function openSnapshot(
 
   /**
    * Le `onsuccess` d'une requête précède le commit de sa transaction, qui peut encore
-   * avorter : sans ça, `clear()` (REQ-SRC-08) résout avant que l'effacement soit
+   * avorter : sans ça, `clear()` résout avant que l'effacement soit
    * acquis. Sur erreur, `transaction.error` n'est pas encore posé quand `onerror` se
    * déclenche — d'où le repli, sans lequel on rejetterait avec `null`.
    */

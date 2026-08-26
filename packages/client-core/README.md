@@ -1,4 +1,4 @@
-# @tacita/client-core — session, crypto, store, sync (spec 04)
+# @tacita/client-core — session, crypto, store, sync
 
 Couche fondation du client, headless (zéro DOM). Tous les autres packages
 reçoivent le `MatrixClient` via `initSession` : **aucun autre package n'importe
@@ -32,7 +32,7 @@ await session.logout(); // révocation + wipe complet
   affiche un historique sans jamais paginer le verra rétrécir tout seul.
 - **Logs.** Utiliser `createLogger()` / `eventRef()`. Le logger filtre
   structurellement les corps d'événements ; un `console.log` direct sur un
-  contenu déchiffré viole REQ-COR-09 même en dev.
+  contenu déchiffré viole même en dev.
 - **Wipe.** Tout package qui persiste des données appelle `registerWipe` à
   l'initialisation, sinon ses données survivent à la déconnexion.
 
@@ -50,26 +50,26 @@ await session.logout(); // révocation + wipe complet
   (D-06) avant d'être implémentée.
 - **Un jeton restauré n'est pas validé.** Le valider demanderait le réseau, ce que
   `restoreSession` existe pour éviter. Un jeton révoqué se manifeste par un
-  `M_UNKNOWN_TOKEN` au premier appel : c'est au shard UI (spec 11) de router vers
+  `M_UNKNOWN_TOKEN` au premier appel : c'est au shard UI de router vers
   l'OIDC à ce moment-là.
 - **La confiance vient de l'identité, pas d'une vérification appareil par appareil**
-  (D-08). REQ-COR-07 verrouille le mode `OnlySignedDevicesIsolationMode` : les clés
+  (D-08). verrouille le mode `OnlySignedDevicesIsolationMode` : les clés
   Megolm ne partent qu'aux appareils que leur propriétaire a signés de son identité
   cross-signing, et un événement venu d'un appareil non signé reste illisible. Comme
-  REQ-COR-06 impose ce bootstrap à l'inscription, aucune étape supplémentaire n'est
+ impose ce bootstrap à l'inscription, aucune étape supplémentaire n'est
   demandée à l'utilisateur.
   **Conséquence découverte en fumée, à connaître côté UI :** sans identité
   cross-signing, un compte ne peut pas chiffrer *du tout* — la crypto Rust rejette
   l'envoi (« Encryption failed because cross-signing is not set up on your account »).
   Le bootstrap n'est donc plus seulement la condition pour être lu, c'est la condition
-  pour écrire. L'étape bloquante de REQ-UI-04 n'est pas un confort : la sauter rend le
+  pour écrire. L'étape bloquante de n'est pas un confort : la sauter rend le
   client muet.
   **Ce que ce modèle ne couvre pas, et qu'il faut dire à l'utilisateur :** si le
   compte d'un correspondant est entièrement compromis — ses secrets cross-signing
   avec — l'attaquant peut signer un appareil à lui, et ses signatures deviennent
   menteuses. Épingler l'identité par vérification interactive (SAS/QR) est la parade ;
   elle est hors V1, spec dédiée post-V1. En attendant, une **réinitialisation
-  d'identité** d'un correspondant fait lever le chiffrement : l'UI (spec 11) doit
+  d'identité** d'un correspondant fait lever le chiffrement : l'UI doit
   exiger une confirmation explicite avant tout nouvel envoi vers lui, pas un
   avertissement ignorable.
   Corollaire : l'override par salon (`Room.setBlacklistUnverifiedDevices`) n'a plus

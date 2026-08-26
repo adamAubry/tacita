@@ -13,7 +13,7 @@ interface SuggestionsProps {
 }
 
 /**
- * REQ-UIX-28 — composant 16, variation **suggestion** : une carte cliquable qui mène au
+ * composant 16, variation **suggestion** : une carte cliquable qui mène au
  * profil. Elle ne porte aucune action directe — ajouter quelqu'un se décide sur son
  * profil, après l'avoir regardé, pas depuis une ligne de résultat.
  */
@@ -37,7 +37,7 @@ export function Suggestions({ profils, onOuvrirProfil }: SuggestionsProps) {
                 <Text type="body" weight="bold" maxLines={1}>
                   {profil.displayName}
                 </Text>
-                {/* REQ-UIX-42 — sans le domaine : c'est le même pour tout le monde. */}
+                {/* sans le domaine : c'est le même pour tout le monde. */}
                 <Text type="supporting" color="secondary" maxLines={1}>
                   {identifiantCourt(profil.userId)}
                 </Text>
@@ -57,7 +57,7 @@ interface DemandesListProps {
 }
 
 /**
- * REQ-UIX-29 — composant 16, variation **demande** : accepter en vert, refuser en rouge.
+ * composant 16, variation **demande** : accepter en vert, refuser en rouge.
  *
  * Les deux couleurs sont les seules de l'app à porter un sens par elles-mêmes ; elles
  * sont doublées par leur libellé, parce qu'une paire vert/rouge seule est illisible pour
