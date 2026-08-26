@@ -13,7 +13,6 @@ const readme = readFileSync(new URL("../README.md", import.meta.url), "utf-8");
 const callConf = readFileSync(new URL("../call.conf", import.meta.url), "utf-8");
 const baseCallConf = readFileSync(new URL("../../proxy/call.conf", import.meta.url), "utf-8");
 const nginx = readFileSync(new URL("../../proxy/nginx.conf", import.meta.url), "utf-8");
-const config = readFileSync(new URL("../element-call.json", import.meta.url), "utf-8");
 
 const IMAGE = overlay.services["element-call"].image as string;
 
@@ -48,7 +47,13 @@ describe("Element Call auto-hébergé, épinglé, et sa version consignée", () 
   });
 
   it("le mode MatrixRTC est épinglé, et jamais celui des événements sticky", () => {
-    const { matrix_rtc_mode } = JSON.parse(config) as { matrix_rtc_mode?: string };
+    // La configuration est servie par le proxy, pas écrite dans le conteneur : l'image
+    // tourne en uid 101 et ne peut pas écrire dans son propre `/app`.
+    const json = /location = \/config\.json[\s\S]*?return 200 '(.*?)';/.exec(callConf)?.[1];
+    expect(json).toBeTruthy();
+    const { matrix_rtc_mode } = JSON.parse(json!.replaceAll("$homeserver", "chat.example.org")) as {
+      matrix_rtc_mode?: string;
+    };
 
     // Épinglé : au défaut, c'est le réglage développeur de chaque utilisateur qui
     // décide, donc une forme d'événements différente par appareil.
@@ -71,6 +76,22 @@ describe("Element Call auto-hébergé, épinglé, et sa version consignée", () 
     expect(monte(base.services.proxy)).toBe(true);
     expect(monte(overlay.services.proxy)).toBe(true);
     expect(nginx).toContain("include /etc/nginx/call.conf;");
+  });
+
+  it("le conteneur d'Element Call reste celui d'amont : rien à écrire, donc rien à casser", () => {
+    // Le défaut du 26/08/2026, et le seul qui ait jamais empêché la pile de démarrer :
+    // un `sed` d'entrypoint écrivait dans `/app`, que l'image possède en root alors
+    // qu'elle tourne en uid 101. Sortie immédiate, relance toutes les 60 secondes.
+    const service = overlay.services["element-call"] as Record<string, unknown>;
+    expect(service.entrypoint).toBeUndefined();
+    expect(service.command).toBeUndefined();
+    expect(service.volumes).toBeUndefined();
+    expect(service.user).toBeUndefined();
+
+    // Et la configuration se prend au domaine de la requête, comme le `.well-known` :
+    // aucune valeur templatée au démarrage, donc rien à rendre avant de servir.
+    expect(callConf).toMatch(/server_name\s+~\^call\\\.\(\?<homeserver>/);
+    expect(callConf).toContain("$homeserver/livekit/jwt");
   });
 
   it("l'overlay sert Element Call sous son propre nom d'hôte, pas sous un préfixe", () => {

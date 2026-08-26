@@ -57,17 +57,11 @@ services:
   element-call:
     image: ghcr.io/element-hq/element-call@sha256:e352de468647777e3780fec45281e2ccc90da69a828f7a3d88700ff9ac04bb0b # v0.23.0, résolu le 2026-08-07
     restart: unless-stopped
-    # Même motif que `livekit-sfu` ci-dessus : deux valeurs templatées et pas
-    # d'envsubst dans l'image. Le fichier est écrit là où l'image le sert.
-    entrypoint:
-      - /bin/sh
-      - -c
-      - sed "s|__SERVER_NAME__|$$SERVER_NAME|g" /conf/config.json > /app/config.json
-        && exec nginx -g "daemon off;"
-    environment:
-      SERVER_NAME: ${SERVER_NAME}
-    volumes:
-      - ./element-call.json:/conf/config.json:ro
+    # **Aucun entrypoint, aucun volume, aucune variable** : le conteneur est celui
+    # d'amont, tel quel. Sa configuration est servie par le proxy (`rtc/call.conf`,
+    # `location = /config.json`), parce que l'image tourne en uid 101 et que son `/app`
+    # appartient à root — le `sed` au démarrage qui vivait ici ne pouvait pas écrire, et
+    # le conteneur repartait toutes les 60 secondes sans jamais servir une page.
 
   proxy:
     # aucun `ports:` ici, et c'est le fait marquant de cet overlay : le proxy garde

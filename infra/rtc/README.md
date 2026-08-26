@@ -149,13 +149,30 @@ foi et ne faisaient rien du tout.
 
 1. relire `src/UrlParams.ts` de la nouvelle version — `UserIntent` et `UrlConfiguration`
    sont la source, et les noms y bougent (`hideHeader` → `header` en est la preuve) ;
-2. vérifier `MatrixRTCMode` dans `src/config/ConfigOptions.ts`. Notre `element-call.json`
-   épingle `compatibility`. **Ne pas passer à `matrix_2_0`** sans changer d'abord
+2. vérifier `MatrixRTCMode` dans `src/config/ConfigOptions.ts`. Notre configuration —
+   servie par `call.conf`, voir ci-dessous — épingle `compatibility`. **Ne pas passer à `matrix_2_0`** sans changer d'abord
    `packages/calls` : ce mode active les événements *sticky* de MSC4354, et `activeCall()`
    cesserait de voir les participants **sans erreur bruyante** — le salon afficherait
    simplement « aucun appel ». C'est la divergence que `packages/calls/README.md` annonce ;
 3. mettre à jour version, digest et date ci-dessus. Un digest non consigné est une
    jonction non relue, quelle que soit la qualité du reste.
+
+**Sa configuration est servie par le proxy, pas écrite dans le conteneur.** L'image tourne
+en uid 101 et son `/app` appartient à root : l'overlay y rendait pourtant un `config.json`
+par un `sed` au démarrage, qui ne pouvait pas aboutir. Le conteneur sortait en
+« Permission denied » avant de lancer nginx, et Docker le relançait toutes les
+60 secondes — le plafond de son backoff, ce qui donne l'illusion trompeuse d'un
+redémarrage régulier plutôt que d'un échec immédiat.
+
+Personne ne l'avait vu, et c'est la partie instructive : tant que l'overlay exigeait deux
+IPv4 publiques, **cet entrypoint n'avait jamais tourné une seule fois**. Les tests de
+`rtc/tests/` lisaient sa chaîne dans le YAML et la trouvaient bien formée. Règle 4 :
+« module terminé » et « produit qui marche » sont deux portes distinctes.
+
+`rtc/call.conf` sert donc `/config.json` lui-même, en tirant le nom du homeserver du
+domaine de la requête (`server_name ~^call\.(?<homeserver>.+)$`) — le patron de
+`well-known.conf`, pour la même raison. Le conteneur reste celui d'amont : aucun
+entrypoint, aucun volume, aucune variable, et rien à écrire au démarrage.
 
 Le certificat monté depuis `proxy/certs` doit porter un **SAN pour `call.<SERVER_NAME>`**.
 Sans lui, l'iframe échoue au TLS et le shard n'affiche que son délai de chargement, sans
