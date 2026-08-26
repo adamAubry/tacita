@@ -1,0 +1,11 @@
+{
+  "name": "admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7"
+  }
+}

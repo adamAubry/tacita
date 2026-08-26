@@ -8,10 +8,11 @@
   },
   "scripts": {
     "test": "vitest run --maxWorkers=4",
-    "typecheck": "tsc -p infra && tsc -p apps/push-gateway && tsc -p apps/invite-tokens && tsc -p apps/web && tsc -p packages/client-core && tsc -p packages/messaging && tsc -p packages/outbox && tsc -p packages/search && tsc -p packages/receipts && tsc -p packages/media-pipeline && tsc -p packages/calls",
+    "typecheck": "tsc -p infra && tsc -p apps/admin && tsc -p apps/push-gateway && tsc -p apps/invite-tokens && tsc -p apps/web && tsc -p packages/client-core && tsc -p packages/messaging && tsc -p packages/outbox && tsc -p packages/search && tsc -p packages/receipts && tsc -p packages/media-pipeline && tsc -p packages/calls",
     "lint": "eslint .",
     "prepare": "husky",
-    "smoke": "node --env-file=infra/.env node_modules/vitest/vitest.mjs run --config infra/smoke/vitest.config.ts"
+    "smoke": "node --env-file=infra/.env node_modules/vitest/vitest.mjs run --config infra/smoke/vitest.config.ts",
+    "admin": "node --disable-warning=ExperimentalWarning --experimental-strip-types apps/admin/src/index.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
