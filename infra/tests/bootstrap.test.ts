@@ -169,6 +169,41 @@ describe("tout ce qui se demande, se demande avant", () => {
   });
 });
 
+describe("les questions s'affichent, et ne se retrouvent pas dans les réponses", () => {
+  /**
+   * Le défaut qui faisait paraître le script figé après le « o » de confirmation :
+   * `demander` est appelée dans un `$(...)`, qui capture stdout. Son invite, écrite
+   * sur stdout, n'apparaissait donc jamais — l'utilisateur voyait un écran muet
+   * pendant que `read` attendait sa saisie — et venait de surcroît se coller devant la
+   * réponse dans la variable, qu'`admin init` rejetait ensuite.
+   *
+   * Le test extrait la fonction **du script lui-même** et la fait tourner : une
+   * assertion sur le texte ne dirait pas si la capture est propre.
+   */
+  const fonction = /^demander\(\) \{[\s\S]*?^\}/m.exec(bootstrap)?.[0];
+
+  it("la fonction de saisie existe telle que le test l'attend", () => {
+    expect(fonction).toBeDefined();
+  });
+
+  it("la variable ne reçoit que la réponse, jamais l'invite", () => {
+    const resultat = spawnSync(
+      "sh",
+      ["-c", `${fonction}\nREPONSE="$(demander 'Nom du serveur')"\nprintf '[%s]' "$REPONSE"`],
+      { input: "chat.tacita.fr\n", encoding: "utf-8" },
+    );
+    expect(resultat.stdout).toBe("[chat.tacita.fr]");
+  });
+
+  it("l'invite est bien affichée, sur la sortie d'erreur", () => {
+    const resultat = spawnSync("sh", ["-c", `${fonction}\nX="$(demander 'Nom du serveur')"`], {
+      input: "x\n",
+      encoding: "utf-8",
+    });
+    expect(resultat.stderr).toContain("Nom du serveur");
+  });
+});
+
 describe("le parcours enchaîne les six étapes", () => {
   // Un seul déroulé pour les trois assertions : chacun lance un shell et plusieurs
   // processus Node, et les multiplier rendait la suite instable sous charge.

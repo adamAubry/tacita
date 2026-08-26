@@ -227,8 +227,12 @@ fi
 
 # Le domaine et l'e-mail ne servent qu'à la configuration — mais ils se demandent ici,
 # avec le reste, plutôt qu'au milieu du parcours.
+# L'invite part sur **stderr**, et c'est vital : la fonction est appelée dans un
+# `$(...)`, qui capture stdout. Écrite sur stdout, la question n'apparaissait donc
+# jamais — le script semblait tourner dans le vide alors qu'il attendait une saisie —
+# et se retrouvait de surcroît collée devant la réponse dans la variable.
 demander() {
-  printf '  %s : ' "$1"
+  printf '  %s : ' "$1" >&2
   read -r saisie
   printf '%s' "$saisie"
 }
