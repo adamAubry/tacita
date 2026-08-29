@@ -101,7 +101,11 @@ describe("les rtc_foci sont annoncés quand le RTC est déployé, jamais avant",
     // Même cible que la base : compose fusionne les volumes par point de montage, donc
     // l'overlay remplace le fichier au lieu de s'y ajouter (un doublon ferait échouer
     // le démarrage du conteneur).
-    expect(monté(composeRtc)).toBe(`./well-known.conf:${CIBLE}:ro`);
+    //
+    // La source, elle, est relative à `infra/` et non à ce fichier — c'est le répertoire
+    // du premier `-f` qui fait foi. `infra/tests/montages.test.ts` le vérifie sur le
+    // disque pour tous les overlays ; ici on ne fait que fixer la cible.
+    expect(monté(composeRtc)).toBe(`./rtc/well-known.conf:${CIBLE}:ro`);
   });
 
   it("les deux portent Access-Control-Allow-Origin (sans quoi la découverte échoue en silence)", () => {

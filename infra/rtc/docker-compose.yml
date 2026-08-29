@@ -32,10 +32,15 @@ services:
       # pour lui seul. C'est ce qui permet à un hôte à une seule IPv4 — le cas de
       # l'auto-hébergement — de servir les appels. Motif complet dans livekit.yaml.
       - "5349:5349/tcp"
+    # **Les chemins sont relatifs à `infra/`, pas à ce fichier.** Compose résout les
+    # chemins de *tous* les `-f` contre le répertoire de projet, qui est celui du
+    # **premier** — donc `infra/`. Un `./livekit.yaml` d'apparence évidente désignait
+    # `infra/livekit.yaml`, absent : Docker crée alors un **répertoire** à ce nom et le
+    # monte, et le service lit un répertoire là où il attend un fichier.
     volumes:
-      - ./livekit.yaml:/conf/livekit.yaml:ro
+      - ./rtc/livekit.yaml:/conf/livekit.yaml:ro
       # même certificat que le proxy : le TURN et le homeserver partagent le domaine
-      - ../proxy/certs:/certs:ro
+      - ./proxy/certs:/certs:ro
 
   # Traduit une identité Matrix en jeton d'accès LiveKit. Le SFU ne fait confiance
   # qu'aux jetons qu'il signe : c'est ici que se joue l'autorisation.
@@ -74,6 +79,9 @@ services:
     #
     # même mécanique pour le service d'Element Call : la pile de base
     # monte un fichier vide, l'overlay monte le bloc `server` qui le sert.
+    #
+    # Chemins relatifs à `infra/` — voir `livekit-sfu` : c'est le répertoire du premier
+    # `-f` qui fait foi, jamais celui du fichier qui les écrit.
     volumes:
-      - ./well-known.conf:/etc/nginx/well-known.conf:ro
-      - ./call.conf:/etc/nginx/call.conf:ro
+      - ./rtc/well-known.conf:/etc/nginx/well-known.conf:ro
+      - ./rtc/call.conf:/etc/nginx/call.conf:ro
