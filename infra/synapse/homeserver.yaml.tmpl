@@ -20,9 +20,27 @@ listeners:
     type: http
     x_forwarded: true # derrière le reverse proxy, TLS terminée là-bas
     resources:
-      - names: [client]
+      - names: [client, openid]
         compress: false
-    # Pas de resource "federation" : fédération désactivée, inutile de l'exposer.
+    # **`openid` n'est pas `federation`, et c'est tout l'intérêt.** Relu dans l'image
+    # v1.155.0 : le groupe de servlets `openid` ne contient qu'une classe,
+    # `OpenIdUserInfo`, `PATH = "/openid/userinfo"` — soit le seul endpoint
+    # `/_matrix/federation/v1/openid/userinfo`. Synapse le dit lui-même dans
+    # `app/homeserver.py` : « Skip loading openid resource if federation is defined
+    # since federation resource will include openid ». La ressource est donc un
+    # sous-ensemble strict, et le reste de `/_matrix/federation/` continue de rendre 404.
+    #
+    # Pourquoi il faut : `lk-jwt-service` échange le jeton OpenID du widget d'appel
+    # contre un jeton LiveKit, et il le vérifie par **cet** endpoint (chaîne présente
+    # dans le binaire de l'image épinglée). Sans lui, chaque demande de jeton se solde
+    # par un 500 et aucun appel ne se connecte — constaté sur staging le 29/08/2026.
+    # Deux modules corrects séparément, et le trou entre les deux : règle 1.
+    #
+    # `federation_domain_whitelist: []` reste vide et continue de tout bloquer :
+    # `OpenIdUserInfo` porte `REQUIRE_AUTH = False`, et l'absence d'en-tête
+    # `Authorization` lève `NoAuthenticationError` **avant** le contrôle de liste
+    # blanche, qui n'est donc jamais atteint. Vérifié dans `_base.py` de la même image.
+    # La fédération de salons, elle, reste fermée.
 
 database:
   name: psycopg2

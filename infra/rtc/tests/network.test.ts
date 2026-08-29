@@ -115,3 +115,31 @@ describe("les rtc_foci sont annoncés quand le RTC est déployé, jamais avant",
     }
   });
 });
+
+/**
+ * **La jonction `lk-jwt-service` ↔ `infra`, relue des deux côtés.**
+ *
+ * Le service résout le nom de serveur avant d'appeler `/openid/userinfo` : sans
+ * `/.well-known/matrix/server`, la résolution Matrix retombe sur `<nom>:8448`, port que
+ * cette pile ne publie pas. La demande de jeton échoue alors en 500, sans qu'aucun test
+ * de configuration ne puisse le voir — c'est ce qui s'est passé.
+ *
+ * Les deux fichiers sont montés au même chemin, l'overlay remplaçant la base : la
+ * délégation doit donc vivre dans les **deux**, sinon déployer le SFU la ferait
+ * disparaître, ou l'inverse.
+ */
+describe("la délégation de serveur existe dans les deux .well-known", () => {
+  for (const [nom, conf] of [
+    ["pile de base", wellKnownBase],
+    ["overlay RTC", wellKnownRtc],
+  ] as const) {
+    it(`${nom} : /.well-known/matrix/server pointe le 443`, () => {
+      const bloc = /location\s+=\s+\/\.well-known\/matrix\/server\s*{([^}]*)}/s.exec(conf)?.[1];
+      expect(bloc, "aucune délégation : lk-jwt-service retombera sur le port 8448").toBeTruthy();
+      // Le port compte autant que le nom : c'est le seul que le proxy écoute.
+      expect(bloc).toMatch(/"m\.server":"\$host:443"/);
+      // Même motif que le `.well-known/matrix/client` : sans CORS, l'échec est muet.
+      expect(bloc).toMatch(/Access-Control-Allow-Origin/);
+    });
+  }
+});

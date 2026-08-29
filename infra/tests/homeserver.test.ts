@@ -189,3 +189,40 @@ describe("annuaire ouvert à tous les comptes locaux", () => {
     expect(readme).toContain("regenerate_directory");
   });
 });
+
+/**
+ * **Le seul endroit de fédération que ce déploiement sert, et pourquoi il le sert.**
+ *
+ * Constaté sur staging le 29/08/2026 : rejoindre un appel se soldait par
+ * `POST /livekit/jwt/sfu/get → 500`. `lk-jwt-service` échange le jeton OpenID du widget
+ * contre un jeton LiveKit, et il le vérifie par
+ * `GET /_matrix/federation/v1/openid/userinfo` — chaîne présente dans le binaire de
+ * l'image épinglée. Le listener ne déclarait que `client`, donc l'endpoint n'existait
+ * pas. Deux modules corrects séparément, et le trou entre les deux : règle 1.
+ *
+ * Relu dans l'image v1.155.0 : le groupe de servlets `openid` ne contient qu'une classe,
+ * `OpenIdUserInfo` (`PATH = "/openid/userinfo"`), et `app/homeserver.py` note lui-même
+ * que « federation resource will include openid ». `openid` est donc un sous-ensemble
+ * strict de `federation`, et c'est exactement ce qu'on veut : un endpoint, pas une API.
+ */
+describe("le listener sert l'endpoint OpenID, et rien d'autre de la fédération", () => {
+  const resources = homeserver.listeners[0].resources[0].names as string[];
+
+  it("`openid` est déclaré : sans lui, aucun appel n'obtient de jeton SFU", () => {
+    expect(resources).toContain("openid");
+  });
+
+  it("`federation` ne l'est pas : ce serait ouvrir l'API entière pour un seul endpoint", () => {
+    // Le jour où quelqu'un « corrige » en écrivant `federation`, tout `/_matrix/federation/`
+    // devient public d'un coup — et rien d'autre que cette ligne ne le verrait.
+    expect(resources).not.toContain("federation");
+  });
+
+  it("la fédération de salons reste fermée : la liste blanche ne bouge pas", () => {
+    // `OpenIdUserInfo` porte `REQUIRE_AUTH = False`, et l'absence d'en-tête
+    // `Authorization` lève avant le contrôle de liste blanche — les deux coexistent donc
+    // sans se gêner. Si cette ligne changeait, ce serait une décision, pas un effet de
+    // bord de l'endpoint OpenID.
+    expect(homeserver.federation_domain_whitelist).toEqual([]);
+  });
+});
