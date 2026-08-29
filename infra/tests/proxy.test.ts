@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 
 const nginxConf = readFileSync(new URL("../proxy/nginx.conf", import.meta.url), "utf-8");
@@ -184,4 +185,54 @@ describe("le préfixe d'une route est retiré là où l'amont sert à la racine"
       expect(bloc!.corps).toMatch(attendu);
     });
   }
+});
+
+/**
+ * **Deux nombres qui doivent s'accorder, dans deux dépôts différents.** Le client
+ * s'accorde `pollTimeout + BUFFER_PERIOD_MS` avant d'abandonner un `/sync` ; le proxy,
+ * lui, a un défaut de 60 s. Mesuré au banc le 29/08/2026 contre le digest du compose :
+ * un amont qui répond en 90 s se solde par un **504 à 60,1 s**, cinquante secondes avant
+ * que celui qui attend n'ait renoncé.
+ *
+ * En régime établi Synapse répond en 30 s, donc rien ne mord — et c'est bien le problème :
+ * ça ne mord qu'au redémarrage, caches froids, sur le premier `/sync`, c'est-à-dire au
+ * moment où personne ne cherche la cause du côté du proxy.
+ *
+ * Les constantes sont **relues dans le SDK épinglé**, pas recopiées : un bump qui
+ * allongerait la patience du client doit faire rougir ce test, sans quoi l'écart se
+ * refermerait en silence (règle 7). Si l'une d'elles disparaît, ce test échoue aussi —
+ * c'est voulu : le budget est alors à re-dériver, pas à supposer.
+ */
+describe("le proxy attend plus longtemps que le client sur /sync", () => {
+  // Résolu depuis `client-core`, qui déclare la dépendance : pnpm n'aplatit pas
+  // `node_modules`, et un chemin en dur pointerait sur la mise en page d'aujourd'hui.
+  const sdk = readFileSync(
+    createRequire(new URL("../../packages/client-core/package.json", import.meta.url)).resolve(
+      "matrix-js-sdk/lib/sync.js",
+    ),
+    "utf-8",
+  );
+
+  const constante = (nom: RegExp, quoi: string): number => {
+    const trouve = nom.exec(sdk);
+    expect(trouve, `${quoi} introuvable dans matrix-js-sdk : budget à re-dériver`).toBeTruthy();
+    return Number(trouve![1]) * Number(trouve![2]);
+  };
+
+  it("proxy_read_timeout de /_matrix dépasse le budget que le client s'accorde", () => {
+    // `pollTimeout: 30 * 1000` et `const BUFFER_PERIOD_MS = 80 * 1000`, tels qu'écrits.
+    const budgetClientS =
+      (constante(/pollTimeout:\s*(\d+)\s*\*\s*(\d+)/, "pollTimeout") +
+        constante(/BUFFER_PERIOD_MS\s*=\s*(\d+)\s*\*\s*(\d+)/, "BUFFER_PERIOD_MS")) /
+      1000;
+
+    const bloc = /location\s+\/_matrix\s*{([^}]*)}/s.exec(nginxConf)?.[1];
+    const timeoutS = Number(/proxy_read_timeout\s+(\d+)s;/.exec(bloc ?? "")?.[1]);
+
+    expect(timeoutS, "aucun proxy_read_timeout sur /_matrix : nginx retombe à 60 s").toBeGreaterThan(0);
+    expect(
+      timeoutS,
+      `le proxy renonce à ${timeoutS}s alors que le client attend ${budgetClientS}s`,
+    ).toBeGreaterThan(budgetClientS);
+  });
 });
