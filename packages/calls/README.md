@@ -90,6 +90,19 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
   `discoverFocus` lève `RtcFociMissingError` avec une `reason` (`well-known-unreachable`,
   `well-known-absent`, `no-livekit-focus`) : l'UI doit afficher la cause, pas désactiver
   un bouton en silence.
+- **Le pont est à double sens, et le second sens est à la charge de l'hôte.** Le driver
+  répond à ce que le widget *demande* ; `ClientWidgetApi` n'observe rien de lui-même.
+  `attachCallWidget` branche donc `RoomEvent.Timeline`, `MatrixEventEvent.Decrypted` et
+  `ClientEvent.ReceivedToDeviceMessage` sur `feedEvent`/`feedToDevice`, filtrés sur le
+  salon de l'appel.
+
+  Ajouté le 29/08/2026, après un appel qui se connectait sans qu'on entende rien :
+  Element Call chiffre le média **par participant** et distribue les clés par événements
+  Matrix. Chacun envoyait la sienne — `sendEvent` passe par le driver — et ne recevait
+  jamais celle d'en face : deux flux GCM que personne ne pouvait ouvrir. L'appartenance,
+  elle, marchait, parce qu'elle se **tire** de l'état du salon. Tout ce qui se tirait
+  marchait, tout ce qui se pousse manquait.
+
 - **Le widget reçoit les capacités qu'il demande, sauf celles que le driver ne tient pas.**
   Element Call est notre propre déploiement, dont ce module construit lui-même l'URL : il
   n'y a pas d'origine tierce à arbitrer, donc pas d'invite utilisateur. Le confinement vient

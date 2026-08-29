@@ -1,5 +1,14 @@
 import type { Session } from "@tacita/client-core";
-import { Direction, RoomStateEvent, type MatrixEvent } from "matrix-js-sdk";
+import {
+  ClientEvent,
+  Direction,
+  MatrixEventEvent,
+  RoomEvent,
+  RoomStateEvent,
+  type MatrixEvent,
+  type ReceivedToDeviceMessage,
+  type Room,
+} from "matrix-js-sdk";
 import { ClientWidgetApi, Widget } from "matrix-widget-api";
 
 import { CallWidgetDriver } from "./driver";
@@ -210,7 +219,62 @@ export function attachCallWidget(
 
   const api = new ClientWidgetApi(widget, iframe, new CallWidgetDriver(session, roomId));
   if (onReady) api.once("ready", onReady);
-  return () => api.stop();
+
+  /*
+   * **Le widget ne reçoit que ce qu'on lui pousse.** `ClientWidgetApi` sait *répondre*
+   * aux demandes du widget — c'est le rôle du driver — mais il n'observe rien tout seul.
+   * `feedEvent` et `feedToDevice` sont des méthodes de l'hôte, et la doc d'amont le dit
+   * en toutes lettres : « As a client you are expected to call this for every to-device
+   * event you receive. » Sans elles, la conversation est à sens unique.
+   *
+   * Ce que ça coûtait, constaté sur staging le 29/08/2026 : l'appel se connecte, ICE
+   * s'établit en UDP direct, les deux côtés publient leur piste — et personne n'entend
+   * rien. Element Call chiffre le média **par participant** (`perParticipantE2EE`, la
+   * garantie du produit) et distribue les clés par des événements Matrix. Chacun envoyait
+   * la sienne — `sendEvent` marche, il passe par le driver — et ne recevait jamais celle
+   * d'en face. Deux flux GCM que personne ne peut ouvrir.
+   *
+   * L'appartenance, elle, fonctionnait : elle se lit dans l'**état** du salon, que le
+   * widget va chercher par `readRoomState`. C'est ce qui rendait le défaut si trompeur —
+   * tout ce qui se tire marchait, tout ce qui se pousse manquait.
+   */
+  const nourrir = (event: MatrixEvent): void => {
+    // Un événement qu'on ne sait pas déchiffrer n'a rien à dire au widget, et le lui
+    // envoyer chiffré lui ferait croire à un message inconnu.
+    if (event.isDecryptionFailure()) return;
+    void api.feedEvent(event.getEffectiveEvent() as never, roomId).catch(() => {});
+  };
+
+  const surTimeline = (event: MatrixEvent, room: Room | undefined): void => {
+    if (room?.roomId === roomId) nourrir(event);
+  };
+
+  /*
+   * Le salon est chiffré : un événement arrive d'abord en `m.room.encrypted` et n'est
+   * déchiffré qu'ensuite. `Room.timeline` le voit sous sa forme fermée — c'est
+   * `Decrypted` qui porte le contenu, et donc la clé de média. Même paire d'écouteurs
+   * que `@tacita/messaging`, et pour la même raison.
+   */
+  const surDechiffrement = (event: MatrixEvent): void => {
+    if (event.getRoomId() === roomId) nourrir(event);
+  };
+
+  const surToDevice = ({ message, encryptionInfo }: ReceivedToDeviceMessage): void => {
+    // `encryptionInfo` vaut `null` quand le message est arrivé en clair : c'est
+    // exactement le booléen que le widget attend, pas une supposition de notre part.
+    void api.feedToDevice(message as never, encryptionInfo !== null).catch(() => {});
+  };
+
+  session.client.on(RoomEvent.Timeline, surTimeline);
+  session.client.on(MatrixEventEvent.Decrypted, surDechiffrement);
+  session.client.on(ClientEvent.ReceivedToDeviceMessage, surToDevice);
+
+  return () => {
+    session.client.off(RoomEvent.Timeline, surTimeline);
+    session.client.off(MatrixEventEvent.Decrypted, surDechiffrement);
+    session.client.off(ClientEvent.ReceivedToDeviceMessage, surToDevice);
+    api.stop();
+  };
 }
 
 /**
