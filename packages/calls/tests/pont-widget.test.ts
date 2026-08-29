@@ -4,7 +4,14 @@ import { ClientEvent, MatrixEventEvent, RoomEvent } from "matrix-js-sdk";
 import { ClientWidgetApi } from "matrix-widget-api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { attachCallWidget } from "../src/index";
+import {
+  attachCallWidget,
+  ELEMENT_ACTION_ALWAYS_ON_SCREEN,
+  ELEMENT_ACTION_CLOSE,
+  ELEMENT_ACTION_DEVICE_MUTE,
+  ELEMENT_ACTION_HANGUP,
+  ELEMENT_ACTION_JOIN,
+} from "../src/index";
 
 /**
  * **Le pont ne parle que dans un sens tant que l'hôte ne pousse rien.**
@@ -57,6 +64,9 @@ let feedEvent: Espion;
 let feedToDevice: Espion;
 let detacher: () => void;
 let pont: ReturnType<typeof fakeSession>;
+let api: ClientWidgetApi;
+let repondu: unknown[];
+let raccroche: number;
 
 beforeEach(() => {
   feedEvent = vi.spyOn(ClientWidgetApi.prototype, "feedEvent").mockResolvedValue(undefined) as Espion;
@@ -66,10 +76,29 @@ beforeEach(() => {
   const cadre = document.createElement("iframe");
   document.body.append(cadre);
   pont = fakeSession();
-  detacher = attachCallWidget(pont.session, SALON, cadre, {
-    elementCallUrl: "https://call.tacita.chat",
-    widgetId: "widget-1",
-    parentUrl: "https://app.tacita.chat",
+  repondu = [];
+  raccroche = 0;
+  // L'instance que `attachCallWidget` construit — attrapée au premier `on`, pour émettre
+  // les actions **comme la bibliothèque le fait** plutôt que d'appeler nos handlers en
+  // direct : ce qu'on éprouve, c'est qu'ils sont branchés au bon endroit.
+  const vraiOn = ClientWidgetApi.prototype.on;
+  const capturer = (instance: ClientWidgetApi): ClientWidgetApi => (api = instance);
+  const construit = vi
+    .spyOn(ClientWidgetApi.prototype, "on")
+    .mockImplementation(function (this: ClientWidgetApi, ...args) {
+      return vraiOn.apply(capturer(this), args as never);
+    });
+  detacher = attachCallWidget(
+    pont.session,
+    SALON,
+    cadre,
+    { elementCallUrl: "https://call.tacita.chat", widgetId: "widget-1", parentUrl: "https://app.tacita.chat" },
+    undefined,
+    () => (raccroche += 1),
+  );
+  construit.mockRestore();
+  vi.spyOn(api.transport, "reply").mockImplementation((_req, reponse) => {
+    repondu.push(reponse);
   });
 });
 
@@ -135,5 +164,65 @@ describe("l'hôte pousse au widget ce que le widget ne peut pas aller chercher",
     }
     // `afterEach` rappelle `detacher` : il doit être idempotent.
     detacher = () => {};
+  });
+});
+
+/**
+ * **Les actions qu'Element Call adresse à son hôte.** `ClientWidgetApi` en traite
+ * dix-huit dans son `switch` ; les cinq ci-dessous n'en font pas partie et repartent en
+ * « Unknown or unsupported from-widget action » tant que l'hôte ne les préempte pas.
+ *
+ * Constaté sur staging le 29/08/2026, trois d'un coup dans la console du widget :
+ * `set_always_on_screen`, `io.element.join` et `io.element.device_mute`. La première est
+ * la plus parlante — on accordait `m.always_on_screen` et on répondait « inconnue » quand
+ * il s'en servait. Une promesse affichée et non tenue, un étage au-dessus du driver.
+ */
+describe("l'hôte répond aux actions qu'Element Call lui adresse", () => {
+  /** Comme la bibliothèque : un événement annulable, que l'hôte doit préempter. */
+  const emettre = (nom: string) => {
+    const ev = new CustomEvent(`action:${nom}`, {
+      detail: { api: "fromWidget", action: nom, requestId: "r1", widgetId: "widget-1", data: {} },
+      cancelable: true,
+    });
+    api.emit(`action:${nom}`, ev);
+    return ev;
+  };
+
+  it("chacune des cinq est préemptée : sans quoi la bibliothèque répond « action inconnue »", () => {
+    for (const nom of [
+      ELEMENT_ACTION_ALWAYS_ON_SCREEN,
+      ELEMENT_ACTION_JOIN,
+      ELEMENT_ACTION_DEVICE_MUTE,
+      ELEMENT_ACTION_HANGUP,
+      ELEMENT_ACTION_CLOSE,
+    ]) {
+      expect(emettre(nom).defaultPrevented, `${nom} n'est pas préemptée`).toBe(true);
+    }
+    expect(repondu).toHaveLength(5);
+  });
+
+  it("l'écran toujours allumé obtient un succès, et pas un objet vide", () => {
+    // `setAlwaysOnScreen` lit `response.success` : un `{}` se lirait « refusé ».
+    emettre(ELEMENT_ACTION_ALWAYS_ON_SCREEN);
+
+    expect(repondu[0]).toEqual({ success: true });
+  });
+
+  it("raccrocher sort de l'écran d'appel, sous ses deux noms", () => {
+    // Le bouton de raccrochage vit dans le widget (E-07) : ces deux actions sont le seul
+    // signal qui dise que l'appel est fini. Sans elles, l'écran restait ouvert sur une
+    // session terminée.
+    emettre(ELEMENT_ACTION_HANGUP);
+    emettre(ELEMENT_ACTION_CLOSE);
+
+    expect(raccroche).toBe(2);
+  });
+
+  it("rejoindre et couper le micro ne font que notifier : aucune sortie d'écran", () => {
+    emettre(ELEMENT_ACTION_JOIN);
+    emettre(ELEMENT_ACTION_DEVICE_MUTE);
+
+    expect(raccroche).toBe(0);
+    expect(repondu).toEqual([{}, {}]);
   });
 });

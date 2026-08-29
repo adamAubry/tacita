@@ -92,9 +92,22 @@ export function EcranAppel({ roomId, video }: EcranAppelProps) {
     void discoverFocus(HOMESERVER).then(
       () => {
         if (annule || !cadre.current) return;
-        detacher = attachCallWidget(session, roomId, cadre.current, options, () => {
-          if (!annule) setCharge(true);
-        });
+        detacher = attachCallWidget(
+          session,
+          roomId,
+          cadre.current,
+          options,
+          () => {
+            if (!annule) setCharge(true);
+          },
+          // **Le raccrochage vit dans le widget** (E-07 : pas deux sorties concurrentes
+          // dans le même écran), donc c'est lui qui nous dit quand sortir. Sans cet
+          // écouteur, raccrocher dans Element Call laissait cet écran ouvert sur une
+          // session finie — l'appel était terminé et l'utilisateur restait devant.
+          () => {
+            if (!annule) router.back();
+          },
+        );
       },
       (cause: unknown) => {
         if (!annule) setErreur(messageFocusManquant(cause));

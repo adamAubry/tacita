@@ -64,3 +64,19 @@ export function isLiveMembership(content: Record<string, unknown>, createdTs: nu
   const created = typeof content.created_ts === "number" ? content.created_ts : createdTs;
   return created + (expires ?? DEFAULT_MEMBERSHIP_EXPIRY_MS) > Date.now();
 }
+
+/**
+ * **Les actions qu'Element Call adresse à son hôte.** Relevées dans le bundle de l'image
+ * épinglée v0.23.0 (`ElementWidgetActions`), et ici plutôt qu'à leur site d'usage pour la
+ * même raison que le reste de ce fichier : ce sont des littéraux d'un runtime externe non
+ * stabilisé, qui se relisent au bump et ne se recopient pas de mémoire.
+ *
+ * `set_always_on_screen` est la seule des cinq à être une action **standard** de
+ * `matrix-widget-api` ; elle est là parce que la bibliothèque ne la traite pas davantage
+ * que les autres — c'est l'hôte qui répond, dans les cinq cas.
+ */
+export const ELEMENT_ACTION_ALWAYS_ON_SCREEN = "set_always_on_screen";
+export const ELEMENT_ACTION_JOIN = "io.element.join";
+export const ELEMENT_ACTION_HANGUP = "im.vector.hangup";
+export const ELEMENT_ACTION_CLOSE = "io.element.close";
+export const ELEMENT_ACTION_DEVICE_MUTE = "io.element.device_mute";

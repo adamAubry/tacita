@@ -9,13 +9,18 @@ import {
   type ReceivedToDeviceMessage,
   type Room,
 } from "matrix-js-sdk";
-import { ClientWidgetApi, Widget } from "matrix-widget-api";
+import { ClientWidgetApi, Widget, type IWidgetApiRequest } from "matrix-widget-api";
 
 import { CallWidgetDriver } from "./driver";
 import {
   CALL_APPLICATION,
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
+  ELEMENT_ACTION_ALWAYS_ON_SCREEN,
+  ELEMENT_ACTION_CLOSE,
+  ELEMENT_ACTION_DEVICE_MUTE,
+  ELEMENT_ACTION_HANGUP,
+  ELEMENT_ACTION_JOIN,
   isLivekitFocus,
   isLiveMembership,
   RTC_FOCI_WELL_KNOWN_KEY,
@@ -30,6 +35,11 @@ export type { IncomingCall, IncomingCalls } from "./incoming";
 export {
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
+  ELEMENT_ACTION_ALWAYS_ON_SCREEN,
+  ELEMENT_ACTION_CLOSE,
+  ELEMENT_ACTION_DEVICE_MUTE,
+  ELEMENT_ACTION_HANGUP,
+  ELEMENT_ACTION_JOIN,
   LIVEKIT_FOCUS_TYPE,
   RTC_FOCI_WELL_KNOWN_KEY,
 } from "./matrixrtc";
@@ -203,6 +213,13 @@ export function attachCallWidget(
   iframe: HTMLIFrameElement,
   options: CallWidgetOptions,
   onReady?: () => void,
+  /**
+   * Appelé quand Element Call annonce que l'appel est terminé — `im.vector.hangup` ou
+   * `io.element.close`. C'est le **seul** signal de raccrochage : le bouton vit dans le
+   * widget (E-07 refuse deux sorties concurrentes), donc sans cet écouteur, raccrocher
+   * dans Element Call laissait l'écran d'appel ouvert sur une session finie.
+   */
+  onRaccrocher?: () => void,
 ): () => void {
   const { url } = buildCallWidget(session, roomId, options);
   const widget = new Widget({
@@ -265,6 +282,45 @@ export function attachCallWidget(
     void api.feedToDevice(message as never, encryptionInfo !== null).catch(() => {});
   };
 
+  /*
+   * **Les actions que la bibliothèque ne traite pas, et qu'elle n'a pas à traiter.**
+   * `ClientWidgetApi.handleMessage` a un `switch` de dix-huit actions ; tout le reste
+   * tombe dans son `default:` et repart en « Unknown or unsupported from-widget action ».
+   * Ce n'est pas un manque d'amont : la bibliothèque émet d'abord `action:<nom>` en
+   * événement **annulable**, et c'est à l'hôte de le préempter puis de répondre. Element
+   * Web fait exactement ça ; nous ne le faisions pas, donc Element Call recevait une
+   * erreur à chacune des quatre actions qu'il nous adresse.
+   *
+   * `m.always_on_screen` est le cas le plus net : on accordait la capacité et on
+   * répondait « inconnue » quand il s'en servait. Une promesse affichée et non tenue, la
+   * même que celle du driver, un étage plus haut.
+   *
+   * Répondre `{}` n'est pas éluder : sauf pour l'écran toujours allumé — qui attend un
+   * `success` — ces actions **notifient**, elles ne demandent rien. Ce que l'hôte en fait
+   * lui appartient : ici, seul le raccrochage a une conséquence.
+   */
+  const repondre = (nom: string, reponse: unknown, effet?: () => void): (() => void) => {
+    const handler = (ev: CustomEvent<IWidgetApiRequest>): void => {
+      // Sans `preventDefault`, la bibliothèque répondrait « action inconnue » par-dessus.
+      ev.preventDefault();
+      void api.transport.reply(ev.detail, reponse as never);
+      effet?.();
+    };
+    api.on(`action:${nom}`, handler);
+    return () => void api.off(`action:${nom}`, handler);
+  };
+
+  const actions = [
+    // L'appel occupe tout l'écran de toute façon : la demande est toujours honorée.
+    repondre(ELEMENT_ACTION_ALWAYS_ON_SCREEN, { success: true }),
+    // Deux notifications : le widget dit ce qu'il fait, l'app n'a rien à en faire.
+    repondre(ELEMENT_ACTION_JOIN, {}),
+    repondre(ELEMENT_ACTION_DEVICE_MUTE, {}),
+    // Le raccrochage, lui, doit sortir de l'écran d'appel — les deux formes le disent.
+    repondre(ELEMENT_ACTION_HANGUP, {}, onRaccrocher),
+    repondre(ELEMENT_ACTION_CLOSE, {}, onRaccrocher),
+  ];
+
   session.client.on(RoomEvent.Timeline, surTimeline);
   session.client.on(MatrixEventEvent.Decrypted, surDechiffrement);
   session.client.on(ClientEvent.ReceivedToDeviceMessage, surToDevice);
@@ -273,6 +329,7 @@ export function attachCallWidget(
     session.client.off(RoomEvent.Timeline, surTimeline);
     session.client.off(MatrixEventEvent.Decrypted, surDechiffrement);
     session.client.off(ClientEvent.ReceivedToDeviceMessage, surToDevice);
+    for (const retirer of actions) retirer();
     api.stop();
   };
 }

@@ -90,6 +90,18 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
   `discoverFocus` lève `RtcFociMissingError` avec une `reason` (`well-known-unreachable`,
   `well-known-absent`, `no-livekit-focus`) : l'UI doit afficher la cause, pas désactiver
   un bouton en silence.
+- **Cinq actions d'Element Call sont répondues par l'hôte, pas par la bibliothèque.**
+  `ClientWidgetApi` en traite dix-huit dans son `switch` ; `set_always_on_screen`,
+  `io.element.join`, `io.element.device_mute`, `im.vector.hangup` et `io.element.close`
+  n'en font pas partie. Elle émet `action:<nom>` en événement **annulable** et attend que
+  l'hôte le préempte puis réponde — c'est le contrat, pas un manque d'amont.
+
+  Sans ça, Element Call recevait « Unknown or unsupported from-widget action » à chacune.
+  Le cas le plus net était `m.always_on_screen` : capacité accordée, action déclarée
+  inconnue. Et `im.vector.hangup`/`io.element.close` sont le **seul** signal de
+  raccrochage — le bouton vit dans le widget (E-07 refuse deux sorties concurrentes), donc
+  sans écouteur, raccrocher laissait l'écran d'appel ouvert sur une session finie.
+
 - **Le pont est à double sens, et le second sens est à la charge de l'hôte.** Le driver
   répond à ce que le widget *demande* ; `ClientWidgetApi` n'observe rien de lui-même.
   `attachCallWidget` branche donc `RoomEvent.Timeline`, `MatrixEventEvent.Decrypted` et
