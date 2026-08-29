@@ -90,11 +90,21 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
   `discoverFocus` lève `RtcFociMissingError` avec une `reason` (`well-known-unreachable`,
   `well-known-absent`, `no-livekit-focus`) : l'UI doit afficher la cause, pas désactiver
   un bouton en silence.
-- **Le widget reçoit toutes les capacités qu'il demande.** Element Call est notre propre
-  déploiement, dont ce module construit lui-même l'URL : il n'y a pas d'origine tierce à
-  arbitrer, donc pas d'invite utilisateur. Le confinement vient d'ailleurs — `getKnownRooms`
-  et le contrôle de `roomId` du driver limitent le widget au seul salon de l'appel, quelles
-  que soient les capacités accordées.
+- **Le widget reçoit les capacités qu'il demande, sauf celles que le driver ne tient pas.**
+  Element Call est notre propre déploiement, dont ce module construit lui-même l'URL : il
+  n'y a pas d'origine tierce à arbitrer, donc pas d'invite utilisateur. Le confinement vient
+  d'ailleurs — `getKnownRooms` et le contrôle de `roomId` du driver limitent le widget au
+  seul salon de l'appel, quelles que soient les capacités accordées.
+
+  La réserve a été ajoutée le 29/08/2026, après un appel figé sans erreur : accorder tout
+  incluait des capacités dont la méthode reste celle de `WidgetDriver`, et trois d'entre
+  elles **lèvent de façon synchrone**. `ClientWidgetApi.handleMessage` n'ayant aucun `try`,
+  la requête du widget n'obtient jamais de réponse. Refuser est sûr par construction : la
+  capacité est vérifiée **avant** l'appel au driver, et son absence rend une erreur propre.
+  Aujourd'hui refusées, faute d'implémentation : les événements *sticky* (MSC4407), les
+  événements différés (MSC4157), la navigation, la recherche d'annuaire, le transfert de
+  fichiers et les transports RTC. Les implémenter est ce qui les rouvrira — la table de
+  `driver.ts` compare les prototypes, elle ne se déclare pas.
 - **Une appartenance est ignorée passé 4 h** (`expires` du contenu, sinon le défaut du
   SDK). Sans ce filtre, un client parti sans nettoyer laisse un salon en « appel en cours »
   pour toujours. En contrepartie, un appel réellement plus long que sa fenêtre d'expiration

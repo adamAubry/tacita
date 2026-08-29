@@ -1,6 +1,7 @@
 import type { Session } from "@tacita/client-core";
 import { Direction } from "matrix-js-sdk";
 import {
+  MatrixCapabilities,
   OpenIDRequestState,
   WidgetDriver,
   type Capability,
@@ -32,9 +33,27 @@ export class CallWidgetDriver extends WidgetDriver {
    * lui-même l'URL : il n'y a pas d'origine tierce à arbitrer, donc pas d'invite
    * utilisateur. Le confinement réel vient de `getKnownRooms` : quelles que soient les
    * capacités accordées, le widget ne voit que le salon de l'appel.
+   *
+   * **Mais accorder n'est pas pouvoir.** Cette méthode rendait `new Set(requested)` —
+   * tout ce qu'on lui demandait, y compris ce que ce driver n'implémente pas. Le widget
+   * appelait alors une méthode que `WidgetDriver` laisse en plan, et pour trois d'entre
+   * elles la classe de base **lève de façon synchrone** au lieu de rendre une promesse
+   * rejetée. `ClientWidgetApi.handleMessage` n'a aucun `try` : la levée traverse le
+   * gestionnaire, `transport.reply` n'est jamais appelé, et la requête du widget ne
+   * reçoit **jamais** de réponse. Écran figé, sans une ligne d'erreur pour l'expliquer.
+   *
+   * Observé le 29/08/2026 sur `sendStickyEvent` (MSC4407), l'appelant bloqué sur un
+   * écran mort. `readStickyEvents`, la moitié visible du même défaut, était la seule à
+   * laisser une trace en console — parce que son appelant, lui, l'attrape.
+   *
+   * Refuser est **sûr par construction**, et c'est ce qui fait de ce correctif le bon :
+   * `ClientWidgetApi` vérifie la capacité **avant** d'appeler le driver, et répond une
+   * erreur propre quand elle manque. Le widget se rabat ; il ne se bloque pas.
    */
   public validateCapabilities(requested: Set<Capability>): Promise<Set<Capability>> {
-    return Promise.resolve(new Set(requested));
+    return Promise.resolve(
+      new Set([...requested].filter((capacite) => tenue(capacite as MatrixCapabilities))),
+    );
   }
 
   public getKnownRooms(): string[] {
@@ -149,3 +168,36 @@ export class CallWidgetDriver extends WidgetDriver {
     return this.roomId;
   }
 }
+
+/**
+ * Les capacités qui n'existent que par une méthode du driver. Elles sont accordées si, et
+ * seulement si, `CallWidgetDriver` surcharge la méthode en regard — la comparaison est
+ * faite sur les prototypes, donc la promesse et ce qui la tient ne peuvent pas diverger.
+ * Une capacité absente de cette table est portée par `ClientWidgetApi` lui-même, ou par
+ * une méthode qu'on implémente : elle passe.
+ *
+ * `MatrixCapabilities` et non des littéraux : un renommage en amont casse la compilation
+ * de ce fichier plutôt que de rendre la table silencieusement inopérante.
+ */
+const METHODE_REQUISE = {
+  [MatrixCapabilities.MSC4407SendStickyEvent]: "sendStickyEvent",
+  [MatrixCapabilities.MSC4407ReceiveStickyEvent]: "readStickyEvents",
+  [MatrixCapabilities.MSC4157SendDelayedEvent]: "sendDelayedEvent",
+  [MatrixCapabilities.MSC4157UpdateDelayedEvent]: "cancelScheduledDelayedEvent",
+  [MatrixCapabilities.MSC2931Navigate]: "navigate",
+  [MatrixCapabilities.MSC3973UserDirectorySearch]: "searchUserDirectory",
+  [MatrixCapabilities.MSC4039UploadFile]: "uploadFile",
+  [MatrixCapabilities.MSC4039DownloadFile]: "downloadFile",
+  [MatrixCapabilities.MSC4515RtcTransports]: "getRtcTransports",
+  // Implémentée, elle : c'est elle qui prouve que la table accorde autant qu'elle refuse.
+  [MatrixCapabilities.MSC3846TurnServers]: "getTurnServers",
+} as const satisfies Partial<Record<MatrixCapabilities, keyof WidgetDriver>>;
+
+/** La capacité est-elle tenue par une méthode que ce driver surcharge vraiment ? */
+const tenue = (capacite: MatrixCapabilities): boolean => {
+  const methode = (METHODE_REQUISE as Partial<Record<string, keyof WidgetDriver>>)[capacite];
+  return (
+    methode === undefined ||
+    CallWidgetDriver.prototype[methode] !== WidgetDriver.prototype[methode]
+  );
+};

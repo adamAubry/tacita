@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { WidgetDriver } from "matrix-widget-api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Session } from "@tacita/client-core";
@@ -315,6 +316,74 @@ describe("driver widget standard, sans logique RTC maison", () => {
 
     await vi.waitFor(() => expect(updates).toHaveLength(1));
     expect(updates[0]).toMatchObject({ state: "allowed" });
+  });
+});
+
+/**
+ * Le défaut du 29/08/2026 : l'appelant restait sur un écran mort, et la console ne
+ * portait que `readStickyEvents is not implemented` — la moitié bénigne.
+ *
+ * `validateCapabilities` accordait tout ce qu'on lui demandait. Le widget appelait alors
+ * une méthode que `WidgetDriver` laisse en plan, et trois d'entre elles **lèvent de façon
+ * synchrone**. `ClientWidgetApi.handleMessage` n'ayant aucun `try`, la levée traverse le
+ * gestionnaire et `transport.reply` n'est jamais appelé : la requête du widget n'obtient
+ * jamais de réponse, et l'appel se fige sans une ligne pour le dire.
+ *
+ * C'est la règle 5 prise au pied de la lettre — une promesse affichée et non tenue — à
+ * l'endroit exact où elle coûte le plus : une jonction (règle 1).
+ */
+describe("aucune capacité accordée que le driver ne tienne", () => {
+  const valider = (demandees: string[]) =>
+    new CallWidgetDriver(session, SALON).validateCapabilities(new Set(demandees) as never);
+
+  it("les capacités sticky sont refusées : c'est leur levée synchrone qui figeait l'appel", async () => {
+    const accordees = await valider([
+      "org.matrix.msc4407.send.sticky_event",
+      "org.matrix.msc4407.receive.sticky_event",
+    ]);
+
+    expect([...accordees]).toEqual([]);
+  });
+
+  it("les capacités portées passent, les autres non — dans la même demande", async () => {
+    // Le mélange compte : un filtre qui refuserait tout passerait le test précédent sans
+    // rien prouver. `turn_servers` est implémentée, la timeline est portée par
+    // `ClientWidgetApi` lui-même et n'est pas dans la table.
+    const accordees = await valider([
+      "town.robin.msc3846.turn_servers",
+      `org.matrix.msc2762.timeline:${SALON}`,
+      "org.matrix.msc4157.send.delayed_event",
+      "org.matrix.msc4039.upload_file",
+    ]);
+
+    expect([...accordees].sort()).toEqual(
+      ["town.robin.msc3846.turn_servers", `org.matrix.msc2762.timeline:${SALON}`].sort(),
+    );
+  });
+
+  /**
+   * **Le site de lecture, et il est en amont.** La table dit « refuser tant que la
+   * méthode n'est pas surchargée » ; ce test vérifie que le motif est encore vrai dans la
+   * version épinglée de `matrix-widget-api`. Le jour où l'amont implémente l'une de ces
+   * méthodes — ou le jour où on la surcharge ici — ce test rougit et demande une revue,
+   * au lieu de laisser une capacité refusée pour une raison périmée.
+   */
+  it("chaque capacité refusée l'est parce que la classe de base ne l'implémente pas", async () => {
+    const refusees = [
+      ["org.matrix.msc4407.send.sticky_event", "sendStickyEvent"],
+      ["org.matrix.msc4407.receive.sticky_event", "readStickyEvents"],
+      ["org.matrix.msc4157.send.delayed_event", "sendDelayedEvent"],
+      ["org.matrix.msc4039.upload_file", "uploadFile"],
+    ] as const;
+
+    for (const [capacite, methode] of refusees) {
+      expect([...(await valider([capacite]))], `${capacite} ne devrait pas être accordée`).toEqual(
+        [],
+      );
+      // Et la méthode est bien celle de la classe de base, non surchargée.
+      const base = WidgetDriver.prototype[methode] as unknown;
+      expect(CallWidgetDriver.prototype[methode] as unknown).toBe(base);
+    }
   });
 });
 
