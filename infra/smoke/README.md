@@ -12,6 +12,16 @@ docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
 cd .. && npm run smoke
 ```
 
+## Les chemins du proxy — `proxy-chemins.smoke.test.ts`
+
+Ajoutée le 29/08/2026, après trois routes joignables qui répondaient 404 : `proxy_pass`
+avec une variable ne substitue rien, donc le préfixe partait tel quel — ou partait seul.
+Aucun lien d'invitation, aucun appel, et `infra/tests/proxy.test.ts` au vert tout du long.
+Une requête par route suffit à le voir, et rien d'autre que la pile debout ne le peut.
+
+Les deux assertions RTC exigent l'overlay `rtc/` ; sans lui elles se **sautent** et le
+disent, plutôt que de passer au vert sur un 502.
+
 ## Le parcours d'entrée — `onboarding.smoke.test.ts`
 
 Ajoutée le 25/08/2026, après un défaut que 1039 tests verts n'ont pas vu : une connexion

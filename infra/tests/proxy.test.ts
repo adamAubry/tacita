@@ -126,3 +126,62 @@ describe("un 413 reste lisible par le navigateur", () => {
     expect(matrix).not.toContain("Access-Control-Allow-Origin");
   });
 });
+
+/**
+ * **Le piège de `proxy_pass` avec une variable**, mesuré contre nginx 1.27-alpine le
+ * 29/08/2026 — le digest même du compose, pas une lecture de doc.
+ *
+ * Quand `proxy_pass` porte une **variable**, nginx ne peut plus déterminer la part de
+ * l'URI à remplacer. Il n'applique donc aucune substitution : avec une partie d'URI il
+ * envoie cette URI **littérale** et jette le reste de la requête ; sans partie d'URI il
+ * envoie l'URI **entière**, préfixe compris. Les deux moitiés du piège se sont
+ * refermées le même jour, sur trois routes :
+ *
+ *     /invite/       proxy_pass $amont/   → l'amont recevait « / », pas « /links »
+ *     /livekit/jwt   proxy_pass $amont    → l'amont recevait « /livekit/jwt/sfu/get »
+ *     /livekit/sfu   proxy_pass $amont    → l'amont recevait « /livekit/sfu/rtc/… »
+ *
+ * Trois services joignables, trois 404 : aucun lien d'invitation, et aucun appel — le
+ * jeton et la négociation WebSocket échouaient tous les deux. Et rien ne pouvait le
+ * voir, parce que les tests lisaient la chaîne du `proxy_pass` et la trouvaient
+ * conforme à ce qu'on croyait qu'elle faisait (règle 7).
+ *
+ * La seule forme qui garde la re-résolution DNS **et** le bon chemin est
+ * `rewrite … break` + `proxy_pass` sans partie d'URI.
+ */
+describe("le préfixe d'une route est retiré là où l'amont sert à la racine", () => {
+  /** Les blocs `location`, avec leur motif de correspondance et leur corps. */
+  const blocs = [...nginxConf.matchAll(/location\s+(=\s+)?(\^~\s+)?(\S+)\s*{([^}]*)}/gs)].map(
+    ([, exact, , motif, corps]) => ({ exact: Boolean(exact), motif: motif!, corps: corps! }),
+  );
+
+  it("aucun proxy_pass ne mêle une variable et une partie d'URI, sauf en location exacte", () => {
+    // C'est *la* combinaison qui jette le reste de l'URI. En `location =` il n'y a pas
+    // de reste, donc l'URI littérale est exactement la bonne — `/push/config` en vit.
+    for (const { exact, motif, corps } of blocs) {
+      const passe = /proxy_pass\s+http:\/\/\$[a-z_]+(\S*);/.exec(corps);
+      if (!passe || !passe[1]) continue;
+      expect(exact, `location ${motif} : proxy_pass avec variable ET partie d'URI`).toBe(true);
+    }
+  });
+
+  /**
+   * Les trois amonts qui servent à la racine, nommés ici parce que c'est une
+   * connaissance que la conf ne porte pas : `invite-tokens` sert `/links`,
+   * `lk-jwt-service` sert `/sfu/get`, le SFU sert `/rtc`. Aucun des trois ne connaît le
+   * préfixe sous lequel le proxy le monte, et c'est la bonne frontière — donc c'est au
+   * proxy de le retirer, et à ce test de vérifier qu'il le fait encore.
+   */
+  for (const prefixe of ["/invite/", "/livekit/jwt", "/livekit/sfu"]) {
+    it(`${prefixe} retire son préfixe par un rewrite, et le rewrite porte le même préfixe`, () => {
+      const bloc = blocs.find((b) => b.motif === prefixe);
+      expect(bloc, `aucune location ${prefixe}`).toBeTruthy();
+
+      // Le préfixe du rewrite doit être celui de la location : deux valeurs qui doivent
+      // s'accorder, et rien d'autre ne les relie.
+      const nu = prefixe.replace(/\/$/, "");
+      const attendu = new RegExp(`rewrite\\s+\\^${nu.replace(/\//g, "\\/")}\\/\\?\\(\\.\\*\\)\\$\\s+\\/\\$1\\s+break;`);
+      expect(bloc!.corps).toMatch(attendu);
+    });
+  }
+});

@@ -75,9 +75,13 @@ describe("le service de liens d'invitation est provisionné par ce module", () =
   it("le proxy expose le service sous /invite/, préfixe retiré", () => {
     const route = /location \/invite\/\s*{([^}]*)}/s.exec(nginxConf)?.[1];
     expect(route).toBeTruthy();
-    // Le `/` final est ce qui fait que `/invite/links` atteint `/links` : sans lui, le
-    // service reçoit `/invite/links` et répond 404 à tout.
-    expect(route).toMatch(/proxy_pass\s+http:\/\/\$invite_tokens_upstream\/;/);
+    // **Le `rewrite` est ce qui fait que `/invite/links` atteint `/links`**, et non un
+    // `/` final sur le `proxy_pass`. Cette ligne a dit le contraire jusqu'au 29/08/2026 :
+    // avec une variable, nginx ne substitue rien et envoie l'URI littérale du directive,
+    // soit `/` — le service recevait `/` et répondait 404 à ses quatre routes. Motif
+    // complet et invariant général dans `infra/tests/proxy.test.ts`.
+    expect(route).toMatch(/rewrite\s+\^\/invite\/\?\(\.\*\)\$\s+\/\$1\s+break;/);
+    expect(route).toMatch(/proxy_pass\s+http:\/\/\$invite_tokens_upstream;/);
     expect(route).toMatch(/X-Forwarded-For/); // la limitation par IP en dépend
   });
 
