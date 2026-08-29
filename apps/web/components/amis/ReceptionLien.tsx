@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { contactsDeLaSession } from "../../lib/contacts";
-import { liensDeLaSession, type LiensInvitation } from "../../lib/liens-invitation";
+import { estLienRefuse, liensDeLaSession, type LiensInvitation } from "../../lib/liens-invitation";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { Placeholder } from "../foundation/Placeholder";
 import { Button, Text } from "../foundation/primitives";
@@ -103,11 +103,17 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
         }
 
         if (!annule) setEtat({ phase: "attente", groupe: salon?.name });
-      } catch {
+      } catch (erreur) {
         // Rien n'est journalisé : le token est dans l'URL, et une trace le porterait.
-        // On ne distingue pas non plus l'échec du service de celui du knock — dans les
-        // deux cas, il n'y a rien que le porteur puisse faire depuis cet écran.
-        if (!annule) setEtat({ phase: "indisponible" });
+        //
+        // **Refus et panne se distinguent, et eux seuls** (règle 2). Le service confond
+        // ses quatre causes d'invalidité, et on ne cherche pas à les rouvrir : on lit
+        // seulement s'il a refusé le lien ou s'il n'a pas répondu. Sans cette ligne, un
+        // lien expiré — le cas nominal d'un lien à usage unique valable un jour —
+        // affichait « le service ne répond pas, réessayez plus tard », c'est-à-dire un
+        // conseil d'attendre là où attendre ne peut rien donner. L'échec du `knock`, lui,
+        // n'est pas un refus du lien : il reste une panne, ce qu'il est.
+        if (!annule) setEtat({ phase: estLienRefuse(erreur) ? "invalide" : "indisponible" });
       }
     })();
 

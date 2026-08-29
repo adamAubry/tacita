@@ -25,7 +25,7 @@ l'émetteur. Aucun n'utilise un pouvoir qui lui appartiendrait.
 | Route | Ce qu'elle fait |
 |---|---|
 | `POST /links` | crée un lien — `kind` (`friend`\|`group`), `roomId` si `group`, `maxUses` (défaut 1), `ttlSeconds` (défaut 86 400, plafond 604 800). Rend `{ id, token, expiresAt }`. |
-| `GET /links` | les liens actifs de l'appelant — `{ id, kind, expiresAt, usesLeft }`, jamais ceux d'un autre. |
+| `GET /links` | les liens actifs de l'appelant — `{ id, kind, expiresAt, usesLeft }`, plus `roomId` si `kind: group`, jamais ceux d'un autre. Le salon ne fuite rien — l'appelant est l'émetteur — et sans lui, un client ne peut pas distinguer les liens d'un groupe de ceux d'un autre. |
 | `DELETE /links/:id` | révoque immédiatement. `204`, ou l'échec neutre si le lien n'est pas à l'appelant. |
 | `POST /links/:token/resolve` | rend `{ kind, issuer }`, plus `roomId` si `kind: group`. **Le service s'arrête là.** |
 

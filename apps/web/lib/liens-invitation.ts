@@ -17,6 +17,12 @@ import type { Session } from "@tacita/client-core";
 export interface LienActif {
   id: string;
   kind: "friend" | "group";
+  /**
+   * Le salon d'un lien `group`. **Le panneau de liens est celui d'un groupe** : sans lui,
+   * il ne pouvait pas distinguer ses liens de ceux des autres groupes de l'émetteur, et
+   * ouvrait donc le sas d'un salon sur la foi d'un lien qui menait ailleurs.
+   */
+  roomId?: string;
   /** Millisecondes epoch. L'horloge qui fait foi est celle du serveur. */
   expiresAt: number;
   usesLeft: number;
@@ -67,6 +73,9 @@ export interface LiensInvitation {
 export const USAGES_PAR_DEFAUT = 1;
 export const DUREE_PAR_DEFAUT_S = 86_400;
 
+/** Le préfixe de la route, écrit une fois : `urlDInvitation` l'émet, `estCheminInvitation` le reconnaît. */
+const PREFIXE_INVITATION = "/i/";
+
 /**
  * L'URL qu'on partage. **Une seule définition dans le dépôt** : M-H l'émet pour les
  * groupes, M-G pour les amis, et la route qui la consomme doit correspondre à la
@@ -74,7 +83,15 @@ export const DUREE_PAR_DEFAUT_S = 86_400;
  *
  * elle ne porte que le token : ni émetteur, ni salon, ni nom lisible.
  */
-export const urlDInvitation = (origine: string, token: string) => `${origine}/i/${token}`;
+export const urlDInvitation = (origine: string, token: string) =>
+  `${origine}${PREFIXE_INVITATION}${token}`;
+
+/**
+ * Reconnaître un chemin d'invitation, **depuis la même définition que celle qui l'émet**.
+ * Le parcours d'accueil en a besoin : sa dernière étape navigue, et naviguer par-dessus
+ * une invitation la jette — un lien à usage unique valable un jour ne se retrouve pas.
+ */
+export const estCheminInvitation = (chemin: string) => chemin.startsWith(PREFIXE_INVITATION);
 
 /**
  * le partage. **Web Share API quand elle existe**, presse-papiers sinon :
@@ -105,6 +122,32 @@ export async function partagerLien(
 const BASE = "/invite";
 
 /**
+ * L'échec du service, **avec son statut**. C'est lui qui permet de classer (règle 2) : le
+ * service confond délibérément ses quatre causes d'invalidité en un seul 404, mais « ce
+ * lien n'est plus valide » et « le service ne répond pas » ne se résolvent pas du tout de
+ * la même façon — l'un demande un autre lien, l'autre d'attendre. Sans le statut, l'écran
+ * de réception affichait le second pour le premier, et conseillait d'attendre là où
+ * attendre ne pouvait rien donner.
+ */
+export class ErreurLien extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`service de liens : ${status}`);
+    this.status = status;
+  }
+}
+
+/**
+ * Un refus du service, par opposition à une panne. `404` couvre les quatre causes que le
+ * service refuse de distinguer, `400` le seul cas qu'il nomme (son propre lien) : dans
+ * les deux, il n'y a rien à réessayer. Tout le reste — 429, 5xx, réseau absent — est une
+ * panne, et pour celle-là réessayer est le bon conseil.
+ */
+export const estLienRefuse = (erreur: unknown) =>
+  erreur instanceof ErreurLien && (erreur.status === 404 || erreur.status === 400);
+
+/**
  * Le service est joint avec le **jeton d'accès Matrix** de l'appelant : il ne croit
  * jamais un identifiant qu'on lui donne, il le valide auprès de Synapse.
  */
@@ -123,7 +166,7 @@ export function liensDeLaSession(session: Session, fetch = globalThis.fetch): Li
 
     // Le corps d'erreur du service est délibérément indifférencié : on ne le décortique
     // pas pour en tirer une cause qu'il refuse de donner.
-    if (!reponse.ok) throw new Error(`service de liens : ${reponse.status}`);
+    if (!reponse.ok) throw new ErreurLien(reponse.status);
     return reponse.status === 204 ? undefined : await reponse.json();
   };
 

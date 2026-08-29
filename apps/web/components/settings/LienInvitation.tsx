@@ -61,13 +61,13 @@ export function LienInvitation({
   const [sasRefuse, setSasRefuse] = useState<"knock" | "invite" | undefined>();
 
   /**
-   * Le sas suit le nombre de liens actifs, et rien d'autre. Aligné à chaque
-   * rafraîchissement plutôt qu'aux seuls gestes d'émission et de révocation : un lien
-   * peut expirer tout seul, et personne n'est là pour refermer la porte ce jour-là.
+   * Le sas suit le nombre de liens actifs **de ce groupe**, et rien d'autre. Aligné à
+   * chaque rafraîchissement plutôt qu'aux seuls gestes d'émission et de révocation : un
+   * lien peut expirer tout seul, et personne n'est là pour refermer la porte ce jour-là.
    */
   const alignerSas = useCallback(
     (liens: LienActif[]) => {
-      const voulue = liens.some((lien) => lien.kind === "group") ? "knock" : "invite";
+      const voulue = liens.length > 0 ? "knock" : "invite";
       if (joinRule(session, roomId) === voulue) return;
 
       // **Un échec ne se tait pas** (interdit n°13). Basculer `join_rules` exige le
@@ -84,7 +84,13 @@ export function LienInvitation({
   const rafraichir = useCallback(() => {
     void service
       .lister()
-      .then((liens) => {
+      // **Le tri est ici, et il n'est pas cosmétique.** `lister()` rend tous les liens de
+      // l'appelant, tous salons confondus — ce panneau est celui d'*un* groupe. Sans ce
+      // filtre, un lien émis pour un autre groupe ouvrait le sas de celui-ci, et le
+      // dernier lien de celui-ci révoqué ne le refermait pas tant qu'un autre groupe en
+      // avait un. Deux portes fausses, dans les deux sens.
+      .then((tous) => {
+        const liens = tous.filter((lien) => lien.kind === "group" && lien.roomId === roomId);
         setActifs(liens);
         alignerSas(liens);
       })
@@ -92,7 +98,7 @@ export function LienInvitation({
         setActifs([]);
         setIndisponible(true);
       });
-  }, [service, alignerSas]);
+  }, [service, alignerSas, roomId]);
 
   useEffect(rafraichir, [rafraichir]);
 
@@ -166,7 +172,7 @@ export function LienInvitation({
           {actifs.map((lien) => (
             <ListItem
               key={lien.id}
-              label={lien.kind === "group" ? "Lien de groupe" : "Lien d'ami"}
+              label="Lien de groupe"
               description={`Expire le ${dateLisible(lien.expiresAt)} · ${lien.usesLeft} usage(s) restant(s)`}
               endContent={
                 <Button

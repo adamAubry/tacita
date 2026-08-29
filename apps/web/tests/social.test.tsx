@@ -14,7 +14,7 @@ import { routeConversation } from "../lib/routes";
 import { ProfilAutrui, CONFIRMATIONS } from "../components/profil/ProfilAutrui";
 import { AVERTISSEMENT_PHOTO, ProfilMoi } from "../components/profil/ProfilMoi";
 import { ReceptionLien } from "../components/amis/ReceptionLien";
-import { urlDInvitation, type LiensInvitation } from "../lib/liens-invitation";
+import { liensDeLaSession, urlDInvitation, type LiensInvitation } from "../lib/liens-invitation";
 import type { Demande } from "../lib/contacts";
 import { LIBELLE_NOTE, lireNote } from "../lib/notes";
 import { DEBOUNCE_MS } from "../lib/recherche";
@@ -549,8 +549,15 @@ describe("réception d'un lien : on frappe, un membre confirme", () => {
       client: {
         getRoom: (roomId: string) =>
           roomId === GROUPE && membership ? { name: nom, getMyMembership: () => membership } : null,
+        // Lu par le **vrai** client du service, que deux tests montent pour éprouver le
+        // classement de l'échec de bout en bout.
+        getAccessToken: () => "jeton-porteur",
       },
     }) as never;
+
+  /** Un service qui répond ce statut-là, sans corps exploitable : c'est tout ce que le client lit. */
+  const repond = (status: number) =>
+    vi.fn(async () => ({ ok: false, status, json: async () => ({}) })) as never;
 
   beforeEach(() => {
     frapper.mockClear();
@@ -597,17 +604,53 @@ describe("réception d'un lien : on frappe, un membre confirme", () => {
     expect(frapper).not.toHaveBeenCalled();
   });
 
-  it("un lien invalide ne dit pas laquelle des quatre causes : le service refuse de le dire", async () => {
+  it("un lien de groupe sans salon est inutilisable : on ne devine pas le salon manquant", async () => {
     const liens = service(vi.fn(async () => ({ kind: "group" as const, issuer: "@luca:t" })));
     render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
 
-    // inconnu, expiré, révoqué et bloqué rendent la même chose. Deviner
-    // laquelle pour l'afficher reconstruirait l'énumérabilité que le service refuse.
-    const message = await screen.findByText("Ce lien n'est plus valide");
-    expect(message).toBeTruthy();
+    expect(await screen.findByText("Ce lien n'est plus valide")).toBeTruthy();
+  });
+
+  /**
+   * **Le vrai client, sur un vrai statut.** Les deux moitiés du classement vivent dans
+   * deux fichiers que rien d'autre ne relie : `liens-invitation` pose le statut sur
+   * l'erreur, `ReceptionLien` le lit. Mocker `resoudre` à l'interface ne peut pas les
+   * éprouver ensemble — c'est ce qui a laissé le défaut vivre entre les deux (règle 7).
+   *
+   * Le 404 n'est pas un cas limite : un lien à usage unique valable un jour finit
+   * *toujours* par le rendre. Il affichait « le service ne répond pas, réessayez plus
+   * tard », soit un conseil d'attendre là où attendre ne peut rien donner (règle 2).
+   */
+  it("un lien refusé dit qu'il est invalide, pas que le service est en panne", async () => {
+    const liens = liensDeLaSession(session(), repond(404));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    expect(await screen.findByText("Ce lien n'est plus valide")).toBeTruthy();
+    expect(screen.queryByText("Le lien n'a pas pu être vérifié")).toBeNull();
+
+    // Et toujours pas laquelle des quatre causes : le service refuse de le dire, et
+    // l'écran ne le reconstruit pas.
     for (const cause of [/révoqué seulement/i, /bloqué/i, /inconnu/i]) {
       expect(screen.queryByText(cause)).toBeNull();
     }
+  });
+
+  it("son propre lien est refusé, pas mis en panne : l'émetteur qui teste son lien le voit", async () => {
+    // `400 TACITA_OWN_LINK` — le seul cas que le service nomme, et le premier geste que
+    // fait un émetteur : cliquer sur ce qu'il vient d'envoyer pour vérifier.
+    const liens = liensDeLaSession(session(), repond(400));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    expect(await screen.findByText("Ce lien n'est plus valide")).toBeTruthy();
+  });
+
+  it("le service en panne reste une panne : 5xx conseille de réessayer", async () => {
+    // La contrepartie du classement : ce qui se résout par l'attente doit continuer à le
+    // dire. Sans elle, le correctif aurait juste inversé le mensonge.
+    const liens = liensDeLaSession(session(), repond(503));
+    render(<ReceptionLien token={TOKEN} liens={liens} session={session()} />);
+
+    expect(await screen.findByText("Le lien n'a pas pu être vérifié")).toBeTruthy();
   });
 
   it("service injoignable : l'ajout par identifiant reste proposé", async () => {

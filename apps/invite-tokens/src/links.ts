@@ -121,6 +121,14 @@ export async function issue(
 export interface LinkSummary {
   id: string;
   kind: LinkKind;
+  /**
+   * Le salon d'un lien `group`, comme dans `Resolution`. **Il ne fuite rien** : l'appelant
+   * est l'émetteur, on ne lui apprend que ce qu'il a demandé lui-même. Sans lui, le
+   * panneau de liens d'un groupe ne pouvait pas distinguer les siens de ceux des autres
+   * groupes du même émetteur — il ouvrait donc le sas d'un salon sur la foi d'un lien qui
+   * menait ailleurs, et ne le refermait pas quand il fallait.
+   */
+  roomId?: string;
   expiresAt: number;
   usesLeft: number;
 }
@@ -129,7 +137,14 @@ export interface LinkSummary {
 export async function list(deps: Deps, accessToken: string | undefined): Promise<LinkSummary[]> {
   const issuer = await caller(deps, accessToken);
   const links = await deps.store.listByIssuer(issuer, clock(deps)());
-  return links.map(({ id, kind, expiresAt, usesLeft }) => ({ id, kind, expiresAt, usesLeft }));
+  return links.map(({ id, kind, roomId, expiresAt, usesLeft }) => ({
+    id,
+    kind,
+    expiresAt,
+    usesLeft,
+    // Même forme que `rendu()` : la clé est absente sur un lien `friend`, jamais nulle.
+    ...(kind === "group" && roomId ? { roomId } : {}),
+  }));
 }
 
 /** révocation immédiate. Le lien d'un autre est traité comme inexistant. */

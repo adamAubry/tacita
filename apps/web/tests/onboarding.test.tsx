@@ -15,8 +15,10 @@ import { routeConversation } from "../lib/routes";
 import { ecrireOnboardingEnCours, ecrireRefusEducationIOS } from "../lib/preferences";
 
 const pousser = vi.fn();
+/** L'URL sous le parcours. La porte remplace le contenu sans naviguer : elle survit. */
+let chemin = "/";
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/",
+  usePathname: () => chemin,
   useRouter: () => ({ push: pousser, back: vi.fn() }),
 }));
 
@@ -146,6 +148,7 @@ afterEach(() => {
   connexionParCle.mockReset();
   rediriger.mockReset();
   pousser.mockReset();
+  chemin = "/";
   listees.mockReturnValue([]);
   createGroupChat.mockClear();
   registerDirect.mockClear();
@@ -582,6 +585,37 @@ describe("le parcours d'accueil, de la clé au premier message", () => {
     fireEvent.click(screen.getByText("Ouvrir et écrire"));
     await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
     expect(pousser).toHaveBeenCalledWith(routeConversation("!notes:tacita.test"));
+  });
+
+  /**
+   * **Un compte créé depuis un lien d'invitation ne perd pas le lien.** La porte
+   * *remplace* le contenu sans naviguer, donc l'URL du lien est encore là sous le
+   * parcours — et c'est le seul endroit où le token existe : rien ne le mémorise. La
+   * dernière étape naviguait vers la conversation personnelle, ce qui le jetait, et un
+   * lien à usage unique valable un jour ne se retrouve pas. C'est exactement le parcours
+   * que D-13 a ouvert en supprimant le code d'invitation.
+   */
+  it("créé depuis une invitation, le parcours la rend au lieu de naviguer ailleurs", async () => {
+    chemin = "/i/jeton-opaque";
+    const { session } = fausseSession({ recuperation: "creation" });
+    monter(session);
+
+    await franchirLaCle();
+    await waitFor(() => expect(screen.getByText("Voici votre identité")).toBeTruthy());
+    fireEvent.click(screen.getByText("Continuer"));
+    await waitFor(() => expect(screen.getByText("Ne ratez pas un message")).toBeTruthy());
+    fireEvent.click(screen.getByText("Continuer"));
+
+    // Le bouton dit où il mène : « Ouvrir et écrire » promettrait la conversation
+    // personnelle, qui n'est pas la destination (interdit n°13).
+    await waitFor(() => expect(screen.getByText("Continuer vers l'invitation")).toBeTruthy());
+    fireEvent.click(screen.getByText("Continuer vers l'invitation"));
+
+    // Le parcours est terminé — l'application est ouverte — et l'URL n'a pas bougé.
+    await waitFor(() => expect(screen.getByText("Conversations")).toBeTruthy());
+    expect(pousser).not.toHaveBeenCalled();
+    // Le salon personnel est créé quand même : seule la destination du dernier saut change.
+    expect(createGroupChat).toHaveBeenCalled();
   });
 
   it("dit à chaque écran où l'on en est, et sur combien", async () => {

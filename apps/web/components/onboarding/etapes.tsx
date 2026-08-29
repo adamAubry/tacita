@@ -2,12 +2,13 @@
 
 import type { Session } from "@tacita/client-core";
 import { profileOf, updateProfile } from "@tacita/messaging";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, type ReactNode } from "react";
 
 import { poserIdentiteParDefaut, televerserImageProfil } from "../../lib/identite-par-defaut";
 import { ecrireDemandePushFaite } from "../../lib/preferences";
 import { NOM_NOTES, ouvrirNotesPersonnelles } from "../../lib/premiere-conversation";
+import { estCheminInvitation } from "../../lib/liens-invitation";
 import { routeConversation } from "../../lib/routes";
 import { Banner, Button, Text, VStack } from "../foundation/primitives";
 import { NotificationsPush } from "../settings/NotificationsPush";
@@ -173,6 +174,14 @@ function EtapeNotifications() {
  */
 function EtapePremiereConversation({ session, avancer }: ContenuEtapeProps) {
   const router = useRouter();
+  /**
+   * **Arrivé par un lien d'invitation, on y reste.** La porte *remplace* le contenu sans
+   * naviguer, donc l'URL du lien est encore là sous le parcours — et c'est le seul endroit
+   * où elle existe : rien ne mémorise le token. Naviguer ici le jetait, et un lien à usage
+   * unique valable un jour ne se retrouve pas. Le salon personnel est créé quand même ;
+   * seul le dernier saut change de destination.
+   */
+  const parInvitation = estCheminInvitation(usePathname() ?? "");
   const preparer = useCallback(() => ouvrirNotesPersonnelles(session), [session]);
   const { valeur: roomId, echec } = usePreparation(preparer);
 
@@ -213,14 +222,15 @@ function EtapePremiereConversation({ session, avancer }: ContenuEtapeProps) {
       </VStack>
 
       <Button
-        label="Ouvrir et écrire"
+        label={parInvitation ? "Continuer vers l'invitation" : "Ouvrir et écrire"}
         variant="primary"
         onClick={() => {
           // Le parcours se termine **avant** la navigation : sinon la porte rendrait
           // encore le parcours à l'arrivée sur la conversation, et l'écran ne changerait
-          // pas.
+          // pas. Sous une invitation, terminer suffit — la porte rend alors l'écran de
+          // réception, qui est déjà à cette URL.
           avancer();
-          router.push(routeConversation(roomId));
+          if (!parInvitation) router.push(routeConversation(roomId));
         }}
       />
     </VStack>

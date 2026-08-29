@@ -10,6 +10,7 @@ import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { Confidentialite } from "../components/settings/Confidentialite";
 import { InfosConversation } from "../components/settings/InfosConversation";
 import { LienInvitation } from "../components/settings/LienInvitation";
+import type { LienActif } from "../lib/liens-invitation";
 import { LimitesConnues } from "../components/settings/LimitesConnues";
 import { MembresGroupe } from "../components/settings/MembresGroupe";
 import { NotificationsSalon } from "../components/settings/NotificationsSalon";
@@ -533,7 +534,7 @@ describe("les galeries closent le layout info, dans les deux variantes", () => {
 });
 
 describe("le sas d'un groupe suit ses liens, et se referme", () => {
-  const liensAvec = (actifs: { id: string; kind: "friend" | "group"; expiresAt: number; usesLeft: number }[]) => ({
+  const liensAvec = (actifs: LienActif[]) => ({
     lister: vi.fn(async () => actifs),
     emettreGroupe: vi.fn(async () => ({ id: "l1", token: "jeton", expiresAt: 0 })),
     emettreAmi: vi.fn(),
@@ -548,7 +549,7 @@ describe("le sas d'un groupe suit ses liens, et se referme", () => {
 
   it("un lien de groupe actif ouvre le sas", async () => {
     regleDAcces.mockReturnValue("invite");
-    const liens = liensAvec([{ id: "l1", kind: "group", expiresAt: Date.now(), usesLeft: 1 }]);
+    const liens = liensAvec([{ id: "l1", kind: "group", roomId: "!g:t", expiresAt: Date.now(), usesLeft: 1 }]);
     render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
 
     await waitFor(() => expect(poserRegle).toHaveBeenCalledWith(expect.anything(), "!g:t", "knock"));
@@ -565,7 +566,7 @@ describe("le sas d'un groupe suit ses liens, et se referme", () => {
 
   it("n'écrit rien quand l'état est déjà le bon : un événement d'état inutile est du bruit", async () => {
     regleDAcces.mockReturnValue("knock");
-    const liens = liensAvec([{ id: "l1", kind: "group", expiresAt: Date.now(), usesLeft: 1 }]);
+    const liens = liensAvec([{ id: "l1", kind: "group", roomId: "!g:t", expiresAt: Date.now(), usesLeft: 1 }]);
     render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
 
     await waitFor(() => expect(liens.lister).toHaveBeenCalled());
@@ -578,11 +579,51 @@ describe("le sas d'un groupe suit ses liens, et se referme", () => {
     // personne. C'est la promesse silencieuse que E-13 avait pour but de supprimer.
     regleDAcces.mockReturnValue("invite");
     poserRegle.mockRejectedValueOnce(new Error("M_FORBIDDEN"));
-    const liens = liensAvec([{ id: "l1", kind: "group", expiresAt: Date.now(), usesLeft: 1 }]);
+    const liens = liensAvec([{ id: "l1", kind: "group", roomId: "!g:t", expiresAt: Date.now(), usesLeft: 1 }]);
     render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
 
     expect(await screen.findByText("Ce lien ne fera entrer personne")).toBeTruthy();
     expect(screen.getByText(/administrateur du groupe/)).toBeTruthy();
+  });
+
+  /**
+   * `lister()` rend **tous** les liens de l'appelant, tous salons confondus : c'est le
+   * service qui le veut, et le panneau est celui d'un seul groupe. Sans le tri, un lien
+   * émis pour un autre groupe ouvrait ce salon-ci — une porte ouverte sur un groupe qui
+   * n'a aucun lien, et que personne n'a demandé à ouvrir.
+   */
+  it("le lien d'un autre groupe n'ouvre pas celui-ci", async () => {
+    regleDAcces.mockReturnValue("invite");
+    const liens = liensAvec([{ id: "ailleurs", kind: "group", roomId: "!autre:t", expiresAt: Date.now(), usesLeft: 1 }]);
+    render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
+
+    await waitFor(() => expect(liens.lister).toHaveBeenCalled());
+    expect(poserRegle).not.toHaveBeenCalledWith(expect.anything(), "!g:t", "knock");
+    // Et il n'apparaît pas dans la liste : un lien qu'on ne peut pas rattacher à ce
+    // groupe n'a rien à faire dans son panneau, révocable ou non.
+    expect(screen.queryByRole("button", { name: "Révoquer" })).toBeNull();
+  });
+
+  /**
+   * Le sens inverse, et c'est le plus coûteux : la porte qui **ne se referme pas**. Le
+   * composant promet « revient à `invite` à la révocation du dernier » — le dernier de ce
+   * groupe, pas le dernier tout court.
+   */
+  it("le dernier lien de ce groupe révoqué le referme, même si un autre groupe en a un", async () => {
+    regleDAcces.mockReturnValue("knock");
+    const liens = liensAvec([{ id: "ailleurs", kind: "group", roomId: "!autre:t", expiresAt: Date.now(), usesLeft: 1 }]);
+    render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
+
+    await waitFor(() => expect(poserRegle).toHaveBeenCalledWith(expect.anything(), "!g:t", "invite"));
+  });
+
+  it("un lien d'ami n'ouvre le sas d'aucun groupe", async () => {
+    regleDAcces.mockReturnValue("invite");
+    const liens = liensAvec([{ id: "ami", kind: "friend", expiresAt: Date.now(), usesLeft: 1 }]);
+    render(<LienInvitation session={session()} roomId="!g:t" liens={liens} origine="https://t.test" />);
+
+    await waitFor(() => expect(liens.lister).toHaveBeenCalled());
+    expect(poserRegle).not.toHaveBeenCalledWith(expect.anything(), "!g:t", "knock");
   });
 
   it("les demandes d'entrée s'affichent aux membres, et laisser entrer est une invitation native", async () => {

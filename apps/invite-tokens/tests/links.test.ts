@@ -163,12 +163,31 @@ describe("GET /links liste les liens de l'émetteur, jamais ceux d'un autre", ()
     expect((await list(deps, "jeton-luca"))[0]!.id).not.toBe((await list(deps, "jeton-mira"))[0]!.id);
   });
 
-  it("kind, expiration et usages restants — et rien de plus", async () => {
+  it("kind, salon, expiration et usages restants — et rien de plus", async () => {
     await issue(deps, "jeton-luca", { kind: "group", roomId: SALON, maxUses: 3 });
     const [lien] = await list(deps, "jeton-luca");
 
-    expect(Object.keys(lien!).sort()).toEqual(["expiresAt", "id", "kind", "usesLeft"]);
-    expect(lien).toMatchObject({ kind: "group", usesLeft: 3 });
+    expect(Object.keys(lien!).sort()).toEqual(["expiresAt", "id", "kind", "roomId", "usesLeft"]);
+    expect(lien).toMatchObject({ kind: "group", roomId: SALON, usesLeft: 3 });
+  });
+
+  /**
+   * Le salon est ce qui permet au panneau de liens d'un groupe de reconnaître les siens.
+   * Sans lui il les confondait avec ceux des autres groupes du même émetteur, et son sas
+   * d'entrée suivait alors des liens qui menaient ailleurs — ouvert sans lien propre,
+   * laissé ouvert après la révocation du dernier. Il ne fuite rien : l'appelant est
+   * l'émetteur, on ne lui rend que ce qu'il a demandé lui-même.
+   */
+  it("le salon accompagne un lien de groupe, et rien n'accompagne un lien d'ami", async () => {
+    await issue(deps, "jeton-luca", { kind: "group", roomId: SALON });
+    await lienAmi();
+
+    const liens = await list(deps, "jeton-luca");
+    expect(liens.find((lien) => lien.kind === "group")!.roomId).toBe(SALON);
+    // Absente, pas nulle : la même forme que la résolution, pour qu'un `=== roomId` côté
+    // client ne puisse jamais être vrai par accident.
+    const ami = liens.find((lien) => lien.kind === "friend")!;
+    expect("roomId" in ami).toBe(false);
   });
 
   it("un lien révoqué ou expiré n'est plus actif", async () => {
