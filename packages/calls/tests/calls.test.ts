@@ -146,6 +146,41 @@ describe("URL Element Call complète et paramétrée", () => {
     expect(video.get("skipLobby")).toBeNull();
   });
 
+  /**
+   * **`preload` est une impasse, pas une optimisation.** Relu le 29/08/2026 dans le
+   * bundle de l'image épinglée v0.23.0, `GroupCallView` :
+   *
+   *     if (skipLobby)
+   *       if (widget && preload) { lazyActions.on("io.element.join", …) }
+   *       else setJoined(true)
+   *
+   * `preload` veut dire « n'entre pas dans l'appel, attends que l'hôte envoie
+   * `io.element.join` ». Rien dans ce dépôt n'envoie cette action, et rien ne doit
+   * l'envoyer — c'est le mécanisme de lobby d'Element Web, dont le nôtre n'a pas besoin.
+   *
+   * **Mais il gouverne aussi le rendu**, et c'est la moitié qui coûtait un écran noir.
+   * Toujours dans `GroupCallView`, à la fin :
+   *
+   *     } else if (preload || skipLobby) {
+   *       body = null;          // ne peint rien
+   *     } else {
+   *       body = lobbyView;
+   *     }
+   *
+   * Avec `preload` posé et l'appel non rejoint, Element Call rend donc `null` : plus une
+   * ligne de journal, plus un pixel, et pas la moindre erreur. Constaté sur le
+   * déploiement de staging le 29/08/2026 — poignée de main complète, `GroupCallView`
+   * monté, écran noir. Les deux gardes se refermaient ensemble : celle du rendu peignait
+   * `null`, celle du join attendait une action que personne n'envoie.
+   *
+   * Il avait été posé pour obtenir `content_loaded` ; `sendContentLoaded()` est en fait
+   * appelé sans condition à l'initialisation, également relu dans le bundle.
+   */
+  it("ne demande pas `preload` : ce serait attendre un `io.element.join` que personne n'envoie", () => {
+    const { params } = buildCallWidget(session, SALON, WIDGET);
+    expect(params.preload).toBeUndefined();
+  });
+
   it("n'envoie plus les deux paramètres qu'Element Call ne lit pas", () => {
     // Ils étaient écrits de bonne foi et ne faisaient rien : `video` n'existe dans
     // aucune version, `hideHeader` a été remplacé par `header` (v0.23.0). Le test les

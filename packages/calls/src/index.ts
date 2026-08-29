@@ -156,7 +156,6 @@ export function buildCallWidget(
     // `widgetId` + `parentUrl` sont ce qui le fait basculer en mode widget (`isWidget`
     // dans `UrlParams.ts`), et c'est cette bascule qui rend `intent` lisible pour lui.
     embed: "true",
-    preload: "true",
     // `header=none` et non `hideHeader` : ce dernier a disparu de `UrlConfiguration` en
     // v0.23.0 — le commentaire d'amont le dit rétrocompatible, le code ne le lit plus.
     header: "none",
@@ -202,8 +201,10 @@ export function attachCallWidget(
     creatorUserId: session.client.getUserId() ?? "",
     type: CALL_APPLICATION,
     url,
-    // Element Call annonce lui-même son chargement (`preload=true` → `content_loaded`).
-    // Attendre en plus le `load` de l'iframe ferait démarrer la session deux fois.
+    // Element Call annonce lui-même son chargement par `content_loaded`, qu'il envoie
+    // dès son initialisation et **sans condition** — relu dans le bundle de l'image
+    // épinglée v0.23.0, où l'appel à `sendContentLoaded()` ne dépend d'aucun paramètre
+    // d'URL. Attendre en plus le `load` de l'iframe ferait démarrer la session deux fois.
     waitForIframeLoad: false,
   });
 
