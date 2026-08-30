@@ -5,8 +5,7 @@ les notifications de Synapse vers les navigateurs en **Web Push standard
 (VAPID)**. Sygnal ne couvre qu'APNs et FCM : pour une PWA auto-hébergée, il
 fallait cette passerelle.
 
-Limites assumées : voir plus bas — **à lire avant d'intégrer côté client**
-(sur iOS, rien ne fonctionne hors PWA installée).
+**Limites assumées ci-dessous, à lire avant d'intégrer côté client.**
 
 ## Endpoints
 
@@ -18,6 +17,23 @@ Limites assumées : voir plus bas — **à lire avant d'intégrer côté client*
 Le payload envoyé au navigateur contient **exactement** `event_id` et
 `room_id`. Aucun contenu, aucun expéditeur : le serveur n'en a pas, et le
 client déchiffre localement au réveil.
+
+## Limites assumées
+
+- **Sur iOS, rien ne fonctionne hors PWA installée.** Safari ne délivre de Web Push
+  qu'à une application ajoutée à l'écran d'accueil ; un onglet ordinaire n'en reçoit
+  aucune, et aucun réglage ne le change.
+- **La notification ne peut rien dire du message.** Le payload ne porte que deux
+  identifiants, par construction : la passerelle n'a pas les clés Megolm, et le service
+  worker n'en a pas non plus quand l'application est fermée. Une notification à froid
+  reste générique — voir [`apps/web`](../web).
+- **Un push perdu n'est pas retenté.** Pas de base, pas de file d'attente : la reprise
+  est le `/sync` suivant, qui redescend l'événement de toute façon.
+- **Une rotation des clés VAPID invalide toutes les subscriptions existantes.** Chaque
+  navigateur doit se réabonner, et un pusher qui pointe l'ancienne clé échoue en silence
+  jusque-là.
+- **Un pusher sans `p256dh`/`auth` est inutilisable** : la passerelle le renvoie
+  immédiatement dans `rejected`, et Synapse le supprime.
 
 ## Clés VAPID
 
@@ -63,5 +79,4 @@ immédiatement dans `rejected`.
 ## Non couvert ici
 
 Abonnement navigateur, demande de permission, affichage et déchiffrement des
-notifications : `apps/web`. Pas de base de données, pas de file d'attente — un
-push perdu est rattrapé par le `/sync` suivant.
+notifications : `apps/web`.

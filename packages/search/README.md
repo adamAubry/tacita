@@ -13,6 +13,45 @@ await search.stats(); // { size, max, oldestTs, newestTs }
 search.dispose(); // détache le hook et termine le worker
 ```
 
+## Limites assumées
+
+- **La recherche couvre l'historique téléchargé, pas celui du serveur.** Un
+  message jamais synchronisé sur cet appareil est introuvable. `stats()` rend
+  `oldestTs`/`newestTs` précisément pour que l'UI l'affiche au lieu de
+  laisser croire à une recherche exhaustive.
+- **L'amorçage lit les timelines vives, pas tout le store.** À la création,
+  `createSearch` indexe ce que le client tient déjà — ce que les écrans affichent.
+  Ce qui n'est plus dans la fenêtre de `/sync` n'entre dans l'index que lorsque la
+  remontée d'historique le redescend, donc au fil du défilement.
+- **Le proxy s'attache à une session, pas à un écran.** Il n'indexe que pendant
+  qu'il est branché : un `createSearch` créé à l'ouverture d'un onglet et jeté à sa
+  fermeture n'assiste à aucun déchiffrement et laisse l'index vide.
+- **Plafond de 200 000 événements ; les premiers indexés sortent** (`MAX_EVENTS`,
+  exporté par le paquet). L'éviction suit l'ordre d'indexation locale, jamais la date d'origine
+  des messages : sinon un rattrapage d'historique — qui insère par définition
+  des messages anciens — s'auto-évincerait. `stats().size` contre `max` dit si
+  la purge a mordu, et `oldestTs`/`newestTs` restent des dates d'origine, les
+  seules qui parlent à l'utilisateur.
+- **Mot-clé simple, pas de fuzzy.** Orama fait de l'OR sur les tokens : chercher
+  `réunion demain` rend aussi ce qui ne contient que `réunion`.
+- **`roomId`, `sender` et `msgtype` sont indexés en `enum`, pas en texte.** Ils
+  filtrent à l'égalité exacte et ne sont pas cherchables au mot-clé — chercher un
+  mot ne doit pas matcher un identifiant, ni `m.text` répondre à « text ».
+- **Un changement de schéma d'index jette le snapshot précédent.** Les documents
+  déjà indexés ne sont pas migrés : ils sont effacés, et l'index se reconstruit au
+  fil des déchiffrements suivants. La recherche ne couvre alors plus l'historique
+  antérieur tant qu'il n'est pas reparcouru — `stats()` le dit, comme toujours.
+- **Une rotation de session Megolm ne déclenche rien** (décision assumée). Ce qui
+  a été déchiffré et indexé le reste ; en dehors du cycle de vie des messages
+  ci-dessus, seules la purge de plafond et `wipe()` retirent des entrées.
+- **Un retrait qui échoue n'est pas retenté.** Si le worker rejette la
+  suppression, le document reste trouvable jusqu'au prochain `wipe()`. Ce
+  package n'a aucun canal d'erreur ; la reprise se branchera quand le shard UI en
+  exposera un.
+- **Le snapshot est réécrit en entier à chaque appel d'`index()`.** Suffisant
+  pour des vagues de sync ; à débattre par un timer si le coût devient visible
+  sur un gros index.
+
 ## Recherche filtrée
 
 Les critères sont **combinables** et se composent en ET ; un critère absent ne
@@ -60,41 +99,3 @@ L'endpoint serveur est inopérant sur salon chiffré — il indexe du chiffré. 
 n'y a pas de repli dessus et il n'y en aura pas : une recherche qui ne rend rien
 hors ligne est un bug, pas une dégradation.
 
-## Limites assumées
-
-- **La recherche couvre l'historique téléchargé, pas celui du serveur.** Un
-  message jamais synchronisé sur cet appareil est introuvable. `stats()` rend
-  `oldestTs`/`newestTs` précisément pour que l'UI l'affiche au lieu de
-  laisser croire à une recherche exhaustive.
-- **L'amorçage lit les timelines vives, pas tout le store.** À la création,
-  `createSearch` indexe ce que le client tient déjà — ce que les écrans affichent.
-  Ce qui n'est plus dans la fenêtre de `/sync` n'entre dans l'index que lorsque la
-  remontée d'historique le redescend, donc au fil du défilement.
-- **Le proxy s'attache à une session, pas à un écran.** Il n'indexe que pendant
-  qu'il est branché : un `createSearch` créé à l'ouverture d'un onglet et jeté à sa
-  fermeture n'assiste à aucun déchiffrement et laisse l'index vide.
-- **Plafond de 200 000 événements ; les premiers indexés sortent** (DECISIONS
-  le plafond de l'index). L'éviction suit l'ordre d'indexation locale, jamais la date d'origine
-  des messages : sinon un rattrapage d'historique — qui insère par définition
-  des messages anciens — s'auto-évincerait. `stats().size` contre `max` dit si
-  la purge a mordu, et `oldestTs`/`newestTs` restent des dates d'origine, les
-  seules qui parlent à l'utilisateur.
-- **Mot-clé simple, pas de fuzzy.** Orama fait de l'OR sur les tokens : chercher
-  `réunion demain` rend aussi ce qui ne contient que `réunion`.
-- **`roomId`, `sender` et `msgtype` sont indexés en `enum`, pas en texte.** Ils
-  filtrent à l'égalité exacte et ne sont pas cherchables au mot-clé — chercher un
-  mot ne doit pas matcher un identifiant, ni `m.text` répondre à « text ».
-- **Un changement de schéma d'index jette le snapshot précédent.** Les documents
-  déjà indexés ne sont pas migrés : ils sont effacés, et l'index se reconstruit au
-  fil des déchiffrements suivants. La recherche ne couvre alors plus l'historique
-  antérieur tant qu'il n'est pas reparcouru — `stats()` le dit, comme toujours.
-- **Une rotation de session Megolm ne déclenche rien** (décision assumée). Ce qui
-  a été déchiffré et indexé le reste ; en dehors du cycle de vie des messages
-  ci-dessus, seules la purge de plafond et `wipe()` retirent des entrées.
-- **Un retrait qui échoue n'est pas retenté.** Si le worker rejette la
-  suppression, le document reste trouvable jusqu'au prochain `wipe()`. Ce
-  package n'a aucun canal d'erreur ; la reprise se branchera quand le shard UI
- en exposera un.
-- **Le snapshot est réécrit en entier à chaque appel d'`index()`.** Suffisant
-  pour des vagues de sync ; à débattre par un timer si le coût devient visible
-  sur un gros index.

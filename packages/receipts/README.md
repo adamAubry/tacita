@@ -2,7 +2,7 @@
 
 `createReceipts(session)` suit chaque message sortant à travers **sending → sent →
 delivered → read** et rend un statut observable par `event_id`. Zéro DOM, aucun accès
-direct à IndexedDB : tout passe par la `Session` de `@tacita/client-core`.
+direct à IndexedDB : tout passe par la `Session` de [`@tacita/client-core`](../client-core).
 
 ```ts
 const receipts = createReceipts(session);

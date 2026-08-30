@@ -42,9 +42,9 @@ trier par horodatage** (interdit n°6).
 
 ## ⚠️ Les littéraux MatrixRTC ne sont pas stables
 
-`src/matrixrtc.ts` est le **seul** fichier du package qui porte un littéral de protocole,
+[`src/matrixrtc.ts`](src/matrixrtc.ts) est le **seul** fichier du package qui porte un littéral de protocole,
 et un test structurel échoue si l'un d'eux réapparaît ailleurs. Chaque valeur y est datée
-et sourcée (`matrix-js-sdk@42.0.0`, `infra/rtc/README.md`).
+et sourcée (`matrix-js-sdk@42.0.0`, [`infra/rtc/README.md`](../../infra/rtc/README.md)).
 
 **Divergence connue** : le brouillon courant de MSC4143 remplace l'événement d'état
 `org.matrix.msc3401.call.member` par des événements *sticky* `m.rtc.member` (MSC4354).
@@ -55,14 +55,14 @@ erreur bruyante : le salon affichera simplement « aucun appel ».
 **Depuis, cette bascule a un interrupteur nommé** : le `matrix_rtc_mode` servi dans
 `infra/rtc/element-call.json`. Ses trois valeurs (v0.23.0) sont `legacy`, `compatibility`
 et `matrix_2_0` ; seule la dernière active les événements *sticky*. Nous épinglons
-`compatibility`, et a un test qui refuse `matrix_2_0` — le jour où on voudra y
-passer, c'est ce fichier-ci qu'il faudra changer d'abord.
+`compatibility`, et [`infra/rtc/`](../../infra/rtc) a un test qui refuse `matrix_2_0` — le jour où on voudra
+y passer, c'est ce fichier-ci qu'il faudra changer d'abord.
 
 ## Limites assumées
 
-- **`attachCallWidget` prend une iframe, il n'en rend aucune.** `@tacita/calls` dit « zéro DOM,
+- **`attachCallWidget` prend une iframe, il n'en rend aucune.** [`@tacita/calls`](.) dit « zéro DOM,
   le shard rend l'iframe » — c'est toujours vrai : le shard la rend, ce paquet branche le
-  pont postMessage dessus. Le pont est ici et non dans le shard parce que tient
+  pont postMessage dessus. Le pont est ici et non dans le shard parce que le shard tient
   une liste close de dépendances qui n'inclut pas `matrix-widget-api`, et n'a pas à
   l'inclure : c'est du protocole, pas de l'interface.
 - **Les paramètres d'URL sont relus dans la version épinglée, jamais de mémoire.** Le contrôle est
@@ -77,7 +77,7 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
   de travers y est corrigeable avant d'entrer, caméra comprise.
 - **Le driver envoie directement, sans passer par la file d'envoi**. Seul
   endroit du dépôt, hors `messaging` et `outbox` lui-même, à appeler `client.sendEvent`.
-  C'est voulu et : `WidgetDriver.sendEvent` de `matrix-widget-api`
+  C'est voulu, et la raison est dans le contrat : `WidgetDriver.sendEvent` de `matrix-widget-api`
   doit rendre l'`eventId` **à l'appelant, de façon synchrone**, et Element Call s'en sert
   pour suivre son propre état d'appartenance. Une file différée par nature ne peut pas
   tenir ce contrat — l'événement partirait plus tard, ou jamais.
@@ -148,7 +148,7 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
 - **Un appel manqué ne remonte pas dans l'aperçu de la liste des conversations.** Il est
   dans le salon (`callHistory`) et il sonne à l'instant où il arrive (`incomingCalls`),
   mais l'aperçu vient du dernier **message** — et le porter jusque-là demanderait à
-  `@tacita/messaging` de connaître les littéraux MatrixRTC, dont `src/matrixrtc.ts` est
+  [`@tacita/messaging`](../messaging) de connaître les littéraux MatrixRTC, dont `src/matrixrtc.ts` est
   le seul dépositaire. Limite assumée plutôt qu'un deuxième foyer pour la même valeur.
 - **Le journal ne voit que la fenêtre de timeline chargée.** Remonter l'historique en
   révèle davantage, exactement comme pour les messages ; un appel plus ancien que ce qui

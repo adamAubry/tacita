@@ -5,9 +5,9 @@ bornée et les résout pour un appelant authentifié.
 
 **Le cadre, décidé par le PM : un utilisateur existant ajoute un autre utilisateur
 existant.** Tout ce qui en sort a un comportement défini — jamais une erreur technique
-brute. *(La phrase disait « jamais une inscription en libre-service (`enable_registration: false`) » :
-L'inscription est ouverte à tous. Le service, lui, ne crée
-aucun compte, il résout un token pour un appelant déjà authentifié.)*
+brute. *(La phrase disait « jamais une inscription en libre-service » : l'inscription est
+désormais ouverte à tous. Le service, lui, ne crée aucun compte — il résout un token pour
+un appelant déjà authentifié.)*
 
 ## Ce qu'il ne fait pas, et c'est le point
 
@@ -52,7 +52,7 @@ le **même succès**, sans consommer d'usage de plus.
 ## Déploiement
 
 Le raccordement appartient à `infra` : image, service compose, base
-PostgreSQL dédiée, route proxy, variables. Voir `infra/README.md`.
+PostgreSQL dédiée, route proxy, variables. Voir [`infra/README.md`](../../infra/README.md).
 
 ```
 DATABASE_URL=postgres://…    # base dédiée, jamais celle de Synapse

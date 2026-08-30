@@ -32,8 +32,7 @@ outbox.dispose(); // au démontage : coupe le timer et ferme la base
 
 ## Rien ne part en clair
 
-Avant chaque tentative, la file consulte `Session.isEncrypted(roomId)` (
-). Si le salon n'est pas chiffré, l'entrée passe `failed` avec le code
+Avant chaque tentative, la file consulte `Session.isEncrypted(roomId)`. Si le salon n'est pas chiffré, l'entrée passe `failed` avec le code
 `TACITA_NOT_ENCRYPTED` **sans aucun appel réseau** — un message en clair parti est
 une fuite irréversible, et le prédicat rend `false` tant que l'état est inconnu.
 
@@ -44,11 +43,11 @@ UI doit lui donner un libellé qui dise pourquoi, sinon l'utilisateur voit
 ## Limites assumées
 
 - **Seul `m.room.message` est mis en file.** C'est le seul type qui se compose
-  hors ligne — le texte comme le média (qui fournit le
-  contenu prêt à envoyer) produisent ce type. Un autre type à différer
+  hors ligne — le texte comme le média ([`@tacita/media-pipeline`](../media-pipeline) fournit le contenu
+  prêt à envoyer) produisent ce type. Un autre type à différer
   demanderait un champ `eventType` sur l'entrée.
 - **Le module ne vérifie pas que le salon est chiffré.** Il ne dépend que de la
-  `@tacita/client-core` ; la garde vit dans `@tacita/messaging` et le chiffrement
+  [`@tacita/client-core`](../client-core) ; la garde vit dans [`@tacita/messaging`](../messaging) et le chiffrement
   effectif est fait par la Session à l'envoi.
 - **Un échec définitif est décidé sur le code HTTP.** 4xx hors
   `M_LIMIT_EXCEEDED` → `failed`, plus aucune tentative automatique. Un serveur

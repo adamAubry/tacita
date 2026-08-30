@@ -92,7 +92,7 @@ Tout est écrit dans **[THREAT_MODEL.md](THREAT_MODEL.md)**.
 > [!IMPORTANT]
 > Ports à ouvrir : `80/tcp` (certbot seulement, le temps du défi), `443/tcp`, `3478/udp`
 > et `5349/tcp` (TURN), `7881/tcp` et `50000-50100/udp` (média des appels).
-> `install.sh` ouvre lui-même ceux du RTC quand `ufw` est là. Les oublier fait qu'un
+> [`install.sh`](install.sh) ouvre lui-même ceux du RTC quand `ufw` est là. Les oublier fait qu'un
 > appel se connecte, affiche les participants, puis meurt à 15-20 secondes sans rien dire.
 
 ### Installation
@@ -153,7 +153,7 @@ packages/
 infra/            config-as-code : compose, Synapse, nginx, LiveKit, tests de fumée
 ```
 
-Chaque paquet porte dans son `README.md` son contrat d'interface et ses **limites
+Chaque paquet porte dans son [`README.md`](README.md) son contrat d'interface et ses **limites
 assumées**. Ces limites ne sont pas de la communication : plusieurs sont tenues par des
 tests qui échouent si le README cesse de les dire.
 
@@ -167,7 +167,7 @@ npm run typecheck        # toujours complet — c'est lui qui tient les jonction
 npm run lint
 ```
 
-La pile se lance depuis `infra/` (voir [`infra/README.md`](infra/README.md)) ; l'overlay
+La pile se lance depuis [`infra/`](infra) (voir [`infra/README.md`](infra/README.md)) ; l'overlay
 de développement publie PostgreSQL et l'API Synapse sur l'hôte et installe un CA local.
 Avant le premier `pnpm dev`, le domaine doit résoudre **depuis le navigateur** — le
 README d'`infra` donne la ligne du fichier hosts, cas WSL2 compris.
@@ -201,8 +201,6 @@ de session sans réseau.
 | Document | Ce qu'il couvre |
 | --- | --- |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | ce qui est protégé, ce qui ne l'est pas, et pourquoi |
-| [DECISIONS.md](DECISIONS.md) | les arbitrages produit déjà tranchés, avec leur motif |
-| [PRODUCT.md](PRODUCT.md) · [DESIGN.md](DESIGN.md) | positionnement et voix · le système visuel |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | contraintes, discipline de test, porte de commit |
 | [`infra/README.md`](infra/README.md) | le socle serveur, en détail |
 | [`apps/web/README.md`](apps/web/README.md) | la PWA, et ce qu'elle ne prouve pas |

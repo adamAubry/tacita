@@ -14,7 +14,7 @@ npx vitest run apps/web    # ou `npm test` à la racine
 ```
 
 `.env.local` est ignoré par git : chaque environnement garde le sien. Avant le premier
-`dev`, le nom doit résoudre depuis le **navigateur** — `infra/README.md`, section
+`dev`, le nom doit résoudre depuis le **navigateur** — [`infra/README.md`](../../infra/README.md), section
 « Résoudre le nom depuis l'hôte » (le cas WSL2 y est traité). Sans ça la redirection
 vers l'OIDC est correcte et part vers un nom qui ne mène nulle part.
 
@@ -25,15 +25,15 @@ au contrat. Pas des préférences de style.
 
 1. **Jamais le barrel `@astryxdesign/core`.** *« unsupported to use "export \*" in a client
    boundary »*. Toujours le sous-chemin. En pratique : **un seul fichier importe Astryx**,
-   `components/foundation/primitives.ts`, et tout le reste passe par lui. Un test garde la
+   [`components/foundation/primitives.ts`](components/foundation/primitives.ts), et tout le reste passe par lui. Un test garde la
    règle — sinon elle se redécouvre au build, longtemps après avoir été enfreinte.
-2. **Le `Theme` d'Astryx vit dans un composant `"use client"` à nous** (`app/providers.tsx`).
+2. **Le `Theme` d'Astryx vit dans un composant `"use client"` à nous** ([`app/providers.tsx`](app/providers.tsx)).
    Posé dans le layout racine, qui est un composant serveur, il fait échouer le rendu.
 3. **Le cœur n'embarque aucune palette** : la nôtre est un `defineTheme`, sans paquet de thème.
 
 ## Le thème est la seule source des couleurs
 
-`components/foundation/theme.ts` est **le seul endroit du dépôt** où une valeur hexadécimale
+[`components/foundation/theme.ts`](components/foundation/theme.ts) est **le seul endroit du dépôt** où une valeur hexadécimale
 est écrite. La table de correspondance qui le gouverne — 16 tokens de marque
 vers 79 tokens Astryx — vit dans ce fichier. Trois points s'y jouent, et aucun ne se
 voit à l'œil nu :
@@ -73,8 +73,8 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   permissions de l'iframe, message de `RtcFociMissing`, sortie de secours au délai,
   paramètre de lancement — avec le paquet 10 mocké. Qu'Element Call démarre, s'authentifie
   auprès du SFU et rende du média demande la pile RTC déployée ;
-- **les paramètres d'URL d'Element Call sont relus dans la version épinglée**  :
-  `infra/rtc/` fixe la `v0.23.0` par digest, et le point d'entrée part en `intent`. Ce qui
+- **les paramètres d'URL d'Element Call sont relus dans la version épinglée** :
+  [`infra/rtc/`](../../infra/rtc) fixe la `v0.23.0` par digest, et le point d'entrée part en `intent`. Ce qui
   reste non prouvé, c'est le rendu — voir le point précédent. `skipLobby` n'est jamais
   envoyé : le lobby est le rattrapage d'une intention partie de travers ;
 - **le flux OIDC complet n'a jamais été exécuté d'un bout à l'autre.** Le retour du
@@ -83,7 +83,7 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **le flash de thème au premier rendu est réel** : IndexedDB est asynchrone et l'interdit
   n°2 ferme localStorage. Il ne touche que ceux qui ont choisi l'autre mode que le défaut ;
 - **l'envoi de vocal attend encore Safari.** Les muxeurs vivent dans
-  `@tacita/media-pipeline` : Firefox et Chrome/Edge sont couverts, iOS demande un encodeur
+  [`@tacita/media-pipeline`](../../packages/media-pipeline) : Firefox et Chrome/Edge sont couverts, iOS demande un encodeur
   Opus que le spike doit situer. Le vocal ne s'allumera dans l'UI qu'avec les trois chemins
   couverts — une messagerie où répondre en vocal dépend du téléphone d'en face est la
   promesse conditionnelle que l'interdit n°13 vise ;
@@ -93,7 +93,7 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **l'envoi de pièce jointe n'a pas de barre de progression**, seulement un état : le
   pipeline ne rapporte rien pendant la compression ni le téléversement, et une
   barre serait une animation inventée plutôt qu'une mesure ;
-- **la photo de profil est livrée, et elle n'est pas chiffrée**  : un
+- **la photo de profil est livrée, et elle n'est pas chiffrée** : un
   avatar Matrix est un `mxc://` nu que tout client doit pouvoir afficher, et le chiffrer en
   ferait un carré cassé partout. Elle passe par `uploadPublicProfileImage()`, **l'unique
   chemin public du pipeline**, dont le site d'appel unique est gardé par un test. L'écran
@@ -104,8 +104,8 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **ni l'accueil ni la timeline ne sont fenêtrés.** Astryx `0.2.0` n'expose aucune liste
   virtualisée ; les contraintes de conception prévoyaient ce cas. Le plafond est réel sur une
   conversation ancienne, pas sur une liste de conversations ;
-- **aucune push rule n'a été écrite contre un vrai Synapse.** l'écran de réglages pose les trois niveaux de
-  notification par salon avec les règles natives, et la suite prouve *quelles* règles partent ;
+- **aucune push rule n'a été écrite contre un vrai Synapse.** L'écran de réglages pose
+  les trois niveaux de notification par salon avec les règles natives, et la suite prouve *quelles* règles partent ;
   que le serveur les évalue comme prévu — mentions qui passent en « mentions uniquement »,
   rien qui passe en « silencieux » — demande une pile déployée ;
 - **aucun `knock` n'a été émis contre un vrai Synapse.** Depuis, un lien de groupe
@@ -115,22 +115,22 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
   déployée. À vérifier en premier : la bascule `join_rules` exige un power level d'état,
   et un membre ordinaire qui émet un lien voit un avertissement au lieu d'un lien muet ;
 - ~~**un lien d'invitation de groupe s'émet, mais rien ne le consomme encore.**~~ L'écran de
-  réception appartient à l'écran social, et le mécanisme d'arrivée dans un salon privé reste ouvert
-  L'émission, l'expiration et la révocation, elles, fonctionnent.
+  réception appartient à l'écran social, et le mécanisme d'arrivée dans un salon privé
+  reste ouvert. L'émission, l'expiration et la révocation, elles, fonctionnent.
 
 ## Où sont les choses
 
 | | |
 |---|---|
-| `app/` | routes App Router — les 7 layouts, les 4 onglets dans le groupe `(onglets)` |
-| `components/foundation/` | primitives réexportées, thème, navbar, header, états |
-| `components/onboarding/` | session, porte de récupération, éducation iOS, déconnexion |
-| `components/accueil/` | liste de conversations, en-tête, bannière de demandes, création |
-| `components/conversation/` | timeline, message object, hold menu, starter, composer |
-| `components/media/` | vignettes, viewer, vocal, capture, galeries partagées |
-| `components/recherche/` | barre et périmètre, recherches récentes, résultats surlignés, onglet Mentions |
-| `components/profil/` | profile card, profil propre et d'autrui, note privée locale |
-| `components/amis/` | ajout par lien ou annuaire, demandes reçues |
-| `components/settings/` | réglages, infos de conversation, options, notifications |
-| `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
-| `public/` | manifeste, icônes, service worker |
+| [`app/`](app) | routes App Router — les 7 layouts, les 4 onglets dans le groupe `(onglets)` |
+| [`components/foundation/`](components/foundation) | primitives réexportées, thème, navbar, header, états |
+| [`components/onboarding/`](components/onboarding) | session, porte de récupération, éducation iOS, déconnexion |
+| [`components/accueil/`](components/accueil) | liste de conversations, en-tête, bannière de demandes, création |
+| [`components/conversation/`](components/conversation) | timeline, message object, hold menu, starter, composer |
+| [`components/media/`](components/media) | vignettes, viewer, vocal, capture, galeries partagées |
+| [`components/recherche/`](components/recherche) | barre et périmètre, recherches récentes, résultats surlignés, onglet Mentions |
+| [`components/profil/`](components/profil) | profile card, profil propre et d'autrui, note privée locale |
+| [`components/amis/`](components/amis) | ajout par lien ou annuaire, demandes reçues |
+| [`components/settings/`](components/settings) | réglages, infos de conversation, options, notifications |
+| [`lib/`](lib) | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
+| [`public/`](public) | manifeste, icônes, service worker |

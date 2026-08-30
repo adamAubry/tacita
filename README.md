@@ -88,7 +88,7 @@ All of it, in full: **[THREAT_MODEL.md](THREAT_MODEL.md)**.
 > [!IMPORTANT]
 > Open ports: `80/tcp` (certbot, during the certificate challenge only), `443/tcp`,
 > `3478/udp` and `5349/tcp` (TURN), `7881/tcp` and `50000-50100/udp` (call media).
-> `install.sh` opens the RTC ones itself when `ufw` is present. Miss them and a call
+> [`install.sh`](install.sh) opens the RTC ones itself when `ufw` is present. Miss them and a call
 > connects, shows the participants, then dies at 15–20 seconds with nothing said.
 
 ### Install
@@ -163,7 +163,7 @@ npm run typecheck        # always full — it is what holds the junctions togeth
 npm run lint
 ```
 
-The stack itself runs from `infra/` (see [`infra/README.md`](infra/README.md)); the dev
+The stack itself runs from [`infra/`](infra) (see [`infra/README.md`](infra/README.md)); the dev
 overlay publishes PostgreSQL and the Synapse API on the host and installs a development
 CA. Before the first `pnpm dev`, your domain must resolve **from the browser** — the
 `infra` README has the hosts-file line, WSL2 included.
@@ -197,8 +197,6 @@ network.
 | Document | What it covers |
 | --- | --- |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | what is protected, what is not, and why |
-| [DECISIONS.md](DECISIONS.md) | product trade-offs already settled, with their motive |
-| [PRODUCT.md](PRODUCT.md) · [DESIGN.md](DESIGN.md) | positioning and voice · the visual system |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | constraints, test discipline, commit gate |
 | [`infra/README.md`](infra/README.md) | the server stack, in detail |
 | [`apps/web/README.md`](apps/web/README.md) | the PWA, and what it does not prove |

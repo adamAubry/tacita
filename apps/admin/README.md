@@ -24,7 +24,7 @@ tourne immédiatement après `git clone`, sans `pnpm install`. Sa seule exigence
 — et c'est la première chose que `doctor` vérifie, parce qu'Ubuntu 24.04 livre Node 18
 dans apt.
 
-## `install.sh` — l'assistant d'installation
+## [`install.sh`](../../install.sh) — l'assistant d'installation
 
 Un seul point d'entrée, six étapes, rien à retenir entre elles. Le script **est** le
 parcours ; les commandes `pnpm admin` qu'il enchaîne restent utilisables séparément pour
@@ -76,13 +76,13 @@ qu'un déploiement automatisé puisse s'y fier.
 ./install.sh --dev
 ```
 
-La version de pnpm est **lue dans `package.json`**, jamais recopiée ; celle de Node est
-tenue avec `machine.ts` par `infra/tests/bootstrap.test.ts`.
+La version de pnpm est **lue dans [`package.json`](package.json)**, jamais recopiée ; celle de Node est
+tenue avec `machine.ts` par [`infra/tests/bootstrap.test.ts`](../../infra/tests/bootstrap.test.ts).
 
 ## Pourquoi un outil et pas un runbook
 
 Un runbook décrit l'état du dépôt au jour où il a été écrit. Celui-ci lit l'état réel.
-La différence n'est pas théorique : au 25/08/2026, `infra/README.md` et
+La différence n'est pas théorique : au 25/08/2026, [`infra/README.md`](../../infra/README.md) et
 `docs/LAUNCH_README.md` décrivaient encore longuement Keycloak, le realm `tacita` et
 `kcadm.sh`, alors que le SSO a été supprimé et qu'aucun service `keycloak` n'existe
 plus dans `docker-compose.yml`. Un administrateur qui suivait la doc créait un compte
@@ -112,7 +112,7 @@ vivante contre une liste de clés.
 **Les appels ne demandent plus rien que l'outil ne sache produire.** Il fallait deux IPv4
 publiques distinctes, que `init` laissait vides faute de pouvoir les inventer — donc une
 pile qui refusait de démarrer sur une machine qui n'en a qu'une. Depuis que le TURN-TLS a
-quitté le 443 pour le 5349 (`infra/rtc/README.md`), il ne reste que la paire de clés du
+quitté le 443 pour le 5349 ([`infra/rtc/README.md`](../../infra/rtc/README.md)), il ne reste que la paire de clés du
 SFU, générée comme les autres secrets.
 
 La paire VAPID est produite par `node:crypto` seul : point P-256 non compressé, 65 octets,

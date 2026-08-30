@@ -46,24 +46,23 @@ await session.logout(); // révocation + wipe complet
   présenterait une garantie que le module n'offre pas. **Conséquence : qui a accès
   au profil du navigateur a accès au compte et à l'historique déchiffrable.**
   Relever le niveau suppose une clé de pickle sur le store crypto *et* un écran de
-  déverrouillage à chaque ouverture — décision produit, encore ouverte
- avant d'être implémentée.
+  déverrouillage à chaque ouverture — décision produit encore ouverte.
 - **Un jeton restauré n'est pas validé.** Le valider demanderait le réseau, ce que
   `restoreSession` existe pour éviter. Un jeton révoqué se manifeste par un
   `M_UNKNOWN_TOKEN` au premier appel : c'est au shard UI de router vers
   l'OIDC à ce moment-là.
-- **La confiance vient de l'identité, pas d'une vérification appareil par appareil**
-. verrouille le mode `OnlySignedDevicesIsolationMode` : les clés
+- **La confiance vient de l'identité, pas d'une vérification appareil par appareil.**
+  `initSession` verrouille le mode `OnlySignedDevicesIsolationMode` : les clés
   Megolm ne partent qu'aux appareils que leur propriétaire a signés de son identité
   cross-signing, et un événement venu d'un appareil non signé reste illisible. Comme
- impose ce bootstrap à l'inscription, aucune étape supplémentaire n'est
-  demandée à l'utilisateur.
+  l'inscription impose ce bootstrap, aucune étape supplémentaire n'est demandée à
+  l'utilisateur.
   **Conséquence découverte en fumée, à connaître côté UI :** sans identité
   cross-signing, un compte ne peut pas chiffrer *du tout* — la crypto Rust rejette
   l'envoi (« Encryption failed because cross-signing is not set up on your account »).
   Le bootstrap n'est donc plus seulement la condition pour être lu, c'est la condition
-  pour écrire. L'étape bloquante de n'est pas un confort : la sauter rend le
-  client muet.
+  pour écrire. L'étape bloquante de l'inscription n'est pas un confort : la sauter rend
+  le client muet.
   **Ce que ce modèle ne couvre pas, et qu'il faut dire à l'utilisateur :** si le
   compte d'un correspondant est entièrement compromis — ses secrets cross-signing
   avec — l'attaquant peut signer un appareil à lui, et ses signatures deviennent

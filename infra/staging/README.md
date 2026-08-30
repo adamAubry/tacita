@@ -1,9 +1,9 @@
 # Staging — configurer le VPS Ubuntu
 
 Runbook de la machine de staging : de l'image Ubuntu nue à une pile joignable depuis un
-téléphone..
+téléphone.
 
-Le pendant local est `infra/README.md` (le socle) et le runbook de dev de la machine de
+Le pendant local est [`infra/README.md`](../README.md) (le socle) et le runbook de dev de la machine de
 développement. Ici, rien n'est machine-dépendant : ce fichier est le contrat de
 l'environnement, il doit rester rejouable sur un VPS neuf.
 
@@ -23,7 +23,7 @@ Ce qui marchera pour la première fois ici, et qui n'a jamais pu marcher en loca
 | ✅ Un vrai certificat, donc un vrai contexte sécurisé | service worker, PWA installable, `crypto.subtle`                                                                                           |
 | ✅ Ouvrir l'application depuis un téléphone           | plus besoin d'un fichier hosts ni d'un CA importé                                                                                          |
 | ⚠️ **Push notifications**                             | la chaîne est complète pour la première fois ; **rien n'a jamais été délivré de bout en bout**, c'est ici que ça se prouve ou que ça tombe |
-| ❌ **Appels audio/vidéo** | l'overlay `rtc/` exige deux IPv4 publiques, voir § 9 |
+| ❌ **Appels audio/vidéo** | l'overlay [`rtc/`](../rtc) exige deux IPv4 publiques, voir § 9 |
 
 L'absence d'appels est **attendue et annoncée correctement** : sans overlay RTC, le
 `.well-known` n'annonce aucun focus et l'UI affiche `RtcFociMissing` plutôt
@@ -146,7 +146,7 @@ que la pile de base monte dans le proxy — puis recharge nginx. Le pourquoi de 
 plutôt que d'un montage est dans le script ; en deux mots, les liens de `live/` sont
 relatifs et se cassent à la première rotation.
 
-🚫 **Ne jamais lancer `infra/proxy/generate-dev-certs.sh` sur cette machine.** Il écrit
+🚫 **Ne jamais lancer [`infra/proxy/generate-dev-certs.sh`](../proxy/generate-dev-certs.sh) sur cette machine.** Il écrit
 aux mêmes chemins et remplacerait le certificat Let's Encrypt par un auto-signé. Le
 symptôme serait une erreur TLS sur tous les clients à la fois, y compris les téléphones
 déjà appairés.
@@ -250,7 +250,7 @@ Keycloak pas encore prêt au démarrage de Synapse (`docker compose restart syna
 
 Ce 302 **est** la preuve, parce que le chemin qu'il emprunte est celui du client HTTP de
 Synapse (Twisted). Interroger la même URL depuis un autre outil dans le conteneur
-prouverait un chemin que Synapse n'emprunte pas — c'est la règle 3 de `CONTRIBUTING.md`,
+prouverait un chemin que Synapse n'emprunte pas — c'est la règle 3 de [`CONTRIBUTING.md`](../../CONTRIBUTING.md),
 et elle a déjà coûté une journée sur ce dépôt.
 
 Puis, depuis un navigateur : `https://chat.<domaine>` doit servir le shard.
@@ -265,8 +265,7 @@ plus.)*
 ### L'inscription est ouverte, et il n'y a rien à fermer
 
 Créer un compte se fait depuis l'app : « Créer un compte » sur l'écran de connexion, un
-identifiant, un mot de passe. Pas de code d'invitation, pas d'e-mail, pas de captcha
-.
+identifiant, un mot de passe. Pas de code d'invitation, pas d'e-mail, pas de captcha.
 
 ⚠️ **Sur une machine publique, ça veut dire n'importe qui.** Et un compte suffit à
 énumérer l'annuaire. C'est l'arbitrage assumé, pris pour un déploiement
@@ -286,7 +285,7 @@ docker compose -f docker-compose.yml -f staging/docker-compose.yml exec synapse 
   register_new_matrix_user -c /data/homeserver.yaml http://localhost:8008
 ```
 
-Le pseudo devient le localpart Matrix tel quel (`adam` → `@adam:chat.<domaine>`) : pas de
+Le pseudo devient le localpart Matrix tel quel (`alice` → `@alice:chat.<domaine>`) : pas de
 majuscule, pas de `@`.
 
 Au premier écran après connexion, **la clé de récupération est bloquante et c'est voulu** :
@@ -335,7 +334,7 @@ non plus — le TURN s'annonce sous `SERVER_NAME`, que le certificat porte déj�
 docker compose -f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker-compose.yml up -d
 ```
 
-`./install.sh` fait les trois. **Limite assumée** : un client à la fois derrière
+[`./install.sh`](../../install.sh) fait les trois. **Limite assumée** : un client à la fois derrière
 un NAT symétrique et un pare-feu sortant qui ne laisse passer que le 443 n'atteint plus le
 relais — voir `rtc/README.md`, qui porte le motif et ce qu'il reste à ce client.
 
@@ -360,5 +359,5 @@ relais — voir `rtc/README.md`, qui porte le motif et ce qu'il reste à ce clie
 | Aucune notification push ne parvient, la passerelle tournant | lire `docker compose … logs push-gateway` : aucune ligne ⇒ Synapse n'appelle pas (`SYNAPSE_IP_RANGE_WHITELIST`, ou salon en silencieux) ; `push_failed` ⇒ le code dit lequel. L'écran Profil › Réglages › Notifications dit le maillon manquant | `infra/README.md` § |
 
 Pour ce qui ressemble à une limite du produit plutôt qu'à une panne, la liste « Ce qui
-n'est pas prouvé » d'`apps/web/README.md` fait foi, et `infra/README.md` porte les
+n'est pas prouvé » d'[`apps/web/README.md`](../../apps/web/README.md) fait foi, et `infra/README.md` porte les
 limites assumées du socle.

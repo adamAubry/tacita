@@ -24,7 +24,7 @@ transcodage vidéo et l'encodage Opus ne doivent jamais toucher le thread princi
 | Adaptateur                      | Implémentation attendue                          |
 | ------------------------------- | ------------------------------------------------ |
 | `resizeImage`                   | OffscreenCanvas (sert aussi aux vignettes)        |
-| `transcodeVideo`, `extractPoster` | WebCodecs, dans un Worker (`@tacita/media-pipeline` § Méthode) |
+| `transcodeVideo`, `extractPoster` | WebCodecs, dans un Worker ([`@tacita/media-pipeline`](.) § Méthode) |
 | `transcodeAudio` | encodeur Opus WASM |
 | `decodeAudio`                   | `AudioContext.decodeAudioData`, ramené au mono    |
 | `saveViaFilePicker` / `saveViaDownload` | File System Access, sinon téléchargement  |
@@ -32,7 +32,7 @@ transcodage vidéo et l'encodage Opus ne doivent jamais toucher le thread princi
 
 Aucun de ces adaptateurs n'a été évalué contre les contraintes PWA réelles (iOS Safari,
 mémoire disponible en Worker, WebCodecs derrière un flag). C'est un point à lever avant
-`apps/web`, pas une hypothèse à valider dans le code de ce package.
+[`apps/web`](../../apps/web), pas une hypothèse à valider dans le code de ce package.
 
 ## Limites assumées
 
@@ -41,22 +41,21 @@ mémoire disponible en Worker, WebCodecs derrière un flag). C'est un point à l
   horodatage et le fait qu'il existe restent lisibles. AES-CTR ne padant pas, le chiffré
   fait exactement le poids du clair : à débit quasi constant, **taille ÷ débit
   ≈ durée**, et celle d'une vidéo ou d'un vocal se déduit du seul blob alors qu'elle est
-  rangée dans l'événement chiffré. **on ne pade pas**, parce que le même
-  observateur détient déjà le graphe social et le profil d'activité.
-  Métadonnées assumées.
+  rangée dans l'événement chiffré. Le choix est assumé : **on ne pade pas**, parce que le
+  même observateur détient déjà le graphe social et le profil d'activité.
 - **Le nom du fichier ne part pas au serveur** (`includeFilename: false`) : il ne vit que
   dans l'événement chiffré. Un nom de fichier est du contenu.
 - **Les vignettes sont chiffrées séparément**, avec leur propre clé : le serveur ne peut
   pas redimensionner ce qu'il ne déchiffre pas, et `/_matrix/media/*/thumbnail` n'est
   jamais appelé sur un média chiffré.
 - **La compression est destructive et irréversible pour le destinataire.** Il ne reçoit
-  que la version compressée aux seuils de compression ; l'original non compressé n'existe que sur
+  que la version compressée ; l'original non compressé n'existe que sur
   l'appareil de l'auteur, s'il a appelé `saveOriginal`.
 - **Deux profils réseau, pas de réglage utilisateur**. Sans Network Information
   API (Safari), le profil est « bon réseau » : on ne dégrade pas ce qu'on ne mesure pas.
 - **Tout accès média passe par les endpoints authentifiés** (`/_matrix/client/v1/media/…`).
-  Les anciens endpoints v3 répondent 404 depuis Synapse v1.146 — voir `infra/README.md`,
-. Aucune URL média publique n'est supposée nulle part.
+  Les anciens endpoints v3 répondent 404 depuis Synapse v1.146 — voir [`infra/README.md`](../../infra/README.md).
+  Aucune URL média publique n'est supposée nulle part.
 - **Le remuxage WebM → Ogg ne réencode rien, et c'est le but.** Le flux Opus que produit
   Chrome est déjà celui qu'on envoie ; seul son conteneur change. Aucune perte, aucun
   encodeur. En revanche, **le chemin Safari/iOS (MP4/AAC) reste ouvert** : lui demande un

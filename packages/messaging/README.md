@@ -52,9 +52,9 @@ await setRoomNotificationLevel(session, roomId, "mentions");
 - **`@everyone` devient `@room` dans le corps du message.** C'est ce littéral que
   la push rule native `.m.rule.roomnotif` cherche ; `m.mentions.room` est posé en
   parallèle pour `.m.rule.is_room_mention`. Le réaffichage en `@everyone` est du
-  rendu, donc `apps/web`.
-- **Seuls les pseudos sans espace sont résolus en mention.** `@luca` et
-  `@luca:tacita.test` deviennent une mention, `@Jean Dupont` reste du texte —
+  rendu, donc [`apps/web`](../../apps/web).
+- **Seuls les pseudos sans espace sont résolus en mention.** `@bob` et
+  `@bob:tacita.test` deviennent une mention, `@Jean Dupont` reste du texte —
   la syntaxe n'a pas de délimiteur de fin.
 - **Pas de rôles nommés.** L'échelle de power levels Matrix est exposée telle
   quelle, en entiers. Toute traduction en libellés est du rendu.

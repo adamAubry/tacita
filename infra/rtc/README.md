@@ -15,7 +15,7 @@ docker compose -f docker-compose.yml -f rtc/docker-compose.yml up -d
 
 Variables à remplir dans `.env` en plus de celles de `infra` : `LIVEKIT_KEY` et
 `LIVEKIT_SECRET`, que `pnpm admin init` génère. **Rien d'autre** — pas d'IP à déclarer,
-pas de domaine pour le TURN. C'est ce qui permet à `install.sh` de monter cet
+pas de domaine pour le TURN. C'est ce qui permet à [`install.sh`](../../install.sh) de monter cet
 overlay à chaque installation, sans question de plus à poser à l'administrateur.
 
 Sur une machine de développement, un overlay de plus :
@@ -53,8 +53,8 @@ d'Element Call et de `lk-jwt-service`** :
 - le nom des champs du focus (`type`, `livekit_service_url`).
 
 Une valeur périmée ne casse pas bruyamment : le bouton d'appel reste simplement
-inerte. Le seul endroit du dépôt qui porte ces littéraux est `rtc/well-known.conf` ;
-`@tacita/calls` les relit côté client.
+inerte. Le seul endroit du dépôt qui porte ces littéraux est [`rtc/well-known.conf`](well-known.conf) ;
+[`@tacita/calls`](../../packages/calls) les relit côté client.
 
 ## l'annonce du focus appartient à cet overlay
 
@@ -62,7 +62,7 @@ Deux fichiers servent la même route, un seul est monté à la fois :
 
 | Fichier | Monté par | Annonce |
 |---|---|---|
-| `proxy/well-known.conf` | `docker-compose.yml` (pile de base) | `m.homeserver` seul, **aucun focus** |
+| `proxy/well-known.conf` | [`docker-compose.yml`](docker-compose.yml) (pile de base) | `m.homeserver` seul, **aucun focus** |
 | `rtc/well-known.conf` | cet overlay | `m.homeserver` + `org.matrix.msc4143.rtc_foci` |
 
 Même point de montage (`/etc/nginx/well-known.conf`) : compose fusionne les volumes
@@ -76,9 +76,9 @@ annonce ne doit pas survivre au déploiement qu'elle décrit.
 
 ## la plage UDP s'ouvre en deux endroits
 
-`firewall/host-ufw.sh` (pare-feu de l'hôte) **et**
-`firewall/security-group.tf` (groupe de sécurité cloud) déclarent la même plage
-`50000-50100/udp`, alignée sur `rtc.port_range_start/end` de `livekit.yaml` — de même
+[`firewall/host-ufw.sh`](firewall/host-ufw.sh) (pare-feu de l'hôte) **et**
+[`firewall/security-group.tf`](firewall/security-group.tf) (groupe de sécurité cloud) déclarent la même plage
+`50000-50100/udp`, alignée sur `rtc.port_range_start/end` de [`livekit.yaml`](livekit.yaml) — de même
 pour le `5349/tcp` du TURN-TLS et `turn.tls_port`. Les tests échouent si les trois
 divergent, et `pnpm admin doctor` lit la même source pour décider quels ports publiés
 sont légitimes.
@@ -130,7 +130,7 @@ digest résolu le **2026-08-07** (le tag `latest` pointait alors sur le même).
 **URL servie : `https://call.<SERVER_NAME>`.**
 
 Ces trois lignes ne sont pas décoratives : elles sont ce qui rend relisable ce que
-`packages/calls` écrit dans l'URL du widget. Avant elles, le shard passait un paramètre
+[`packages/calls`](../../packages/calls) écrit dans l'URL du widget. Avant elles, le shard passait un paramètre
 de lancement audio/vidéo qu'aucune version ne pouvait confirmer. Ce que
 la relecture de `src/UrlParams.ts` de la v0.23.0 a donné :
 
@@ -150,10 +150,10 @@ foi et ne faisaient rien du tout.
 1. relire `src/UrlParams.ts` de la nouvelle version — `UserIntent` et `UrlConfiguration`
    sont la source, et les noms y bougent (`hideHeader` → `header` en est la preuve) ;
 2. vérifier `MatrixRTCMode` dans `src/config/ConfigOptions.ts`. Notre configuration —
-   servie par `call.conf`, voir ci-dessous — épingle `compatibility`. **Ne pas passer à `matrix_2_0`** sans changer d'abord
+   servie par [`call.conf`](call.conf), voir ci-dessous — épingle `compatibility`. **Ne pas passer à `matrix_2_0`** sans changer d'abord
    `packages/calls` : ce mode active les événements *sticky* de MSC4354, et `activeCall()`
    cesserait de voir les participants **sans erreur bruyante** — le salon afficherait
-   simplement « aucun appel ». C'est la divergence que `packages/calls/README.md` annonce ;
+   simplement « aucun appel ». C'est la divergence que [`packages/calls/README.md`](../../packages/calls/README.md) annonce ;
 3. mettre à jour version, digest et date ci-dessus. Un digest non consigné est une
    jonction non relue, quelle que soit la qualité du reste.
 
@@ -169,9 +169,9 @@ IPv4 publiques, **cet entrypoint n'avait jamais tourné une seule fois**. Les te
 `rtc/tests/` lisaient sa chaîne dans le YAML et la trouvaient bien formée. Règle 4 :
 « module terminé » et « produit qui marche » sont deux portes distinctes.
 
-`rtc/call.conf` sert donc `/config.json` lui-même, en tirant le nom du homeserver du
+[`rtc/call.conf`](call.conf) sert donc `/config.json` lui-même, en tirant le nom du homeserver du
 domaine de la requête (`server_name ~^call\.(?<homeserver>.+)$`) — le patron de
-`well-known.conf`, pour la même raison. Le conteneur reste celui d'amont : aucun
+[`well-known.conf`](well-known.conf), pour la même raison. Le conteneur reste celui d'amont : aucun
 entrypoint, aucun volume, aucune variable, et rien à écrire au démarrage.
 
 Le certificat monté depuis `proxy/certs` doit porter un **SAN pour `call.<SERVER_NAME>`**.
@@ -185,7 +185,7 @@ met en SAN.
 - **Métadonnées d'appel visibles.** Le média est chiffré de bout en bout
   (SFU en relais aveugle), mais le SFU et `lk-jwt-service` voient qui appelle
   qui, quand et combien de temps — même limite que le reste du serveur, voir
-  `../README.md`.
+  [`../README.md`](../README.md).
 - **Un client à la fois derrière un NAT symétrique et un pare-feu sortant qui ne laisse
   passer que le 443 ne joint pas le TURN**, qui écoute sur 5349. Il lui reste l'UDP
   50000-50100 et le repli ICE/TCP 7881 ; c'est la conjonction des deux qui perd le relais,

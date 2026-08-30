@@ -12,17 +12,17 @@ docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
 cd .. && npm run smoke
 ```
 
-## Les chemins du proxy — `proxy-chemins.smoke.test.ts`
+## Les chemins du proxy — [`proxy-chemins.smoke.test.ts`](proxy-chemins.smoke.test.ts)
 
 Ajoutée le 29/08/2026, après trois routes joignables qui répondaient 404 : `proxy_pass`
 avec une variable ne substitue rien, donc le préfixe partait tel quel — ou partait seul.
-Aucun lien d'invitation, aucun appel, et `infra/tests/proxy.test.ts` au vert tout du long.
+Aucun lien d'invitation, aucun appel, et [`infra/tests/proxy.test.ts`](../tests/proxy.test.ts) au vert tout du long.
 Une requête par route suffit à le voir, et rien d'autre que la pile debout ne le peut.
 
-Les deux assertions RTC exigent l'overlay `rtc/` ; sans lui elles se **sautent** et le
+Les deux assertions RTC exigent l'overlay [`rtc/`](../rtc) ; sans lui elles se **sautent** et le
 disent, plutôt que de passer au vert sur un 502.
 
-## Le parcours d'entrée — `onboarding.smoke.test.ts`
+## Le parcours d'entrée — [`onboarding.smoke.test.ts`](onboarding.smoke.test.ts)
 
 Ajoutée le 25/08/2026, après un défaut que 1039 tests verts n'ont pas vu : une connexion
 par identifiant et mot de passe tombait sur « Entrez votre clé de récupération ». Les deux
@@ -100,21 +100,20 @@ survit au rendu, et que `error_description`, qui vient d'un tiers, est échappé
   rendu par `/sync`, déchiffré ici. On assère aussi que ce que Synapse a stocké est
   bien `m.room.encrypted` et ne contient pas le texte.
 - **La reprise de session** : objets neufs, même IndexedDB, aucun jeton fourni. La
-  session se rouvre, garde le même `device_id`, et l'historique reste déchiffrable
-.
+  session se rouvre, garde le même `device_id`, et l'historique reste déchiffrable.
 
-- **Que le login OIDC aboutit** (`login.smoke.test.ts`) : Synapse redirige
+- **Que le login OIDC aboutit** ([`login.smoke.test.ts`](login.smoke.test.ts)) : Synapse redirige
   vers le realm Keycloak, avec PKCE. C'est la découverte OIDC qui était cassée — quatre
-  causes, documentées dans `../README.md` — et c'est elle que la redirection prouve.
+  causes, documentées dans [`../README.md`](../README.md) — et c'est elle que la redirection prouve.
 
 - **Que la consommation d'un lien d'invitation est atomique**
-  (`invite-tokens.smoke.test.ts`) : deux résolutions concurrentes du dernier
+  ([`invite-tokens.smoke.test.ts`](invite-tokens.smoke.test.ts)) : deux résolutions concurrentes du dernier
   usage, **arbitrées par PostgreSQL**. La suite par défaut ne peut pas le prouver — son
   imitation de la base est monothread, donc atomique par construction, et une imitation
   qui confirme l'hypothèse par construction ne l'éprouve pas. Elle y asserte la forme de
   l'instruction SQL ; ici, on l'exécute.
 
-- **Que l'annuaire répond à qui ne partage rien** (`annuaire.smoke.test.ts`,
+- **Que l'annuaire répond à qui ne partage rien** ([`annuaire.smoke.test.ts`](annuaire.smoke.test.ts),
 ) : deux comptes créés pour l'occasion, aucun salon en commun, et l'un
   trouve l'autre par un fragment de son nom d'affichage. Le test de config atteste que
   `search_all_users: true` est écrit dans le fichier ; il n'atteste pas qu'une recherche
@@ -130,7 +129,7 @@ plus loin exigerait de piloter un formulaire HTML, donc un navigateur, donc Play
 interdit. Le jeton des tests de session vient donc du secret partagé de, pas
 du flux SSO.
 
-`semerCredentials` (dans `harness.ts`, une seule copie pour les quatre cibles qui ouvrent
+`semerCredentials` (dans [`harness.ts`](harness.ts), une seule copie pour les quatre cibles qui ouvrent
 une session) est le seul endroit où la cible triche, et exactement du montant de ce
 qui reste : en production ces trois valeurs viennent de `initSession()` après le SSO.
 
@@ -138,12 +137,12 @@ qui reste : en production ces trois valeurs viennent de `initSession()` après l
 
 Elle exige Docker debout. Le hook de pré-commit lance la suite complète à chaque
 commit ; l'y inclure la casserait pour tout le monde. D'où une config à part
-(`vitest.config.ts` ici), un suffixe distinct (`*.smoke.test.ts`) et l'exclusion de
-`smoke/**` dans `../vitest.config.ts`.
+([`vitest.config.ts`](vitest.config.ts) ici), un suffixe distinct (`*.smoke.test.ts`) et l'exclusion de
+`smoke/**` dans [`../vitest.config.ts`](../vitest.config.ts).
 
 ## L'overlay
 
-`docker-compose.yml` de ce dossier ne contient que des écarts dev/prod :
+[`docker-compose.yml`](docker-compose.yml) de ce dossier ne contient que des écarts dev/prod :
 alias réseau pour résoudre `SERVER_NAME` en interne, confiance dans le certificat
 auto-signé, `SYNAPSE_IP_RANGE_WHITELIST`, et le port de Synapse publié sur la boucle
 locale (l'API d'admin est bloquée au proxy). Aucun artefact de production
@@ -154,5 +153,5 @@ n'est modifié.
 Au premier lancement, un bug réel dans `client-core` : `IndexedDBStore.startup()` était
 appelé **avant** l'affectation du store au client. Sur une base vierge l'ordre inverse
 passe — donc un premier lancement marchait, et la suite sur mocks aussi. Seule la
-reprise de session échouait, systématiquement. Le code venait de `@tacita/client-core` d'origine :
+reprise de session échouait, systématiquement. Le code venait de [`@tacita/client-core`](../../packages/client-core) d'origine :
 le défaut était sur `main` depuis le début.

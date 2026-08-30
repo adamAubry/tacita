@@ -3,22 +3,22 @@
 Config-as-code : PostgreSQL, Synapse, Keycloak (OIDC + WebAuthn), MinIO (S3),
 reverse proxy nginx, et le **raccordement** de deux services livrés ailleurs — la
 passerelle Web Push et le service de liens d'invitation.
-Hors scope : LiveKit/TURN/well-known, le *code* de la passerelle push
- et celui du service de liens.
+Hors scope : LiveKit/TURN/well-known, le *code* de la passerelle push et celui du
+service de liens.
 
 ## Deux environnements
 
 Ce README décrit le socle et **la machine de développement**. Le staging — VPS Ubuntu,
 vrai domaine, vrai certificat, shard servi par le proxy — a son propre runbook :
-**`staging/README.md`**. Les deux partagent `docker-compose.yml` ; tout ce
-qui les sépare vit dans un overlay chargé volontairement (règle 6 de `CONTRIBUTING.md`) :
+**[`staging/README.md`](staging/README.md)**. Les deux partagent [`docker-compose.yml`](docker-compose.yml) ; tout ce
+qui les sépare vit dans un overlay chargé volontairement (règle 6 de [`CONTRIBUTING.md`](../CONTRIBUTING.md)) :
 
 | | Compose | Shard | Certificat |
 | --- | --- | --- | --- |
-| dev | `docker-compose.yml` + `smoke/docker-compose.yml` | `pnpm --filter web dev` sur l'hôte, `SHARD_ORIGIN=http://localhost:3000` | auto-signé, CA à importer |
-| staging | `docker-compose.yml` + `staging/docker-compose.yml` | service `web`, servi sur `SERVER_NAME`, `SHARD_ORIGIN` vide | Let's Encrypt |
+| dev | `docker-compose.yml` + [`smoke/docker-compose.yml`](smoke/docker-compose.yml) | `pnpm --filter web dev` sur l'hôte, `SHARD_ORIGIN=http://localhost:3000` | auto-signé, CA à importer |
+| staging | `docker-compose.yml` + [`staging/docker-compose.yml`](staging/docker-compose.yml) | service `web`, servi sur `SERVER_NAME`, `SHARD_ORIGIN` vide | Let's Encrypt |
 
-Les deux overlays ne se composent **jamais** ensemble : `smoke/` publie PostgreSQL et
+Les deux overlays ne se composent **jamais** ensemble : [`smoke/`](smoke) publie PostgreSQL et
 l'API Synapse sur l'hôte et installe un CA de développement dans le magasin de confiance
 de Synapse — trois choses qui n'ont rien à faire sur une machine publique.
 
@@ -72,8 +72,8 @@ confiance réelle, le service worker ne s'installe pas — exige un contexte
 sécurisé. Pour tester la PWA, il faut l'import.
 
 Le nom lui-même se change dans `infra/.env` (`SERVER_NAME`), suivi de
-`./proxy/generate-dev-certs.sh` pour que les SAN suivent, et de la recopie des trois
-URLs dans `apps/web/.env.local` — voir `apps/web/.env.example`. Les deux fichiers sont
+[`./proxy/generate-dev-certs.sh`](proxy/generate-dev-certs.sh) pour que les SAN suivent, et de la recopie des trois
+URLs dans `apps/web/.env.local` — voir [`apps/web/.env.example`](../apps/web/.env.example). Les deux fichiers sont
 ignorés par git : chaque environnement garde le sien, le dépôt ne porte que les exemples.
 
 ## Versions épinglées
@@ -190,7 +190,7 @@ dit** : le pusher est bien enregistré sur le compte, l'application annonce des
 notifications actives, aucune n'arrive.
 
 C'est le même blocage que le 503 muet du login OIDC, sur le second client
-sortant de Synapse. `infra/.env.example` livre donc `["172.16.0.0/12"]`, et le
+sortant de Synapse. [`infra/.env.example`](.env.example) livre donc `["172.16.0.0/12"]`, et le
 garde-fou reste le même : ne pas activer `url_preview_enabled` tant que cette
 liste n'est pas vide.
 
@@ -228,14 +228,14 @@ ailleurs — aucun port publié. Ses quatre routes exigent chacune un jeton d'ac
 Matrix valide.
 
 **Aucun secret d'administration Synapse dans son environnement**, et un test le
-vérifie (`tests/invite-tokens.test.ts`). C'est le point : `invite-tokens` borne les
+vérifie ([`tests/invite-tokens.test.ts`](tests/invite-tokens.test.ts)). C'est le point : `invite-tokens` borne les
 dégâts d'une compromission en ne lui donnant aucun pouvoir Matrix, et le
 raccordement est précisément l'endroit où on le lui rendrait par confort. Il
 joint Synapse par le nom du réseau du compose (`http://synapse:8008`) — passer
 par le proxy TLS rejouerait les quatre causes du 503 OIDC ci-dessous.
 
 **Base dédiée `invite_tokens`**, jamais une table dans celle de Synapse. Elle est
-créée par `postgres/10-invite-tokens.sh`, monté dans
+créée par [`postgres/10-invite-tokens.sh`](postgres/10-invite-tokens.sh), monté dans
 `/docker-entrypoint-initdb.d/` — donc **uniquement à la première initialisation du
 volume**. Sur une pile déjà démarrée :
 
@@ -274,12 +274,12 @@ joindre le proxy par le nom public.
    login : `generate-dev-certs.sh` ne passait qu'un `/CN=`. `service_identity` — donc Twisted, donc
    Synapse — refuse un certificat sans SAN, et **tout navigateur moderne aussi, depuis 2017**. Le
    certificat de dev était donc inutilisable pour la PWA elle-même (contexte sécurisé),
-   et `.env.example` promettait déjà un SAN pour le nom que le RTC sert — ce que le script ne
+   et [`.env.example`](.env.example) promettait déjà un SAN pour le nom que le RTC sert — ce que le script ne
    pouvait pas tenir. Corrigé : `-addext subjectAltName=…`, avec `call.<domaine>`. *(Il y avait
    alors un troisième nom, `TURN_DOMAIN` ; il a disparu le 26/08/2026 — le TURN s'annonce sous
    `SERVER_NAME`, que le certificat porte déjà.)*
 
-**Vérification.** `infra/smoke/login.smoke.test.ts` assère le 302 vers le realm Keycloak, sous un
+**Vérification.** [`infra/smoke/login.smoke.test.ts`](smoke/login.smoke.test.ts) assère le 302 vers le realm Keycloak, sous un
 `describe` nommé `` — c'est le critère de comportement demandé par le PM. Retirer l'une de
 ces corrections le fait échouer avec « 503 = découverte OIDC injoignable ».
 
@@ -291,14 +291,14 @@ s'appliquent telles quelles. Si `SERVER_NAME` résout publiquement, aucune des t
 ## rate limiting
 
 Défauts relevés dans la doc v1.155.0, configurés ici à ≥ 10× (voir
-`synapse/homeserver.yaml.tmpl` pour les valeurs exactes et leurs commentaires
+[`synapse/homeserver.yaml.tmpl`](synapse/homeserver.yaml.tmpl) pour les valeurs exactes et leurs commentaires
 en regard de chaque défaut).
 
 ## Rendu des templates
 
 - `synapse/homeserver.yaml.tmpl` : l'image officielle Synapse ne fait que
   vérifier l'existence du fichier de config, elle ne substitue aucune
-  variable — `synapse/entrypoint.sh` rend le template via `envsubst` au
+  variable — [`synapse/entrypoint.sh`](synapse/entrypoint.sh) rend le template via `envsubst` au
   démarrage du conteneur.
 - `keycloak/realm-export.json` : Keycloak substitue nativement les
   `${VAR}` d'un realm importé à partir de son propre environnement (pas de
