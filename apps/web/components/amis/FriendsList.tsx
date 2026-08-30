@@ -98,14 +98,20 @@ export function DemandesList({ demandes, onAccepter, onRefuser }: DemandesListPr
               label="Accepter"
               variant="primary"
               size="sm"
-              // Le vert de l'accent ne suffit pas : DESIGN.md réserve `success` à la
-              // confirmation, et c'est bien ce que fait ce bouton.
-              style={{ background: "var(--color-success)" }}
+              /*
+               * **Aucune surcharge de fond** (revue de conception E-10, 30/08/2026). Le
+               * commentaire qui vivait ici disait l'inverse de DESIGN.md : la table pose
+               * `success` = `accent`, « pas de second vert ». La ligne repeignait donc un
+               * bouton primaire de sa propre couleur — sans effet, mais en laissant croire
+               * qu'une seconde famille de vert existait. Son voisin « Refuser » repasse en
+               * `secondary` : `danger` est réservé au destructif, et refuser une demande
+               * n'efface aucune donnée de l'utilisateur.
+               */
               onClick={() => onAccepter(demande)}
             />
             <Button
               label="Refuser"
-              variant="destructive"
+              variant="secondary"
               size="sm"
               onClick={() => onRefuser(demande)}
             />

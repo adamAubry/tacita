@@ -12,9 +12,10 @@ import { contactsDeLaSession } from "../../lib/contacts";
 import { CHAMP_CONVERSATION } from "../../lib/recherche";
 import { useSession } from "../onboarding/SessionProvider";
 import { useRecherche } from "./RechercheProvider";
-import { Placeholder } from "../foundation/Placeholder";
+import { VStack } from "../foundation/primitives";
 import { Recherche } from "./Recherche";
 import { routeConversation } from "../../lib/routes";
+import { Skeleton } from "../foundation/Skeleton";
 
 /**
  * Le câblage des deux onglets de recherche : session, worker d'index, conversations.
@@ -60,11 +61,18 @@ export function EcranRecherche({ variation }: { variation?: "search" | "mentions
   );
 
   if (!session || !recherche) {
+    // R-05 : la barre puis ses résultats, aux hauteurs qu'ils auront.
     return (
-      <Placeholder
-        titre="Rechercher"
-        explication="La recherche porte sur l'historique téléchargé sur cet appareil."
-      />
+      <VStack
+        gap={2}
+        style={{ padding: "var(--spacing-3)" }}
+        aria-label="Chargement de la recherche"
+        aria-busy="true"
+      >
+        <Skeleton height={32} />
+        <Skeleton height={56} />
+        <Skeleton height={56} />
+      </VStack>
     );
   }
 

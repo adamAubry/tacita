@@ -170,7 +170,17 @@ export function SearchBar({
     : tokens;
 
   return (
-    <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
+    <div
+      /*
+       * `tacita-recherche` : le point d'accroche des trois correctifs de jetons du
+       * 30/08/2026 (ils ne wrappaient pas, leur rembourrage était faux, le fond du bouton
+       * de retrait débordait). Les règles vivent dans `tokens.css`, hors couche, et visent
+       * le `div[role="group"]` que `Tokenizer` rend — le contrat sémantique du composant,
+       * pas une classe atomique qui changerait au prochain bump.
+       */
+      className="tacita-recherche"
+      style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}
+    >
       <PowerSearch
         config={config}
         filters={affiches as never}

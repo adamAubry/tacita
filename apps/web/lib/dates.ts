@@ -51,3 +51,23 @@ export function dureeAppel(millisecondes: number): string {
   if (minutes < 60) return `${minutes} min`;
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`;
 }
+
+/**
+ * **Une date absolue, écrite pareil partout** (30/08/2026, revue de conception E-02).
+ *
+ * Elle vivait en deux exemplaires : `Appareils` composait « Vu le 30 août 09:12 » avec une
+ * locale et des options explicites, `LienInvitation` appelait `toLocaleString()` nu — donc
+ * « 31/08/2026 14:02:33 », avec les secondes et un format qui change de navigateur en
+ * navigateur. C'était la seule date que le système ne contrôlait pas, dans une application
+ * dont DESIGN.md impose les chiffres tabulaires « pour toute heure et tout compteur ».
+ *
+ * Ici et pas dans les deux composants : un format écrit à deux endroits diverge au premier
+ * ajustement, et c'est alors celui qu'on ne relit pas qui ment.
+ */
+export const dateComplete = (horodatage: number): string =>
+  new Date(horodatage).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });

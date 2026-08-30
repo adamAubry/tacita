@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 
-import { Button, Dialog, DialogHeader, Icon } from "./primitives";
+import { IconeFermer } from "./icons";
+import { Button, Dialog, DialogHeader } from "./primitives";
 
 interface SheetProps {
   ouvert: boolean;
@@ -59,7 +60,7 @@ function BoutonFermer({ onFermer }: { onFermer: () => void }) {
       label="Fermer"
       variant="ghost"
       isIconOnly
-      icon={<Icon icon="close" />}
+      icon={IconeFermer}
       onClick={onFermer}
     />
   );

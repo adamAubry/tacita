@@ -36,6 +36,21 @@ export interface Conversation {
   /** Au moins une mention non lue. Elle prime sur le compteur, côté rendu. */
   mention: boolean;
   pinned: boolean;
+  /**
+   * **L'avatar du salon, en `mxc://`** (30/08/2026, plainte : « la photo de profil d'un
+   * utilisateur ne s'affiche pas dans l'accueil »).
+   *
+   * Il manquait purement et simplement : `ConversationAvatar` sait résoudre un `mxc://`
+   * par un fetch authentifié, mais aucun appelant de la liste ne pouvait lui en donner un
+   * — le contrat ne le portait pas. Toutes les conversations de l'accueil, de la recherche
+   * et des informations de salon retombaient donc sur les initiales, y compris pour des
+   * comptes qui ont bien une photo.
+   *
+   * En DM, c'est l'avatar du correspondant et non celui du salon : un DM n'a pas d'avatar
+   * de salon, et `getAvatarFallbackMember()` est ce que le SDK expose pour retrouver
+   * l'autre membre.
+   */
+  avatarUrl?: string;
 }
 
 /** une invitation en attente : la « demande d'ami » de D-09. */
@@ -93,6 +108,22 @@ export async function registerDirect(
   });
 }
 
+/**
+ * l'avatar à montrer pour ce salon. En DM, celui de l'autre : un salon
+ * de deux personnes n'a pas d'avatar de salon, et en afficher un vide reviendrait à
+ * effacer la photo du correspondant. En groupe, celui du salon, et rien d'autre — le
+ * premier membre venu ne représente pas le groupe.
+ *
+ * `undefined` plutôt que chaîne vide : `ConversationAvatar` retombe alors sur les
+ * initiales, ce qui est le comportement voulu quand il n'y a pas d'image.
+ */
+function avatarDe(room: Room, peerId: string | undefined): string | undefined {
+  if (peerId !== undefined) {
+    return room.getMember(peerId)?.getMxcAvatarUrl() ?? undefined;
+  }
+  return room.getMxcAvatarUrl() ?? undefined;
+}
+
 function describe(session: Session, room: Room, peers: Map<string, string>): Conversation {
   // le dernier message est le dernier du flux /sync, pas le plus récemment
   // horodaté. Aucun tri n'est introduit ici.
@@ -109,6 +140,7 @@ function describe(session: Session, room: Room, peers: Map<string, string>): Con
     unread: room.getUnreadNotificationCount(NotificationCountType.Total),
     mention: room.getUnreadNotificationCount(NotificationCountType.Highlight) > 0,
     pinned: FAVOURITE_TAG in room.tags,
+    avatarUrl: avatarDe(room, peerId),
   };
 }
 
@@ -166,6 +198,34 @@ export async function openDirectMessage(session: Session, userId: string): Promi
   for (const [roomId, peerId] of directPeers(session)) {
     if (peerId !== userId) continue;
     if (session.client.getRoom(roomId)?.getMyMembership() === KnownMembership.Join) return roomId;
+  }
+
+  /*
+   * **Une invitation reçue de cette personne compte** (30/08/2026, plainte : « la
+   * duplication d'une demande d'ami crée une deuxième conversation »).
+   *
+   * La boucle ci-dessus ne reconnaissait que les salons **rejoints**. Or quand quelqu'un
+   * vous a déjà envoyé une demande et que vous l'ajoutez de votre côté — depuis son profil,
+   * ou par un lien —, son salon est en `invite` et non en `join` : il était donc ignoré, et
+   * un second DM était créé. Les deux personnes se retrouvaient avec deux conversations,
+   * dont une morte.
+   *
+   * On rejoint l'invitation en attente plutôt que d'en fabriquer une autre : c'est le même
+   * geste que « Accepter » dans l'écran des demandes, et il rend le même salon.
+   *
+   * `m.direct` n'est pas fiable ici — le serveur ne l'écrit pas toujours chez l'invité —,
+   * donc on interroge `getDMInviter()`, qui lit le `is_direct` de l'invitation elle-même.
+   */
+  const invitation = session.client
+    .getRooms()
+    .find(
+      (room) =>
+        room.getMyMembership() === KnownMembership.Invite && room.getDMInviter() === userId,
+    );
+  if (invitation) {
+    await session.client.joinRoom(invitation.roomId);
+    await registerDirect(session, userId, invitation.roomId);
+    return invitation.roomId;
   }
   const { room_id } = await createDirectMessage(session, userId);
   // Sans cette ligne, la boucle ci-dessus ne retrouvera jamais ce salon et un second

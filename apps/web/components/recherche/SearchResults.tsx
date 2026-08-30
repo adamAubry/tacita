@@ -3,10 +3,12 @@
 import type { Conversation } from "@tacita/messaging";
 
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
+import { IconeRecherche } from "../foundation/icons";
 import { Placeholder } from "../foundation/Placeholder";
-import { ClickableCard, Skeleton, Text } from "../foundation/primitives";
+import { ClickableCard, Text } from "../foundation/primitives";
 import { HighlightedText } from "./HighlightedText";
 import { MessagePreview, type ResultatMessage } from "./MessagePreview";
+import { Skeleton } from "../foundation/Skeleton";
 
 interface SearchResultsProps {
   /** Conversations dont le **nom** correspond — jamais leur contenu. */
@@ -40,7 +42,12 @@ function ConversationTrouvee({
       onClick={() => onOuvrir(conversation.roomId)}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-        <ConversationAvatar nom={conversation.name} direct={conversation.direct} taille={36} />
+        <ConversationAvatar
+          nom={conversation.name}
+          mxc={conversation.avatarUrl}
+          direct={conversation.direct}
+          taille={36}
+        />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text type="body" weight="bold" maxLines={1}>
             <HighlightedText texte={conversation.name} terme={terme} />
@@ -102,7 +109,7 @@ export function SearchResults({
   }
 
   if (conversations.length === 0 && messages.length === 0) {
-    return <Placeholder titre="Aucun résultat" explication={perimetre} />;
+    return <Placeholder icone={IconeRecherche} titre="Aucun résultat" explication={perimetre} />;
   }
 
   return (

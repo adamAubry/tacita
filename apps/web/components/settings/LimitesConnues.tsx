@@ -129,9 +129,15 @@ export function LimitesConnues() {
 
       {/* Le type d'événement est lu du paquet, pas recopié : une chaîne recopiée n'est
           plus un contrat. Discret — il n'intéresse que qui sait le lire. */}
-      <Text type="code" color="secondary">
-        {DELIVERED_EVENT_TYPE}
-      </Text>
+      <div style={{ display: "grid", gap: "var(--spacing-1)" }}>
+        <Text type="supporting" color="secondary">
+          Le type d&apos;événement de notre accusé « délivré », pour qui voudrait le
+          reconnaître dans un autre client :
+        </Text>
+        <Text type="code" color="secondary">
+          {DELIVERED_EVENT_TYPE}
+        </Text>
+      </div>
     </div>
   );
 }

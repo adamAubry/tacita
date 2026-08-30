@@ -1,6 +1,7 @@
 "use client";
 
-import { ClickableCard, Icon, Text } from "./primitives";
+import { IconeChevron } from "./icons";
+import { ClickableCard, Text } from "./primitives";
 
 interface OptionCardProps {
   titre: string;
@@ -36,7 +37,7 @@ export function OptionCard({ titre, detail, onClick }: OptionCardProps) {
             {detail}
           </Text>
         </div>
-        <Icon icon="chevronRight" />
+        <span aria-hidden style={{ display: "flex", color: "var(--color-icon-secondary)" }}>{IconeChevron}</span>
       </div>
     </ClickableCard>
   );

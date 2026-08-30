@@ -28,6 +28,26 @@ import { environnementMedia } from "./media-env";
  * travail en double sur quelques kilo-octets, une fois dans la vie d'un compte, contre
  * un second chemin d'envoi que l'interdit n°11 refuse.
  */
+/** Dessine sur le meilleur canevas disponible ; le canevas du DOM est le repli. */
+async function tramerSurCanevas(image: HTMLImageElement): Promise<Blob | null> {
+  if (typeof OffscreenCanvas === "function") {
+    const horsEcran = new OffscreenCanvas(TAILLE_IDENTITE, TAILLE_IDENTITE);
+    const contexte = horsEcran.getContext("2d");
+    if (contexte && typeof horsEcran.convertToBlob === "function") {
+      contexte.drawImage(image, 0, 0, TAILLE_IDENTITE, TAILLE_IDENTITE);
+      return horsEcran.convertToBlob({ type: "image/png" });
+    }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = TAILLE_IDENTITE;
+  canvas.height = TAILLE_IDENTITE;
+  const contexte = canvas.getContext("2d");
+  if (!contexte) return null;
+  contexte.drawImage(image, 0, 0, TAILLE_IDENTITE, TAILLE_IDENTITE);
+  return new Promise((resoudre) => canvas.toBlob(resoudre, "image/png"));
+}
+
 async function tramer(svg: string): Promise<File> {
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   try {
@@ -37,12 +57,16 @@ async function tramer(svg: string): Promise<File> {
     // décodée — `onload` peut précéder le décodage et donner un dessin vide.
     await image.decode();
 
-    const canvas = new OffscreenCanvas(TAILLE_IDENTITE, TAILLE_IDENTITE);
-    const contexte = canvas.getContext("2d");
-    if (!contexte) throw new Error("contexte 2d indisponible : identité non tramée");
-
-    contexte.drawImage(image, 0, 0, TAILLE_IDENTITE, TAILLE_IDENTITE);
-    const blob = await canvas.convertToBlob({ type: "image/png" });
+    /*
+     * **`OffscreenCanvas` n'est pas partout** (30/08/2026, plainte : « les photos de
+     * profil ne se créent pas »). Il n'existe sur Safari qu'à partir de 17, et la cible de
+     * ce produit est une PWA installée sur iPhone. Sur un appareil un peu ancien, la
+     * construction levait, l'appelant avalait l'erreur, et le compte naissait sans image
+     * sans que rien ne le dise. On teste la présence de ce qu'on appelle, pas la version
+     * du navigateur.
+     */
+    const blob = await tramerSurCanevas(image);
+    if (!blob) throw new Error("tramage impossible : le canevas n'a rien rendu");
     return new File([blob], "identite.png", { type: "image/png" });
   } finally {
     URL.revokeObjectURL(url);

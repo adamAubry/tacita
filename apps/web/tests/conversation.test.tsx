@@ -533,16 +533,24 @@ describe("accusés : trois niveaux, et ce qu'ils ne promettent pas", () => {
   };
 
   it("envoyé, délivré puis lu se distinguent à l'écran", () => {
+    /*
+     * Les trois états se distinguent par leur **étiquette accessible**, plus par un
+     * caractère. Les coches étaient les glyphes `✓` et `✓✓` ; ce sont désormais des SVG au
+     * trait, comme toutes les autres marques de l'application (E-08, 30/08/2026). Assertion
+     * sur le rôle et le nom : c'est ce que l'utilisateur perçoit, et ça ne dépend plus du
+     * dessin retenu.
+     */
     recuDe("sent");
-    expect(screen.getByText("✓")).toBeTruthy();
+    expect(screen.getByRole("img", { name: /^Envoyé\.$/ })).toBeTruthy();
 
     recuDe("delivered");
-    expect(screen.getByText("✓✓")).toBeTruthy();
-    expect(screen.getByLabelText(/extension propre à Tacita/)).toBeTruthy();
+    expect(screen.getByRole("img", { name: /extension propre à Tacita/ })).toBeTruthy();
 
     recuDe("read");
     // DESIGN.md : la coche verte est un trait d'identité, et « lu » seul la porte.
-    expect(screen.getByText("✓✓").style.color).toContain("--color-text-accent");
+    expect(screen.getByRole("img", { name: "Lu." }).style.color).toContain(
+      "--color-text-accent",
+    );
   });
 
   it("un destinataire masqué reste à « envoyé », et l'explique", () => {
@@ -552,7 +560,7 @@ describe("accusés : trois niveaux, et ce qu'ils ne promettent pas", () => {
 
   it("un message en cours d'envoi ne porte aucune coche", () => {
     rendreMessage({ message: message({ moi: true }), recu: { statut: "sending", indecidable: false } });
-    expect(screen.queryByText("✓")).toBeNull();
+    expect(screen.queryByRole("img", { name: /Envoyé|Délivré|Lu/ })).toBeNull();
   });
 });
 

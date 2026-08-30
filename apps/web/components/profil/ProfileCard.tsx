@@ -6,7 +6,13 @@ import type { ReactNode } from "react";
 import { identifiantCourt } from "../../lib/identifiants";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
 import { useImageMxc } from "../foundation/useImageMxc";
-import { Badge, Button, Icon, Text } from "../foundation/primitives";
+import {
+  IconeAjouterMembre,
+  IconeBloque,
+  IconeCoche,
+  IconeRetour,
+} from "../foundation/icons";
+import { Button, Text } from "../foundation/primitives";
 
 interface ProfileCardProps {
   nom: string;
@@ -33,10 +39,23 @@ interface ProfileCardProps {
   retour?: boolean;
 }
 
-const LIBELLE_STATUT = {
-  ami: "Ami",
-  "non-ami": "Pas encore ami",
-  bloque: "Bloqué",
+/**
+ * **Le statut est une icône, pas un mot** (30/08/2026, plainte : « le badge "ami" devrait
+ * être une icône, pas du texte »).
+ *
+ * Trois raisons de céder. Le badge est posé sur une **photo choisie par l'utilisateur** :
+ * un mot y demande un fond opaque pour rester lisible, une forme s'en passe mieux. Il
+ * partage sa rangée avec le bouton d'options, qui est une icône : deux objets de même rang
+ * dessinés dans deux registres. Et « Pas encore ami » est long — sur un nom qui remplit la
+ * ligne, il poussait le bouton d'options vers le bord.
+ *
+ * Le mot reste, en étiquette accessible : ce qui se lit à l'œil devient une forme, ce qui
+ * se lit à l'oreille ne perd rien.
+ */
+const STATUT = {
+  ami: { libelle: "Ami", icone: IconeCoche },
+  "non-ami": { libelle: "Pas encore ami", icone: IconeAjouterMembre },
+  bloque: { libelle: "Bloqué", icone: IconeBloque },
 } as const;
 
 /**
@@ -253,7 +272,7 @@ export function ProfileCard({
           // hors barème, pour une pastille de verre deux fois plus large que son chevron.
           size="lg"
           className="tacita-retour"
-          icon={<Icon icon="chevronLeft" />}
+          icon={IconeRetour}
           onClick={() => router.back()}
         />
         ) : (
@@ -271,18 +290,28 @@ export function ProfileCard({
           }}
         >
           {statut && (
-            <Badge
-              label={LIBELLE_STATUT[statut]}
+            <span
+              role="img"
+              aria-label={STATUT[statut].libelle}
+              title={STATUT[statut].libelle}
               // DESIGN.md : encre sur `accent-soft`, et le bloqué en `error` — c'est le
-              // seul des trois statuts qui doive se remarquer sans être lu.
+              // seul des trois statuts qui doive se remarquer sans être lu. Le disque
+              // reprend la taille du bouton voisin : deux pastilles de même rang.
               style={{
+                display: "grid",
+                placeItems: "center",
+                width: "var(--size-element-lg)",
+                height: "var(--size-element-lg)",
+                borderRadius: "var(--radius-full)",
                 background:
                   statut === "bloque"
                     ? "var(--color-error-muted)"
                     : "var(--color-accent-muted)",
                 color: "var(--color-text-primary)",
               }}
-            />
+            >
+              {STATUT[statut].icone}
+            </span>
           )}
           {actions}
         </div>

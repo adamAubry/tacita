@@ -40,8 +40,8 @@ import { brancherModeMasque } from "../../lib/mode-masque";
 import { lireFondEcran } from "../../lib/preferences";
 import { BandeauAppel } from "../appels/BandeauAppel";
 import { LayoutHeader } from "../foundation/LayoutHeader";
-import { IconeAppel, IconeCamera, IconeVideo } from "../foundation/icons";
-import { Button, Icon } from "../foundation/primitives";
+import { IconeAppel, IconeCamera, IconeInfo, IconeVideo } from "../foundation/icons";
+import { Button } from "../foundation/primitives";
 import { MediaPicker } from "../media/MediaPicker";
 import { MediaViewer } from "../media/MediaViewer";
 import { PhotoCapture } from "../media/PhotoCapture";
@@ -519,7 +519,7 @@ export function Conversation({ roomId }: { roomId: string }) {
                 label="Informations"
                 variant="ghost"
                 isIconOnly
-                icon={<Icon icon="info" />}
+                icon={IconeInfo}
                 onClick={() => router.push(routeInfos(roomId))}
               />
             </div>

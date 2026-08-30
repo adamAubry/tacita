@@ -4,6 +4,7 @@ import type { Session } from "@tacita/client-core";
 import { joinRule, setJoinRule } from "@tacita/messaging";
 import { useCallback, useEffect, useState } from "react";
 
+import { dateComplete } from "../../lib/dates";
 import {
   liensDeLaSession,
   urlDInvitation,
@@ -20,7 +21,7 @@ interface LienInvitationProps {
   origine?: string;
 }
 
-const dateLisible = (ms: number) => new Date(ms).toLocaleString();
+
 
 /**
  * Les liens d'invitation d'un groupe : émettre, voir l'expiration,
@@ -173,7 +174,7 @@ export function LienInvitation({
             <ListItem
               key={lien.id}
               label="Lien de groupe"
-              description={`Expire le ${dateLisible(lien.expiresAt)} · ${lien.usesLeft} usage(s) restant(s)`}
+              description={`Expire le ${dateComplete(lien.expiresAt)} · ${lien.usesLeft} usage(s) restant(s)`}
               endContent={
                 <Button
                   label="Révoquer"

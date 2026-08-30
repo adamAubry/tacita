@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { contactsDeLaSession } from "../../lib/contacts";
 import { estLienRefuse, liensDeLaSession, type LiensInvitation } from "../../lib/liens-invitation";
+import { IconeLien } from "../foundation/icons";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { Placeholder } from "../foundation/Placeholder";
 import { Button, Text } from "../foundation/primitives";
@@ -129,7 +130,7 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
       <LayoutHeader titre="Invitation" retour={false} />
 
       {etat.phase === "resolution" && (
-        <Placeholder titre="Vérification du lien…" explication="Un instant." />
+        <Placeholder icone={IconeLien} titre="Vérification du lien…" explication="Un instant." />
       )}
 
       {etat.phase === "attente" && (
@@ -152,6 +153,7 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
 
       {etat.phase === "invalide" && (
         <Placeholder
+          icone={IconeLien}
           titre="Ce lien n'est plus valide"
           explication="Il a peut-être expiré, été révoqué, ou déjà servi le nombre de fois prévu. Demandez-en un nouveau à la personne qui vous l'a envoyé."
           action={retour}
@@ -160,6 +162,7 @@ export function ReceptionLien({ token, liens, session: injectee }: ReceptionLien
 
       {etat.phase === "indisponible" && (
         <Placeholder
+          icone={IconeLien}
           titre="Le lien n'a pas pu être vérifié"
           explication="Le service ne répond pas. Réessayez plus tard — ou demandez à être ajouté par votre identifiant Matrix, ce qui ne passe pas par lui."
           action={retour}

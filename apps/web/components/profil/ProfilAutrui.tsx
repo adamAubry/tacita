@@ -4,8 +4,8 @@ import type { Profile } from "@tacita/messaging";
 import { useState, type ReactNode } from "react";
 
 import { ButtonsList } from "../foundation/ButtonsList";
-import { IconeAppel } from "../foundation/icons";
-import { Button, Icon, SegmentedControl, SegmentedControlItem, Text } from "../foundation/primitives";
+import { IconeAppel, IconeDavantage } from "../foundation/icons";
+import { Button, SegmentedControl, SegmentedControlItem, Text } from "../foundation/primitives";
 import { Sheet } from "../foundation/Sheet";
 import { Note } from "./Note";
 import { ProfileCard } from "./ProfileCard";
@@ -99,6 +99,7 @@ export function ProfilAutrui({
     <>
       <ProfileCard
         nom={profil.displayName}
+        userId={profil.userId}
         avatarUrl={profil.avatarUrl}
         bannerUrl={profil.bannerUrl}
         statut={bloque ? "bloque" : estAmi ? "ami" : "non-ami"}
@@ -107,7 +108,7 @@ export function ProfilAutrui({
             label="Options"
             variant="ghost"
             isIconOnly
-            icon={<Icon icon="moreHorizontal" />}
+            icon={IconeDavantage}
             onClick={() => setOptions(true)}
           />
         }
@@ -115,7 +116,14 @@ export function ProfilAutrui({
 
       {estAmi ? (
         <>
-          <div style={{ padding: "0 var(--spacing-3)" }}>
+          {/*
+            **Un seul rail, et des écarts qui disent les paliers** (30/08/2026, plainte :
+            « spacing du layout de l'écran profil d'un autre »). Le sélecteur était collé
+            sous la carte, les actions payaient 16 px, la note 12 : trois rails différents
+            sur trois blocs empilés. Tout passe au rail de `--spacing-3`, celui de tous les
+            autres écrans, et le détachement se fait par le haut.
+          */}
+          <div style={{ padding: "var(--spacing-4) var(--spacing-3) 0" }}>
             <SegmentedControl
               label="Actions ou activité"
               value={onglet}
@@ -135,20 +143,27 @@ export function ProfilAutrui({
                 display: "flex",
                 gap: "var(--spacing-3)",
                 justifyContent: "center",
-                padding: "var(--spacing-4)",
+                padding: "var(--spacing-5) var(--spacing-3)",
               }}
             >
               <Button label="Message" variant="primary" onClick={onMessage} />
               <Button label="Appel audio" variant="secondary" icon={IconeAppel} onClick={onAppel} />
             </div>
           ) : (
-            <div style={{ padding: "var(--spacing-3)" }}>{activite}</div>
+            <div style={{ padding: "var(--spacing-4) var(--spacing-3) var(--spacing-3)" }}>
+            {activite}
+          </div>
           )}
         </>
       ) : (
         // Composant 26 — un seul grand bouton. C'est la seule chose à faire ici.
         <div
-          style={{ display: "grid", justifyItems: "center", gap: "var(--spacing-2)", padding: "var(--spacing-4)" }}
+          style={{
+            display: "grid",
+            justifyItems: "center",
+            gap: "var(--spacing-3)",
+            padding: "var(--spacing-6) var(--spacing-3)",
+          }}
         >
           <Button
             label="Ajouter"

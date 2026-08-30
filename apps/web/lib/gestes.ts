@@ -66,6 +66,24 @@ export function useGlissement({
 }: OptionsGlissement) {
   const depart = useRef<{ x: number; y: number } | null>(null);
   const minuterie = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /*
+   * **L'axe se décide une fois, au premier mouvement franc** (30/08/2026, plainte :
+   * « slider un message marche mal »).
+   *
+   * La tolérance verticale était réévaluée à *chaque* `pointermove` : un défilement de
+   * timeline qui partait un peu de travers faisait glisser le message, puis le rappelait
+   * sec dès que le doigt dépassait 32 px de vertical. Le message tremblait sous le pouce
+   * pendant qu'on lisait, et une réponse partait parfois toute seule.
+   *
+   * `null` tant qu'on ne sait pas, puis « x » ou « y » pour toute la durée du geste. En
+   * « y », on ne touche plus à rien : le défilement appartient à la page.
+   */
+  const axe = useRef<"x" | "y" | null>(null);
+
+  /** Un appui long qui a déjà agi ne doit pas aussi déclencher un glissement au relâché. */
+  const aAgi = useRef(false);
+
   const [ecart, setEcart] = useState(0);
 
   const annuler = () => {
@@ -76,6 +94,8 @@ export function useGlissement({
   const finir = () => {
     annuler();
     depart.current = null;
+    axe.current = null;
+    aAgi.current = false;
     setEcart(0);
   };
 
@@ -83,8 +103,6 @@ export function useGlissement({
     style: {
       touchAction: "pan-y" as const,
       transform: ecart === 0 ? undefined : `translateX(${ecart}px)`,
-      // Le retour à zéro s'anime, le suivi du doigt non : sans cette distinction, chaque
-      // pixel parcouru traînerait derrière le doigt. DESIGN.md — 120–180 ms, ease-out.
       transition: ecart === 0 ? "transform 140ms ease-out" : undefined,
     },
 
@@ -94,15 +112,21 @@ export function useGlissement({
         return;
       }
       depart.current = { x: evenement.clientX, y: evenement.clientY };
-      if (onAppuiLong) minuterie.current = setTimeout(onAppuiLong, DUREE_APPUI_LONG);
+      axe.current = null;
+      aAgi.current = false;
+      if (onAppuiLong) {
+        minuterie.current = setTimeout(() => {
+          aAgi.current = true;
+          onAppuiLong();
+        }, DUREE_APPUI_LONG);
+      }
       /*
-       * La capture garde les événements sur cet élément même quand le doigt en sort. Sans
-       * elle, un glissement qui déborde sur le message voisin — ou qui remonte hors de la
-       * carte — perd son `pointerup`, et le geste meurt sans que rien ne le dise.
-       * Optionnelle : jsdom n'implémente pas `PointerEvent`, les tests envoient des
-       * `MouseEvent` qui n'ont ni `pointerId` ni cette méthode.
+       * **Pas de capture ici.** Elle était prise dès le `pointerdown`, donc sur chaque
+       * effleurement : l'élément recevait tous les événements avant même qu'on sache s'il
+       * s'agissait d'un tap, d'un défilement ou d'un glissement. Elle est prise dans
+       * `onPointerMove`, une fois l'axe horizontal établi — c'est-à-dire une fois qu'il y
+       * a quelque chose à capturer.
        */
-      evenement.currentTarget.setPointerCapture?.(evenement.pointerId);
     },
 
     onPointerMove(evenement: PointerEvent) {
@@ -111,18 +135,28 @@ export function useGlissement({
 
       const dx = evenement.clientX - origine.x;
       const dy = evenement.clientY - origine.y;
-      if (Math.abs(dx) < SEUIL_GLISSEMENT_COMMENCE && Math.abs(dy) < SEUIL_GLISSEMENT_COMMENCE) {
-        return;
-      }
-      // Le doigt bouge : ce n'est plus un appui, et le menu ne doit pas s'ouvrir dessous.
-      annuler();
 
-      // Un doigt qui part à la verticale descend la liste : on lui rend la main plutôt
-      // que de traîner le message en biais derrière lui.
-      if (Math.abs(dy) > TOLERANCE_VERTICALE) {
-        depart.current = null;
-        setEcart(0);
-        return;
+      // L'axe est acquis : un geste vertical ne redevient jamais horizontal en route.
+      if (axe.current === "y") return;
+
+      if (axe.current === null) {
+        // En dessous du seuil, un tremblement de pouce n'a pas à choisir pour l'utilisateur.
+        if (
+          Math.abs(dx) < SEUIL_GLISSEMENT_COMMENCE &&
+          Math.abs(dy) < SEUIL_GLISSEMENT_COMMENCE
+        ) {
+          return;
+        }
+        annuler();
+        // La dominante l'emporte, et elle vaut pour tout le geste. `TOLERANCE_VERTICALE`
+        // reste le plafond au-delà duquel un mouvement penché est un défilement.
+        axe.current =
+          Math.abs(dx) > Math.abs(dy) && Math.abs(dy) <= TOLERANCE_VERTICALE ? "x" : "y";
+        if (axe.current === "y") {
+          setEcart(0);
+          return;
+        }
+        evenement.currentTarget.setPointerCapture?.(evenement.pointerId);
       }
 
       const suivi = onDroite === undefined && dx > 0 ? 0 : onGauche === undefined && dx < 0 ? 0 : dx;
@@ -131,15 +165,78 @@ export function useGlissement({
 
     onPointerUp(evenement: PointerEvent) {
       const origine = depart.current;
+      const axeAvant = axe.current;
+      const aAgiAvant = aAgi.current;
       finir();
       if (!origine) return;
 
+      // Un appui long a déjà agi, ou le geste n'était pas horizontal : le relâché n'agit
+      // pas. Sans ça, un hold menu ouvert repartait en réponse dès qu'on levait le doigt.
+      if (aAgiAvant || axeAvant !== "x") return;
+
       const dx = evenement.clientX - origine.x;
-      if (Math.abs(evenement.clientY - origine.y) > TOLERANCE_VERTICALE) return;
       if (dx >= SEUIL_GLISSEMENT) onDroite?.();
       else if (dx <= -SEUIL_GLISSEMENT) onGauche?.();
     },
 
+    onPointerCancel: finir,
+  };
+}
+
+/** Distance à tirer avant que le rafraîchissement parte. */
+export const SEUIL_TIRAGE = 72;
+/** Ce que le contenu descend au maximum pendant le tirage. */
+const AMPLITUDE_TIRAGE = 96;
+
+/**
+ * **Tirer vers le bas pour rafraîchir** (30/08/2026, demande utilisateur).
+ *
+ * *Interprétation, à confirmer.* La demande dit « swipe up pour refresh ». Aucun système
+ * ne place le rafraîchissement sur un balayage vers le haut — sur iOS comme sur Android,
+ * c'est le tirage vers le **bas**, en haut de liste, et le balayage vers le haut sert à
+ * défiler. On implémente donc la convention, qui est ce que le doigt essaiera d'abord ;
+ * l'inverser est un signe à changer si l'intention était bien l'autre.
+ *
+ * Le tirage n'arme que si la page est **déjà en haut** : sinon le geste appartient au
+ * défilement, et l'utilisateur qui remonte sa liste verrait le contenu s'étirer sous son
+ * doigt à chaque fois qu'il atteint le sommet.
+ */
+export function useTirerPourRafraichir(rafraichir: () => void) {
+  const depart = useRef<number | null>(null);
+  const [tire, setTire] = useState(0);
+
+  const finir = () => {
+    depart.current = null;
+    setTire(0);
+  };
+
+  return {
+    /** Ce que le conteneur doit rendre pour montrer le tirage. */
+    tire,
+    pret: tire >= SEUIL_TIRAGE,
+    style: {
+      transform: tire === 0 ? undefined : `translateY(${tire}px)`,
+      transition: tire === 0 ? "transform 140ms ease-out" : undefined,
+    },
+    onPointerDown(evenement: PointerEvent) {
+      // `scrollY` et non le conteneur : l'accueil défile avec le document.
+      depart.current = globalThis.scrollY <= 0 ? evenement.clientY : null;
+    },
+    onPointerMove(evenement: PointerEvent) {
+      if (depart.current === null) return;
+      const dy = evenement.clientY - depart.current;
+      if (dy <= 0) {
+        setTire(0);
+        return;
+      }
+      // Résistance : le contenu suit à moitié, ce qui dit « c'est un geste, pas un défilement ».
+      setTire(Math.min(AMPLITUDE_TIRAGE, dy / 2));
+    },
+    onPointerUp() {
+      const acquis = tire >= SEUIL_TIRAGE;
+      finir();
+      if (acquis) rafraichir();
+    },
     onPointerCancel: finir,
   };
 }

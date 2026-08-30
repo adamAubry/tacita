@@ -25,6 +25,10 @@ interface SalonFictif {
   highlight?: number;
   tags?: string[];
   inviter?: string;
+  /** `mxc://` du salon — en groupe, c'est lui que la liste affiche. */
+  avatar?: string;
+  /** `mxc://` par membre — en DM, c'est celui de l'autre que la liste affiche. */
+  avatarsMembres?: Record<string, string>;
 }
 
 /**
@@ -41,6 +45,17 @@ function fakeClient(salons: SalonFictif[], directs: Record<string, string[]> = {
     getDMInviter: () => salon.inviter,
     getUnreadNotificationCount: (type?: string) =>
       (type === "highlight" ? salon.highlight : salon.unread) ?? 0,
+    /*
+     * **Les deux méthodes d'avatar font partie du contrat** (30/08/2026, plainte : « la
+     * photo de profil ne s'affiche pas dans l'accueil »). Le doublon ne les portait pas,
+     * parce que `Conversation` ne portait pas encore `avatarUrl` — et un doublon qui ne
+     * modèle pas ce que le code appelle ne peut infirmer aucune hypothèse (règle 3).
+     */
+    getMxcAvatarUrl: () => salon.avatar ?? null,
+    getMember: (userId: string) => {
+      const mxc = salon.avatarsMembres?.[userId];
+      return mxc === undefined ? null : { getMxcAvatarUrl: () => mxc };
+    },
   }));
 
   const client = {

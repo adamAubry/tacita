@@ -137,12 +137,17 @@ describe("profil d'un non-ami : Send invite, et rien d'autre", () => {
         onAction={vi.fn()}
       />,
     );
-    expect(screen.getByText("Pas encore ami")).toBeTruthy();
+    /*
+     * Le statut se lit par son **étiquette accessible** et non par du texte : c'est une
+     * icône depuis le 30/08/2026 (plainte : « le badge "ami" devrait être une icône »).
+     * Le mot reste, à l'oreille — c'est bien lui qu'on assertait, et il est toujours là.
+     */
+    expect(screen.getByRole("img", { name: "Pas encore ami" })).toBeTruthy();
     unmount();
 
     rendreAutrui({ estAmi: true, bloque: true });
-    expect(screen.getByText("Bloqué")).toBeTruthy();
-    expect(screen.queryByText("Ami")).toBeNull();
+    expect(screen.getByRole("img", { name: "Bloqué" })).toBeTruthy();
+    expect(screen.queryByRole("img", { name: "Ami" })).toBeNull();
   });
 });
 

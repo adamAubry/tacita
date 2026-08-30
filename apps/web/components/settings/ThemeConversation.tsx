@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { effacerFondEcran, ecrireFondEcran, lireFondEcran } from "../../lib/preferences";
 import { Button, Text } from "../foundation/primitives";
@@ -24,9 +24,12 @@ interface ThemeConversationProps {
  * ni account data. Le libellé le dit, parce qu'un réglage qu'on croit synchronisé et qui
  * ne l'est pas passe pour une panne au prochain téléphone (E-02, même raisonnement).
  *
- * ponytail: `<input type="file">` natif plutôt que le MediaPicker de M-E. Celui-ci
- * refuse la vidéo, annonce des envois et parle de pièces jointes — trois comportements
- * qui n'ont rien à faire ici. Le rung natif suffit.
+ * ponytail: on ne passe pas par le MediaPicker de M-E. Celui-ci refuse la vidéo, annonce
+ * des envois et parle de pièces jointes — trois comportements qui n'ont rien à faire ici.
+ * L'`<input type="file">` reste donc le mécanisme, mais **caché** : rendu nu, il posait le
+ * bouton « Parcourir… » du navigateur et sa typographie système au milieu d'une feuille
+ * entièrement composée en primitives (revue de conception E-13, 30/08/2026). Le motif —
+ * input caché, `Button` qui le déclenche — est celui de `FormulaireIdentite`.
  */
 export function ThemeConversation({
   roomId,
@@ -37,6 +40,7 @@ export function ThemeConversation({
   const [actuel, setActuel] = useState<Blob | undefined>();
   const [candidat, setCandidat] = useState<Blob | undefined>();
   const [apercu, setApercu] = useState<string | undefined>();
+  const champ = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void lireFondEcran(indexedDB, roomId).then(setActuel).catch(() => {});
@@ -88,14 +92,30 @@ export function ThemeConversation({
         </div>
       </div>
 
-      <label style={{ display: "grid", gap: "var(--spacing-1)" }}>
-        <Text type="label">Choisir une image</Text>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(evenement) => setCandidat(evenement.target.files?.[0] ?? undefined)}
-        />
-      </label>
+      {/*
+        **L'input est caché, un `Button` le déclenche** (revue de conception E-13,
+        30/08/2026). Il était nu : le bouton « Parcourir… » du navigateur et sa typographie
+        système, au milieu d'une feuille entièrement composée en primitives Astryx. Le
+        motif juste existait déjà deux fichiers plus loin, dans `FormulaireIdentite` — il
+        est repris tel quel plutôt que réinventé.
+      */}
+      <input
+        ref={champ}
+        type="file"
+        accept="image/*"
+        aria-label="Choisir une image"
+        hidden
+        onChange={(evenement) => {
+          const fichier = evenement.target.files?.[0];
+          evenement.target.value = "";
+          setCandidat(fichier ?? undefined);
+        }}
+      />
+      <Button
+        label={candidat ? "Image choisie — en changer" : "Choisir une image"}
+        variant="secondary"
+        onClick={() => champ.current?.click()}
+      />
 
       <div style={{ display: "flex", gap: "var(--spacing-2)" }}>
         <Button

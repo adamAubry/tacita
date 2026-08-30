@@ -4,9 +4,10 @@ import type { EncryptedFile } from "@tacita/media-pipeline";
 import { useEffect, useState } from "react";
 
 import { IconeImage, IconeVideo } from "../foundation/icons";
-import { Button, Skeleton, Text } from "../foundation/primitives";
+import { Button, Text } from "../foundation/primitives";
 import { VoicePlayer } from "./VoicePlayer";
 import { dureeLisible, tailleLisible, type Media, type Telecharger } from "./media";
+import { Skeleton } from "../foundation/Skeleton";
 
 /**
  * Déchiffre une pièce jointe et rend une URL d'objet, révoquée au démontage.

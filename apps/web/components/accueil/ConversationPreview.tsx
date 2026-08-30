@@ -71,6 +71,16 @@ export function ConversationPreview({
       ? {}
       : {
           onDroite: () => onEpingler(conversation.roomId, !conversation.pinned),
+          /*
+           * **Glissement gauche : les actions** (30/08/2026, demande utilisateur — « on
+           * aimerait avoir des actions au glissement gauche/droite d'une conversation »).
+           *
+           * La droite épingle depuis le début ; la gauche n'était branchée sur rien, et le
+           * seul chemin vers les actions était l'appui long — un geste qu'on ne découvre
+           * pas. Elle ouvre la même feuille, donc aucune action n'existe uniquement au
+           * doigt (DESIGN.md : « chaque geste a un équivalent visible »).
+           */
+          onGauche: () => setMenuOuvert(true),
           onAppuiLong: () => setMenuOuvert(true),
         },
   );
@@ -84,7 +94,11 @@ export function ConversationPreview({
         {...geste}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-          <ConversationAvatar nom={conversation.name} direct={conversation.direct} />
+          <ConversationAvatar
+            nom={conversation.name}
+            mxc={conversation.avatarUrl}
+            direct={conversation.direct}
+          />
 
           {/* `minWidth: 0` : sans lui, un aperçu long élargit la ligne au lieu d'être
               tronqué — la troncature d'un enfant de flex ne s'applique pas autrement. */}
