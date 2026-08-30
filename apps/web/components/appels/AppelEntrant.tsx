@@ -122,7 +122,8 @@ export function AppelEntrant() {
       aria-label={`Appel entrant de ${appel.nom}`}
       style={{
         position: "fixed",
-        top: "calc(var(--spacing-2) + env(safe-area-inset-top, 0px))",
+        // R-07 : sous la barre d'en-tête, jamais dessus — le token porte le pourquoi.
+        top: "calc(var(--tacita-decalage-appel) + var(--spacing-2) + env(safe-area-inset-top, 0px))",
         left: "var(--spacing-2)",
         right: "var(--spacing-2)",
         zIndex: 20,

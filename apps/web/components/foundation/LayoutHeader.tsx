@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { Button, Icon, Text, Toolbar } from "./primitives";
+import { IconeRetour } from "./icons";
+import { Button, Text, Toolbar } from "./primitives";
 
 interface LayoutHeaderProps {
   titre: string;
@@ -33,7 +34,7 @@ export function LayoutHeader({ titre, fin, retour = true }: LayoutHeaderProps) {
             label="Retour"
             variant="ghost"
             isIconOnly
-            icon={<Icon icon="chevronLeft" />}
+            icon={IconeRetour}
             onClick={() => router.back()}
           />
         ) : undefined

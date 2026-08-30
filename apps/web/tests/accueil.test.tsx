@@ -69,9 +69,24 @@ function conversation(partiel: Partial<Conversation> = {}): Conversation {
  * au vert en n'ayant rien glissé. `MouseEvent` porte les coordonnées, et React lit le
  * type qu'on lui donne. À reprendre tel quel pour les gestes de M-D.
  */
-function glisser(cible: HTMLElement, distance: number) {
+function glisser(cible: HTMLElement, distance: number, vertical = 0) {
   fireEvent(cible, new MouseEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 }));
-  fireEvent(cible, new MouseEvent("pointerup", { bubbles: true, clientX: distance, clientY: 0 }));
+  /*
+   * **Le `pointermove` n'est pas facultatif** (30/08/2026). Le simulateur passait du
+   * `pointerdown` au `pointerup` sans rien entre les deux — ce qu'aucun pointeur réel ne
+   * fait. Depuis que le geste **verrouille son axe** au premier mouvement franc (plainte
+   * « slider un message marche mal »), un glissement sans mouvement n'a pas d'axe, donc
+   * pas d'action : le test décrivait une trajectoire impossible et le code avait raison
+   * de ne rien en faire.
+   */
+  fireEvent(
+    cible,
+    new MouseEvent("pointermove", { bubbles: true, clientX: distance, clientY: vertical }),
+  );
+  fireEvent(
+    cible,
+    new MouseEvent("pointerup", { bubbles: true, clientX: distance, clientY: vertical }),
+  );
 }
 
 /**
@@ -193,6 +208,27 @@ describe("épingler : glissement droit, et son équivalent non gestuel", () => {
 
     glisser(carte("adam"), SEUIL_GLISSEMENT - 1);
     glisser(carte("adam"), -SEUIL_GLISSEMENT);
+    expect(onEpingler).not.toHaveBeenCalled();
+  });
+
+  /*
+   * **Le geste penché appartient au défilement** (30/08/2026, plainte : « slider un
+   * message marche mal »). Le seuil de distance seul ne suffit pas : un doigt qui descend
+   * la liste en biais franchit 64 px d'horizontal en route. L'axe se verrouille au premier
+   * mouvement franc et ne se rouvre plus — c'est ce que ce test tient.
+   */
+  it("un glissement à dominante verticale ne déclenche aucune action", () => {
+    const onEpingler = vi.fn();
+    render(
+      <ConversationsList
+        conversations={[conversation({ name: "adam" })]}
+        onOuvrir={vi.fn()}
+        onEpingler={onEpingler}
+      />,
+    );
+
+    // 64 px d'horizontal, mais 80 px de vertical : c'est un défilement.
+    glisser(carte("adam"), SEUIL_GLISSEMENT, 80);
     expect(onEpingler).not.toHaveBeenCalled();
   });
 
@@ -379,7 +415,7 @@ describe("la liste dit ce qu'elle fait : skeleton, puis vide, puis contenu", () 
       />,
     );
 
-    expect(screen.getByText("Démarre ta première conversation")).toBeTruthy();
+    expect(screen.getByText("Démarrez votre première conversation")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Nouvelle conversation" }));
     expect(onDemarrer).toHaveBeenCalledTimes(1);
   });

@@ -1,8 +1,9 @@
 "use client";
 
 import { PINNED_EVENTS_METADATA } from "@tacita/messaging";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
+import { IconeEpingle, IconeFichier, IconeImage, IconeLien } from "../foundation/icons";
 import { Placeholder } from "../foundation/Placeholder";
 import { SegmentedControl, SegmentedControlItem, Text } from "../foundation/primitives";
 import { MediaMessage } from "./MediaMessage";
@@ -16,11 +17,11 @@ import {
   type Telecharger,
 } from "./media";
 
-const ONGLETS: { cle: Onglet; libelle: string; vide: string }[] = [
-  { cle: "medias", libelle: "Médias", vide: "Aucune photo ni vidéo dans l'historique téléchargé." },
-  { cle: "epingles", libelle: "Épinglés", vide: "Aucun message épinglé." },
-  { cle: "liens", libelle: "Liens", vide: "Aucun lien partagé dans l'historique téléchargé." },
-  { cle: "fichiers", libelle: "Fichiers", vide: "Aucun fichier dans l'historique téléchargé." },
+const ONGLETS: { cle: Onglet; libelle: string; vide: string; icone: ReactNode }[] = [
+  { cle: "medias", libelle: "Médias", vide: "Aucune photo ni vidéo", icone: IconeImage },
+  { cle: "epingles", libelle: "Épinglés", vide: "Aucun message épinglé", icone: IconeEpingle },
+  { cle: "liens", libelle: "Liens", vide: "Aucun lien partagé", icone: IconeLien },
+  { cle: "fichiers", libelle: "Fichiers", vide: "Aucun fichier", icone: IconeFichier },
 ];
 
 /**
@@ -75,7 +76,7 @@ export function ConversationCollections({
   const [onglet, setOnglet] = useState<Onglet>("medias");
   const contenus = repartir(evenements, epingles);
   const courant = contenus[onglet];
-  const vide = ONGLETS.find((o) => o.cle === onglet)!.vide;
+  const { vide, icone } = ONGLETS.find((o) => o.cle === onglet)!;
 
   return (
     <section aria-label="Contenus partagés" style={{ display: "grid", gap: "var(--spacing-3)" }}>
@@ -111,7 +112,7 @@ export function ConversationCollections({
       )}
 
       {courant.length === 0 ? (
-        <Placeholder titre={vide} />
+        <Placeholder icone={icone} titre={vide} />
       ) : (
         <ul style={onglet === "medias" ? GRILLE : LISTE}>
           {courant.map((evenement, rang) => {

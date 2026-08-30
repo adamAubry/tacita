@@ -19,6 +19,8 @@ import { HomeHeader } from "./HomeHeader";
 import { NewConversationSheet } from "./NewConversationSheet";
 import { RequestsBanner } from "./RequestsBanner";
 import { contactsDeLaSession } from "../../lib/contacts";
+import { useTirerPourRafraichir } from "../../lib/gestes";
+import { Text } from "../foundation/primitives";
 import { routeConversation } from "../../lib/routes";
 
 interface Donnees {
@@ -76,8 +78,45 @@ export function Accueil() {
 
   const ouvrir = useCallback((roomId: string) => router.push(routeConversation(roomId)), [router]);
 
+  /*
+   * **Tirer pour rafraîchir** (30/08/2026, demande utilisateur). La liste se met à jour
+   * toute seule par `subscribeConversations` ; le geste ne sert donc pas à aller chercher
+   * des données, il sert à **le vérifier** — c'est ce qu'on fait quand on doute que
+   * l'application soit à jour, et ne rien avoir sous le doigt est ce qui fait douter.
+   */
+  const relire = useCallback(() => {
+    if (!session) return;
+    setDonnees({
+      conversations: listerConversations(session),
+      demandes: invitations(session).length,
+    });
+  }, [session]);
+  const tirage = useTirerPourRafraichir(relire);
+
   return (
-    <>
+    <div
+      onPointerDown={tirage.onPointerDown}
+      onPointerMove={tirage.onPointerMove}
+      onPointerUp={tirage.onPointerUp}
+      onPointerCancel={tirage.onPointerCancel}
+      style={tirage.style}
+    >
+      {/* Le repère du tirage : il occupe la place qu'il prend, plutôt que de flotter. */}
+      {tirage.tire > 0 && (
+        <div
+          role="status"
+          style={{
+            display: "grid",
+            placeItems: "center",
+            height: tirage.tire,
+            overflow: "hidden",
+          }}
+        >
+          <Text type="supporting" color="secondary">
+            {tirage.pret ? "Relâchez pour actualiser" : "Tirez pour actualiser"}
+          </Text>
+        </div>
+      )}
       <HomeHeader
         tri={tri}
         onTri={setTri}
@@ -112,6 +151,6 @@ export function Accueil() {
           if (session) void createGroupChat(session, nom, membres).then(({ room_id }) => ouvrir(room_id));
         }}
       />
-    </>
+    </div>
   );
 }

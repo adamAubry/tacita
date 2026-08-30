@@ -17,11 +17,12 @@ import { contactsDeLaSession } from "../../lib/contacts";
 import { enregistrerWipeNotes } from "../../lib/notes";
 import { ConversationCollections } from "../media/ConversationCollections";
 import { useMediaActions } from "../media/useMediaActions";
-import { Placeholder } from "../foundation/Placeholder";
+import { VStack } from "../foundation/primitives";
 import { LogoutButton } from "../onboarding/LogoutButton";
 import { useSession } from "../onboarding/SessionProvider";
 import { ProfilAutrui, type ActionProfil } from "./ProfilAutrui";
 import { ProfilMoi } from "./ProfilMoi";
+import { Skeleton } from "../foundation/Skeleton";
 
 /**
  * Le câblage des deux layouts Profile.
@@ -34,6 +35,16 @@ import { ProfilMoi } from "./ProfilMoi";
  * Les composants rendus ne connaissent ni `Session` ni les paquets : ils reçoivent un
  * `Profile`, des booléens et des callbacks. C'est ce qui rend M-G testable avec des
  * interfaces mockées, comme son objectif mesurable le demande.
+ */
+/**
+ * **Un squelette, pas un état vide** (30/08/2026, revue de conception R-05). Ces trois
+ * écrans rendaient un `<Placeholder>` — le composant d'état *vide* — pendant le
+ * chargement : on lisait « Profil / Chargement… » en gros et centré, à la place de
+ * l'écran, puis tout était remplacé. Trois défauts en un : le mauvais composant
+ * sémantique, un saut de mise en page complet à l'arrivée des données, et une
+ * contradiction avec la règle maison « pas de spinner plein écran : skeletons localisés »
+ * — l'interdit visait le sablier, et c'est un état vide plein écran qui avait pris sa
+ * place. La géométrie ci-dessous est celle du contenu final.
  */
 export function EcranProfil({ userId }: { userId?: string }) {
   const { etat } = useSession();
@@ -70,7 +81,16 @@ export function EcranProfil({ userId }: { userId?: string }) {
 
 
   if (!session || !profil || !contacts) {
-    return <Placeholder titre="Profil" explication="Chargement…" />;
+    return (
+      <VStack gap={4} aria-label="Chargement du profil" aria-busy="true">
+        {/* La bannière, l'avatar remonté dessus, puis les deux lignes d'identité. */}
+        <Skeleton height={190} />
+        <VStack gap={2} style={{ padding: "0 var(--spacing-3)" }}>
+          <Skeleton width={180} height={28} />
+          <Skeleton width={110} height={18} />
+        </VStack>
+      </VStack>
+    );
   }
 
   if (estMoi) {

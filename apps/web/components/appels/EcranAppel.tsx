@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ELEMENT_CALL_URL, HOMESERVER } from "../../lib/config";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
+import { IconeAppel } from "../foundation/icons";
 import { Placeholder } from "../foundation/Placeholder";
 import { Button, Text } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
@@ -156,6 +157,7 @@ export function EcranAppel({ roomId, video }: EcranAppelProps) {
     >
       {panne ? (
         <Placeholder
+          icone={IconeAppel}
           titre="Appel impossible"
           explication={panne}
           action={<Button label="Retour" variant="primary" onClick={sortir} />}

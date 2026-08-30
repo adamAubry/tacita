@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 
 import { DEBOUNCE_MS } from "../../lib/recherche";
 import { ButtonsList } from "../foundation/ButtonsList";
+import { IconeAjouterMembre, IconeRecherche } from "../foundation/icons";
 import { LayoutHeader } from "../foundation/LayoutHeader";
 import { Placeholder } from "../foundation/Placeholder";
-import { Button, Skeleton, Text, TextInput } from "../foundation/primitives";
+import { Button, Text, TextInput } from "../foundation/primitives";
 import { Suggestions } from "./FriendsList";
+import { Skeleton } from "../foundation/Skeleton";
 
 interface AjouterAmisProps {
   /**
@@ -143,6 +145,7 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
 
       {!chargement && resultats !== null && resultats.length === 0 && (
         <Placeholder
+          icone={IconeRecherche}
           titre="Personne à ce nom"
           explication="Vérifiez l'orthographe, ou partagez plutôt un lien d'invitation."
         />
@@ -154,6 +157,7 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
 
       {resultats === null && !chargement && (
         <Placeholder
+          icone={IconeAjouterMembre}
           titre="Aucune suggestion"
           explication="Tacita ne construit pas de graphe social : personne ne peut vous suggérer qui ajouter. Partagez un lien, ou cherchez un nom."
           action={<Button label="Partager un lien" onClick={() => void partager()} />}

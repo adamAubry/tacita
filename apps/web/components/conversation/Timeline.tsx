@@ -5,12 +5,13 @@ import type { ReactionTally } from "@tacita/messaging";
 import type { ReceiptStatus } from "@tacita/receipts";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { Skeleton } from "../foundation/primitives";
+
 import { AppelObjet } from "./AppelObjet";
 import { DateSeparator } from "./DateSeparator";
 import { MessageObject } from "./MessageObject";
 import type { Media, Telecharger } from "../media/media";
 import { nouveauJour, shouldShowHeader, type MessageAffiche } from "./message";
+import { Skeleton } from "../foundation/Skeleton";
 
 interface TimelineProps {
   messages: MessageAffiche[];
@@ -252,7 +253,13 @@ export function Timeline({
         flex: 1,
         minHeight: 0,
         overflowY: "auto",
-        paddingBottom: "var(--spacing-3)",
+        /*
+         * **Le premier message ne colle plus à l'en-tête** (30/08/2026, plainte :
+         * « spacing du layout d'une conversation »). La timeline ne payait que son bas :
+         * en haut, le premier bloc démarrait à un pixel du filet de la barre, et le
+         * séparateur de date s'y écrasait. Les deux bouts au même pas.
+         */
+        paddingBlock: "var(--spacing-3)",
         // Le voile est **au-dessus** de l'image et sous le texte : c'est lui qui rend les
         // messages lisibles quel que soit le fond choisi (DESIGN.md, token `scrim`). Sans
         // lui, un fond clair effacerait le texte, et l'utilisateur n'aurait aucun moyen

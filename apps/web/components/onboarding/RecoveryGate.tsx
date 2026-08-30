@@ -4,12 +4,13 @@ import type { ReactNode } from "react";
 
 import { HOMESERVER } from "../../lib/config";
 
-import { Skeleton, VStack } from "../foundation/primitives";
+import { VStack } from "../foundation/primitives";
 import { Connexion } from "./Connexion";
 import { EcranDePorte } from "./EcranDePorte";
 import { Onboarding } from "./Onboarding";
 import { RecoveryUnlock } from "./RecoveryUnlock";
 import { useSession } from "./SessionProvider";
+import { Skeleton } from "../foundation/Skeleton";
 
 /**
  * la porte d'entrée de toute l'app.

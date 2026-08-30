@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ButtonsList } from "../foundation/ButtonsList";
 import { Sheet } from "../foundation/Sheet";
 import { Button, CheckboxList, CheckboxListItem, TextInput } from "../foundation/primitives";
+import { IconeAjouterMembre } from "../foundation/icons";
 import { Placeholder } from "../foundation/Placeholder";
 import type { Contact } from "../../lib/contacts";
 
@@ -75,8 +76,9 @@ export function NewConversationSheet({
           personne à proposer, et l'écran le dit au lieu de rester vide. */}
       {etape !== "choix" && contacts.length === 0 && (
         <Placeholder
+          icone={IconeAjouterMembre}
           titre="Personne à qui écrire pour l'instant"
-          explication="Ajoute quelqu'un par un lien d'invitation, et il apparaîtra ici."
+          explication="Ajoutez quelqu'un par un lien d'invitation, et il apparaîtra ici."
         />
       )}
 

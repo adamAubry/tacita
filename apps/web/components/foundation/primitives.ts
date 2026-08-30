@@ -39,7 +39,7 @@ export type {
 export { ProgressBar } from "@astryxdesign/core/ProgressBar";
 export { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 export { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
-export { Skeleton } from "@astryxdesign/core/Skeleton";
+export { Skeleton as SkeletonAstryx } from "@astryxdesign/core/Skeleton";
 // `Spinner` est **localisé**, jamais plein écran (DESIGN.md) : il ne sert qu'à dire
 // qu'une étape prépare quelque chose, à la place du contenu qu'elle prépare.
 export { Spinner } from "@astryxdesign/core/Spinner";

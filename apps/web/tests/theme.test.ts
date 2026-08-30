@@ -54,7 +54,22 @@ describe("le thème porte les valeurs de DESIGN.md, et rien d'autre", () => {
   it("les quarante tokens chromatiques sont posés sur les neutres", () => {
     expect(FAMILLES_CHROMATIQUES).toHaveLength(10);
     for (const famille of FAMILLES_CHROMATIQUES) {
-      expect(tokens[`--color-background-${famille}`], famille).toBe(couple(surface));
+      /*
+       * **`gray` fait exception, et seulement sur le fond** (30/08/2026, plainte : « le
+       * bouton mode masqué de confidentialité ne se rend pas en light »).
+       *
+       * La neutralisation posait les dix fonds sur `surface`. Or `Switch` d'Astryx lit
+       * `--color-background-gray` pour sa **piste éteinte** : celle-ci était donc peinte
+       * en blanc, sur une feuille elle-même blanche, avec un curseur blanc dessus. Le
+       * contrôle existait et ne se voyait pas.
+       *
+       * `gray` n'est pas une famille chromatique comme les neuf autres : c'est le neutre
+       * de la bibliothèque. Il rejoint `--color-track` sur le filet, qui est le neutre du
+       * nôtre. L'intention du garde ne bouge pas — aucune couleur d'Astryx n'entre.
+       */
+      expect(tokens[`--color-background-${famille}`], famille).toBe(
+        couple(famille === "gray" ? hairline : surface),
+      );
       expect(tokens[`--color-border-${famille}`], famille).toBe(couple(hairline));
       expect(tokens[`--color-icon-${famille}`], famille).toBe(couple(textMuted));
       expect(tokens[`--color-text-${famille}`], famille).toBe(couple(textMuted));
@@ -238,6 +253,62 @@ describe("le thème porte les valeurs de DESIGN.md, et rien d'autre", () => {
     // La forme qui ne marche pas, dans le fichier qui a la classe : `opacity` n'a rien à
     // faire dans un objet `style` ici, avec ou sans `var()`.
     expect(carte).not.toMatch(/opacity:/);
+  });
+
+  /*
+   * **Règle 7, appliquée au dégagement de l'appel entrant** (30/08/2026, revue R-07).
+   *
+   * La bannière est `position: fixed` en haut de la fenêtre, et elle se posait exactement
+   * sur la bande qu'occupe la `Toolbar` : pendant qu'elle sonnait, le retour, le titre et
+   * les trois actions de la conversation étaient inatteignables. Le dégagement vit
+   * désormais dans un token — donc à une jonction que personne ne relit, et c'est
+   * précisément ce que la règle 7 refuse de laisser sans test.
+   *
+   * Le test relie la valeur à son site de lecture. Il ne prouve pas le rendu — jsdom ne
+   * calcule aucune géométrie, et les 52 px ont été mesurés à la main. Il empêche que le
+   * token disparaisse, ou que la bannière cesse de le lire, sans que personne ne le voie.
+   */
+  /*
+   * Règle 7 encore : deux feuilles écrites le 30/08/2026 pour des plaintes utilisateur, et
+   * deux sélecteurs qui n'existent que si quelqu'un les pose. Une règle CSS dont la classe
+   * a disparu du composant est indétectable — elle ne casse rien, elle cesse simplement
+   * d'agir.
+   */
+  it("les correctifs de jetons de recherche ont leur classe sur le composant", () => {
+    const feuille = sansCommentaires(lire("components/foundation/tokens.css"));
+    expect(feuille).toMatch(/\.tacita-recherche \[role="group"\]/);
+
+    const barre = sansCommentaires(lire("components/recherche/SearchBar.tsx"));
+    expect(barre).toContain('className="tacita-recherche"');
+  });
+
+  it("le lissage des skeletons a sa classe sur le composant", () => {
+    const feuille = sansCommentaires(lire("components/foundation/tokens.css"));
+    expect(feuille).toMatch(/\.tacita-skeleton\s*\{[^}]*animation-timing-function/);
+
+    const enrobage = sansCommentaires(lire("components/foundation/Skeleton.tsx"));
+    expect(enrobage).toContain("tacita-skeleton");
+  });
+
+  /*
+   * Le défaut de l'agent utilisateur, `body { margin: 8px }`, insérait toute
+   * l'application de 8 px et laissait voir le blanc du navigateur sur les quatre bords.
+   * jsdom ne peint rien : sans ce test, la ligne peut repartir sans que rien ne le dise.
+   */
+  it("le fond de l'application touche les quatre bords", () => {
+    const feuille = sansCommentaires(lire("components/foundation/tokens.css"));
+    expect(feuille).toMatch(/body\s*\{[^}]*margin:\s*0/);
+  });
+
+  it("la bannière d'appel entrant se pose sous la barre d'en-tête, jamais dessus", () => {
+    const feuille = sansCommentaires(lire("components/foundation/tokens.css"));
+    expect(feuille).toMatch(/--tacita-decalage-appel:\s*\d+px/);
+
+    const banniere = sansCommentaires(lire("components/appels/AppelEntrant.tsx"));
+    expect(banniere).toContain("var(--tacita-decalage-appel)");
+    // La forme qui ne marche pas : un `top` qui repart de zéro remettrait la bannière
+    // sur l'en-tête, et rien à l'écran ne le dirait avant le premier appel reçu.
+    expect(banniere).not.toMatch(/top:\s*"calc\(var\(--spacing-2\)/);
   });
 });
 

@@ -50,6 +50,16 @@ export const tacitaTheme = defineTheme({
     "--color-neutral": t(D.hairline),
     "--color-skeleton": t(D.hairline),
     "--color-track": t(D.hairline),
+    /*
+     * **La piste éteinte du `Switch`** (30/08/2026, plainte : « le bouton mode masqué ne
+     * se rend pas en light »). Le thème mappait `--color-track` en pensant couvrir
+     * l'interrupteur ; `Switch` d'Astryx lit en fait `--color-background-gray`, qui
+     * restait à son défaut de bibliothèque — `light-dark(#0A131733, #666A724C)`, un
+     * bleu-noir à 20 %. C'est exactement le piège que ce fichier documente déjà pour les
+     * familles chromatiques et les anneaux `inset` : un token non mappé fait entrer la
+     * palette d'Astryx dans un système qui s'est interdit toute autre couleur.
+     */
+    "--color-background-gray": t(D.hairline),
 
     // — Encre
     "--color-text-primary": t(D.text),

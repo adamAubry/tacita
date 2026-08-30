@@ -3,13 +3,12 @@
 import type { Session } from "@tacita/client-core";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-import { IconeCle } from "../foundation/icons";
+import { IconeCle, IconeCopier, IconeInfo } from "../foundation/icons";
 import {
   Banner,
   Button,
   Card,
   Divider,
-  Icon,
   Text,
   TextInput,
   VStack,
@@ -403,7 +402,7 @@ export function RecoveryStep({ session, reinitialiser = false }: RecoveryStepPro
               <Button
                 label="En savoir plus"
                 variant="ghost"
-                icon={<Icon icon="info" />}
+                icon={IconeInfo}
                 href={EN_SAVOIR_PLUS}
                 target="_blank"
                 // `noopener` d'abord pour ce qu'il empêche : sans lui, la page ouverte
@@ -546,7 +545,7 @@ export function RecoveryStep({ session, reinitialiser = false }: RecoveryStepPro
                 }[copie]
               }
               variant="ghost"
-              icon={<Icon icon="copy" />}
+              icon={IconeCopier}
               width="100%"
               style={{ "--button-focus-offset": "-3px" } as CSSProperties}
               onClick={() => {

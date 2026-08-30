@@ -2,9 +2,11 @@
 
 import type { Conversation } from "@tacita/messaging";
 
+import { IconeConversation } from "../foundation/icons";
 import { Placeholder } from "../foundation/Placeholder";
-import { Button, Skeleton } from "../foundation/primitives";
+import { Button } from "../foundation/primitives";
 import { ConversationPreview } from "./ConversationPreview";
+import { Skeleton } from "../foundation/Skeleton";
 
 export type Tri = "recentes" | "anciennes";
 
@@ -15,7 +17,7 @@ interface ConversationsListProps {
   tri?: Tri;
   onOuvrir: (roomId: string) => void;
   onEpingler: (roomId: string, epingle: boolean) => void;
-  /** L'action de l'état vide — « démarre ta première conversation ». */
+  /** L'action de l'état vide — « démarrez votre première conversation ». */
   onDemarrer?: () => void;
   maintenant?: number;
 }
@@ -70,8 +72,9 @@ export function ConversationsList({
   if (conversations.length === 0) {
     return (
       <Placeholder
-        titre="Démarre ta première conversation"
-        explication="Ajoute quelqu'un, et vos messages apparaîtront ici."
+        icone={IconeConversation}
+        titre="Démarrez votre première conversation"
+        explication="Ajoutez quelqu'un, et vos messages apparaîtront ici."
         action={
           onDemarrer ? <Button label="Nouvelle conversation" onClick={onDemarrer} /> : undefined
         }

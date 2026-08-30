@@ -80,6 +80,20 @@
      lisent `--radius-full`. C'est `ConversationAvatar` qui redéfinit ce token dans sa
      propre portée ; la valeur, elle, vit ici, avec les autres géométries. */
   --tacita-radius-avatar: 40%;
+
+  /* **Le dégagement de la bannière d'appel entrant** (30/08/2026, revue de conception
+     R-07). Elle est `position: fixed` en haut de la fenêtre — hors du flux, parce que
+     l'écran Conversation est une colonne de hauteur fixée et qu'un bandeau inséré
+     au-dessus d'elle pousserait le composer hors de la fenêtre. Mais « en haut de la
+     fenêtre », c'est exactement la bande qu'occupe la `Toolbar` : pendant qu'elle sonnait,
+     le retour, le titre et les trois actions de la conversation étaient inatteignables.
+
+     52 px = la hauteur rendue d'une `Toolbar` (min-height `--size-element-sm` de 28 px,
+     plus son rembourrage et son filet). Mesurée, pas déduite : jsdom ne calcule aucune
+     géométrie. Limite assumée — l'en-tête de l'accueil est plus haut, et la bannière en
+     couvre la seconde rangée ; cet écran-là n'a pas de bouton de retour, donc aucune
+     sortie n'est masquée. */
+  --tacita-decalage-appel: 52px;
 }
 
 /*
@@ -323,6 +337,82 @@
  */
 body {
   overflow-wrap: anywhere;
+
+  /*
+   * **Les bordures blanches** (30/08/2026, plainte utilisateur). L'agent utilisateur pose
+   * `body { margin: 8px }` par défaut, et rien ne le remettait à zéro : le conteneur de
+   * `Providers`, qui porte `min-height: 100dvh` et le fond de l'application, était donc
+   * inséré de 8 px sur les quatre côtés. On voyait le blanc du navigateur tout autour —
+   * et en thème sombre, un cadre clair autour d'une application sombre.
+   *
+   * Même famille d'oubli que `box-sizing` et que les marges de titre plus bas : un défaut
+   * du web qui n'existe pas en jsdom, donc invisible à toute la suite de tests.
+   */
+  margin: 0;
+}
+
+/*
+ * **Les jetons de la recherche** (30/08/2026, plaintes utilisateur).
+ *
+ * `Tokenizer` d'Astryx — ce que `PowerSearch` compose — rend un `div[role="group"]` en
+ * `flex-wrap: nowrap` **et** `overflow: hidden` : au-delà de deux ou trois jetons, les
+ * suivants n'étaient pas repoussés à la ligne, ils étaient **coupés**. Sur 390 px de
+ * large, un filtre « Personne » et un filtre « Conversation » suffisent à faire
+ * disparaître le troisième.
+ *
+ * Le sélecteur passe par le rôle, pas par une classe atomique : `role="group"` est le
+ * contrat sémantique du composant, une classe hachée est un détail de compilation qui
+ * change au prochain `pnpm up`.
+ *
+ * Cette feuille est **hors couche** : elle l'emporte donc sur `astryx-base` sans avoir à
+ * rivaliser de spécificité avec les `:not(#\#)` empilés d'Astryx. C'est le mécanisme prévu
+ * par la déclaration d'ordre en tête de fichier.
+ *
+ * Mesuré nulle part : jsdom ne calcule aucune mise en page. À vérifier au navigateur.
+ */
+.tacita-recherche [role="group"] {
+  flex-wrap: wrap;
+  height: auto;
+  overflow: visible;
+  row-gap: var(--spacing-1);
+}
+
+/* Le jeton lui-même : le rayon des contrôles, pas `--radius-inner` (4 px), qui le faisait
+   lire comme un fragment d'autre chose. */
+.tacita-recherche [role="group"] > span {
+  border-radius: var(--radius-element);
+}
+
+/* Le bouton de retrait portait le fond d'un contrôle de pleine taille dans un jeton haut
+   de 24 px : le halo débordait du jeton qu'il ferme. On le ramène à un carré à sa
+   mesure. */
+.tacita-recherche [role="group"] button {
+  width: var(--spacing-4);
+  height: var(--spacing-4);
+  padding: 0;
+  border-radius: var(--radius-inner);
+  flex: 0 0 auto;
+}
+
+/*
+ * **Les skeletons** (30/08/2026, plainte utilisateur — « dégueulasse »).
+ *
+ * Astryx anime l'opacité avec `animation-timing-function: steps(10, end)` : au lieu d'un
+ * fondu, dix paliers secs, ce qui donne un clignotement saccadé sur toute une liste de
+ * skeletons — et d'autant plus visible qu'ils sont plusieurs et décalés dans le temps.
+ *
+ * DESIGN.md : « le mouvement confirme, il ne divertit pas ». Un fondu continu confirme
+ * qu'on attend ; un stroboscope à dix crans divertit, et mal.
+ */
+.tacita-skeleton {
+  animation-timing-function: ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tacita-skeleton {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 /*

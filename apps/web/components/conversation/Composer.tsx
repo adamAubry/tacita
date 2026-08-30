@@ -110,7 +110,17 @@ export function Composer({
           toutes les messageries : c'est un bloc de texte, il n'a pas la même largeur
           qu'une icône et ne peut pas partager la ligne du champ sans l'écraser. */}
       {contexte && (
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--spacing-2)",
+            // Sans `overflow: hidden` sur la rangée, un extrait insécable — une URL —
+            // élargit la ligne au lieu d'être tronqué, et pousse « Annuler » hors du
+            // cadre (30/08/2026, plainte : « écran de réponse : overflow »).
+            overflow: "hidden",
+          }}
+        >
           {/* Le filet reprend celui de la citation en timeline : c'est le même objet à
               deux moments — ce qu'on va citer, puis ce qu'on a cité. */}
           <div
@@ -127,7 +137,10 @@ export function Composer({
               {contexte.libelle} : {contexte.extrait}
             </Text>
           </div>
-          <Button label="Annuler" variant="ghost" onClick={contexte.onAnnuler} />
+          {/* `flexShrink: 0` : c'est la citation qui cède, jamais la sortie. */}
+          <div style={{ flexShrink: 0 }}>
+            <Button label="Annuler" variant="ghost" onClick={contexte.onAnnuler} />
+          </div>
         </div>
       )}
 

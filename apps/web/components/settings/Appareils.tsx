@@ -3,16 +3,11 @@
 import type { Appareil, Session } from "@tacita/client-core";
 import { useCallback, useEffect, useState } from "react";
 
+import { dateComplete } from "../../lib/dates";
+import { IconeInfo } from "../foundation/icons";
 import { Placeholder } from "../foundation/Placeholder";
-import {
-  Banner,
-  Button,
-  Divider,
-  Skeleton,
-  Text,
-  TextInput,
-  VStack,
-} from "../foundation/primitives";
+import { Banner, Button, Divider, Text, TextInput, VStack } from "../foundation/primitives";
+import { Skeleton } from "../foundation/Skeleton";
 
 /**
  * **les appareils connectés, et le moyen de les déconnecter.**
@@ -50,14 +45,7 @@ const MESSAGES: Record<Echec, string> = {
  * à un souvenir — « il y a 3 jours » ne se compare à rien.
  */
 const dateLisible = (ms?: number) =>
-  ms === undefined
-    ? "Dernière activité inconnue"
-    : `Vu le ${new Date(ms).toLocaleDateString("fr-FR", {
-        day: "numeric",
-        month: "long",
-        hour: "2-digit",
-        minute: "2-digit",
-      })}`;
+  ms === undefined ? "Dernière activité inconnue" : `Vu le ${dateComplete(ms)}`;
 
 export function Appareils({ session }: { session: Session }) {
   const [etat, setEtat] = useState<Etat>({ phase: "chargement" });
@@ -121,6 +109,7 @@ export function Appareils({ session }: { session: Session }) {
     return (
       <div style={{ padding: "var(--spacing-3)" }}>
         <Placeholder
+          icone={IconeInfo}
           titre="La liste n'a pas pu être lue"
           explication="Le serveur n'a pas répondu. Rouvrez cet écran pour réessayer."
         />

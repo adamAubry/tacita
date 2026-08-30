@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { IconeLecture, IconePause } from "../foundation/icons";
 import { Button, Text } from "../foundation/primitives";
 import { dureeLisible } from "./media";
 
@@ -44,6 +45,8 @@ export function VoicePlayer({ source, dureeMs, ondes = [] }: VoicePlayerProps) {
       <Button
         label={lecture ? "Pause" : "Lire le message vocal"}
         variant="ghost"
+        isIconOnly
+        icon={lecture ? IconePause : IconeLecture}
         isDisabled={source === undefined}
         onClick={() => {
           const element = audio.current;

@@ -6,11 +6,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { contactsDeLaSession, type Demande } from "../../lib/contacts";
 import { liensDeLaSession, partagerLien, urlDInvitation } from "../../lib/liens-invitation";
-import { Placeholder } from "../foundation/Placeholder";
+import { LayoutHeader } from "../foundation/LayoutHeader";
+import { VStack } from "../foundation/primitives";
 import { useSession } from "../onboarding/SessionProvider";
 import { AjouterAmis } from "./AjouterAmis";
 import { Demandes } from "./Demandes";
 import { routeConversation } from "../../lib/routes";
+import { Skeleton } from "../foundation/Skeleton";
 
 /** Le câblage des layouts Add-friends et Friend request. */
 export function EcranAmis({ variation }: { variation: "ajouter" | "demandes" }) {
@@ -42,7 +44,21 @@ export function EcranAmis({ variation }: { variation: "ajouter" | "demandes" }) 
   }, [session]);
 
   if (!session || !contacts) {
-    return <Placeholder titre="Amis" explication="Chargement…" />;
+    // R-05 : la géométrie de la liste qui arrive, pas un état vide plein écran.
+    return (
+      <>
+        <LayoutHeader titre={variation === "ajouter" ? "Ajouter" : "Demandes"} />
+        <VStack
+          gap={2}
+          style={{ padding: "var(--spacing-3)" }}
+          aria-label="Chargement"
+          aria-busy="true"
+        >
+          <Skeleton height={56} />
+          <Skeleton height={56} />
+        </VStack>
+      </>
+    );
   }
 
   return variation === "ajouter" ? (

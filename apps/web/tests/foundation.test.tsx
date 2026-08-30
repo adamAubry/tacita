@@ -10,8 +10,9 @@ import { LayoutHeader } from "../components/foundation/LayoutHeader";
 import { Navbar, ONGLETS } from "../components/foundation/Navbar";
 import { Placeholder } from "../components/foundation/Placeholder";
 import { Sheet } from "../components/foundation/Sheet";
-import { SegmentedControl, SegmentedControlItem, Skeleton } from "../components/foundation/primitives";
+import { SegmentedControl, SegmentedControlItem } from "../components/foundation/primitives";
 import { RACINE, lire, sansCommentaires, sourcesLivrees } from "./sources";
+import { Skeleton } from "../components/foundation/Skeleton";
 
 /**
  * `next/navigation` n'existe pas hors du rendu de Next. Les deux fonctions dont les

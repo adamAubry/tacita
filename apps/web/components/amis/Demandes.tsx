@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { Demande } from "../../lib/contacts";
 import { LayoutHeader } from "../foundation/LayoutHeader";
+import { IconeAjouterMembre } from "../foundation/icons";
 import { Placeholder } from "../foundation/Placeholder";
 import { DemandesList } from "./FriendsList";
 
@@ -43,6 +44,7 @@ export function Demandes({ demandes, onAccepter, onRefuser, onOuvrir }: Demandes
 
       {restantes.length === 0 ? (
         <Placeholder
+          icone={IconeAjouterMembre}
           titre="Aucune demande"
           explication="Les invitations reçues apparaîtront ici."
         />

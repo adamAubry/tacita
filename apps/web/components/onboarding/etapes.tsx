@@ -3,7 +3,7 @@
 import type { Session } from "@tacita/client-core";
 import { profileOf, updateProfile } from "@tacita/messaging";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { poserIdentiteParDefaut, televerserImageProfil } from "../../lib/identite-par-defaut";
 import { ecrireDemandePushFaite } from "../../lib/preferences";
@@ -72,11 +72,19 @@ export interface EtapeOnboarding {
  * étape après un rechargement ne coûte que la relecture du profil.
  */
 function EtapeIdentite({ session, avancer }: ContenuEtapeProps) {
+  /*
+   * **L'échec du dessin se dit** (30/08/2026, plainte : « les photos de profil ne se
+   * créent pas »). L'erreur était avalée : l'écran annonçait « Voici votre identité »
+   * au-dessus d'une carte aux initiales, sans un mot. Interdit n°13 — on ne présente pas
+   * comme fait ce qui ne l'est pas. L'étape reste facultative, et le formulaire en dessous
+   * permet de choisir une image à la main.
+   */
+  const [dessinRate, setDessinRate] = useState(false);
   const preparer = useCallback(async () => {
     // Un échec de téléversement ne bloque pas l'étape : le compte garde ses initiales, et
     // le formulaire juste dessous permet de choisir une image soi-même. Rien n'est
     // journalisé — un échec porte l'URL d'un média (interdit n°8).
-    await poserIdentiteParDefaut(session).catch(() => {});
+    await poserIdentiteParDefaut(session).catch(() => setDessinRate(true));
     return profileOf(session, session.client.getUserId() ?? "");
   }, [session]);
 
@@ -91,9 +99,9 @@ function EtapeIdentite({ session, avancer }: ContenuEtapeProps) {
           Voici votre identité
         </Text>
         <Text style={{ textWrap: "pretty" }}>
-          Cette photo et cette bannière ont été dessinées sur cet appareil à partir de
-          votre identifiant. Rien n&apos;a été demandé à personne, et elles seront les
-          mêmes partout où vous vous connecterez.
+          {dessinRate
+            ? "Vos images n'ont pas pu être dessinées sur cet appareil. Ce n'est pas bloquant : choisissez-en une ci-dessous, ou continuez avec vos initiales."
+            : "Cette photo et cette bannière ont été dessinées sur cet appareil à partir de votre identifiant. Rien n'a été demandé à personne, et elles seront les mêmes partout où vous vous connecterez."}
         </Text>
       </VStack>
 

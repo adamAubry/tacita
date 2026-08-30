@@ -7,6 +7,7 @@ import type { ReceiptStatus } from "@tacita/receipts";
 import { heure } from "../../lib/dates";
 import { useGlissement } from "../../lib/gestes";
 import { ConversationAvatar } from "../foundation/ConversationAvatar";
+import { IconeCoche, IconeDoubleCoche } from "../foundation/icons";
 import { MediaMessage } from "../media/MediaMessage";
 import type { Media, Telecharger } from "../media/media";
 import { Button, Text, ToggleButton } from "../foundation/primitives";
@@ -37,7 +38,18 @@ interface MessageObjectProps {
 }
 
 /** `sending` n'y figure pas : ce statut ne rend aucune coche, il rend `null`. */
-const COCHE = { sent: "✓", delivered: "✓✓", read: "✓✓" } as const;
+/**
+ * DESIGN.md nomme la coche verte « trait d'identité ». C'étaient les caractères `✓` et
+ * `✓✓` — des glyphes typographiques au milieu d'une interface dont toutes les autres
+ * marques sont des SVG au trait : épaisseur, alignement vertical et dessin changeaient
+ * d'une plateforme à l'autre. Le seul trait d'identité que l'équipe ne dessinait pas
+ * (revue de conception E-08, 30/08/2026).
+ */
+const COCHE = {
+  sent: IconeCoche,
+  delivered: IconeDoubleCoche,
+  read: IconeDoubleCoche,
+} as const;
 
 /**
  * les accusés, et **ce qu'ils ne disent pas**.
@@ -61,13 +73,22 @@ function Recu({ statut, indecidable }: { statut: ReceiptStatus; indecidable: boo
 
   return (
     <span
+      /*
+       * `role="img"` : la coche est un SVG `aria-hidden` (E-08), donc le nom accessible
+       * doit être porté par ce conteneur — sans rôle, un `<span>` étiqueté n'est exposé à
+       * rien. `title` reste pour l'infobulle de bureau ; sur tactile elle ne s'affiche
+       * jamais, et c'est « Limites connues » et « Confidentialité » qui portent
+       * l'explication de « délivré » pour de bon.
+       */
+      role="img"
       title={aide}
       aria-label={aide}
       style={{
         // DESIGN.md : la coche verte est un trait d'identité, et elle ne l'est que pour
         // « lu ». Les états intermédiaires restent muets.
         color: statut === "read" ? "var(--color-text-accent)" : "var(--color-text-secondary)",
-        fontSize: "var(--font-size-xs)",
+        // L'icône porte sa propre taille (16) : plus de `font-size` à régler ici.
+        display: "flex",
       }}
     >
       {COCHE[statut]}
@@ -152,10 +173,22 @@ export function MessageObject({
         gap: "var(--spacing-3)",
         // L'alignement de l'avatar est réservé même sans en-tête : sans lui, un message
         // groupé rentrerait sous l'avatar et la colonne de texte danserait.
-        padding: entete ? "var(--spacing-2) var(--spacing-3) 0" : "0 var(--spacing-3)",
+        /*
+         * Un groupe s'ouvre sur `--spacing-3` et non `--spacing-2` : à 8 px, deux
+         * groupes d'auteurs différents se touchaient presque, et le regroupement Discord
+         * — qui repose entièrement sur l'écart — ne se lisait plus (30/08/2026).
+         */
+        padding: entete ? "var(--spacing-3) var(--spacing-3) 0" : "0 var(--spacing-3)",
         // Un envoi en cours ou en échec est plus pâle : l'information est dans l'état,
         // pas dans une icône de plus.
-        opacity: message.envoi === undefined || message.envoi === "queued" ? 1 : 0.6,
+        /*
+         * **Plus d'opacité sur le bloc** (revue de conception E-07, 30/08/2026). Elle
+         * valait 0,6 dès que l'envoi n'était plus « en attente », et s'appliquait donc au
+         * texte du message, à la phrase qui explique l'échec et aux deux boutons
+         * « Réessayer » et « Supprimer ». C'est le seul moment où l'on doit relire ce
+         * qu'on a écrit pour décider si on le renvoie, et c'était le moment où le
+         * contraste baissait. L'état se dit déjà en toutes lettres, sous le message.
+         */
       }}
     >
       <div style={{ width: 40, flexShrink: 0 }}>

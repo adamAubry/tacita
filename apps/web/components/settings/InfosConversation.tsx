@@ -22,7 +22,7 @@ import { LayoutHeader } from "../foundation/LayoutHeader";
 import {
   IconeAjouterMembre,
   IconeMuet,
-  IconeOptions,
+  IconeChevronBas,
   IconeProfil,
   IconeRecherche,
 } from "../foundation/icons";
@@ -114,7 +114,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
     {
       cle: "options",
       libelle: "Options",
-      icone: IconeOptions,
+      icone: IconeChevronBas,
       // Les options sont **déjà sur cet écran**, plus bas : le bouton y amène, il
       // n'ouvre pas une modal de plus. Ouvrir arbitrairement la première (le thème)
       // sous le libellé « Options » serait un bouton qui ment sur sa destination.
@@ -140,7 +140,7 @@ export function InfosConversation({ roomId }: { roomId: string }) {
           padding: "var(--spacing-4)",
         }}
       >
-        <ConversationAvatar nom={nom} direct={direct} taille={48} />
+        <ConversationAvatar nom={nom} mxc={salon?.avatarUrl} direct={direct} taille={48} />
         <Text type="display-3" as="h1">
           {nom}
         </Text>

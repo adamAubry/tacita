@@ -176,3 +176,166 @@ export const IconeAjouterMembre: ReactNode = (
     <path d="M18.5 6.5v6M15.5 9.5h6" />
   </svg>
 );
+
+/**
+ * **Les six icônes reprises à Astryx** (ajoutées le 30/08/2026, revue de conception R-01).
+ *
+ * Elles existaient dans le jeu de la bibliothèque, et c'était le problème : `chevronLeft`
+ * et `info` d'Astryx voisinaient `IconeAppel` et `IconeVideo` d'ici dans la **même** barre
+ * d'outils de l'écran Conversation — deux grilles, deux épaisseurs de trait, deux tailles
+ * optiques, séparées par 4 px de gouttière. L'œil ne sait pas nommer une différence de
+ * provenance, il la voit en une demi-seconde.
+ *
+ * Redessinées sur le `trait` ci-dessus, donc : 24×24, 1,5, extrémités rondes. Le jeu de
+ * l'application est désormais **entier** — plus aucun composant n'importe `Icon`.
+ */
+export const IconeRetour: ReactNode = (
+  <svg {...trait}>
+    <path d="m14.5 5-7 7 7 7" />
+  </svg>
+);
+
+export const IconeChevron: ReactNode = (
+  <svg {...trait}>
+    <path d="m9.5 5 7 7-7 7" />
+  </svg>
+);
+
+export const IconeFermer: ReactNode = (
+  <svg {...trait}>
+    <path d="M5.5 5.5l13 13M18.5 5.5l-13 13" />
+  </svg>
+);
+
+export const IconeInfo: ReactNode = (
+  <svg {...trait}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 11v6" />
+    <path d="M12 7.6v.1" />
+  </svg>
+);
+
+export const IconeCopier: ReactNode = (
+  <svg {...trait}>
+    <rect x="8.5" y="8.5" width="12" height="12" rx="2.5" />
+    <path d="M16 5.5H6a2.5 2.5 0 0 0-2.5 2.5v10" />
+  </svg>
+);
+
+export const IconeDavantage: ReactNode = (
+  <svg {...trait}>
+    <circle cx="5" cy="12" r="1.6" />
+    <circle cx="12" cy="12" r="1.6" />
+    <circle cx="19" cy="12" r="1.6" />
+  </svg>
+);
+
+/**
+ * **Les coches d'accusé de réception** (30/08/2026, revue de conception E-08).
+ *
+ * Elles étaient les caractères `✓` et `✓✓`, posés dans un `<span>` : des glyphes
+ * typographiques au milieu d'une interface dont toutes les autres marques sont des SVG au
+ * trait. Épaisseur différente, alignement vertical différent, et un dessin qui change
+ * d'une plateforme à l'autre — DESIGN.md nomme pourtant la coche verte « trait
+ * d'identité », et c'était le seul que l'équipe ne dessinait pas.
+ *
+ * Grille de 16 plutôt que de 24, à trait égal (1,5 en unités utilisateur) : à la taille
+ * où elles se rendent — la ligne du message —, une géométrie de 24 réduite donnerait un
+ * trait plus fin que celui de toutes les autres icônes. La grille change, le trait non.
+ */
+const traitPetit = { ...trait, width: 16, height: 16, viewBox: "0 0 16 16" } as const;
+
+export const IconeCoche: ReactNode = (
+  <svg {...traitPetit}>
+    <path d="m3 8.5 3.5 3.5L13 5" />
+  </svg>
+);
+
+export const IconeDoubleCoche: ReactNode = (
+  <svg {...traitPetit}>
+    <path d="m1.5 8.5 3.5 3.5L11.5 5" />
+    <path d="m8 12 6.5-7" />
+  </svg>
+);
+
+/**
+ * Lecture et pause du message vocal (30/08/2026, revue de conception R-03). Le bouton
+ * portait un `label` sans `icon` ni `isIconOnly` : Astryx rendait donc la phrase « Lire le
+ * message vocal » en toutes lettres, collée à une forme d'onde dessinée au pixel. Le
+ * libellé reste — il devient l'étiquette accessible, motif du bouton d'envoi du composer.
+ */
+export const IconeLecture: ReactNode = (
+  <svg {...trait} fill="currentColor" stroke="none">
+    <path d="M7.5 5.2 18 12 7.5 18.8z" />
+  </svg>
+);
+
+export const IconePause: ReactNode = (
+  <svg {...trait} fill="currentColor" stroke="none">
+    <rect x="7" y="5.5" width="3.5" height="13" rx="1" />
+    <rect x="13.5" y="5.5" width="3.5" height="13" rx="1" />
+  </svg>
+);
+
+/**
+ * **Les quatre icônes d'état vide** (30/08/2026, revue de conception R-04).
+ *
+ * DESIGN.md prescrit « Placeholder — icône au trait monochrome, pas d'illustration
+ * cartoon », et le composant accepte bien une prop `icone`. Sur seize appels, aucun ne la
+ * passait : tous les états vides de l'application étaient du texte centré sans ancre
+ * visuelle, ce qui les fait lire comme une erreur d'affichage plutôt que comme une
+ * réponse. La règle était écrite, le composant prêt, et personne ne s'en servait.
+ *
+ * Les autres états vides réutilisent des icônes déjà là — recherche, muet, appel, ajout de
+ * membre. Ces quatre-ci manquaient.
+ */
+export const IconeConversation: ReactNode = (
+  <svg {...trait}>
+    <path d="M20.5 4.5h-17v13h5v4l5-4h7z" />
+  </svg>
+);
+
+export const IconeFichier: ReactNode = (
+  <svg {...trait}>
+    <path d="M6 3.5h7l5 5v12H6z" />
+    <path d="M13 3.5v5h5" />
+  </svg>
+);
+
+export const IconeLien: ReactNode = (
+  <svg {...trait}>
+    <path d="M10.2 13.8a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2" />
+    <path d="M13.8 10.2a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2" />
+  </svg>
+);
+
+export const IconeEpingle: ReactNode = (
+  <svg {...trait}>
+    <path d="M9 3.5h6l-1 6 3.5 3.5H6.5L10 9.5z" />
+    <path d="M12 13v7.5" />
+  </svg>
+);
+
+/**
+ * **Deux icônes de statut et un chevron** (30/08/2026, plaintes utilisateur).
+ *
+ * `IconeChevronBas` remplace la roue crantée sur le bouton « Options » des informations
+ * d'une conversation : ce bouton **fait défiler la page** jusqu'aux cartes d'options, il ne
+ * réglait jamais rien. Une roue crantée promet des réglages ; un chevron vers le bas
+ * promet ce qui se passe.
+ *
+ * `IconeBloque` et `IconeCoche` servent au statut de l'écran profil, où le mot était
+ * écrit en toutes lettres dans un badge.
+ */
+export const IconeChevronBas: ReactNode = (
+  <svg {...trait}>
+    <path d="m5 9.5 7 7 7-7" />
+  </svg>
+);
+
+export const IconeBloque: ReactNode = (
+  <svg {...trait}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="m6 6 12 12" />
+  </svg>
+);

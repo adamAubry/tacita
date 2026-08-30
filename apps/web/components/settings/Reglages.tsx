@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 
 import { useModeTheme } from "../../app/providers";
 import { ButtonsList } from "../foundation/ButtonsList";
+import { IconeMuet } from "../foundation/icons";
 import { OptionCard } from "../foundation/OptionCard";
 import { Placeholder } from "../foundation/Placeholder";
 import { Sheet } from "../foundation/Sheet";
@@ -188,6 +189,7 @@ export function Reglages() {
 
             {filtrees.length === 0 ? (
               <Placeholder
+                icone={IconeMuet}
                 titre="Aucune conversation en silence"
                 explication="Ouvrez les informations d'une conversation pour changer son niveau."
               />
