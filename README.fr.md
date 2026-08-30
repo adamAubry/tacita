@@ -157,26 +157,6 @@ Chaque paquet porte dans son [`README.md`](README.md) son contrat d'interface et
 assumées**. Ces limites ne sont pas de la communication : plusieurs sont tenues par des
 tests qui échouent si le README cesse de les dire.
 
-## Développement
-
-```sh
-pnpm install
-pnpm --filter web dev    # http://localhost:3000
-npm test                 # Vitest, tous les projets
-npm run typecheck        # toujours complet — c'est lui qui tient les jonctions
-npm run lint
-```
-
-La pile se lance depuis [`infra/`](infra) (voir [`infra/README.md`](infra/README.md)) ; l'overlay
-de développement publie PostgreSQL et l'API Synapse sur l'hôte et installe un CA local.
-Avant le premier `pnpm dev`, le domaine doit résoudre **depuis le navigateur** — le
-README d'`infra` donne la ligne du fichier hosts, cas WSL2 compris.
-
-Deux règles dures à connaître avant une première PR : **Vitest uniquement** (pas de
-Playwright, aucun navigateur piloté dans la suite) et **Astryx uniquement** pour le style
-(pas de Tailwind, pas de CSS-in-JS). La liste complète, avec le bug derrière chaque
-règle, est dans [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## État
 
 Pré-1.0, et le dit. Le projet distingue deux portes, et vous devriez faire pareil :
@@ -201,7 +181,6 @@ de session sans réseau.
 | Document | Ce qu'il couvre |
 | --- | --- |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | ce qui est protégé, ce qui ne l'est pas, et pourquoi |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | contraintes, discipline de test, porte de commit |
 | [`infra/README.md`](infra/README.md) | le socle serveur, en détail |
 | [`apps/web/README.md`](apps/web/README.md) | la PWA, et ce qu'elle ne prouve pas |
 | `packages/*/README.md` | un contrat et une liste de limites par module |
