@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { asSession } from "@tacita/client-core/testing";
-import { ClientEvent, MatrixEventEvent, RoomEvent } from "matrix-js-sdk";
+import { ClientEvent, MatrixEventEvent, RoomEvent, RoomStateEvent } from "matrix-js-sdk";
 import { ClientWidgetApi } from "matrix-widget-api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,8 +17,8 @@ import {
  * **Le pont ne parle que dans un sens tant que l'hôte ne pousse rien.**
  *
  * `ClientWidgetApi` répond aux demandes du widget — c'est le driver — mais n'observe
- * rien de lui-même : `feedEvent` et `feedToDevice` sont des méthodes que le client doit
- * appeler, et la doc d'amont le dit en toutes lettres.
+ * rien de lui-même : `feedEvent`, `feedStateUpdate` et `feedToDevice` sont des méthodes
+ * que le client doit appeler, et la doc d'amont le dit pour chacune en toutes lettres.
  *
  * Constaté sur staging le 29/08/2026 : appel connecté, ICE établi en UDP direct, les deux
  * côtés publiant leur piste audio — et le silence. Element Call chiffre le média **par
@@ -58,9 +58,21 @@ const evenement = (roomId: string, dechiffrable = true) => ({
   getEffectiveEvent: () => ({ type: "io.element.call.encryption_keys", room_id: roomId }),
 });
 
+/** Un événement d'**état** : c'est par là que passe l'appartenance à l'appel. */
+const etat = (roomId: string) => ({
+  isDecryptionFailure: () => false,
+  getRoomId: () => roomId,
+  getEffectiveEvent: () => ({
+    type: "org.matrix.msc3401.call.member",
+    state_key: "_@autre:tacita.chat_APPAREIL_m.call",
+    room_id: roomId,
+  }),
+});
+
 type Espion = ReturnType<typeof vi.fn<(...args: unknown[]) => unknown>>;
-/** Les deux méthodes de l'hôte, espionnées sur le prototype : c'est leur appel qu'on éprouve. */
+/** Les trois méthodes de l'hôte, espionnées sur le prototype : c'est leur appel qu'on éprouve. */
 let feedEvent: Espion;
+let feedStateUpdate: Espion;
 let feedToDevice: Espion;
 let detacher: () => void;
 let pont: ReturnType<typeof fakeSession>;
@@ -70,6 +82,9 @@ let raccroche: number;
 
 beforeEach(() => {
   feedEvent = vi.spyOn(ClientWidgetApi.prototype, "feedEvent").mockResolvedValue(undefined) as Espion;
+  feedStateUpdate = vi
+    .spyOn(ClientWidgetApi.prototype, "feedStateUpdate")
+    .mockResolvedValue(undefined) as Espion;
   feedToDevice = vi
     .spyOn(ClientWidgetApi.prototype, "feedToDevice")
     .mockResolvedValue(undefined) as Espion;
@@ -141,6 +156,31 @@ describe("l'hôte pousse au widget ce que le widget ne peut pas aller chercher",
     expect(feedToDevice.mock.calls.map((appel) => appel[1])).toEqual([true, false]);
   });
 
+  it("une mise à jour d'état atteint le widget par `feedStateUpdate`, pas par `feedEvent`", () => {
+    // **Deux obligations distinctes de l'hôte, et `feedEvent` ne tient pas la seconde.**
+    // Quand l'hôte annonce `org.matrix.msc2762_update_state` — `matrix-widget-api@1.18.0`
+    // l'annonce toujours — le widget injecte ce qui arrive par `send_event` avec une
+    // liste d'état vide : l'événement entre dans sa timeline et jamais dans son état.
+    // `ClientWidgetApi` ne pousse l'état complet qu'une fois, à l'octroi des capacités.
+    //
+    // Ce qui casse sans cette ligne : `MatrixRTCSession.memberships` d'Element Call reste
+    // figé sur qui était dans l'appel au démarrage de son widget. `RTCEncryptionManager`
+    // ne distribue une clé qu'aux appartenances qui changent — donc, personne n'arrivant
+    // jamais, aucune clé ne part, et les deux côtés publient du GCM que nul n'ouvre.
+    pont.emettre(RoomStateEvent.Events, etat(SALON));
+
+    expect(feedStateUpdate).toHaveBeenCalledTimes(1);
+    expect(feedStateUpdate.mock.calls[0]![0]).toMatchObject({
+      type: "org.matrix.msc3401.call.member",
+    });
+  });
+
+  it("une mise à jour d'état d'un autre salon ne traverse pas le pont", () => {
+    pont.emettre(RoomStateEvent.Events, etat(AUTRE));
+
+    expect(feedStateUpdate).not.toHaveBeenCalled();
+  });
+
   it("un salon qui n'est pas celui de l'appel ne traverse pas le pont", () => {
     // Le confinement du driver vaut pour ce que le widget demande ; celui-ci vaut pour
     // ce qu'on lui envoie. Les deux sens ont besoin de leur garde.
@@ -156,10 +196,15 @@ describe("l'hôte pousse au widget ce que le widget ne peut pas aller chercher",
     expect(feedEvent).not.toHaveBeenCalled();
   });
 
-  it("détacher retire les trois écouteurs : un appel raccroché n'écoute plus", () => {
+  it("détacher retire les quatre écouteurs : un appel raccroché n'écoute plus", () => {
     detacher();
 
-    for (const nom of [RoomEvent.Timeline, MatrixEventEvent.Decrypted, ClientEvent.ReceivedToDeviceMessage]) {
+    for (const nom of [
+      RoomEvent.Timeline,
+      MatrixEventEvent.Decrypted,
+      RoomStateEvent.Events,
+      ClientEvent.ReceivedToDeviceMessage,
+    ]) {
       expect(pont.compte(nom), `${nom} est resté branché`).toBe(0);
     }
     // `afterEach` rappelle `detacher` : il doit être idempotent.

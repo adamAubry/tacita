@@ -276,6 +276,38 @@ export function attachCallWidget(
     if (event.getRoomId() === roomId) nourrir(event);
   };
 
+  /*
+   * **`feedEvent` ne met pas l'état à jour, et l'état est la liste des participants.**
+   *
+   * Deuxième moitié du même défaut qu'`ebf53c5`, un étage plus bas. L'hôte a *deux*
+   * obligations distinctes, et leurs docstrings d'amont le disent chacune : `feedEvent`
+   * « pour tout nouvel événement », `feedStateUpdate` « pour toute mise à jour d'état ».
+   * On ne tenait que la première.
+   *
+   * Ce que ça coûte, relu dans `matrix-js-sdk/lib/embedded.js` de l'image épinglée :
+   * quand l'hôte annonce la version d'API `msc2762_update_state` — et `matrix-widget-api@1.18.0`
+   * l'annonce toujours — le widget injecte les événements reçus par `send_event` avec une
+   * liste d'état **vide**. Un événement d'état poussé par `feedEvent` atterrit dans la
+   * timeline du widget et **jamais dans son état**. `ClientWidgetApi` ne pousse l'état
+   * complet qu'une fois, à l'octroi des capacités ; après ça, `feedStateUpdate` est le
+   * seul chemin.
+   *
+   * Conséquence exacte : `MatrixRTCSession.memberships` d'Element Call reste figé sur qui
+   * était dans l'appel à l'instant où son widget a démarré. `RTCEncryptionManager` ne
+   * distribue une clé qu'aux appartenances qui *changent* ; sans mise à jour, il n'appelle
+   * `sendKey` qu'avec nous-même, que `ToDeviceKeyTransport` filtre — et n'envoie donc
+   * rien. Deux widgets ouverts avant que quiconque ait rejoint : personne n'apprend
+   * l'arrivée de l'autre, aucune clé ne part, pas un seul `send_to_device` sur le pont.
+   * L'appel se connecte, les pistes se publient, et `MissingKey` des deux côtés.
+   *
+   * `RoomStateEvent.Events` et non la timeline : c'est le même écouteur qu'`activeCall`
+   * plus bas, et le seul qui voie aussi l'état arrivé hors fenêtre de timeline.
+   */
+  const surEtat = (event: MatrixEvent): void => {
+    if (event.getRoomId() !== roomId) return;
+    void api.feedStateUpdate(event.getEffectiveEvent() as never).catch(() => {});
+  };
+
   const surToDevice = ({ message, encryptionInfo }: ReceivedToDeviceMessage): void => {
     // `encryptionInfo` vaut `null` quand le message est arrivé en clair : c'est
     // exactement le booléen que le widget attend, pas une supposition de notre part.
@@ -323,11 +355,13 @@ export function attachCallWidget(
 
   session.client.on(RoomEvent.Timeline, surTimeline);
   session.client.on(MatrixEventEvent.Decrypted, surDechiffrement);
+  session.client.on(RoomStateEvent.Events, surEtat);
   session.client.on(ClientEvent.ReceivedToDeviceMessage, surToDevice);
 
   return () => {
     session.client.off(RoomEvent.Timeline, surTimeline);
     session.client.off(MatrixEventEvent.Decrypted, surDechiffrement);
+    session.client.off(RoomStateEvent.Events, surEtat);
     session.client.off(ClientEvent.ReceivedToDeviceMessage, surToDevice);
     for (const retirer of actions) retirer();
     api.stop();
