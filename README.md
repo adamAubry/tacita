@@ -153,29 +153,10 @@ Every package carries its own `README.md` with its interface contract and its **
 limits**. Those limits are not marketing copy: several of them are enforced by tests that
 fail if the README stops saying them.
 
-## Development
-
-```sh
-pnpm install
-pnpm --filter web dev    # http://localhost:3000
-npm test                 # Vitest, all projects
-npm run typecheck        # always full — it is what holds the junctions together
-npm run lint
-```
-
-The stack itself runs from [`infra/`](infra) (see [`infra/README.md`](infra/README.md)); the dev
-overlay publishes PostgreSQL and the Synapse API on the host and installs a development
-CA. Before the first `pnpm dev`, your domain must resolve **from the browser** — the
-`infra` README has the hosts-file line, WSL2 included.
-
-Two hard rules worth knowing before your first PR: **Vitest only** (no Playwright, no
-driven browser in the suite), and **Astryx only** for styling (no Tailwind, no
-CSS-in-JS). The full list, with the bug behind each rule, is in
-[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Status
 
-Pre-1.0, and honest about it. The project distinguishes two gates, and so should you:
+Pre-1.0 - The project distinguishes two gates:
 
 ```sh
 npm test        # unit and configuration tests, mocks, no external dependency
@@ -197,7 +178,6 @@ network.
 | Document | What it covers |
 | --- | --- |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | what is protected, what is not, and why |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | constraints, test discipline, commit gate |
 | [`infra/README.md`](infra/README.md) | the server stack, in detail |
 | [`apps/web/README.md`](apps/web/README.md) | the PWA, and what it does not prove |
 | `packages/*/README.md` | one contract and one limits list per module |
