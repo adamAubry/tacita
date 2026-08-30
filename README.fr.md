@@ -50,20 +50,33 @@ personnes qui vit entièrement sur votre machine, c'est exactement ça.
 
 ## Fonctionnalités
 
-- Conversations **chiffrées de bout en bout**, directes et de groupe (crypto Rust,
-  vodozemac)
-- **Appels audio et vidéo** chiffrés, via Element Call — aucun client RTC maison
-- **Photos, vidéos, vocaux et fichiers** — chiffrés côté client avant l'envoi, un seul
-  pipeline pour tous les types
-- **Hors ligne** : lire, chercher et composer sans connexion ; ce que vous écrivez part
-  à la reconnexion et survit à un rechargement
-- **Recherche locale** dans votre historique, dans un Web Worker — le serveur n'est
-  jamais interrogé, il ne saurait pas répondre
-- **Installable** sur iOS et Android depuis le navigateur, avec des notifications qui ne
-  portent aucun contenu et se déchiffrent au réveil
-- **Réponses, réactions, éditions, épinglage, mentions, indicateurs de saisie**, et des
-  accusés `envoi → envoyé → délivré → lu` par message
-- **Liens d'invitation** à durée de vie bornée — un utilisateur existant en ajoute un autre
+- **Chiffrement de bout en bout**, en direct et en groupe, crypto Rust (vodozemac) — [`messaging`](packages/messaging)
+- **Appels audio et vidéo** chiffrés, via Element Call, aucun client RTC maison — [`calls`](packages/calls)
+- **Photos, vidéos, vocaux et fichiers**, chiffrés côté client, un seul pipeline — [`media-pipeline`](packages/media-pipeline)
+- **Hors ligne** — lire, chercher et composer sans connexion, et un rechargement ne perd rien — [`outbox`](packages/outbox)
+- **Recherche locale** dans votre historique, dans un Web Worker, jamais sur le serveur — [`search`](packages/search)
+- **Réponses, réactions, éditions, épingles, mentions, saisie**, et `envoi → envoyé → délivré → lu` — [`receipts`](packages/receipts)
+- **Installable** sur iOS et Android, avec des notifications qui ne portent aucun contenu — [`push-gateway`](apps/push-gateway)
+- **Liens d'invitation** à durée de vie bornée : un utilisateur existant en ajoute un autre — [`invite-tokens`](apps/invite-tokens)
+
+## Ce que le serveur voit
+
+Le serveur ne voit jamais le contenu d'un message. Il voit les métadonnées, et la nuance
+compte :
+
+- **qui parle à qui**, dans quels salons, et quand
+- **la taille exacte de chaque pièce jointe** — donc, à débit quasi constant, la durée de
+  chaque vidéo et de chaque vocal
+- **les réactions**, qui ne sont pas chiffrées, et **les épingles**, qui sont de l'état
+  de salon
+
+> [!CAUTION]
+> Votre **clé de récupération** transite vers le serveur au changement de mot de passe,
+> elle déchiffre tout votre historique, et elle ouvre une session à elle seule. C'est
+> tenable parce que l'opérateur, c'est vous. Ça cesse de l'être dès que vous hébergez
+> pour des inconnus.
+
+Tout est écrit dans **[THREAT_MODEL.md](THREAT_MODEL.md)**.
 
 ## Démarrer
 
@@ -118,25 +131,6 @@ pnpm admin doctor       # diagnostique une pile qui tourne, sans rien toucher
 
 Chaque commande nomme la suivante. Une option inconnue arrête la commande au lieu d'être
 ignorée : `--domain` répond « voulais-tu dire `--domaine` ? ».
-
-## Ce que le serveur voit
-
-Le serveur ne voit jamais le contenu d'un message. Il voit les métadonnées, et la nuance
-compte :
-
-- **qui parle à qui**, dans quels salons, et quand
-- **la taille exacte de chaque pièce jointe** — donc, à débit quasi constant, la durée de
-  chaque vidéo et de chaque vocal
-- **les réactions**, qui ne sont pas chiffrées, et **les épingles**, qui sont de l'état
-  de salon
-
-> [!CAUTION]
-> Votre **clé de récupération** transite vers le serveur au changement de mot de passe,
-> elle déchiffre tout votre historique, et elle ouvre une session à elle seule. C'est
-> tenable parce que l'opérateur, c'est vous. Ça cesse de l'être dès que vous hébergez
-> pour des inconnus.
-
-Tout est écrit dans **[THREAT_MODEL.md](THREAT_MODEL.md)**.
 
 ## Structure du dépôt
 

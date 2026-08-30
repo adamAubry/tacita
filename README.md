@@ -49,19 +49,30 @@ people that lives entirely on your box, that is what this is.
 
 ## Features
 
-- **End-to-end encrypted** conversations, direct and group, with Rust crypto (vodozemac)
-- **Voice and video calls** through Element Call, encrypted, no home-made RTC client
-- **Photos, video, voice notes and files** — encrypted client-side before upload, one
-  single pipeline for every file type
-- **Offline first**: read, search and compose with no connection; what you write leaves
-  on reconnect and survives a page reload
-- **Local search** over your own history, in a Web Worker — the server is never asked,
-  because it could not answer anyway
-- **Installable** on iOS and Android from the browser, with push notifications that
-  carry no content and decrypt on wake
-- **Replies, reactions, edits, pins, mentions, typing indicators**, and read receipts
-  with a `sending → sent → delivered → read` status per message
-- **Invite links** with a bounded lifetime — an existing user adds an existing user
+- **End-to-end encrypted** conversations, direct and group, Rust crypto (vodozemac) — [`messaging`](packages/messaging)
+- **Voice and video calls** through Element Call, encrypted, no home-made RTC client — [`calls`](packages/calls)
+- **Photos, video, voice notes and files**, encrypted client-side, one single pipeline — [`media-pipeline`](packages/media-pipeline)
+- **Offline first** — read, search and compose with no connection, and a reload loses nothing — [`outbox`](packages/outbox)
+- **Local search** over your own history, in a Web Worker, never on the server — [`search`](packages/search)
+- **Replies, reactions, edits, pins, mentions, typing**, and `sending → sent → delivered → read` — [`receipts`](packages/receipts)
+- **Installable** on iOS and Android, with push notifications that carry no content — [`push-gateway`](apps/push-gateway)
+- **Invite links** with a bounded lifetime: an existing user adds an existing user — [`invite-tokens`](apps/invite-tokens)
+
+## What the server can see
+
+The server never sees message content. It does see metadata, and the difference matters:
+
+- **who talks to whom**, in which rooms, and when
+- **the exact byte size of every attachment** — which, at a near-constant bitrate, gives
+  away the duration of every video and every voice note
+- **reactions**, which are sent unencrypted, and **pinned lists**, which are room state
+
+> [!CAUTION]
+> Your **recovery key** reaches the server when you change your password, it decrypts
+> your entire history, and it opens a session on its own. This is tolerable because you
+> are the operator. It stops being tolerable the moment you host for strangers.
+
+All of it, in full: **[THREAT_MODEL.md](THREAT_MODEL.md)**.
 
 ## Getting started
 
@@ -116,22 +127,6 @@ pnpm admin doctor       # diagnoses a running stack without touching it
 
 Each command names the next one. An unknown option stops the command instead of being
 ignored: `--domain` answers *"did you mean `--domaine`?"*.
-
-## What the server can see
-
-The server never sees message content. It does see metadata, and the difference matters:
-
-- **who talks to whom**, in which rooms, and when
-- **the exact byte size of every attachment** — which, at a near-constant bitrate, gives
-  away the duration of every video and every voice note
-- **reactions**, which are sent unencrypted, and **pinned lists**, which are room state
-
-> [!CAUTION]
-> Your **recovery key** reaches the server when you change your password, it decrypts
-> your entire history, and it opens a session on its own. This is tolerable because you
-> are the operator. It stops being tolerable the moment you host for strangers.
-
-All of it, in full: **[THREAT_MODEL.md](THREAT_MODEL.md)**.
 
 ## Project structure
 
