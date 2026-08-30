@@ -27,7 +27,7 @@ interface LienInvitationProps {
  * Les liens d'invitation d'un groupe : émettre, voir l'expiration,
  * révoquer.
  *
- * **Le sas d'entrée suit le cycle de vie des liens** (E-13, voie A). Un lien de groupe ne
+ * **Le sas d'entrée suit le cycle de vie des liens** (voie A). Un lien de groupe ne
  * peut pas faire entrer tout seul : son porteur ne peut ni s'inviter ni rejoindre un
  * salon en `join_rule: invite`. Le salon passe donc en `knock` **à l'émission du premier
  * lien actif** et revient à `invite` **à la révocation du dernier** — pas de knock
@@ -74,7 +74,7 @@ export function LienInvitation({
       // **Un échec ne se tait pas** (interdit n°13). Basculer `join_rules` exige le
       // power level d'état : un membre ordinaire peut créer un lien et voir la bascule
       // refusée. Son lien serait alors parfaitement valide et ne ferait entrer personne
-      // — exactement le genre de promesse silencieuse que l'escalade E-13 a corrigée.
+      // — exactement le genre de promesse silencieuse qu'on a corrigée ici.
       // Ni réessai ni rattrapage : le droit ne s'obtient pas en insistant, il se demande
       // à quelqu'un. On le dit, c'est tout ce qu'on peut faire d'utile.
       void setJoinRule(session, roomId, voulue).catch(() => setSasRefuse(voulue));

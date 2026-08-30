@@ -26,7 +26,7 @@ interface MembresGroupeProps {
  * les rôles nommés, et inventer « modérateur » à l'affichage serait la même invention un
  * cran plus bas.
  *
- * **Les demandes d'entrée sont au-dessus de la liste** (E-13, voie A) : quelqu'un qui a
+ * **Les demandes d'entrée sont au-dessus de la liste** (voie A) : quelqu'un qui a
  * suivi un lien de groupe a frappé, et attend. Elles sont ici plutôt que dans l'écran des
  * demandes d'amis (M-G) parce qu'elles concernent **ce groupe** et que n'importe lequel
  * de ses membres peut confirmer — c'est là qu'on regarde quand on gère un groupe.

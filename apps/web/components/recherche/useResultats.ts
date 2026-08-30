@@ -17,7 +17,7 @@ export interface Resultats {
  * minuteur du précédent avant d'en poser un neuf, donc une rafale de changements ne
  * produit qu'un appel, celui du dernier état.
  *
- * *Note de portée (M-F, écart relevé et escaladé — E-11).* Le débounce porte sur les
+ * *Note de portée (M-F, écart relevé et escaladé).* Le débounce porte sur les
  * **critères**, pas sur les caractères : `PowerSearch` 0.2.0 ne notifie pas la frappe
  * brute, son texte libre ne devient un token qu'à la validation. La fenêtre reste utile
  * — éditer, ajouter et retirer des tokens produit bien des rafales — mais elle ne rend

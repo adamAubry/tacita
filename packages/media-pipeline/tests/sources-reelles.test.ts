@@ -32,7 +32,7 @@ describe("sources réelles : ce qu'une caméra écrit, et pas seulement nous", (
     // l'orientation vient de la matrice du `tkhd`, jamais devinée.
     expect(source.rotation).toBe(270);
     /*
-     * **Le défaut du 21/08/2026, tenu par cette ligne.** QuickTime range `esds` dans un
+     * **Le défaut, tenu par cette ligne.** QuickTime range `esds` dans un
      * atome `wave` ; ne le chercher qu'à la racine de l'entrée `mp4a` faisait lever, et
      * l'exception emportait la vidéo entière — aucune vidéo d'iPhone ne partait.
      */

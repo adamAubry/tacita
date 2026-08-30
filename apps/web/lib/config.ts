@@ -29,7 +29,7 @@ export const ELEMENT_CALL_URL =
  * relais de push ouvert. Le client ne peut pas la deviner — il l'enregistre telle que le
  * déploiement la lui donne, d'où cette variable.
  *
- * Corrigé le 07/08/2026 en montant la pile : le shard visait une origine publique
+ * Corrigé en montant la pile : le shard visait une origine publique
  * `https://push.example.org` qui n'existe dans aucun déploiement. Les deux appels
  * échouaient — la lecture de la clé en 404, et le pusher enregistré pointait vers un
  * hôte injoignable, donc aucune notification n'aurait jamais été délivrée.

@@ -1,3 +1,9 @@
+/**
+ * La façade de recherche : ce que le shard appelle, et le Worker derrière.
+ *
+ * Poste les requêtes au Worker, rend les résultats, et tient le cycle de vie de
+ * l'index — construction, reprise depuis IndexedDB, purge.
+ */
 import type { Session } from "@tacita/client-core";
 import { MatrixEventEvent, RoomEvent, type MatrixEvent } from "matrix-js-sdk";
 

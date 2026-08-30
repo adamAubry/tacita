@@ -1,3 +1,11 @@
+/**
+ * L'outil d'administration en ligne de commande : le point d'entrée.
+ *
+ * Aiguille vers les commandes — `init`, `dns`, `certificat`, `doctor` — que
+ * `install.sh` enchaîne et qui restent utilisables séparément. Chacune vit dans son
+ * propre fichier ; celui-ci ne fait que lire les arguments et rendre un code de
+ * sortie sur lequel un déploiement automatisé peut s'appuyer.
+ */
 import { execFile } from "node:child_process";
 import { chmodSync, readFileSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { resolve4 } from "node:dns/promises";

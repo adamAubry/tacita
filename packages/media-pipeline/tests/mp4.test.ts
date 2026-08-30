@@ -79,7 +79,7 @@ describe("muxeur MP4 : les échantillons encodés deviennent un fichier lisible"
   const boites = lireBoites(fichier);
 
   it("le fichier s'ouvre sur ftyp, puis moov, puis mdat — et rien d'autre", () => {
-    // `moov` **avant** les données depuis le 20/08/2026 : c'est ce qui permet à un lecteur
+    // `moov` **avant** les données : c'est ce qui permet à un lecteur
     // de démarrer sans lire la fin du fichier (prérequis de la lecture progressive).
     expect(boites.map((boite) => boite.type)).toEqual(["ftyp", "moov", "mdat"]);
     expect(String.fromCharCode(...boites[0]!.contenu.subarray(0, 4))).toBe("isom");

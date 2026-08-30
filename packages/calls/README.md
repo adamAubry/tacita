@@ -52,7 +52,7 @@ Element Call et le SDK déployé sont encore sur l'ancien préfixe — c'est don
 implémenté. Le jour où le SDK bascule, `activeCall` cessera de voir les participants sans
 erreur bruyante : le salon affichera simplement « aucun appel ».
 
-**Depuis E-14, cette bascule a un interrupteur nommé** : le `matrix_rtc_mode` servi dans
+**Depuis, cette bascule a un interrupteur nommé** : le `matrix_rtc_mode` servi dans
 `infra/rtc/element-call.json`. Ses trois valeurs (v0.23.0) sont `legacy`, `compatibility`
 et `matrix_2_0` ; seule la dernière active les événements *sticky*. Nous épinglons
 `compatibility`, et a un test qui refuse `matrix_2_0` — le jour où on voudra y
@@ -65,8 +65,8 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
   pont postMessage dessus. Le pont est ici et non dans le shard parce que tient
   une liste close de dépendances qui n'inclut pas `matrix-widget-api`, et n'a pas à
   l'inclure : c'est du protocole, pas de l'interface.
-- **Les paramètres d'URL sont relus dans la version épinglée, jamais de mémoire.** E-14
-  close : `infra/rtc/` épingle Element Call `v0.23.0` par digest, et
+- **Les paramètres d'URL sont relus dans la version épinglée, jamais de mémoire.** Le contrôle est
+  possible : `infra/rtc/` épingle Element Call `v0.23.0` par digest, et
   `option.video` se traduit en `intent=start_call` / `start_call_voice` d'après
   `src/UrlParams.ts` de cette version. Le passage a corrigé deux paramètres qui ne
   faisaient rien — `video`, qui n'existe dans aucune version, et `hideHeader`, remplacé
@@ -99,7 +99,7 @@ passer, c'est ce fichier-ci qu'il faudra changer d'abord.
   Sans ça, Element Call recevait « Unknown or unsupported from-widget action » à chacune.
   Le cas le plus net était `m.always_on_screen` : capacité accordée, action déclarée
   inconnue. Et `im.vector.hangup`/`io.element.close` sont le **seul** signal de
-  raccrochage — le bouton vit dans le widget (E-07 refuse deux sorties concurrentes), donc
+  raccrochage — le bouton vit dans le widget (deux sorties concurrentes sont refusées), donc
   sans écouteur, raccrocher laissait l'écran d'appel ouvert sur une session finie.
 
 - **Le pont est à double sens, et le second sens est à la charge de l'hôte.** Le driver

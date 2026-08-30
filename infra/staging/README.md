@@ -181,7 +181,7 @@ Les valeurs qui **doivent** changer par rapport à l'exemple :
 | `LIVEKIT_KEY`, `LIVEKIT_SECRET`                                                                                 | `openssl rand -hex 32` pour le secret — le SFU ne fait confiance qu'aux jetons signés avec (§ 9) |
 
 `SYNAPSE_IP_RANGE_WHITELIST` n'est pas facultatif ici. L'overlay pose un alias réseau qui
-fait résoudre `SERVER_NAME` vers le proxy depuis l'intérieur du compose (levier de D-07,
+fait résoudre `SERVER_NAME` vers le proxy depuis l'intérieur du compose (levier de déploiement,
 plus fiable que de compter sur le hairpin NAT du fournisseur). L'adresse obtenue est
 privée, et Synapse refuse par défaut ses propres requêtes sortantes vers les plages
 privées — protection SSRF. Sans la whitelist, la découverte OIDC échoue et **tout login
@@ -231,7 +231,7 @@ Laisser Keycloak importer son realm — une quinzaine de secondes — avant de j
 ce soit. Le `depends_on: healthy` du compose est là pour ça : Synapse met en cache l'échec
 de découverte OIDC s'il interroge trop tôt, et ne s'en remet pas sans redémarrage.
 
-### Contrôle de pré-vol — D-07
+### Contrôle de pré-vol
 
 **Une seule commande a valeur de preuve**, et elle doit passer avant toute création de
 compte. Elle traverse le proxy, Synapse, et surtout la découverte OIDC faite par Synapse
@@ -250,7 +250,7 @@ Keycloak pas encore prêt au démarrage de Synapse (`docker compose restart syna
 
 Ce 302 **est** la preuve, parce que le chemin qu'il emprunte est celui du client HTTP de
 Synapse (Twisted). Interroger la même URL depuis un autre outil dans le conteneur
-prouverait un chemin que Synapse n'emprunte pas — c'est la règle 3 de `CLAUDE.md`,
+prouverait un chemin que Synapse n'emprunte pas — c'est la règle 3 de `CONTRIBUTING.md`,
 et elle a déjà coûté une journée sur ce dépôt.
 
 Puis, depuis un navigateur : `https://chat.<domaine>` doit servir le shard.
@@ -259,8 +259,7 @@ Puis, depuis un navigateur : `https://chat.<domaine>` doit servir le shard.
 
 ## 7. Les comptes
 
-*(Section réécrite le 25/08/2026 — Keycloak supprimé par D-12, garde d'inscription retiré
-par D-13. Elle décrivait la fermeture de `registrationAllowed` sur un service qui n'existe
+*(Section réécrite : Keycloak supprimé, garde d'inscription retiré. Elle décrivait la fermeture de `registrationAllowed` sur un service qui n'existe
 plus.)*
 
 ### L'inscription est ouverte, et il n'y a rien à fermer
@@ -270,9 +269,9 @@ identifiant, un mot de passe. Pas de code d'invitation, pas d'e-mail, pas de cap
 .
 
 ⚠️ **Sur une machine publique, ça veut dire n'importe qui.** Et un compte suffit à
-énumérer l'annuaire. C'est l'arbitrage de D-13, pris pour un déploiement
+énumérer l'annuaire. C'est l'arbitrage assumé, pris pour un déploiement
 auto-hébergé en cercle restreint — il ne tient pas au-delà. Si ce staging devient
-joignable par des inconnus, le repli est écrit dans D-13 : remettre
+joignable par des inconnus, le repli est : remettre
 `registration_requires_token: true` dans `synapse/homeserver.yaml.tmpl`, redémarrer
 Synapse, et émettre les jetons par l'API d'admin. Le test de échouera alors et
 c'est voulu : il tient la décision, dans un sens comme dans l'autre.
@@ -290,8 +289,8 @@ docker compose -f docker-compose.yml -f staging/docker-compose.yml exec synapse 
 Le pseudo devient le localpart Matrix tel quel (`adam` → `@adam:chat.<domaine>`) : pas de
 majuscule, pas de `@`.
 
-Au premier écran après connexion, **la clé de récupération est bloquante et c'est voulu**
-(D-08) : sans elle le cross-signing n'est pas amorcé et le compte ne peut pas
+Au premier écran après connexion, **la clé de récupération est bloquante et c'est voulu** :
+sans elle le cross-signing n'est pas amorcé et le compte ne peut pas
 chiffrer. La noter, l'écran ne la remontre pas.
 
 ---
@@ -336,7 +335,7 @@ non plus — le TURN s'annonce sous `SERVER_NAME`, que le certificat porte déj�
 docker compose -f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker-compose.yml up -d
 ```
 
-`sh infra/bootstrap.sh` fait les trois. **Limite assumée** : un client à la fois derrière
+`./install.sh` fait les trois. **Limite assumée** : un client à la fois derrière
 un NAT symétrique et un pare-feu sortant qui ne laisse passer que le 443 n'atteint plus le
 relais — voir `rtc/README.md`, qui porte le motif et ce qu'il reste à ce client.
 

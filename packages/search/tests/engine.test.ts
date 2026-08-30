@@ -192,8 +192,8 @@ describe("recherche filtrée, critères combinables et locaux", () => {
   });
 });
 
-describe("plafond D-01 et éviction des plus anciens", () => {
-  it("le plafond par défaut est celui de la décision D-01", () => {
+describe("plafond de l'index et éviction des plus anciens", () => {
+  it("le plafond par défaut est celui que le README consigne", () => {
     expect(MAX_EVENTS).toBe(200_000);
   });
 

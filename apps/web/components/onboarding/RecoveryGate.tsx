@@ -22,7 +22,7 @@ import { Skeleton } from "../foundation/Skeleton";
  * par URL directe » veut dire concrètement.
  *
  * Les deux blocages n'ont pas la même nature et il ne faut pas les confondre : la clé est
- * bloquante parce que **sans elle le compte ne chiffre pas** (D-08) ; le parcours l'est
+ * bloquante parce que **sans elle le compte ne chiffre pas** ; le parcours l'est
  * parce qu'il se termine dans une conversation ouverte, et qu'un parcours dont on peut
  * sortir par le milieu laisse quelqu'un sur une application vide. Ses étapes, elles,
  * peuvent être facultatives — c'est le parcours qui le dit, pas cette porte.
@@ -52,7 +52,7 @@ export function RecoveryGate({
 
   if (etat.phase === "hors-session") {
     /*
-     * **le formulaire, et non une redirection** (D-12, 25/08/2026).
+     * **le formulaire, et non une redirection**.
      *
      * Cet écran affichait « Connexion… / Redirection vers votre fournisseur » : il n'y
      * avait rien à saisir, l'identité vivant chez Keycloak. Elle est revenue dans le

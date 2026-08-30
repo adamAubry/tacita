@@ -1,3 +1,10 @@
+/**
+ * La barre d'écriture : champ, actions, et l'intention en cours.
+ *
+ * `ContexteComposer` dit ce que la barre est en train de faire — écrire, répondre à
+ * un message, ou en modifier un — et l'écran en dispose. Le composer n'envoie rien
+ * lui-même : il rend le contenu, l'écran le confie à la file.
+ */
 "use client";
 
 import type { MentionCandidate } from "@tacita/messaging";
@@ -44,7 +51,7 @@ interface ComposerProps {
  * Le champ grandit vers le haut jusqu'à `maxRows` puis défile, et les boutons restent
  * alignés sur sa dernière ligne (`flex-end`) — sinon ils flottent au milieu d'un pavé.
  *
- * **Pourquoi pas `ChatComposer`** (escalade E-16) : son corps
+ * **Pourquoi pas `ChatComposer`** : son corps
  * est une colonne `[en-tête] [champ] [rangée d'actions]`, et la rangée d'actions est
  * rendue **inconditionnellement**, bouton d'envoi compris. C'est la forme d'un composer
  * d'assistant — ChatGPT, Claude —, pas celle d'une messagerie, et aucun de ses props ne

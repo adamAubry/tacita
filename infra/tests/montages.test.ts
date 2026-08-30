@@ -8,7 +8,7 @@ import { parse } from "yaml";
  * **Le répertoire de projet, c'est `infra/`.** Compose résout les chemins relatifs de
  * *tous* les fichiers `-f` contre le répertoire du **premier** — jamais contre celui du
  * fichier qui les écrit. Les trois overlays sont documentés et lancés depuis `infra/`
- * (`docker compose -f docker-compose.yml -f rtc/docker-compose.yml …`, cf. `bootstrap.sh`),
+ * (`docker compose -f docker-compose.yml -f rtc/docker-compose.yml …`, cf. `install.sh`),
  * donc `./x` veut dire `infra/x` partout, y compris dans `rtc/docker-compose.yml`.
  */
 const INFRA = new URL("../", import.meta.url);
@@ -44,7 +44,7 @@ const FICHIERS = [
 ];
 
 /**
- * Le défaut du 29/08/2026, remonté du VPS de staging :
+ * Le défaut, remonté du VPS de staging :
  *
  *   nginx: [crit] pread() "/etc/nginx/well-known.conf" failed (21: Is a directory)
  *

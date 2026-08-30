@@ -1,3 +1,14 @@
+/**
+ * L'écran de la clé de récupération — le seul moment où elle est montrée.
+ *
+ *  1. `ConfirmationMotDePasse` — le serveur redemande le mot de passe pour remplacer
+ *     une identité ; cet écran le collecte sans jamais le garder.
+ *  2. `RecoveryStep` — génère la clé, l'affiche une fois, propose la copie, et ne la
+ *     remontre pas. Bloquant par conception : sans clé, l'appareil n'est pas signé et
+ *     le compte ne peut pas chiffrer.
+ *
+ * Ce que la clé permet, et ce qu'elle expose, est écrit dans THREAT_MODEL.md.
+ */
 "use client";
 
 import type { Session } from "@tacita/client-core";
@@ -30,7 +41,7 @@ const EN_SAVOIR_PLUS =
  * en tapant une adresse ; un écran qui remplace l'app, non.
  *
  * Pourquoi elle bloque, en une phrase que l'UI doit tenir : **sans clé de récupération,
- * le compte ne peut pas chiffrer du tout** (D-08). Ce n'est pas une précaution pour plus
+ * le compte ne peut pas chiffrer du tout**. Ce n'est pas une précaution pour plus
  * tard, c'est ce qui rend l'envoi possible.
  *
  * Le cadre de page (largeur de mesure, marges, safe-areas) appartient à `RecoveryGate` :
@@ -69,12 +80,12 @@ interface RecoveryStepProps {
 
 /**
  * **la ré-authentification que le serveur exige** pour *remplacer* une
- * identité cross-signing (réécrit le 25/08/2026).
+ * identité cross-signing (réécrit).
  *
  * Deux choses à ne pas confondre, et elles ont changé le même jour. **L'inscription ne
  * rencontre plus rien** : un premier dépôt d'identité passe sans épreuve sur la version
  * déployée, E-22 est éteinte. **Le remplacement, lui, en demande une**, et c'est un mot
- * de passe depuis que Keycloak est parti (D-12) — cet écran servait une page de repli SSO
+ * de passe depuis que Keycloak est parti — cet écran servait une page de repli SSO
  * qui n'existe plus, et le chemin « j'ai perdu ma clé » échouait donc sur un 401 brut.
  *
  * Il n'apparaît que quand le module n'a pas déjà le mot de passe, c'est-à-dire après un

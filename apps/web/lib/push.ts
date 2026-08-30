@@ -1,3 +1,13 @@
+/**
+ * Les notifications, côté client : l'abonnement, l'état, et l'aperçu local.
+ *
+ *  1. `apercuLocal` — le contenu d'une notification quand l'application est ouverte.
+ *     Fenêtre fermée, le service worker n'a aucune clé Megolm et ne peut rien dire de
+ *     plus que « Nouveau message » : c'est par conception.
+ *  2. `estIOS`, `estInstallee`, `etatPushLocal` — ce que cet appareil permet.
+ *  3. `brancherPush` / `DiagnosticPush` — l'abonnement, et le diagnostic des trois
+ *     maillons quand il manque, plutôt qu'un « ça ne marche pas ».
+ */
 import type { Session } from "@tacita/client-core";
 import { mentionCandidates, messages as listerMessages, messageText } from "@tacita/messaging";
 

@@ -1,3 +1,13 @@
+/**
+ * Lecture d'un événement média : ce que la timeline a besoin d'en savoir.
+ *
+ *  1. `mediaDe` — extrait d'un événement le média qu'il porte, ou rien.
+ *  2. `fluxFichierDisponible`, `navigateurLit` — ce que cet appareil sait faire.
+ *  3. `seuilsAppareil` — les plafonds de compression du profil courant.
+ *
+ * Fonctions pures, sans DOM : le composant décide de l'affichage, ce fichier décide
+ * de ce qu'il y a à afficher.
+ */
 import { CHAMP_BLOCS, SEUILS, type EncryptedFile, type Seuils } from "@tacita/media-pipeline";
 
 /**

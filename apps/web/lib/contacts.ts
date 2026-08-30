@@ -24,8 +24,8 @@ export interface Demande {
 }
 
 /**
- * L'interface contre laquelle l'UI se code (E-04). Matrix n'a **aucun graphe social** :
- * un « ami » est un DM existant, et c'est le produit final, pas une étape (D-09).
+ * L'interface contre laquelle l'UI se code. Matrix n'a **aucun graphe social** :
+ * un « ami » est un DM existant, et c'est le produit final, pas une étape.
  *
  * Elle existe pour que la substitution reste possible sans réécriture — du découplage
  * ordinaire, pas un pari sur une V2.
@@ -45,7 +45,7 @@ export interface Contacts {
   /** Accepter rend le salon à ouvrir ; c'est l'appelant qui navigue. */
   accepter(roomId: string): Promise<string>;
   refuser(roomId: string): Promise<void>;
-  /** Envoyer une demande : en V1, une invitation de DM (D-09). */
+  /** Envoyer une demande : en V1, une invitation de DM. */
   inviter(userId: string): Promise<string>;
   /** Retirer un ami = quitter le DM partagé. Sans DM, il n'y a rien à quitter. */
   retirer(userId: string): Promise<void>;

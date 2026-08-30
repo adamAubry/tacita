@@ -22,7 +22,7 @@ interface Contexte {
   /** wipe complet, après confirmation explicite. */
   deconnecter: (session: Session) => Promise<void>;
   /**
-   * une session que l'écran de connexion vient d'ouvrir (D-12). C'est lui qui
+   * une session que l'écran de connexion vient d'ouvrir. C'est lui qui
    * parle au réseau ; le provider ne fait que router l'état qui en sort.
    */
   sessionOuverte: (session: Session) => void;
@@ -72,7 +72,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
 
         if (annule) return;
         if (!session) {
-          // plus de redirection : la porte rend le formulaire (D-12).
+          // plus de redirection : la porte rend le formulaire.
           setEtat({ phase: "hors-session" });
           return;
         }
@@ -93,7 +93,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
   /*
    * un jeton que le serveur refuse ne doit pas survivre à l'écran.
    *
-   * Mesuré au navigateur le 08/08/2026 : session révoquée côté serveur, page rechargée,
+   * Mesuré au navigateur : session révoquée côté serveur, page rechargée,
    * et l'application se rouvrait comme si de rien n'était — les credentials locaux
    * suffisaient à la faire démarrer, et le refus n'arrivait que plus tard, dans /sync.
    * Le SDK a un signal pour ça, et c'est le seul qui distingue « refusé » de « injoignable ».
@@ -121,7 +121,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
      * par le parcours lui-même (`Onboarding`), pas ici : c'est lui qui sait quand il
      * commence et quand il finit.
      *
-     * **Mais `mode` ne suffit pas à décider seul** (corrigé le 25/08/2026). Il dit d'où
+     * **Mais `mode` ne suffit pas à décider seul** (corrigé). Il dit d'où
      * l'on sort, pas où l'on en était : une inscription interrompue au dépôt de l'identité
      * repart en `deverrouillage`, et le parcours — commencé, marqué, jamais fini — était
      * alors jeté. Symptôme exact remonté par l'utilisateur : la clé recréée, puis l'accueil
@@ -145,7 +145,7 @@ export function SessionProvider({ children, homeserverUrl, indexedDB }: SessionP
   }, [etat, base]);
 
   /*
-   * **la déconnexion redevient locale, et c'est tout** (D-12).
+   * **la déconnexion redevient locale, et c'est tout**.
    *
    * Elle traînait un défaut tant que Keycloak existait : `logout()` révoquait le jeton
    * Matrix, mais le cookie de session du fournisseur y survivait, et le retour vers

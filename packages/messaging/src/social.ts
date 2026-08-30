@@ -1,3 +1,9 @@
+/**
+ * Le lien social : demandes d'ami, contacts, annuaire, profils.
+ *
+ * Se relier à quelqu'un passe par une invitation à un salon direct — il n'y a pas
+ * de liste d'amis côté serveur, et c'est la seule primitive que Matrix offre.
+ */
 import type { Session } from "@tacita/client-core";
 
 import { registerDirect } from "./conversations";
@@ -7,7 +13,7 @@ import { registerDirect } from "./conversations";
  *
  * Chaque fonction d'ici est un appel Matrix **natif** : accepter une demande d'ami est un
  * `join`, la refuser un `leave`, bloquer une écriture dans `m.ignored_user_list`. Il n'y
- * a pas de graphe social derrière, et il n'y en aura pas — D-09 l'a refusé, pas reporté.
+ * a pas de graphe social derrière, et il n'y en aura pas l'a refusé, pas reporté.
  *
  * Ces fonctions vivent dans le paquet et non dans un écran pour la même raison qu'en
  * M-C : « ami », « bloqué » et « demande en attente » sont de la logique métier, et une
@@ -204,8 +210,7 @@ export function identifiantComplet(terme: string, domaine: string | undefined): 
  * Un terme vide ne part pas : l'annuaire rendrait un échantillon arbitraire du serveur,
  * ce qui n'est pas une réponse à « qui cherchez-vous ? ».
  *
- * **L'annuaire couvre tous les comptes du serveur depuis le 21/08/2026** (
- * escalade E-21 tranchée) : une recherche par nom d'affichage ou par fragment
+ * **L'annuaire couvre tous les comptes du serveur** : une recherche par nom d'affichage ou par fragment
  * d'identifiant aboutit, ce qui n'était pas le cas auparavant. La conséquence — tout
  * compte peut énumérer les autres — est assumée ;
  * l'écran d'ajout la dit aussi, parce qu'elle vaut pour l'utilisateur lui-même.
@@ -221,7 +226,7 @@ export async function searchUsers(
   /**
    * **une adresse exacte se résout par son profil, pas par l'annuaire.**
    *
-   * Mesuré contre un vrai Synapse le 07/08/2026 : `/user_directory/search` rendait
+   * Mesuré contre un vrai Synapse : `/user_directory/search` rendait
    * `results: []` pour un compte qui existe pourtant, tandis que `/profile/@…` rendait
    * son nom d'affichage — le défaut `search_all_users: false` ne montrant que les gens
    * avec qui on partage déjà un salon. E-21 a depuis ouvert l'annuaire, et

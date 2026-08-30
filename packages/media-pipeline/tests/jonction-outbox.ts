@@ -23,7 +23,7 @@ export function passationVerifiee(outbox: Outbox, roomId: string, contenu: Attac
 }
 
 /**
- * **La seconde moitié de la même jonction, ajoutée le 20/08/2026 avec.**
+ * **La seconde moitié de la même jonction, ajoutée avec.**
  *
  * La file possède désormais la reprise du téléversement, et le pipeline lui remet des
  * blobs chiffrés accompagnés du chemin où poser leur URL. C'est une seconde promesse

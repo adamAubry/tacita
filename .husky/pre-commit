@@ -1,10 +1,20 @@
+# Un commentaire date raconte une histoire que `git log` porte deja, et oblige le
+# lecteur a charger un design mort avant de lire le vivant. Le motif va dans le message
+# de commit ou dans une issue ; le commentaire reste au present, sur le code qui existe.
+if git diff --cached -U0 -- '*.ts' '*.tsx' \
+   | grep -nE '^\+.*(//|\*).*[0-9]{2}/[0-9]{2}/20[0-9]{2}'; then
+  echo
+  echo "Commentaire date ci-dessus. L'historique va dans git, le motif dans le commit."
+  exit 1
+fi
+
 npx lint-staged
 
 # `typecheck` reste toujours complet : il est le moins cher des deux, et c'est lui qui
 # tient les jonctions inter-modules au niveau des types (regle 1 + sites de compilation).
 npm run typecheck
 
-# Portee des tests : choisie par l'auteur du commit, cf. CLAUDE.md § Workflow.
+# Portee des tests : choisie par l'auteur du commit, cf. CONTRIBUTING.md § Commit gate.
 # Defaut = tout le workspace. Peu impactant = scoper au projet touche, explicitement :
 #
 #   TACITA_TESTS="--project @tacita/outbox" git commit -m "..."

@@ -1,3 +1,11 @@
+/**
+ * Les liens d'invitation : émettre, lister, révoquer.
+ *
+ * Un lien sert à **se relier** à quelqu'un, jamais à créer un compte — les deux n'ont
+ * jamais été le même objet. `DEFAULT_MAX_USES`, `DEFAULT_TTL_SECONDS` et
+ * `MAX_TTL_SECONDS` bornent ce qu'un lien peut porter ; `LinkError` nomme les refus,
+ * pour que l'appelant les distingue d'une panne.
+ */
 import type { MatrixReader } from "./matrix.ts";
 import type { Link, LinkKind, Store } from "./store.ts";
 import { hashToken, mintToken } from "./tokens.ts";

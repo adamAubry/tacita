@@ -37,7 +37,7 @@ export function RechercheProvider({ children }: { children: ReactNode }) {
      * `lib/search-worker.ts`, comme l'autre site du shard : une seule forme, une seule
      * chose à vérifier au prochain changement de bundler.
      *
-     * Mesuré au build le 21/08/2026, parce que l'en-tête de `lib/search-worker.ts` laisse
+     * Mesuré au build, parce que l'en-tête de `lib/search-worker.ts` laisse
      * entendre le contraire : webpack **résout aussi** `new URL("@tacita/search/worker",
      * import.meta.url)` et en émet le même chunk de worker. Les deux formes marchent ici ;
      * ce n'est donc pas un correctif, seulement une uniformisation.

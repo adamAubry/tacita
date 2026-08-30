@@ -19,7 +19,7 @@ const normaliser = (valeur: string): string => (valeur.split(";")[0] ?? "").trim
  *
  * L'audio a sa ligne parce que le shard rend trois `msgtype`, pas deux : `m.audio` passe
  * par la même fonction de téléchargement et le même `URL.createObjectURL` que les deux
- * autres. `audio/ogg` est notre format de sortie unique (D-03) ; les quatre autres sont
+ * autres. `audio/ogg` est notre format de sortie unique ; les quatre autres sont
  * ce qu'un client tiers ou un pont peut envoyer.
  */
 export const TYPES_RENDUS: Readonly<Record<"video" | "image" | "audio", readonly string[]>> = {

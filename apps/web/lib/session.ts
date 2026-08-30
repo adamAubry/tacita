@@ -44,7 +44,7 @@ export type EtatSession =
  * le même aller-retour SSO : construire l'URL de redirection vers le fournisseur, puis
  * retirer de l'historique le `loginToken` qu'il renvoyait dans la barre d'adresse.
  *
- * Supprimés le 25/08/2026 (D-12) avec Keycloak. L'identité est portée par Synapse, la
+ * Supprimés avec Keycloak. L'identité est portée par Synapse, la
  * connexion est un formulaire (`Connexion.tsx`), et plus aucun secret ne transite par
  * l'URL — ce qui retire aussi, au passage, la classe de fuite que `retirerJetonDeLUrl`
  * existait pour contenir : capture d'écran, synchronisation de navigateur, copier-coller.
@@ -55,11 +55,11 @@ export type EtatSession =
  * rien lui-même — il ne fait que router les trois cas sur deux phases.
  *
  * Sans identité cross-signing sur cet appareil, **le compte ne peut pas chiffrer du
- * tout** (D-08) : il ne recevrait pas les clés Megolm des autres, et les siennes ne
+ * tout** : il ne recevrait pas les clés Megolm des autres, et les siennes ne
  * partiraient à personne. L'étape n'est donc pas un confort qu'on pourrait différer, et
  * c'est pour ça qu'elle bloque.
  *
- * Il n'y a plus de trace locale à consulter (l'ancien `recuperation-faite`, 08/08/2026) :
+ * Il n'y a plus de trace locale à consulter (l'ancien `recuperation-faite`) :
  * `recoveryState()` lit le magasin crypto, ce qui répond juste hors ligne **et** distingue
  * les deux étapes. La trace, elle, ne savait rien du `device_id` — après une
  * déconnexion/reconnexion dans le même navigateur, elle laissait passer un appareil non
@@ -71,7 +71,7 @@ export async function etatDe(session: Session, indexedDB?: IDBFactory): Promise<
    * écran : la porte montre déjà une géométrie d'attente pendant que cette fonction
    * répond, et une lecture faite plus tard ferait clignoter l'accueil avant le parcours.
    *
-   * Lue **avant** la branche, et portée par les deux phases (corrigé le 25/08/2026) : la
+   * Lue **avant** la branche, et portée par les deux phases (corrigé) : la
    * confirmation de la clé décidait sinon du parcours sur le seul `mode`, et perdait la
    * marque de quiconque avait commencé une inscription puis dû passer par l'autre chemin.
    *

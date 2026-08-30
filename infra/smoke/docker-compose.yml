@@ -12,7 +12,7 @@ services:
   # l'atomicité de la consommation d'un usage est une propriété de PostgreSQL, et une
   # imitation monothread la confirmerait par construction au lieu de l'éprouver.
   # Lié à la boucle locale, jamais exposé sur une interface publique, et présent dans
-  # ce seul overlay (D-07).
+  # ce seul overlay.
   postgres:
     ports:
       # 55432 et non 5432 : un PostgreSQL local — ou celui d'un autre projet — sur le port par
@@ -25,7 +25,7 @@ services:
         aliases:
           # Synapse lit la découverte OIDC sur https://${SERVER_NAME}/auth/… :
           # sans cet alias le nom ne résout nulle part depuis le réseau Docker et
-          # tout login répond 503. En production le nom résout publiquement (D-07).
+          # tout login répond 503. En production le nom résout publiquement.
           - ${SERVER_NAME}
 
   synapse:

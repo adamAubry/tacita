@@ -1,3 +1,13 @@
+/**
+ * Les vérifications de configuration : ce que `doctor` lit dans les fichiers.
+ *
+ * Une `Verification` par sujet — fichier `.env` présent, nom de serveur posé, secrets
+ * remplis, clés VAPID de la bonne longueur, certificat en place. Chacune rend un
+ * constat **et son remède** : un diagnostic qui ne dit pas quoi faire ne sert à rien.
+ *
+ * Ces tests attestent le contenu des fichiers. Ils ne disent pas que le produit
+ * marche — c'est l'autre porte.
+ */
 import { X509Certificate } from "node:crypto";
 
 import {
@@ -48,7 +58,7 @@ export const SECRETS_REQUIS = [
   "SYNAPSE_FORM_SECRET",
   "S3_ACCESS_KEY_ID",
   "S3_SECRET_ACCESS_KEY",
-  // Les appels font partie de la pile depuis le 26/08/2026 : le SFU ne fait confiance
+  // Les appels font partie de la pile : le SFU ne fait confiance
   // qu'aux jetons que `lk-jwt-service` signe avec cette paire. Laissée sur `change-me`,
   // les deux la partagent quand même et rien n'échoue au démarrage — le premier appel
   // seul découvre que n'importe qui pouvait forger un jeton.

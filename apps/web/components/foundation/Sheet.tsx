@@ -38,7 +38,7 @@ interface SheetProps {
 }
 
 /**
- * **Deux sorties, toujours les deux, sur toutes les feuilles** (11/08/2026) : ce bouton,
+ * **Deux sorties, toujours les deux, sur toutes les feuilles** : ce bouton,
  * et le clic sur le fond.
  *
  * Il n'y a **pas de touche Échap sur un téléphone.** `purpose="form"` d'Astryx, qui bloque

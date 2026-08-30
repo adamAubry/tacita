@@ -5,8 +5,7 @@ import { ecrireCle, lireCle, viderStore } from "./preferences";
 /**
  * la note privée sur un profil.
  *
- * **Locale à l'appareil, jamais synchronisée** (D-09, escalade E-02 tranchée le
- * 05/08/2026). Le mécanisme naturel — l'account data Matrix — est en clair côté serveur :
+ * **Locale à l'appareil, jamais synchronisée** (décision produit). Le mécanisme naturel — l'account data Matrix — est en clair côté serveur :
  * y déposer ce qu'on pense de quelqu'un serait exactement le contenu que le principe
  * directeur protège. La note suit l'appareil, pas l'utilisateur, et c'est **définitif**,
  * pas une étape vers une version synchronisée.

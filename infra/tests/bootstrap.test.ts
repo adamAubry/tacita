@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const DEPOT = new URL("../../", import.meta.url).pathname;
-const bootstrap = readFileSync(join(DEPOT, "infra/bootstrap.sh"), "utf-8");
+const bootstrap = readFileSync(join(DEPOT, "install.sh"), "utf-8");
 const machine = readFileSync(join(DEPOT, "apps/admin/src/machine.ts"), "utf-8");
 
 /**
@@ -23,7 +23,7 @@ const bacASable = (
   mkdirSync(join(racine, "infra/rtc/firewall"), { recursive: true });
   mkdirSync(join(racine, "bin"), { recursive: true });
 
-  cpSync(join(DEPOT, "infra/bootstrap.sh"), join(racine, "infra/bootstrap.sh"));
+  cpSync(join(DEPOT, "install.sh"), join(racine, "install.sh"));
   // Le script réel, pas une doublure : c'est lui que l'assistant lance en root, et
   // c'est `ufw` qui est doublé plus bas. Une copie ici prouve aussi que le chemin
   // écrit dans l'assistant est celui où le fichier vit vraiment.
@@ -74,7 +74,7 @@ const bacASable = (
 
 /** Rend le code et la sortie plutôt que de lever : un échec est ici un cas à éprouver. */
 const lancer = (racine: string, args: readonly string[] = []) => {
-  const resultat = spawnSync("sh", [join(racine, "infra/bootstrap.sh"), ...args], {
+  const resultat = spawnSync("sh", [join(racine, "install.sh"), ...args], {
     // PATH délibérément restreint : hériter de celui de la machine ferait dépendre le
     // test de ce qui y est installé — un `pnpm` réel masquerait l'étape qu'on éprouve.
     // `node` reste le vrai : c'est lui qui exécute la doublure de l'outil admin.
@@ -368,7 +368,7 @@ describe("les scripts du dépôt restent exécutables", () => {
    * destination.
    */
   it.each([
-    "infra/bootstrap.sh",
+    "install.sh",
     "infra/proxy/generate-dev-certs.sh",
     "infra/postgres/10-invite-tokens.sh",
     "infra/rtc/firewall/host-ufw.sh",

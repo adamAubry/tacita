@@ -1,3 +1,14 @@
+/**
+ * L'index de recherche : Orama, construit et interrogé dans un Web Worker.
+ *
+ *  1. Alimenté au fil du déchiffrement des événements, par lots.
+ *  2. Persisté en IndexedDB pour survivre au rechargement.
+ *  3. Interrogé avec des filtres (salon, expéditeur, période, type).
+ *
+ * Plafonné à `MAX_EVENTS` : au-delà, l'éviction suit l'ordre d'indexation locale.
+ * Le `/search` du serveur n'est jamais appelé — il ne sait rien lire d'un salon
+ * chiffré.
+ */
 import {
   count,
   create,
@@ -86,7 +97,7 @@ export interface SearchFilters {
 
 /**
  * Le document tel qu'il vit dans l'index. `tsIndexed` est posé ici et jamais par
- * l'appelant : c'est l'ordre d'indexation locale, **seul** critère d'éviction (D-01).
+ * l'appelant : c'est l'ordre d'indexation locale, **seul** critère d'éviction.
  * Évincer par `tsOrigin` ferait qu'un rattrapage d'historique — qui insère par
  * définition des événements anciens — s'auto-évincerait au premier plafond atteint.
  */
@@ -242,7 +253,7 @@ export async function createEngine(options: EngineOptions): Promise<SearchEngine
           // de sa cible), et ça rend le re-déchiffrement d'un événement inoffensif.
           //
           // Les deux horodatages restent ceux du premier passage : l'éviction suit
-          // l'ordre d'indexation (D-01), et les bornes de stats() la date d'origine du
+          // l'ordre d'indexation, et les bornes de stats() la date d'origine du
           // message — pas celle de sa dernière correction.
           if (previous) {
             replaced.push({ ...previous, ...rest, tsOrigin: previous.tsOrigin });

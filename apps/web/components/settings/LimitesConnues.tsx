@@ -67,7 +67,7 @@ const LIMITES: Limite[] = [
      *
      * Elle est ici et pas seulement dans l'écran de changement : quelqu'un qui décide de
      * confier ses conversations à ce produit doit pouvoir le savoir avant, pas au moment
-     * où il tape sa clé. **La phrase a grossi le 25/08/2026** : depuis D-14, la clé ne
+     * où il tape sa clé. **La phrase a grossi** : depuis D-14, la clé ne
      * fait plus que déchiffrer, elle ouvre — la garder comme un mot de passe cesse d'être
      * un conseil de prudence et devient la seule chose qui protège le compte.
      */

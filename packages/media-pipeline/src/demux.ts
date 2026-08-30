@@ -1,3 +1,9 @@
+/**
+ * Démuxage : d'un conteneur vidéo vers les échantillons encodés qu'il transporte.
+ *
+ * L'entrée du chemin de transcodage — `mp4.ts` en est la sortie. Rend les
+ * échantillons et ce qu'il faut pour les redécrire : codec, dimensions, rotation.
+ */
 import {
   createFile,
   DataStream,
@@ -27,7 +33,7 @@ import type { EchantillonVideo, PisteAudio, Rotation } from "./mp4";
  *
  * **Elle ne touche pas WebCodecs**, et c'est la condition qui la rendait admissible :
  * octets → structures, exécutable dans Node, donc testable sans navigateur. E-10 reste
- * intacte — l'encodage vit toujours dans le shard. *(Mesuré le 20/08/2026 : `mp4-muxer`,
+ * intacte — l'encodage vit toujours dans le shard. *(Mesuré : `mp4-muxer`,
  * l'autre candidat, commence `addVideoChunk` par `sample instanceof EncodedVideoChunk` et
  * lève un `ReferenceError` dans Node. Le faire passer aurait demandé de définir nous-mêmes
  * la classe que le test vérifie — la règle 3, à la lettre.)*
@@ -90,7 +96,7 @@ export function rotationDeMatrice(matrice: Matrix | undefined): Rotation {
  * La boîte de configuration d'une piste, écrite telle quelle par mp4box — ou `undefined`
  * quand la piste n'en porte aucune des formes demandées.
  *
- * **`undefined` et non une exception, et c'est le correctif du 21/08/2026.** Une piste
+ * **`undefined` et non une exception, et c'est le correctif.** Une piste
  * audio sans `esds` — du PCM `sowt`, ce qu'écrivent les enregistrements d'écran et les
  * vieux iPhone — faisait lever ici, et l'exception emportait **toute la vidéo** : le
  * fichier ne partait pas, alors que sa piste image était parfaitement lisible. Le manque
@@ -158,7 +164,7 @@ function pistesSonores(fichier: ISOFile, info: { tracks?: { id: number }[] }): n
  * lit la **première piste vidéo** d'un MP4/MOV et rend ce qu'il faut pour
  * décider : remuxer, réencoder, ou refuser.
  *
- * Une seule piste vidéo est lue, et c'est assumé : le pipeline en produit une (D-04), et
+ * Une seule piste vidéo est lue, et c'est assumé : le pipeline en produit une, et
  * une source multi-angles n'a pas de sens dans une messagerie. `pistes` et `audio`
  * remontent quand même, parce que ce sont eux qui disent au prédicat du chemin rapide que
  * la source n'est pas ordinaire.

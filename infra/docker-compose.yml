@@ -107,7 +107,7 @@ services:
   #
   # **Aucun secret d'administration Synapse ici**, et un test l'asserte : le service ne
   # détient aucun pouvoir Matrix. Il valide le jeton de son appelant auprès de Synapse et
-  # rend un identifiant ; c'est le client qui invite (D-09).
+  # rend un identifiant ; c'est le client qui invite.
   #
   # Base dédiée `invite_tokens`, jamais celle de Synapse. Joint par son nom sur le réseau
   # du compose ; seul le proxy l'expose, sous /invite/.

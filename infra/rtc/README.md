@@ -15,10 +15,10 @@ docker compose -f docker-compose.yml -f rtc/docker-compose.yml up -d
 
 Variables à remplir dans `.env` en plus de celles de `infra` : `LIVEKIT_KEY` et
 `LIVEKIT_SECRET`, que `pnpm admin init` génère. **Rien d'autre** — pas d'IP à déclarer,
-pas de domaine pour le TURN. C'est ce qui permet à `infra/bootstrap.sh` de monter cet
+pas de domaine pour le TURN. C'est ce qui permet à `install.sh` de monter cet
 overlay à chaque installation, sans question de plus à poser à l'administrateur.
 
-Sur une machine de développement, un overlay de plus (D-07) :
+Sur une machine de développement, un overlay de plus :
 
 ```sh
 docker compose -f docker-compose.yml -f smoke/docker-compose.yml \
@@ -53,8 +53,8 @@ d'Element Call et de `lk-jwt-service`** :
 - le nom des champs du focus (`type`, `livekit_service_url`).
 
 Une valeur périmée ne casse pas bruyamment : le bouton d'appel reste simplement
-inerte. Le seul endroit du dépôt qui porte ces littéraux est `rtc/well-known.conf`
- ; `@tacita/calls` les relit côté client.
+inerte. Le seul endroit du dépôt qui porte ces littéraux est `rtc/well-known.conf` ;
+`@tacita/calls` les relit côté client.
 
 ## l'annonce du focus appartient à cet overlay
 
@@ -69,7 +69,7 @@ Même point de montage (`/etc/nginx/well-known.conf`) : compose fusionne les vol
 par cible, l'overlay remplace donc le fichier de base au lieu de s'y ajouter.
 
 **Pourquoi ce détour plutôt qu'un `rtc_foci` en dur dans `nginx.conf`** — c'est ce
-qu'on faisait jusqu'au 05/08/2026 (escalade E-08). Une pile sans SFU annonçait un focus
+qu'on faisait avant. Une pile sans SFU annonçait un focus
 dont le backend n'existe pas : `discoverFocus()` réussissait, et l'appel mourait en
 502 à la connexion au lieu du `RtcFociMissing` que rend affichable. Une
 annonce ne doit pas survivre au déploiement qu'elle décrit.
@@ -83,7 +83,7 @@ pour le `5349/tcp` du TURN-TLS et `turn.tls_port`. Les tests échouent si les tr
 divergent, et `pnpm admin doctor` lit la même source pour décider quels ports publiés
 sont légitimes.
 
-`infra/bootstrap.sh` lance `host-ufw.sh` lui-même, en root, avant de démarrer la pile —
+`install.sh` lance `host-ufw.sh` lui-même, en root, avant de démarrer la pile —
 mais seulement là où `ufw` existe. Sur une machine protégée autrement, ces règles
 restent à reporter à la main : le script le dit alors au lieu de se taire.
 
@@ -131,7 +131,7 @@ digest résolu le **2026-08-07** (le tag `latest` pointait alors sur le même).
 
 Ces trois lignes ne sont pas décoratives : elles sont ce qui rend relisable ce que
 `packages/calls` écrit dans l'URL du widget. Avant elles, le shard passait un paramètre
-de lancement audio/vidéo qu'aucune version ne pouvait confirmer — escalade E-14. Ce que
+de lancement audio/vidéo qu'aucune version ne pouvait confirmer. Ce que
 la relecture de `src/UrlParams.ts` de la v0.23.0 a donné :
 
 | Ce que le client envoie | Ce que la v0.23.0 en fait |

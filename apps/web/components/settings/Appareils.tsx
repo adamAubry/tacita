@@ -1,3 +1,10 @@
+/**
+ * La liste des appareils connectés, et leur révocation.
+ *
+ * Une dernière activité peut manquer : le serveur ne la connaît que si l'appareil a
+ * parlé depuis qu'il la retient. On n'affiche alors rien plutôt qu'une date inventée —
+ * un « jamais vu » lu comme « inactif » ferait révoquer le mauvais appareil.
+ */
 "use client";
 
 import type { Appareil, Session } from "@tacita/client-core";
@@ -12,11 +19,11 @@ import { Skeleton } from "../foundation/Skeleton";
 /**
  * **les appareils connectés, et le moyen de les déconnecter.**
  *
- * Il n'existait rien de tel, et l'audit du 25/08/2026 a dit ce que ça voulait dire mis
+ * Il n'existait rien de tel, et l'audit a dit ce que ça voulait dire mis
  * bout à bout : les jetons d'accès de ce déploiement n'expirent jamais, le changement de
- * mot de passe ne déconnecte volontairement personne (D-12, pour ne pas faire perdre son
+ * mot de passe ne déconnecte volontairement personne (pour ne pas faire perdre son
  * historique déchiffré à chaque appareil), et la clé de récupération ouvre une session à
- * elle seule (D-14). Un jeton qui fuit restait donc valable pour toujours, sans que son
+ * elle seule. Un jeton qui fuit restait donc valable pour toujours, sans que son
  * propriétaire puisse ni le voir ni le révoquer. **Après une compromission, il n'y avait
  * rien à faire** — et un produit qui garde une promesse de confidentialité doit au
  * minimum offrir le geste de la reprendre.
@@ -74,7 +81,7 @@ export function Appareils({ session }: { session: Session }) {
     setEchec(undefined);
     try {
       /*
-       * Le mot de passe n'est envoyé que si le module ne l'a pas déjà (D-15) : après une
+       * Le mot de passe n'est envoyé que si le module ne l'a pas déjà : après une
        * connexion, le champ ne s'affiche même pas. Ce qui suit vaut donc pour une page
        * rechargée, où plus personne ne le connaît.
        */

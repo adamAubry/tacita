@@ -1,3 +1,9 @@
+/**
+ * La liste des conversations telle que l'accueil la montre.
+ *
+ * Rassemble par salon le dernier message, le compte de non-lus et l'interlocuteur.
+ * L'ordre est celui du flux /sync, jamais `origin_server_ts`.
+ */
 import type { Session } from "@tacita/client-core";
 import {
   ClientEvent,
@@ -82,7 +88,7 @@ function directPeers(session: Session): Map<string, string> {
  * `createRoom({ is_direct: true })` ne pose ce drapeau que dans l'invitation envoyée : le
  * serveur n'écrit **pas** l'account data `m.direct` du créateur, et le SDK non plus. Sans
  * cette écriture, un DM créé par l'app n'est un DM pour personne — mesuré avec deux
- * navigateurs contre un vrai Synapse le 07/08/2026, où un DM s'affichait « 2 membres,
+ * navigateurs contre un vrai Synapse, où un DM s'affichait « 2 membres,
  * c'est le début de ce groupe ».
  *
  * Cinq choses en dépendaient, toutes cassées en silence : le libellé et l'avatar du DM,
@@ -258,10 +264,10 @@ export function subscribeConversations(session: Session, listener: () => void): 
    * déjà connu. C'est le signal d'une invitation reçue : le salon n'existait pas encore
    * côté client, donc aucun de ses propres événements n'a pu être réémis à temps.
    *
-   * Mesuré contre un vrai Synapse le 07/08/2026, avec deux navigateurs : sans lui, une
+   * Mesuré contre un vrai Synapse, avec deux navigateurs : sans lui, une
    * demande d'ami n'apparaissait **qu'après rechargement complet de la page**. Le serveur
    * la livrait bien — elle était dans le `/sync` de l'invité — mais rien dans l'app ne
-   * disait qu'il fallait relire. C'est le parcours d'entrée du produit (D-09) : on ne
+   * disait qu'il fallait relire. C'est le parcours d'entrée du produit : on ne
    * peut pas commencer une conversation sans que l'autre voie la demande.
    *
    * `MyMembership` ne suffit pas et reste nécessaire : il porte l'acceptation et le

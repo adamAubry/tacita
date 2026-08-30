@@ -6,14 +6,14 @@ bornée et les résout pour un appelant authentifié.
 **Le cadre, décidé par le PM : un utilisateur existant ajoute un autre utilisateur
 existant.** Tout ce qui en sort a un comportement défini — jamais une erreur technique
 brute. *(La phrase disait « jamais une inscription en libre-service (`enable_registration: false`) » :
-D-13 a ouvert l'inscription le 25/08/2026. Le service, lui, n'a pas changé — il ne crée
+L'inscription est ouverte à tous. Le service, lui, ne crée
 aucun compte, il résout un token pour un appelant déjà authentifié.)*
 
 ## Ce qu'il ne fait pas, et c'est le point
 
 Le service **n'exécute aucune action Matrix**. Il ne détient ni jeton d'administration,
 ni droit d'inviter, ni droit de créer un salon. Il rend un identifiant au porteur
-authentifié ; **c'est le client qui invite ensuite**, par le chemin natif de D-09
+authentifié ; **c'est le client qui invite ensuite**, par le chemin natif de la demande d'ami
 (invitation de DM pour un ami, invitation de salon pour un groupe).
 
 Ses trois seuls appels à Synapse sont des **lectures faites avec le jeton de l'appelant** :
@@ -51,7 +51,7 @@ le **même succès**, sans consommer d'usage de plus.
 
 ## Déploiement
 
-Le raccordement appartient à `infra` — : image, service compose, base
+Le raccordement appartient à `infra` : image, service compose, base
 PostgreSQL dédiée, route proxy, variables. Voir `infra/README.md`.
 
 ```

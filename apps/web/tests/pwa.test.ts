@@ -146,11 +146,20 @@ describe("Astryx exclusif, par défaut de refus", () => {
    * barre système. La palette a été sortie dans un module sans aucun import ; ce test garde
    * la séparation, que rien d'autre ne rappellerait avant le prochain build.
    */
+  /** Le code sans sa carte de tête ni ses lignes vides : ce qui commence vraiment. */
+  const sansEnTete = (code: string) =>
+    code.replace(/^(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*)*/, "");
+
   it("aucun composant serveur n'importe le thème — la palette est là pour ça", () => {
     for (const { chemin, code } of sourcesLivrees()) {
       if (chemin.endsWith("/theme.ts")) continue;
       if (!/from ["'][./]*theme["']/.test(code)) continue;
-      expect(code.startsWith('"use client"'), `${chemin} importe le thème sans être client`).toBe(
+      // La directive doit être la première *instruction*, pas le premier caractère :
+      // une carte en tête de fichier est un commentaire, et les commentaires ne sont
+      // pas des instructions. Comparer la chaîne brute ferait échouer ce test à la
+      // première carte posée sur un composant client, pour une raison qui n'a rien à
+      // voir avec ce qu'il garde.
+      expect(sansEnTete(code).startsWith('"use client"'), `${chemin} importe le thème sans être client`).toBe(
         true,
       );
     }

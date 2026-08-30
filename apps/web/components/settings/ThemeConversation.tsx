@@ -22,13 +22,13 @@ interface ThemeConversationProps {
  *
  * L'image ne quitte **jamais** l'appareil : ni compression par le pipeline, ni upload,
  * ni account data. Le libellé le dit, parce qu'un réglage qu'on croit synchronisé et qui
- * ne l'est pas passe pour une panne au prochain téléphone (E-02, même raisonnement).
+ * ne l'est pas passe pour une panne au prochain téléphone (même raisonnement).
  *
  * ponytail: on ne passe pas par le MediaPicker de M-E. Celui-ci refuse la vidéo, annonce
  * des envois et parle de pièces jointes — trois comportements qui n'ont rien à faire ici.
  * L'`<input type="file">` reste donc le mécanisme, mais **caché** : rendu nu, il posait le
  * bouton « Parcourir… » du navigateur et sa typographie système au milieu d'une feuille
- * entièrement composée en primitives (revue de conception E-13, 30/08/2026). Le motif —
+ * entièrement composée en primitives (revue de conception E-13). Le motif —
  * input caché, `Button` qui le déclenche — est celui de `FormulaireIdentite`.
  */
 export function ThemeConversation({

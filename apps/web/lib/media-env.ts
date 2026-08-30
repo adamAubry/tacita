@@ -1,3 +1,10 @@
+/**
+ * L'environnement média : ce que le pipeline reçoit du navigateur.
+ *
+ * Le pipeline est headless et ne connaît ni `document`, ni `<canvas>`, ni WebCodecs.
+ * Ce fichier lui fournit ces capacités, et rend `TranscodageIndisponible` quand la
+ * plateforme ne les a pas — un refus nommé, que l'écran sait afficher.
+ */
 import type { MediaEnvironment, Raster } from "@tacita/media-pipeline";
 
 import type { MotifEchec } from "./transcode-video";
@@ -11,7 +18,7 @@ import type { DemandeTranscodage, ReponseTranscodage } from "./transcode-worker"
 /**
  * Ce qui manque au shard pour produire les formats de sortie imposés. **Lever avec un type
  * nommé, jamais rendre un blob approximatif** : un vocal qui n'est pas de l'Ogg/Opus est
- * illisible par les clients Matrix standards (D-03), et une vidéo non transcodée partirait
+ * illisible par les clients Matrix standards, et une vidéo non transcodée partirait
  * au format brut de l'appareil, à des dizaines de mégaoctets.
  *
  * Ce qui manque est plus étroit qu'un codec : Firefox enregistre déjà en Ogg/Opus, Chrome
@@ -23,7 +30,7 @@ import type { DemandeTranscodage, ReponseTranscodage } from "./transcode-worker"
  * L'UI ne propose pas ces deux chemins tant qu'ils ne sont pas couverts : c'est la seule
  * façon honnête de ne pas afficher une fonction qui échouerait (interdit n°13).
  *
- * **Arbitré (E-10, 06/08/2026) : encodage dans le shard, empaquetage dans le paquet.** Le
+ * **Arbitré : encodage dans le shard, empaquetage dans le paquet.** Le
  * remuxage WebM → Ogg et le muxeur MP4 vivent dans `@tacita/media-pipeline` ; la vidéo et
  * les vocaux Chrome/Edge/Firefox sont couverts.
  *
@@ -176,7 +183,7 @@ async function mesurerVideo(blob: Blob): Promise<{ width: number; height: number
 
 /**
  * démuxage par le paquet, décodage et réencodage par `WebCodecs`,
- * empaquetage par le muxeur du paquet (E-10). Le shard n'écrit aucun format.
+ * empaquetage par le muxeur du paquet. Le shard n'écrit aucun format.
  *
  * **Dans un worker**, comme `@tacita/media-pipeline` l'exige depuis l'origine : un transcodage tient le
  * processeur pendant des secondes, et sur le thread de rendu c'est la timeline qui se

@@ -211,7 +211,7 @@ describe("un seul DM par correspondant", () => {
 
 describe("un DM est inscrit dans m.direct, sinon il n'en est un pour personne", () => {
   /**
-   * Mesuré avec deux navigateurs contre un vrai Synapse le 07/08/2026 : un DM créé par
+   * Mesuré avec deux navigateurs contre un vrai Synapse : un DM créé par
    * l'app s'affichait « 2 membres, c'est le début de ce groupe ». `is_direct` ne pose le
    * drapeau que dans l'invitation ; ni le serveur ni le SDK n'écrivent l'account data.
    */

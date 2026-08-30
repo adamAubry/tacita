@@ -20,7 +20,7 @@ import {
  * rien de lui-même : `feedEvent`, `feedStateUpdate` et `feedToDevice` sont des méthodes
  * que le client doit appeler, et la doc d'amont le dit pour chacune en toutes lettres.
  *
- * Constaté sur staging le 29/08/2026 : appel connecté, ICE établi en UDP direct, les deux
+ * Constaté sur staging : appel connecté, ICE établi en UDP direct, les deux
  * côtés publiant leur piste audio — et le silence. Element Call chiffre le média **par
  * participant** et distribue les clés par des événements Matrix ; chacun envoyait la
  * sienne et ne recevait jamais celle d'en face. L'appartenance, elle, marchait : elle se
@@ -217,7 +217,7 @@ describe("l'hôte pousse au widget ce que le widget ne peut pas aller chercher",
  * dix-huit dans son `switch` ; les cinq ci-dessous n'en font pas partie et repartent en
  * « Unknown or unsupported from-widget action » tant que l'hôte ne les préempte pas.
  *
- * Constaté sur staging le 29/08/2026, trois d'un coup dans la console du widget :
+ * Constaté sur staging, trois d'un coup dans la console du widget :
  * `set_always_on_screen`, `io.element.join` et `io.element.device_mute`. La première est
  * la plus parlante — on accordait `m.always_on_screen` et on répondait « inconnue » quand
  * il s'en servait. Une promesse affichée et non tenue, un étage au-dessus du driver.
@@ -254,7 +254,7 @@ describe("l'hôte répond aux actions qu'Element Call lui adresse", () => {
   });
 
   it("raccrocher sort de l'écran d'appel, sous ses deux noms", () => {
-    // Le bouton de raccrochage vit dans le widget (E-07) : ces deux actions sont le seul
+    // Le bouton de raccrochage vit dans le widget : ces deux actions sont le seul
     // signal qui dise que l'appel est fini. Sans elles, l'écran restait ouvert sur une
     // session terminée.
     emettre(ELEMENT_ACTION_HANGUP);

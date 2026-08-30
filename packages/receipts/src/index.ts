@@ -1,3 +1,9 @@
+/**
+ * Le statut d'un message sortant, à quatre niveaux : sending → sent → delivered → read.
+ *
+ * `delivered` est une extension à nous : Matrix ne définit que `m.read`. Le README du
+ * paquet le dit, et l'UI ne le présente jamais comme du Matrix natif.
+ */
 import { createLogger, type Session } from "@tacita/client-core";
 import {
   ClientEvent,

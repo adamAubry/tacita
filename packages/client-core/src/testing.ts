@@ -11,7 +11,7 @@ import type { Session } from "./session";
  * contrat n'apparaissait donc nulle part — `Partial` l'accepte absent, le cast
  * éteint le reste — et sortait en `undefined is not a function` chez le seul
  * consommateur qui compose les sept paquets : le shard UI.
- * `identityResetOf` et `confirmIdentityOf`, ajoutés le 04/08/2026, sont passés
+ * `identityResetOf` et `confirmIdentityOf`, ajoutés, sont passés
  * exactement par là.
  *
  * Deux gardes :

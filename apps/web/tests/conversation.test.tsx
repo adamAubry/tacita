@@ -536,7 +536,7 @@ describe("accusés : trois niveaux, et ce qu'ils ne promettent pas", () => {
     /*
      * Les trois états se distinguent par leur **étiquette accessible**, plus par un
      * caractère. Les coches étaient les glyphes `✓` et `✓✓` ; ce sont désormais des SVG au
-     * trait, comme toutes les autres marques de l'application (E-08, 30/08/2026). Assertion
+     * trait, comme toutes les autres marques de l'application. Assertion
      * sur le rôle et le nom : c'est ce que l'utilisateur perçoit, et ça ne dépend plus du
      * dessin retenu.
      */

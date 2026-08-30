@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { Button, Text, TextInput } from "../foundation/primitives";
 
 /**
- * la phrase d'honnêteté du choix de photo (E-12, voie A).
+ * la phrase d'honnêteté du choix de photo (voie A).
  *
  * Exportée parce que le test la lit : c'est la condition qui rend le chemin public
  * acceptable, pas une décoration. Même registre que les « limites connues » — on dit ce

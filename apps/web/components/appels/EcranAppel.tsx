@@ -1,3 +1,11 @@
+/**
+ * L'écran d'appel : le widget Element Call, et ce qui l'entoure.
+ *
+ *  1. `messageFocusManquant` — traduit un échec de découverte du SFU en une phrase
+ *     qui dit quoi faire, au lieu d'un 502 en pleine connexion.
+ *  2. `EcranAppel` — monte le widget, et abandonne après `DELAI_CHARGEMENT_MS` plutôt
+ *     que de laisser tourner un écran noir.
+ */
 "use client";
 
 import {
@@ -20,7 +28,7 @@ import { useSession } from "../onboarding/SessionProvider";
 /**
  * la cause, en clair. Les trois `reason` n'appellent pas le même geste :
  * l'une se retente, les deux autres se règlent côté déploiement. Un « appel impossible »
- * unique ferait ressembler une pile sans SFU (E-08, cas fréquent en développement) à une
+ * unique ferait ressembler une pile sans SFU (cas fréquent en développement) à une
  * panne réseau passagère.
  */
 export function messageFocusManquant(cause: unknown): string {
@@ -52,7 +60,7 @@ interface EcranAppelProps {
  * Ce qui est à nous : le conteneur plein écran avec ses safe-areas, la découverte du
  * focus et son message d'erreur, la sortie de secours tant que le widget n'a pas chargé.
  *
- * Ce qui ne l'est pas, et n'a pas à être discuté ici (E-07, interdit n°7) : la bascule
+ * Ce qui ne l'est pas, et n'a pas à être discuté ici (interdit n°7) : la bascule
  * voix↔vidéo, le layout des vignettes, l'auto-masquage des contrôles, le raccrochage —
  * tout cela vit dans Element Call. Le seul paramètre que nous lui passons est celui du
  * point d'entrée choisi.

@@ -190,7 +190,7 @@ describe("le thème porte les valeurs de DESIGN.md, et rien d'autre", () => {
   /**
    * DESIGN.md : « aucune valeur hexadécimale dans le code des composants ».
    *
-   * Les quatre longueurs, pas seulement six : l'audit impeccable du 07/08/2026 a trouvé
+   * Les quatre longueurs, pas seulement six : l'audit impeccable a trouvé
    * un `#000` dans un masque de `ProfileCard`, que la version à `{6}` laissait passer.
    * La forme courte est précisément celle qu'on écrit sans y penser.
    *
@@ -235,7 +235,7 @@ describe("le thème porte les valeurs de DESIGN.md, et rien d'autre", () => {
    * feuille**. La contrainte n'est pas cosmétique : `opacity` est validée comme un nombre
    * par le CSSOM, donc `element.style.opacity = "var(--x)"` ne stocke pas la référence,
    * il stocke `NaN` — la couche reste à pleine force, et rien ne le signale. Écrit une
-   * première fois de bonne foi le 11/08/2026, sans effet.
+   * première fois de bonne foi, sans effet.
    *
    * Le test lit la feuille et la source, faute de navigateur — comme les deux au-dessus.
    * Il ne prouve pas le rendu ; il empêche la règle de repartir en `style` inline, où
@@ -269,7 +269,7 @@ describe("le thème porte les valeurs de DESIGN.md, et rien d'autre", () => {
    * token disparaisse, ou que la bannière cesse de le lire, sans que personne ne le voie.
    */
   /*
-   * Règle 7 encore : deux feuilles écrites le 30/08/2026 pour des plaintes utilisateur, et
+   * Règle 7 encore : deux feuilles écrites pour des plaintes utilisateur, et
    * deux sélecteurs qui n'existent que si quelqu'un les pose. Une règle CSS dont la classe
    * a disparu du composant est indétectable — elle ne casse rien, elle cesse simplement
    * d'agir.

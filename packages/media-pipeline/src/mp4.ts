@@ -1,13 +1,23 @@
+/**
+ * Muxeur MP4 minimal : des échantillons encodés vers un fichier lisible partout.
+ *
+ * Écrit les boîtes ISO-BMFF à la main (`ftyp`, `moov`, `mdat` et leur descendance)
+ * parce que le navigateur sait encoder des échantillons mais pas les empaqueter.
+ *
+ *  1. Primitives de boîtes et de tables — `boite`, `stts`, `stss`, `ctts`.
+ *  2. Pistes : vidéo obligatoire, audio facultatif.
+ *  3. `ecrireMp4` assemble, dans l'ordre exigé par la spec.
+ */
 import type { Bytes } from "./attachments";
 
 /**
- * Muxeur MP4 (ISO BMFF) — **octets → octets, aucun DOM** (§ Méthode, E-10).
+ * Muxeur MP4 (ISO BMFF) — **octets → octets, aucun DOM** (§ Méthode).
  *
  * Il n'encode rien : il reçoit des échantillons déjà encodés — par `WebCodecs` pour la
  * vidéo, tels quels depuis la source pour l'audio — et les range dans les boîtes qu'un
  * lecteur attend. C'est le pendant vidéo du muxeur Ogg.
  *
- * **Deux pistes depuis le 20/08/2026.** Le commentaire qui vivait ici disait
+ * **Deux pistes.** Le commentaire qui vivait ici disait
  * « une piste, pas de son : l'audio d'une vidéo de téléphone n'est pas dans le périmètre
  * de D-04, et aucune exigence ne la demande ». C'était vrai de la lettre de specs et faux
  * du produit : sur une messagerie, une vidéo muette est perçue comme un bug. La REQ existe
@@ -97,7 +107,7 @@ const encodeur = new TextEncoder();
  * d'éléments de tableau JavaScript — plusieurs centaines de mégaoctets d'allocation et
  * plusieurs secondes, dans le worker. Invisible sur les échantillons de quelques
  * kilo-octets des tests, décisif sur un fichier réel : c'est ce qui rendait l'envoi d'une
- * vidéo « très long » (mesuré le 20/08/2026, sur un fichier de 89 Mo).
+ * vidéo « très long » (mesuré, sur un fichier de 89 Mo).
  *
  * `Uint8Array.set` accepte aussi bien une vue qu'un tableau ordinaire : une seule
  * allocation, une copie par morceau, et les entiers restent des octets.
@@ -253,7 +263,7 @@ const ftyp = boite("ftyp", encodeur.encode("isom"), u32(512), encodeur.encode("i
 /**
  * Écrit un MP4 **faststart** : `ftyp`, `moov`, `mdat`.
  *
- * *(Ordre inversé le 20/08/2026. La version précédente écrivait `moov` en dernier, avec ce
+ * *(Ordre inversé. La version précédente écrivait `moov` en dernier, avec ce
  * motif : « le déplacer en tête demanderait de recalculer tous les décalages de chunk une
  * fois sa taille connue, pour un gain qui n'existe qu'en lecture progressive ». Les deux
  * moitiés étaient fausses. Le recalcul tient en **une passe de plus** : la taille d'un

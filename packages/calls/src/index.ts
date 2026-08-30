@@ -1,3 +1,16 @@
+/**
+ * Les appels, côté client : tout sauf le RTC lui-même.
+ *
+ *  1. `discoverFocus` — trouve le SFU annoncé par le `.well-known` du serveur, et
+ *     échoue explicitement (`RtcFociMissingError`) quand la pile n'en annonce aucun.
+ *  2. `buildCallWidget` — l'URL d'Element Call, paramètres relus dans la version
+ *     épinglée plutôt que de mémoire.
+ *  3. `attachCallWidget` — le pont d'API widget, dans les deux sens.
+ *  4. `activeCall` / `hangupLocal` — l'état d'appel d'un salon.
+ *
+ * Aucune négociation, aucune clé de média, aucune appartenance d'appel ici : tout
+ * cela vit dans Element Call.
+ */
 import type { Session } from "@tacita/client-core";
 import {
   ClientEvent,
@@ -95,7 +108,7 @@ export interface CallWidgetOptions {
   /**
    * Point d'entrée : `true` pour « appel vidéo », `false` pour « appel audio »
    * C'est un **paramètre de lancement**, pas un réglage : la bascule
-   * voix↔vidéo pendant l'appel appartient à Element Call (E-07).
+   * voix↔vidéo pendant l'appel appartient à Element Call.
    *
    * Traduit en `intent`, relu dans `src/UrlParams.ts` de la **v0.23.0** — la version
    * qu'épingle `infra/rtc/`. E-14 close : la version précédente de ce
@@ -244,7 +257,7 @@ export function attachCallWidget(
    * en toutes lettres : « As a client you are expected to call this for every to-device
    * event you receive. » Sans elles, la conversation est à sens unique.
    *
-   * Ce que ça coûtait, constaté sur staging le 29/08/2026 : l'appel se connecte, ICE
+   * Ce que ça coûtait, constaté sur staging : l'appel se connecte, ICE
    * s'établit en UDP direct, les deux côtés publient leur piste — et personne n'entend
    * rien. Element Call chiffre le média **par participant** (`perParticipantE2EE`, la
    * garantie du produit) et distribue les clés par des événements Matrix. Chacun envoyait

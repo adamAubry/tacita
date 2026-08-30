@@ -5,9 +5,9 @@
 # parcours ; les commandes `pnpm admin` qu'il enchaîne restent utilisables séparément
 # pour qui sait déjà ce qu'il fait.
 #
-#   sh infra/bootstrap.sh
-#   sh infra/bootstrap.sh --domaine=chat.mon-domaine.fr --email=moi@mon-domaine.fr --oui
-#   sh infra/bootstrap.sh --dev        # machine de développement, certificat auto-signé
+#   ./install.sh
+#   ./install.sh --domaine=chat.mon-domaine.fr --email=moi@mon-domaine.fr --oui
+#   ./install.sh --dev        # machine de développement, certificat auto-signé
 #
 # Pourquoi du shell POSIX alors que tout le reste est en TypeScript : c'est l'œuf et la
 # poule. Ce script doit tourner AVANT Node — d'où `sh` et non `bash`, aucune dépendance,
@@ -32,7 +32,7 @@ set -eu
 NODE_MAJEUR_MINIMAL=22
 TOTAL_ETAPES=6
 
-RACINE="$(cd "$(dirname "$0")/.." && pwd)"
+RACINE="$(cd "$(dirname "$0")" && pwd)"
 JOURNAL="$(mktemp -t tacita-install-XXXXXX.log)"
 
 SANS_DEMANDER=0
@@ -89,7 +89,7 @@ echouer() {
   titre "  Dernières lignes du journal ($JOURNAL) :"
   tail -20 "$JOURNAL" | sed 's/^/    /'
   titre "  Le journal est conservé. Corriger, puis relancer :"
-  dire "    sh infra/bootstrap.sh"
+  dire "    ./install.sh"
   dire "  Le script reprendra à cette étape."
   exit 1
 }
@@ -339,7 +339,7 @@ if [ "$BESOIN_GROUPE" -eq 1 ]; then
   dire "    session. Sans ça, le démarrage de la pile répondrait « permission denied »,"
   dire "    et ce ne serait pas une autre panne."
   titre "    exit          # puis se reconnecter en SSH"
-  dire "    cd $RACINE && sh infra/bootstrap.sh"
+  dire "    cd $RACINE && ./install.sh"
   dire ""
   dire "  Le script reprendra à l'étape 2."
   exit 0
@@ -378,7 +378,7 @@ else
     admin dns 2>&1 | sed 's/^/  /' || true
     if [ "$SANS_DEMANDER" -eq 1 ] || [ ! -t 0 ]; then
       souci "le DNS n'est pas prêt, et personne ne peut répondre — arrêt ici"
-      dire "    Créer les enregistrements, puis relancer : sh infra/bootstrap.sh"
+      dire "    Créer les enregistrements, puis relancer : ./install.sh"
       exit 1
     fi
     printf '  [r] réessayer   [p] passer outre   [a] abandonner : '
@@ -390,7 +390,7 @@ else
         break
         ;;
       *)
-        dire "  Abandon. Relancer plus tard : sh infra/bootstrap.sh"
+        dire "  Abandon. Relancer plus tard : ./install.sh"
         exit 1
         ;;
     esac
@@ -443,7 +443,7 @@ fi
 # monter partout, y compris sur l'hôte à une adresse de l'auto-hébergement.
 if [ "$DEV" -eq 1 ]; then
   # `rtc/dev.docker-compose.yml` : le SFU annonce la boucle locale au lieu de partir
-  # découvrir une IP publique que le navigateur de la machine ne joindra pas (D-07).
+  # découvrir une IP publique que le navigateur de la machine ne joindra pas.
   COMPOSE="-f docker-compose.yml -f smoke/docker-compose.yml -f rtc/docker-compose.yml -f rtc/dev.docker-compose.yml"
 else
   COMPOSE="-f docker-compose.yml -f staging/docker-compose.yml -f rtc/docker-compose.yml"
@@ -483,7 +483,7 @@ else
   titre "Il reste des lignes ✗ ci-dessus."
   dire "  Chacune porte son remède. Les corriger, puis relancer :"
   dire ""
-  dire "    sh infra/bootstrap.sh        # reprend le parcours là où il en est"
+  dire "    ./install.sh        # reprend le parcours là où il en est"
   dire "    pnpm admin doctor            # vérifie seulement, sans rien toucher"
   dire ""
   dire "  Journal de cette installation : $JOURNAL"

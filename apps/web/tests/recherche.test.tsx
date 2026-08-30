@@ -433,7 +433,7 @@ describe("débounce des changements de critères, skeletons, zéro réseau", () 
 
     // Chaque changement arrive avant la fin de la fenêtre : le minuteur précédent est
     // annulé. **Des critères, pas des frappes** — `PowerSearch` ne notifie la saisie
-    // qu'à la validation d'un token (E-11, voie A). Éditer la valeur d'un token, en
+    // qu'à la validation d'un token (voie A). Éditer la valeur d'un token, en
     // ajouter un puis en retirer un autre produit bien ces rafales.
     for (let rang = 2; rang <= 20; rang++) {
       rerender({ terme: "r".repeat(rang) });

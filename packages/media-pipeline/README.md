@@ -14,7 +14,7 @@ await saveOriginal(env, originalBlob, "IMG_0001.heic"); //, hors chemin d'envoi
 
 `MediaEnvironment` est l'unique frontière avec le navigateur : le package n'a aucune
 dépendance DOM et **n'embarque aucun codec**. Il porte **une** dépendance runtime depuis
-le 20/08/2026 — `mp4box@2.4.1`, pour **démuxer** ce qui entre (E-17). Elle ne touche pas
+le 20/08/2026 — `mp4box@2.4.1`, pour **démuxer** ce qui entre. Elle ne touche pas
 `WebCodecs` et tourne dans Node : c'est ce qui la rendait admissible, et les tests de
 `demux.ts` en sont la preuve permanente. Version épinglée, digest au lockfile, CHANGELOG
 relu avant tout bump. L'app fournit les
@@ -28,7 +28,7 @@ transcodage vidéo et l'encodage Opus ne doivent jamais toucher le thread princi
 | `transcodeAudio` | encodeur Opus WASM |
 | `decodeAudio`                   | `AudioContext.decodeAudioData`, ramené au mono    |
 | `saveViaFilePicker` / `saveViaDownload` | File System Access, sinon téléchargement  |
-| `connection`                    | `navigator.connection` (D-04)                     |
+| `connection`                    | `navigator.connection`                     |
 
 Aucun de ces adaptateurs n'a été évalué contre les contraintes PWA réelles (iOS Safari,
 mémoire disponible en Worker, WebCodecs derrière un flag). C'est un point à lever avant
@@ -39,9 +39,9 @@ mémoire disponible en Worker, WebCodecs derrière un flag). C'est un point à l
 - **Le serveur voit la taille et la date de chaque pièce jointe — donc la durée.** Le blob
   est opaque — AES-CTR 256, clé et IV jamais transmis au serveur — mais son poids, son
   horodatage et le fait qu'il existe restent lisibles. AES-CTR ne padant pas, le chiffré
-  fait exactement le poids du clair : à débit quasi constant (D-04), **taille ÷ débit
+  fait exactement le poids du clair : à débit quasi constant, **taille ÷ débit
   ≈ durée**, et celle d'une vidéo ou d'un vocal se déduit du seul blob alors qu'elle est
-  rangée dans l'événement chiffré. **D-11 : on ne pade pas**, parce que le même
+  rangée dans l'événement chiffré. **on ne pade pas**, parce que le même
   observateur détient déjà le graphe social et le profil d'activité.
   Métadonnées assumées.
 - **Le nom du fichier ne part pas au serveur** (`includeFilename: false`) : il ne vit que
@@ -50,9 +50,9 @@ mémoire disponible en Worker, WebCodecs derrière un flag). C'est un point à l
   pas redimensionner ce qu'il ne déchiffre pas, et `/_matrix/media/*/thumbnail` n'est
   jamais appelé sur un média chiffré.
 - **La compression est destructive et irréversible pour le destinataire.** Il ne reçoit
-  que la version compressée aux seuils D-04 ; l'original non compressé n'existe que sur
+  que la version compressée aux seuils de compression ; l'original non compressé n'existe que sur
   l'appareil de l'auteur, s'il a appelé `saveOriginal`.
-- **Deux profils réseau, pas de réglage utilisateur** (D-04). Sans Network Information
+- **Deux profils réseau, pas de réglage utilisateur**. Sans Network Information
   API (Safari), le profil est « bon réseau » : on ne dégrade pas ce qu'on ne mesure pas.
 - **Tout accès média passe par les endpoints authentifiés** (`/_matrix/client/v1/media/…`).
   Les anciens endpoints v3 répondent 404 depuis Synapse v1.146 — voir `infra/README.md`,
@@ -60,7 +60,7 @@ mémoire disponible en Worker, WebCodecs derrière un flag). C'est un point à l
 - **Le remuxage WebM → Ogg ne réencode rien, et c'est le but.** Le flux Opus que produit
   Chrome est déjà celui qu'on envoie ; seul son conteneur change. Aucune perte, aucun
   encodeur. En revanche, **le chemin Safari/iOS (MP4/AAC) reste ouvert** : lui demande un
-  vrai encodage, que `transcodeAudio` porte et que le spike E-10 doit encore situer
+  vrai encodage, que `transcodeAudio` porte et qu'un spike doit encore situer
   (`WebCodecs` natif, ou encodeur WASM dans ce paquet).
 - **On écrit nos conteneurs, on ne lit pas ceux des autres.** Le muxeur MP4 et le muxeur
   Ogg sont écrits ici, parce que ce qu'ils produisent est borné et connu. Le **démuxage**

@@ -1,3 +1,20 @@
+/**
+ * L'écran d'une conversation : tout ce qu'un salon ouvert met à l'écran.
+ *
+ * Le plus gros composant du shard, parce qu'il est le point où sept modules se
+ * rencontrent. Dans l'ordre du fichier :
+ *
+ *  1. État local — intention du composer (rien, réponse, édition), menu d'appui long,
+ *     envoi de média, capture, visionneur, fond d'écran.
+ *  2. Abonnements — timeline, file d'envoi, accusés. Chacun rend sa fonction de
+ *     désabonnement ; aucun ne survit au démontage.
+ *  3. Fusion — les messages du serveur et ceux qui attendent dans la file, en un seul
+ *     flux, dans l'ordre du /sync.
+ *  4. Rendu — `Timeline`, `Composer`, et les surfaces qui s'ouvrent par-dessus.
+ *
+ * Aucune logique métier ici : ce que cet écran découvre remonte dans le paquet
+ * concerné.
+ */
 "use client";
 
 import type { Session } from "@tacita/client-core";
@@ -101,7 +118,7 @@ export function Conversation({ roomId }: { roomId: string }) {
   /**
    * l'échec **dédié** de la compression, distinct de l'absence de bouton.
    *
-   * La vidéo est proposée partout depuis que le chemin rapide existe (E-18) : une source
+   * La vidéo est proposée partout depuis que le chemin rapide existe : une source
    * déjà conforme se remuxe sans encodeur. Ce qui reste possible, c'est qu'une source
    * **non** conforme tombe sur un appareil qui ne sait pas réencoder — et ça, il faut le
    * dire à ce moment-là, avec sa phrase, sinon le bouton promet plus que le pipeline ne
@@ -459,7 +476,7 @@ export function Conversation({ roomId }: { roomId: string }) {
        * navigateur ne sait pas lire ce format » se règle en changeant d'appareil ou en
        * réexportant la vidéo ; « il ne sait pas l'encoder » non. Les confondre — ce que
        * faisait la phrase unique — envoyait chercher une solution qui n'existe pas :
-       * mesuré le 20/08/2026 sur un `.mov` d'iPhone en HEVC, refusé sous le mot
+       * mesuré sur un `.mov` d'iPhone en HEVC, refusé sous le mot
        * « compresser » alors que rien n'avait pu être décodé.
        */
       setErreurMedia(

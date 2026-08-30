@@ -1,3 +1,10 @@
+/**
+ * L'écran de recherche : la barre, les recherches récentes, les résultats.
+ *
+ * Tout est local. Le serveur n'est jamais interrogé — il ne saurait pas répondre sur
+ * un salon chiffré — et l'écran dit ce que la primitive permet plutôt que de laisser
+ * croire à une recherche complète.
+ */
 "use client";
 
 import type { Conversation } from "@tacita/messaging";

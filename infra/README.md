@@ -11,7 +11,7 @@ Hors scope : LiveKit/TURN/well-known, le *code* de la passerelle push
 Ce README décrit le socle et **la machine de développement**. Le staging — VPS Ubuntu,
 vrai domaine, vrai certificat, shard servi par le proxy — a son propre runbook :
 **`staging/README.md`**. Les deux partagent `docker-compose.yml` ; tout ce
-qui les sépare vit dans un overlay chargé volontairement (D-07, règle 6 de `CLAUDE.md`) :
+qui les sépare vit dans un overlay chargé volontairement (règle 6 de `CONTRIBUTING.md`) :
 
 | | Compose | Shard | Certificat |
 | --- | --- | --- | --- |
@@ -31,7 +31,7 @@ docker compose up -d
 ```
 
 Créer un compte se fait **depuis l'app** : identifiant et mot de passe, sans code
-d'invitation (D-13). Le script d'admin reste là pour un compte de service ou
+d'invitation. Le script d'admin reste là pour un compte de service ou
 pour dépanner sans navigateur — il n'est plus le chemin normal :
 
 ```sh
@@ -98,7 +98,7 @@ S3-compatible maintenu (OVH, Scaleway, AWS) via les mêmes variables d'env.
 
 ## annuaire ouvert, et sa reconstruction
 
-`user_directory.search_all_users: true` (E-21, tranchée le 21/08/2026). Le défaut de
+`user_directory.search_all_users: true` (tranchée le 21/08/2026). Le défaut de
 Synapse ne liste que les comptes avec qui on partage déjà un salon ou qui sont dans un
 salon public : ce déploiement n'en a aucun, donc l'annuaire ne répondait à personne, et
 « Ajouter un ami » exigeait de connaître l'identifiant exact.
@@ -268,7 +268,7 @@ joindre le proxy par le nom public.
    convention du module `ssl` de Python, et le client HTTP de Synapse est **Twisted**, qui charge sa
    racine de confiance depuis le magasin OpenSSL du système. Corrigé : le CA de dev est copié dans
    `/usr/local/share/ca-certificates/` puis `update-ca-certificates` **au démarrage, depuis
-   l'overlay** (D-07 — l'image de production n'est pas modifiée ; l'entrypoint d'origine est
+   l'overlay** (l'image de production n'est pas modifiée ; l'entrypoint d'origine est
    conservé, on ne fait que le précéder).
 4. **Le certificat n'avait aucun `subjectAltName`.** Cause profonde, et la seule qui dépassait le
    login : `generate-dev-certs.sh` ne passait qu'un `/CN=`. `service_identity` — donc Twisted, donc

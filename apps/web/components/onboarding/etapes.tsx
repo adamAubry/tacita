@@ -1,3 +1,12 @@
+/**
+ * Le parcours d'accueil, après la création du compte : trois étapes, dans l'ordre.
+ *
+ *  1. `EtapeIdentite` — nom affiché et photo.
+ *  2. `EtapeNotifications` — la demande de permission, expliquée avant d'être posée.
+ *  3. `EtapePremiereConversation` — sortir sur quelque chose à faire, pas sur un vide.
+ *
+ * `ETAPES` est la liste ; l'écran ne connaît que sa longueur et son index.
+ */
 "use client";
 
 import type { Session } from "@tacita/client-core";
@@ -30,7 +39,7 @@ import { RecoveryStep } from "./RecoveryStep";
  * L'ordre suit ce que le parcours doit produire, pas ce qui est le plus facile à
  * demander :
  *
- * 1. **la clé** — bloquante, non négociable : sans elle le compte ne chiffre pas (D-08),
+ * 1. **la clé** — bloquante, non négociable : sans elle le compte ne chiffre pas,
  *    donc rien de ce qui suit n'aurait de sens ;
  * 2. **l'identité** — le premier moment où l'on voit quelque chose de soi ;
  * 3. **les notifications** — la question se pose une fois qu'il y a quelque chose à

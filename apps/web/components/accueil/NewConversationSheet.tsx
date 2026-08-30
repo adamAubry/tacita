@@ -72,7 +72,7 @@ export function NewConversationSheet({
         />
       )}
 
-      {/* Aucune source honnête de « suggestions » n'existe (E-04) : sans DM, il n'y a
+      {/* Aucune source honnête de « suggestions » n'existe : sans DM, il n'y a
           personne à proposer, et l'écran le dit au lieu de rester vide. */}
       {etape !== "choix" && contacts.length === 0 && (
         <Placeholder

@@ -147,7 +147,7 @@ describe("URL Element Call complète et paramétrée", () => {
   });
 
   /**
-   * **`preload` est une impasse, pas une optimisation.** Relu le 29/08/2026 dans le
+   * **`preload` est une impasse, pas une optimisation.** Relu dans le
    * bundle de l'image épinglée v0.23.0, `GroupCallView` :
    *
    *     if (skipLobby)
@@ -169,7 +169,7 @@ describe("URL Element Call complète et paramétrée", () => {
    *
    * Avec `preload` posé et l'appel non rejoint, Element Call rend donc `null` : plus une
    * ligne de journal, plus un pixel, et pas la moindre erreur. Constaté sur le
-   * déploiement de staging le 29/08/2026 — poignée de main complète, `GroupCallView`
+   * déploiement de staging — poignée de main complète, `GroupCallView`
    * monté, écran noir. Les deux gardes se refermaient ensemble : celle du rendu peignait
    * `null`, celle du join attendait une action que personne n'envoie.
    *
@@ -355,7 +355,7 @@ describe("driver widget standard, sans logique RTC maison", () => {
 });
 
 /**
- * Le défaut du 29/08/2026 : l'appelant restait sur un écran mort, et la console ne
+ * Le défaut : l'appelant restait sur un écran mort, et la console ne
  * portait que `readStickyEvents is not implemented` — la moitié bénigne.
  *
  * `validateCapabilities` accordait tout ce qu'on lui demandait. Le widget appelait alors

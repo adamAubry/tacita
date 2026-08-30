@@ -1,3 +1,13 @@
+/**
+ * Les gestes tactiles : glissement latéral et tirer-pour-rafraîchir.
+ *
+ * Les seuils sont ici parce qu'ils se répondent — `SEUIL_GLISSEMENT` sépare un
+ * défilement d'un geste, `ZONE_MORTE_BORD` laisse à Safari iOS son geste de retour
+ * arrière, `DUREE_APPUI_LONG` ouvre le menu d'un message.
+ *
+ * Simulés en test par événements pointer ; jsdom ne rend aucune géométrie, donc rien
+ * ici ne se prouve à l'écran.
+ */
 "use client";
 
 import { useRef, useState, type PointerEvent } from "react";

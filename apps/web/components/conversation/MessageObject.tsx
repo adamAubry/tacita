@@ -1,3 +1,12 @@
+/**
+ * Un message à l'écran : la bulle, et ce qu'elle porte autour d'elle.
+ *
+ *  1. `Recu` — la coche d'accusé. Trois niveaux, et un cas « indécidable » qui
+ *     n'affiche rien plutôt que d'inventer.
+ *  2. `EtatEnvoi` — ce que dit une entrée encore dans la file : en cours, à
+ *     réessayer, ou échouée avec un motif que l'utilisateur peut traiter.
+ *  3. `MessageObject` — la bulle : corps, réponse citée, réactions, édition.
+ */
 "use client";
 
 import type { ReactionTally } from "@tacita/messaging";
@@ -43,7 +52,7 @@ interface MessageObjectProps {
  * `✓✓` — des glyphes typographiques au milieu d'une interface dont toutes les autres
  * marques sont des SVG au trait : épaisseur, alignement vertical et dessin changeaient
  * d'une plateforme à l'autre. Le seul trait d'identité que l'équipe ne dessinait pas
- * (revue de conception E-08, 30/08/2026).
+ * (revue de conception E-08).
  */
 const COCHE = {
   sent: IconeCoche,
@@ -74,7 +83,7 @@ function Recu({ statut, indecidable }: { statut: ReceiptStatus; indecidable: boo
   return (
     <span
       /*
-       * `role="img"` : la coche est un SVG `aria-hidden` (E-08), donc le nom accessible
+       * `role="img"` : la coche est un SVG `aria-hidden`, donc le nom accessible
        * doit être porté par ce conteneur — sans rôle, un `<span>` étiqueté n'est exposé à
        * rien. `title` reste pour l'infobulle de bureau ; sur tactile elle ne s'affiche
        * jamais, et c'est « Limites connues » et « Confidentialité » qui portent
@@ -176,13 +185,13 @@ export function MessageObject({
         /*
          * Un groupe s'ouvre sur `--spacing-3` et non `--spacing-2` : à 8 px, deux
          * groupes d'auteurs différents se touchaient presque, et le regroupement Discord
-         * — qui repose entièrement sur l'écart — ne se lisait plus (30/08/2026).
+         * — qui repose entièrement sur l'écart — ne se lisait plus.
          */
         padding: entete ? "var(--spacing-3) var(--spacing-3) 0" : "0 var(--spacing-3)",
         // Un envoi en cours ou en échec est plus pâle : l'information est dans l'état,
         // pas dans une icône de plus.
         /*
-         * **Plus d'opacité sur le bloc** (revue de conception E-07, 30/08/2026). Elle
+         * **Plus d'opacité sur le bloc** (revue de conception E-07). Elle
          * valait 0,6 dès que l'envoi n'était plus « en attente », et s'appliquait donc au
          * texte du message, à la phrase qui explique l'échec et aux deux boutons
          * « Réessayer » et « Supprimer ». C'est le seul moment où l'on doit relire ce

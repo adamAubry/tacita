@@ -2,7 +2,7 @@
  * Les routes qui portent un identifiant de salon — **en paramètre de requête, pas en
  * segment de chemin**, et c'est le hors-ligne qui l'impose.
  *
- * Mesuré au navigateur le 08/08/2026 : avec `/c/[roomId]`, chaque salon est une route
+ * Mesuré au navigateur : avec `/c/[roomId]`, chaque salon est une route
  * *dynamique*. Next va chercher sa charge RSC sur le réseau à chaque navigation, et le
  * service worker ne peut pas précacher un ensemble d'URL non borné. Hors ligne, le
  * résultat était sans appel — la conversation apparaissait dans la liste, et rester

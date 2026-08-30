@@ -352,7 +352,7 @@ describe("primitives partagées", () => {
   });
 
   /**
-   * **Deux sorties sur toutes les feuilles**, décidées le 11/08/2026 : le bouton, et le
+   * **Deux sorties sur toutes les feuilles**, décidées : le bouton, et le
    * clic sur le fond.
    *
    * Le défaut qu'elles ferment était un cul-de-sac réel : `purpose="form"` d'Astryx bloque
@@ -429,7 +429,7 @@ describe("primitives partagées", () => {
   });
 
   /**
-   * WCAG 4.1.2 — audit impeccable du 07/08/2026. Neuf feuilles s'ouvraient sans nom
+   * WCAG 4.1.2 — audit impeccable. Neuf feuilles s'ouvraient sans nom
    * accessible : un lecteur d'écran annonçait « boîte de dialogue » et s'arrêtait là.
    * Astryx l'écrivait dans la sortie de nos propres tests, et personne ne la lisait.
    *
@@ -458,7 +458,7 @@ describe("DESIGN.md — un mot insécable ne doit pas élargir l'écran", () => 
    *
    * jsdom ne calcule aucune mise en page : ce test ne prouve pas le rendu, il empêche la
    * ligne qui le tient de disparaître (règle 7 — une valeur qu'aucun site de lecture ne
-   * relit est indétectable). La mesure, elle, a été faite au navigateur le 21/08/2026.
+   * relit est indétectable). La mesure, elle, a été faite au navigateur.
    */
   it("`body` porte la coupure, et c'est `anywhere` — `break-word` ne suffirait pas", () => {
     const feuille = sansCommentaires(
@@ -480,7 +480,7 @@ describe("DESIGN.md — un mot insécable ne doit pas élargir l'écran", () => 
 
 describe("le bandeau de connexion est branché, pas seulement écrit", () => {
   it("il suit navigator.onLine et ses deux événements", async () => {
-    // Mesuré au navigateur le 08/08/2026 : `ConnectionBanner` existait, avait ses tests,
+    // Mesuré au navigateur : `ConnectionBanner` existait, avait ses tests,
     // et **aucun écran ne le montait**. Couper le réseau n'affichait rien. Un composant
     // que personne ne rend ne tient aucune promesse — c'est le branchement qui compte.
     const etat = { valeur: true };

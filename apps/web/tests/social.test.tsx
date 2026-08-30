@@ -30,7 +30,7 @@ vi.mock("next/navigation", () => ({
 
 /** E-13 — le paquet 05 est mocké à son interface : M-G compose, il ne dérive rien. */
 const frapper = vi.fn(async () => ({ room_id: "!groupe:t" }));
-/** L'interface `Contacts` (E-04) : les écrans se codent contre elle, pas contre le SDK. */
+/** L'interface `Contacts` : les écrans se codent contre elle, pas contre le SDK. */
 const inviterContact = vi.fn(async () => "!dm:t");
 vi.mock("../lib/contacts", () => ({
   contactsDeLaSession: () => ({ inviter: inviterContact }),
@@ -139,7 +139,7 @@ describe("profil d'un non-ami : Send invite, et rien d'autre", () => {
     );
     /*
      * Le statut se lit par son **étiquette accessible** et non par du texte : c'est une
-     * icône depuis le 30/08/2026 (plainte : « le badge "ami" devrait être une icône »).
+     * icône (plainte : « le badge "ami" devrait être une icône »).
      * Le mot reste, à l'oreille — c'est bien lui qu'on assertait, et il est toujours là.
      */
     expect(screen.getByRole("img", { name: "Pas encore ami" })).toBeTruthy();
@@ -482,7 +482,7 @@ describe("photo de profil : livrée, et honnête sur ce qu'elle expose", () => {
     return fichier;
   };
 
-  it("le champ existe — E-12 close, et il n'est pas grisé", () => {
+  it("le champ existe, et il n'est pas grisé", () => {
     rendre();
     // Une option grisée est une promesse non tenue affichée (interdit n°13). Avant E-12
     // le champ était **absent** ; il est maintenant là et il marche.
@@ -752,7 +752,7 @@ describe("l'identifiant s'affiche sans son domaine", () => {
 
 describe("le champ nomme les deux chemins, et dit ce qu'ils exposent", () => {
   /**
-   * E-21, tranchée le 21/08/2026 : l'annuaire couvre tous les comptes du serveur
+   * E-21, tranchée : l'annuaire couvre tous les comptes du serveur
    * Deux conséquences d'écran, et elles vont ensemble — l'une dit ce que
    * la recherche peut, l'autre ce qu'elle coûte.
    */

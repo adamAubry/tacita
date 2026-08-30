@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { HOMESERVER } from "./harness";
 
 /**
- * critère de comportement du 03/08/2026 : « une connexion aboutit ». Les
+ * critère de comportement : « une connexion aboutit ». Les
  * tests de config attestent les fichiers, la fumée atteste le comportement.
  *
- * **Réécrit le 25/08/2026** : ce fichier vérifiait que Synapse redirigeait vers le realm
+ * **Réécrit** : ce fichier vérifiait que Synapse redirigeait vers le realm
  * Keycloak. Keycloak a été supprimé par D-12 le matin même, et le test est resté rouge
  * derrière — il attestait un comportement que le produit avait cessé de vouloir. Un test
  * qui échoue pour une raison qu'on connaît et qu'on accepte n'atteste plus rien : il

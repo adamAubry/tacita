@@ -1,3 +1,14 @@
+/**
+ * Le pipeline média : un seul chemin d'envoi, pour tous les types de fichier.
+ *
+ *  1. Analyse de la source — type, dimensions, durée, verdict de plafond.
+ *  2. Compression, si c'est un média, aux seuils du profil réseau courant.
+ *  3. Chiffrement côté client : ce qui part est un blob opaque.
+ *  4. Téléversement du blob, puis l'événement Matrix qui porte les clés.
+ *
+ * Le téléchargement lit la même chaîne à l'envers. Photo, vidéo, vocal, ZIP, PDF,
+ * bureautique : la même, sans canal parallèle.
+ */
 import type { Session } from "@tacita/client-core";
 
 import {
@@ -274,7 +285,7 @@ export async function plafondTeleversement(session: Session): Promise<number | u
 /**
  * le refus **avant** le téléversement, avec de quoi le dire.
  *
- * Mesuré le 20/08/2026 : une vidéo de onze minutes sort à environ 206 Mo aux cibles D-04,
+ * Mesuré : une vidéo de onze minutes sort à environ 206 Mo aux cibles D-04,
  * au-dessus du plafond de 200 Mo du déploiement. Sans ce contrôle, le client téléversait
  * les 206 Mo pour s'entendre refuser à la fin — plusieurs minutes de réseau et de batterie
  * pour un échec connu d'avance, et un message qui ne disait pas pourquoi.
@@ -456,7 +467,7 @@ async function construireContenu(
 
     case "audio": {
       // / D-03 — un seul format sort d'ici, quel que soit ce qui entre. Trois
-      // chemins, trois coûts (E-10) : Firefox rend déjà de l'Ogg/Opus, Chrome rend le même
+      // chemins, trois coûts : Firefox rend déjà de l'Ogg/Opus, Chrome rend le même
       // flux Opus dans un conteneur WebM — un remuxage suffit, sans encodeur ni perte —,
       // et Safari rend du MP4/AAC, seul cas qui demande un vrai encodage.
       const ogg = await versOggOpus(env, file, type);
@@ -519,7 +530,7 @@ export function poserUrl(contenu: Record<string, unknown>, chemin: string[], url
  *
  * Un avatar Matrix est un `mxc://` nu : tout client doit pouvoir l'afficher sans clé.
  * Chiffré, il n'est un avatar nulle part — un carré cassé chez tous les correspondants.
- * Le chiffrer serait donc une non-feature, pas une garantie (E-12, voie A) : le seul
+ * Le chiffrer serait donc une non-feature, pas une garantie (voie A) : le seul
  * choix honnête est de le poser en clair et de le **dire**, comme les réactions et les
  * épingles.
  *

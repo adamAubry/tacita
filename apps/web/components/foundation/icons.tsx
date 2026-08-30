@@ -1,3 +1,10 @@
+/**
+ * Les icônes, en SVG inline — une constante par icône, rien d'autre dans ce fichier.
+ *
+ * Inline plutôt qu'un paquet : elles héritent alors de `currentColor`, donc du thème,
+ * sans qu'aucune couleur ne soit écrite ici. Chacune est `aria-hidden` — le nom
+ * accessible appartient au contrôle qui la porte, jamais à l'icône.
+ */
 import type { ReactNode } from "react";
 
 /**
@@ -178,7 +185,7 @@ export const IconeAjouterMembre: ReactNode = (
 );
 
 /**
- * **Les six icônes reprises à Astryx** (ajoutées le 30/08/2026, revue de conception R-01).
+ * **Les six icônes reprises à Astryx** (ajoutées, revue de conception R-01).
  *
  * Elles existaient dans le jeu de la bibliothèque, et c'était le problème : `chevronLeft`
  * et `info` d'Astryx voisinaient `IconeAppel` et `IconeVideo` d'ici dans la **même** barre

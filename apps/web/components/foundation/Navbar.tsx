@@ -1,3 +1,10 @@
+/**
+ * La barre d'onglets du bas, et le glissement latéral qui change d'onglet.
+ *
+ * `ONGLETS` est la source de l'ordre — la barre et le geste lisent la même liste,
+ * sinon un glissement mène ailleurs que le doigt. `SEUIL_GLISSEMENT` sépare un
+ * défilement d'un changement d'onglet ; en dessous, on ne bouge pas.
+ */
 "use client";
 
 import Link from "next/link";

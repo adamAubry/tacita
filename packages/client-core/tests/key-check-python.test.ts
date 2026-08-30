@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { SecretStorage } from "matrix-js-sdk";
 
 /**
- * D-12 — **la vérification de clé de récupération existe en deux exemplaires, dans deux
+ * **la vérification de clé de récupération existe en deux exemplaires, dans deux
  * langages, et ce fichier est le seul endroit où ils se rencontrent.**
  *
  * Le shard vérifie la clé localement pour rendre la faute de frappe immédiate ; le module

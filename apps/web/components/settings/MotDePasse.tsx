@@ -10,7 +10,7 @@ import { useState } from "react";
 import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitives";
 
 /**
- * D-12 — **changer son mot de passe, la clé de récupération à l'appui.**
+ * **changer son mot de passe, la clé de récupération à l'appui.**
  *
  * Le mot de passe courant n'est pas demandé, et ce n'est pas un oubli : il n'autorise rien
  * ici. C'est la clé de récupération qui garde ce changement, et elle seule — une session
@@ -87,7 +87,7 @@ export function MotDePasse({ session }: { session: Session }) {
           status="success"
           title="Mot de passe changé"
           /*
-           * D-15 — **le trou nommé, dit là où il se produit.** La clé de récupération est
+           * **le trou nommé, dit là où il se produit.** La clé de récupération est
            * dérivée du mot de passe ; ce changement ne la re-dérive pas, donc la prochaine
            * connexion sur un appareil neuf redemandera la clé une fois. Personne n'est
            * enfermé dehors — la clé écrite quelque part ouvre toujours —, mais le taire

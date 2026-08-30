@@ -1,3 +1,13 @@
+/**
+ * Les vérifications de la pile : ce que `doctor` lit chez Docker.
+ *
+ *  1. `lireConteneurs` — parse la sortie de compose.
+ *  2. `pileDemarree`, `servicesEnBonneSante` — l'état déclaré.
+ *  3. `servicesQuiBouclent` — le cas que la colonne « Up » masque : un service qui
+ *     redémarre en boucle se réaffiche à chaque relance et paraît debout.
+ *  4. `SERVICES_RTC` — leur absence n'est pas une panne, c'est une pile sans SFU,
+ *     et le diagnostic le dit ainsi.
+ */
 import { attente, attention, casse, ok, type Contexte, type Verification } from "./contrat.ts";
 
 /**
@@ -185,7 +195,7 @@ export const appelsAudioVideo: Verification = {
       : attention(
           "appels audio/vidéo",
           `${absents.join(", ")} absent${absents.length > 1 ? "s" : ""} — aucun focus annoncé, l'app affichera RtcFociMissing`,
-          "relancer en ajoutant -f rtc/docker-compose.yml, ou sh infra/bootstrap.sh qui le fait",
+          "relancer en ajoutant -f rtc/docker-compose.yml, ou ./install.sh qui le fait",
         );
   },
 };

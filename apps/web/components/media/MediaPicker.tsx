@@ -6,7 +6,7 @@ import { IconePlus } from "../foundation/icons";
 import { Button, Text } from "../foundation/primitives";
 
 /**
- * Ce que le pipeline accepte — **la vidéo comprise, partout** (E-18, 20/08/2026).
+ * Ce que le pipeline accepte — **la vidéo comprise, partout**.
  *
  * Elle était conditionnée à la capacité d'encodage de ce navigateur, mesurée avant
  * d'afficher quoi que ce soit. Depuis le chemin rapide, une source déjà conforme aux

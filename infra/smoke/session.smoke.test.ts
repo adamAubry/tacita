@@ -21,7 +21,7 @@ import {
 const ATTENTE = { timeout: 30_000, interval: 250 };
 
 /**
- * Cible de fumée — arbitrage PM du 03/08/2026, point 9, option B.
+ * Cible de fumée — arbitrage PM, point 9, option B.
  *
  * Ce que valide ce fichier, et que 189 tests sur mocks ne valident pas : la crypto
  * Rust (vodozemac) réelle, un vrai IndexedDB, un vrai Synapse, et le fait que nos
