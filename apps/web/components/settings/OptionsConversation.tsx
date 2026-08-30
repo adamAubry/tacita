@@ -5,7 +5,7 @@ import { OptionCard } from "../foundation/OptionCard";
 /**
  * les options d'une conversation.
  *
- * **« Messages éphémères » n'existe pas** : E-03 l'a abandonné, pas reporté (D-09). Il
+ * **« Messages éphémères » n'existe pas** : E-03 l'a abandonné, pas reporté. Il
  * est donc absent du DOM, et surtout pas grisé — une option grisée est une promesse non
  * tenue affichée (interdit n°13). Ce commentaire est la seule trace qu'il en reste, et
  * c'est voulu : sans lui, quelqu'un le rajoutera en croyant à un oubli.

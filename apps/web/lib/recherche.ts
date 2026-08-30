@@ -35,7 +35,7 @@ export interface Token {
 /**
  * les tokens de la barre deviennent les critères de `search()`. Chaque
  * champ a **un** critère d'index correspondant : rien n'est traduit en
- * plein-texte, ce que l'escalade E-01 interdit explicitement.
+ * plein-texte, ce qui est explicitement proscrit.
  *
  * Les critères se composent en ET côté paquet ; deux tokens rendent donc l'intersection
  * sans que ce module ait à la calculer.

@@ -16,7 +16,7 @@ export const useOutbox = () => useContext(ContexteOutbox);
  * Elle vivait dans `Conversation` : créée à l'ouverture d'un salon, `dispose()` au
  * démontage. Le bandeau hors ligne promet pourtant que « ce que vous écrivez partira à la
  * reconnexion » — et cette promesse était fausse dès qu'on quittait l'écran. Mesuré au
- * navigateur le 08/08/2026 : deux messages écrits hors ligne, un rechargement, le réseau
+ * navigateur : deux messages écrits hors ligne, un rechargement, le réseau
  * revenu, et rien ne partait — plus aucune `Conversation` n'était montée pour vider la
  * file. Une promesse qu'on ne tient pas est exactement ce que l'interdit n°13 refuse.
  *

@@ -1,3 +1,9 @@
+/**
+ * La barre de recherche : le texte, et les filtres devenus des jetons.
+ *
+ * `TYPES` est la liste des filtres offerts ; chacun correspond à **un** critère
+ * d'index. Rien n'est traduit en plein-texte — un filtre sans critère n'existe pas.
+ */
 "use client";
 
 import type { SearchStats } from "@tacita/search";
@@ -48,7 +54,7 @@ interface SearchBarProps {
  *
  * Les tokens de la primitive sont configurés ici, un par critère de : chaque
  * filtre de l'UI a un critère d'index correspondant, et aucun ne se replie sur du
- * plein-texte (E-01). Le champ libre est `texte` — `contentSearchFieldKey` route la
+ * plein-texte. Le champ libre est `texte` — `contentSearchFieldKey` route la
  * saisie non structurée vers lui.
  *
  * La phrase de périmètre n'est pas un avertissement discret : c'est la limite connue de

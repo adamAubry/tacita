@@ -72,7 +72,7 @@ function conversation(partiel: Partial<Conversation> = {}): Conversation {
 function glisser(cible: HTMLElement, distance: number, vertical = 0) {
   fireEvent(cible, new MouseEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 }));
   /*
-   * **Le `pointermove` n'est pas facultatif** (30/08/2026). Le simulateur passait du
+   * **Le `pointermove` n'est pas facultatif**. Le simulateur passait du
    * `pointerdown` au `pointerup` sans rien entre les deux — ce qu'aucun pointeur réel ne
    * fait. Depuis que le geste **verrouille son axe** au premier mouvement franc (plainte
    * « slider un message marche mal »), un glissement sans mouvement n'a pas d'axe, donc

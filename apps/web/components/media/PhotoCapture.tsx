@@ -48,7 +48,7 @@ interface PhotoCaptureProps {
  * un refus est expliqué et rattrapable : il n'y a pas d'écran mort.
  *
  * ponytail: photo seulement, pas de vidéo. La capture vidéo produirait du WebM ou du
- * MP4/AAC selon l'appareil, qu'il faudrait transcoder pour envoyer (D-04) — et
+ * MP4/AAC selon l'appareil, qu'il faudrait transcoder pour envoyer — et
  * ce transcodage n'existe pas dans le shard (ESCALATIONS § E-10). Le bouton n'existe donc
  * pas non plus.
  */

@@ -84,7 +84,7 @@ describe("clé de récupération E2EE obligatoire à l'inscription", () => {
    * existante en demande une. Le 401 n'arrive donc qu'ici, et il n'est pas une panne.
    *
    * Le faux `envoyer` reproduit la forme exacte de la réponse mesurée contre le serveur
-   * le 25/08/2026 : un flow **`m.login.password`** à une seule étape. Il disait
+   * : un flow **`m.login.password`** à une seule étape. Il disait
    * `m.login.sso` — hérité de Keycloak, supprimé le matin même par D-12 — et c'est ce
    * décalage qui fermait le chemin « j'ai perdu ma clé » sans que rien ne le dise.
    */
@@ -125,7 +125,7 @@ describe("clé de récupération E2EE obligatoire à l'inscription", () => {
       },
     ]);
     // **Et l'écran n'a pas été montré** : redemander à quelqu'un le mot de passe qu'il
-    // vient de taper est un geste que rien ne justifie (D-15).
+    // vient de taper est un geste que rien ne justifie.
     expect(demanderMotDePasse).not.toHaveBeenCalled();
   });
 
@@ -234,7 +234,7 @@ describe("clé de récupération E2EE obligatoire à l'inscription", () => {
 
 describe("l'inscription franchit les étapes de l'UIA, et rien d'autre", () => {
   /*
-   * **Le défaut trouvé le 25/08/2026 en montant la pile.** `creerCompte` ne franchissait
+   * **Le défaut trouvé en montant la pile.** `creerCompte` ne franchissait
    * qu'une étape et tenait le 401 suivant pour une panne : aucune inscription n'aboutissait.
    *
    * Relu dans le code de l'image v1.155.0 (`_calculate_registration_flows`) : sans e-mail
@@ -329,7 +329,7 @@ describe("recoveryState distingue l'inscription de la reconnexion", () => {
    *
    * Lu sur la sauvegarde, cet état répondait `deverrouillage` : l'écran proposait de saisir
    * une clé qui n'ouvre rien — il n'y a aucune identité à redescendre — et le parcours
-   * d'inscription devenait inatteignable. C'est le défaut remonté le 25/08/2026.
+   * d'inscription devenait inatteignable. C'est le défaut remonté.
    */
   it("une sauvegarde sans identité reste une inscription, pas un déverrouillage", async () => {
     appareilNonSigne();
@@ -385,7 +385,7 @@ describe("unlockRecovery : la deuxième connexion", () => {
   });
 });
 
-describe("la clé de récupération ouvre une session (D-14)", () => {
+describe("la clé de récupération ouvre une session", () => {
   const CHEMIN = "/_synapse/client/tacita/login_recovery";
 
   /** Ce que le module rend quand la clé ouvre : un jeton de connexion, rien d'autre. */
@@ -469,7 +469,7 @@ describe("la clé de récupération ouvre une session (D-14)", () => {
 
 describe("D-15 — se connecter avec son mot de passe suffit, sur un appareil neuf", () => {
   /*
-   * **Le défaut du 25/08/2026, remonté par l'utilisateur** : « je me connecte et j'ai un
+   * **Le défaut, remonté par l'utilisateur** : « je me connecte et j'ai un
    * écran "entrez votre clé de récupération" ». Chaque connexion donne un `device_id`
    * neuf, donc un appareil non signé, donc un mur — devant quelqu'un qui venait de donner
    * le seul secret que le produit lui demande de retenir.
@@ -530,7 +530,7 @@ describe("D-15 — se connecter avec son mot de passe suffit, sur un appareil ne
 
   it("l'identité est relue après signature, sinon la porte se referme derrière", async () => {
     /*
-     * Mesuré contre un vrai Synapse le 25/08/2026 : `bootstrapCrossSigning` signe
+     * Mesuré contre un vrai Synapse : `bootstrapCrossSigning` signe
      * l'appareil, et `getDeviceVerificationStatus` — la source de `recoveryState` —
      * continue de répondre « non signé » tant qu'aucun `/keys/query` n'a eu lieu. Le
      * `true` force ce téléchargement ; sans lui, l'écran de clé revient juste après avoir
@@ -546,9 +546,9 @@ describe("D-15 — se connecter avec son mot de passe suffit, sur un appareil ne
 
 describe("voir ses appareils, et pouvoir les déconnecter", () => {
   /*
-   * L'audit du 25/08/2026 : les jetons de ce déploiement n'expirent pas, le changement de
-   * mot de passe ne déconnecte personne (D-12), et la clé ouvre une session à elle seule
-   * (D-14). Sans ces deux membres, une fuite de jeton n'avait **aucune** réponse.
+   * L'audit : les jetons de ce déploiement n'expirent pas, le changement de
+   * mot de passe ne déconnecte personne, et la clé ouvre une session à elle seule
+   *. Sans ces deux membres, une fuite de jeton n'avait **aucune** réponse.
    */
   const uiaPuisSucces = () => {
     let demande = false;

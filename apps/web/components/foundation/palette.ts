@@ -18,7 +18,7 @@ export const PALETTE = {
   /**
    * `accent` à **8 %** en clair, 16 % en sombre.
    *
-   * Le clair est passé de 10 à 8 % le 10/08/2026 : la pastille de l'onglet actif de la
+   * Le clair est passé de 10 à 8 % : la pastille de l'onglet actif de la
    * navbar est le plus grand aplat d'accent atténué de l'app, et 10 % la faisaient lire
    * comme une surface à part entière plutôt que comme une teinte. Le sombre ne bouge pas
    * — un aplat translucide y a besoin de plus d'alpha pour exister du tout.
@@ -31,7 +31,7 @@ export const PALETTE = {
    * Les fonds d'état, **à 10 %** — le seul taux que DESIGN.md écrive pour un « soft »
    * (`accent-soft`). Ils étaient à 20 % : assez teintés pour que la description d'un
    * bandeau, rendue par Astryx en texte muet, tombe à 4,0:1 sur le fond d'erreur, sous le
-   * seuil AA que DESIGN.md exige de chaque paire. Mesuré au navigateur le 10/08/2026.
+   * seuil AA que DESIGN.md exige de chaque paire. Mesuré au navigateur.
    */
   dangerSoft: { clair: "#B3352C1A", sombre: "#E5716A1A" },
   warning: { clair: "#9A6A00", sombre: "#D9A441" },
@@ -43,7 +43,7 @@ export const PALETTE = {
    * chaque paire, donc 4,5:1 ; l'encre sombre y donne 8,2:1.
    *
    * Le défaut portait sur tous les boutons primaires de l'app en thème sombre — mesuré au
-   * navigateur le 10/08/2026. jsdom ne calcule aucune couleur : un test de contraste sur
+   * navigateur. jsdom ne calcule aucune couleur : un test de contraste sur
    * la palette (`theme.test.ts`) garde désormais la règle sans navigateur.
    */
   surAccent: { clair: "#FFFFFF", sombre: "#131514" },

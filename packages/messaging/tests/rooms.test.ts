@@ -289,7 +289,7 @@ describe("le sas d'entrée : knock, et l'invitation native qui le clôt", () => 
   it("un groupe créé n'est pas en knock : la bascule suit les liens, pas la création", async () => {
     await createGroupChat(ctx.session, "équipe");
     const [opts] = ctx.client.createRoom.mock.calls[0]!;
-    // `@tacita/messaging` « inchangée par défaut » (plan de route E-13) : pas de knock permanent
+    // `@tacita/messaging` « inchangée par défaut » : pas de knock permanent
     // sur tous les groupes.
     expect(JSON.stringify(opts)).not.toContain("knock");
   });

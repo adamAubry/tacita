@@ -21,7 +21,7 @@ describe("chiffrement par défaut sur tout salon", () => {
   });
 });
 
-describe("inscription ouverte, sans garde (D-13)", () => {
+describe("inscription ouverte, sans garde", () => {
   it("l'inscription est ouverte : le produit fait créer son compte depuis l'app", () => {
     expect(homeserver.enable_registration).toBe(true);
   });
@@ -38,7 +38,7 @@ describe("inscription ouverte, sans garde (D-13)", () => {
 
   it("le risque est signé explicitement, sinon Synapse refuse de démarrer", () => {
     /*
-     * **Règle 4, prise en flagrant délit le 25/08/2026.** Les deux assertions ci-dessus
+     * **Règle 4, prise en flagrant délit.** Les deux assertions ci-dessus
      * étaient vertes et le homeserver bootait en boucle : « Error in configuration: You
      * have enabled open registration without any verification » (v1.155.0). Ouvrir
      * l'inscription sans e-mail, captcha ni jeton **exige** ce drapeau — Synapse veut que
@@ -137,7 +137,7 @@ describe("backend média S3", () => {
 
 describe("identifiant + mot de passe, portés par Synapse", () => {
   it("l'authentification par mot de passe native est active", () => {
-    // Réécrite le 25/08/2026 (D-12) : Keycloak supprimé, Matrix porte l'identité.
+    // Réécrite : Keycloak supprimé, Matrix porte l'identité.
     expect(homeserver.password_config.enabled).toBe(true);
   });
 
@@ -168,7 +168,7 @@ describe("identifiant + mot de passe, portés par Synapse", () => {
 
 describe("annuaire ouvert à tous les comptes locaux", () => {
   /**
-   * E-21, tranchée le 21/08/2026. Le défaut de Synapse (`false`) ne liste que les
+   * E-21, tranchée. Le défaut de Synapse (`false`) ne liste que les
    * comptes avec qui on partage déjà un salon ; ce déploiement n'a aucun salon public,
    * donc l'annuaire ne rendait rien et « Ajouter un ami » n'aboutissait qu'avec un
    * identifiant exact déjà connu.
@@ -193,7 +193,7 @@ describe("annuaire ouvert à tous les comptes locaux", () => {
 /**
  * **Le seul endroit de fédération que ce déploiement sert, et pourquoi il le sert.**
  *
- * Constaté sur staging le 29/08/2026 : rejoindre un appel se soldait par
+ * Constaté sur staging : rejoindre un appel se soldait par
  * `POST /livekit/jwt/sfu/get → 500`. `lk-jwt-service` échange le jeton OpenID du widget
  * contre un jeton LiveKit, et il le vérifie par
  * `GET /_matrix/federation/v1/openid/userinfo` — chaîne présente dans le binaire de

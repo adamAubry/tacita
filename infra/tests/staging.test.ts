@@ -33,7 +33,7 @@ describe("le shard est servi par le proxy, sur le domaine du homeserver", () => 
     // ces blocs disparaissait, le fourre-tout l'avalerait en silence et le symptôme
     // serait une page du shard là où l'API était attendue.
     //
-    // `/auth` a quitté cette liste le 25/08/2026 : il routait Keycloak, supprimé par D-12.
+    // `/auth` a quitté cette liste : il routait Keycloak, supprimé par D-12.
     for (const prefixe of ["/_matrix", "/_synapse/client/", "/invite/"]) {
       expect(nginxConf).toContain(`location ${prefixe}`);
     }
@@ -67,7 +67,7 @@ describe("le shard est servi par le proxy, sur le domaine du homeserver", () => 
 
 describe("le staging est un overlay, jamais une modification du socle", () => {
   it("le service du shard vit dans l'overlay, pas dans la pile de base", () => {
-    // Règle 6 de `CLAUDE.md` (D-07) : les écarts d'environnement sont des overlays
+    // Règle 6 de `CLAUDE.md` : les écarts d'environnement sont des overlays
     // chargés volontairement. Le socle reste le backend, déployable seul.
     expect(base.services.web).toBeUndefined();
     expect(staging.services.web.build.dockerfile).toBe("apps/web/Dockerfile");

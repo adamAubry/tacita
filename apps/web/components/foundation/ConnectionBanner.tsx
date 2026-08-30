@@ -46,7 +46,7 @@ export function ConnectionBanner({ etat }: { etat: EtatConnexion }) {
 }
 
 /**
- * Le bandeau **branché**. Mesuré au navigateur le 08/08/2026 : `ConnectionBanner` était
+ * Le bandeau **branché**. Mesuré au navigateur : `ConnectionBanner` était
  * écrit, testé unitairement, et rendu par personne — couper le réseau n'affichait rien.
  * Un composant qu'aucun écran ne monte ne tient aucune promesse.
  *

@@ -26,3 +26,16 @@ e2e/
 # trompeuses commitees. Les *regles* qui en sortent vivent dans CLAUDE.md, qui lui est
 # suivi — un document hors depot ne gouverne rien (cf. § Boucle de developpement).
 docs/
+
+# Atelier — présent sur la machine, absent du dépôt public.
+#
+# Ces fichiers gouvernent la fabrication, pas le produit : instructions d'agent,
+# arbitrages internes, système visuel de travail. Ils restent sur disque et continuent
+# de gouverner les sessions locales ; ce qu'ils portent d'utile à l'extérieur a été
+# repris dans CONTRIBUTING.md et THREAT_MODEL.md, qui eux sont publics.
+CLAUDE.md
+DECISIONS.md
+DESIGN.md
+PRODUCT.md
+.claude/
+.impeccable/

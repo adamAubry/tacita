@@ -167,7 +167,7 @@ function makeClient(crypto: CryptoMock) {
         `https://tacita.test/_matrix/client/v3/auth/${loginType}/fallback/web?session=${sessionId}`,
     ),
     /**
-     * D-14 — l'appel direct au module Synapse (`connexionParCle`, `changerMotDePasse`).
+     * l'appel direct au module Synapse (`connexionParCle`, `changerMotDePasse`).
      * Ce n'est pas une route de l'API Matrix : le SDK ne la connaît pas, il ne fait que
      * porter la requête. Rend `{}` par défaut ; les tests qui veulent un jeton de
      * connexion ou un refus le disent eux-mêmes.

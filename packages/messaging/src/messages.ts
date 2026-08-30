@@ -1,3 +1,10 @@
+/**
+ * Un message dans un salon : l'envoyer, y répondre, l'éditer, le retirer, y réagir.
+ *
+ * Fonctions pures ou prenant la `Session` en premier argument ; aucun état ici.
+ * Les réactions sont des annotations Matrix — donc en clair, et le README du paquet
+ * le dit.
+ */
 import type { Session } from "@tacita/client-core";
 import {
   EventType,
@@ -259,7 +266,7 @@ export function messages(session: Session, roomId: string): MatrixEvent[] {
        * **une modification remplace, elle ne s'ajoute pas.** Un `m.replace`
        * est lui aussi un `m.room.message` : il restait donc dans la liste, à côté de
        * l'original dont le SDK a déjà réécrit le contenu sur place. Résultat mesuré au
-       * navigateur le 08/08/2026 : un message modifié s'affichait **deux fois**, avec le
+       * navigateur : un message modifié s'affichait **deux fois**, avec le
        * même texte. Et supprimer n'en effaçait qu'un — la redaction vise l'original, la
        * bulle du remplacement survivait, message compris.
        *
@@ -320,7 +327,7 @@ export function subscribe(session: Session, roomId: string, listener: () => void
    * heure, jusqu'à ce qu'un autre événement force la mise à jour.
    *
    * En conversation vive, l'événement suivant masquait le défaut. Au rechargement, non :
-   * mesuré au navigateur le 08/08/2026, une conversation rouverte affichait « 13:57 » et
+   * mesuré au navigateur, une conversation rouverte affichait « 13:57 » et
    * un nom, sans une ligne de texte. Même famille que `ClientEvent.Room` —
    * un événement de moins que ce que la vie réelle exige.
    */
@@ -333,7 +340,7 @@ export function subscribe(session: Session, roomId: string, listener: () => void
    * `Room.redaction` et vide l'événement d'origine sur place ; `Room.timeline` ne dit
    * rien. Sans cet écouteur, ne tenait qu'à moitié : l'auteur voyait son
    * message partir, le destinataire continuait de le lire jusqu'au message suivant.
-   * Mesuré au navigateur le 08/08/2026, entre deux sessions réelles.
+   * Mesuré au navigateur, entre deux sessions réelles.
    */
   const surSuppression = (_event: MatrixEvent, room: Room): void => {
     if (room.roomId === roomId) listener();

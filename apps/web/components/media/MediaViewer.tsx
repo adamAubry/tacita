@@ -1,3 +1,11 @@
+/**
+ * Le visionneur plein écran : une image ou une vidéo, ouverte depuis la timeline.
+ *
+ * Zoom (jusqu'à `ZOOM_MAX`), déplacement, passage d'un média à l'autre, fermeture au
+ * glissement vers le bas. `REFUS` porte les cas où l'on n'affiche pas — format que le
+ * navigateur ne lit pas, fichier trop lourd — et chacun dit pourquoi plutôt que de
+ * montrer un cadre vide.
+ */
 "use client";
 
 import { resoudreType, TAILLE_SNIFF, verdictTaille, type Bytes } from "@tacita/media-pipeline";
@@ -207,7 +215,7 @@ export function MediaViewer({
    * `Escape` ferme, comme toute boîte de dialogue modale. Le viewer ne se fermait qu'au
    * glissement vers le bas et au bouton « Fermer » : sur un clavier, une modale plein
    * écran qu'aucune touche ne referme est un piège, et c'est la base de l'accessibilité,
-   * pas un raffinement. Mesuré au navigateur le 08/08/2026 — `Escape` ne faisait rien.
+   * pas un raffinement. Mesuré au navigateur — `Escape` ne faisait rien.
    */
   useEffect(() => {
     const surTouche = (evenement: KeyboardEvent) => {

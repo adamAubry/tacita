@@ -2,7 +2,7 @@
  * **Le seul fichier du shard qui importe Astryx.** Tout le reste passe par ici.
  *
  * Ce n'est pas une préférence de style, c'est une contrainte de construction (M-A,
- * spike du 05/08/2026) : importer depuis le barrel `@astryxdesign/core` casse la
+ * spike) : importer depuis le barrel `@astryxdesign/core` casse la
  * compilation de Next.js — *« unsupported to use "export \*" in a client boundary »*.
  * Les sous-chemins fonctionnent, et les centraliser ici fait que l'erreur ne peut être
  * commise qu'à un endroit. Un test structurel garde la règle.
@@ -18,7 +18,7 @@ export { Button } from "@astryxdesign/core/Button";
 export { Card } from "@astryxdesign/core/Card";
 // `ChatComposer` n'est pas réexporté : son shell est une colonne `[champ] [actions]`,
 // la forme d'un composer d'assistant, et la barre d'écriture d'une messagerie est une
-// rangée (escalade E-16). Seul le champ, lui, est repris tel quel.
+// rangée. Seul le champ, lui, est repris tel quel.
 export { ChatComposerInput } from "@astryxdesign/core/Chat";
 export { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
 export { ClickableCard } from "@astryxdesign/core/ClickableCard";

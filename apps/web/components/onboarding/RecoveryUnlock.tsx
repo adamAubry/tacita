@@ -120,7 +120,7 @@ export function RecoveryUnlock({ session }: { session: Session }) {
             Les trois garde-fous de clavier **portés par le parent**, pas par le champ :
             `autocapitalize`, `autocorrect` et `spellcheck` s'héritent en HTML, et les
             props d'Astryx les omettent délibérément de `BaseProps`. On ne recode pas une
-            primitive parce qu'il lui manque une prop (jurisprudence E-10) — surtout quand
+            primitive parce qu'il lui manque une prop — surtout quand
             la plateforme donne le même résultat d'un cran plus haut.
 
             Ils ne sont pas cosmétiques : une clé est du base58, sensible à la casse. Une

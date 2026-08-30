@@ -20,7 +20,7 @@ import {
  * Ce que la cible existante ne couvre pas : elle valide un utilisateur qui se parle
  * à lui-même — même appareil, mêmes clés. Le partage de clés Megolm entre appareils
  * distincts n'y est jamais exercé, alors que le restreint aux appareils
- * signés par leur propriétaire (D-08, mode `OnlySignedDevicesIsolationMode`).
+ * signés par leur propriétaire (mode `OnlySignedDevicesIsolationMode`).
  *
  * Si ce fichier échoue, la question n'est pas « le test est-il bon » mais « deux
  * personnes peuvent-elles se parler ».
@@ -49,7 +49,7 @@ async function ouvrir(
 
   // le parcours d'inscription impose la clé de récupération, qui amorce
   // le cross-signing. C'est elle qui rend l'appareil signé, donc digne des clés
-  // Megolm (D-08) : le produit n'a besoin de rien d'autre pour que deux personnes
+  // Megolm : le produit n'a besoin de rien d'autre pour que deux personnes
   // se parlent.
   if (signe) await session.setupRecoveryKey();
   return { compte, session };
@@ -60,7 +60,7 @@ beforeAll(async () => {
   bob = await ouvrir("bob");
 });
 
-describe("un appareil non signé reste illisible (D-08)", () => {
+describe("un appareil non signé reste illisible", () => {
   it("le message d'un appareil que son propriétaire n'a pas signé arrive chiffré et le reste", async () => {
     // L'intrus est le **destinataire** : Dave n'a pas amorcé son cross-signing, son
     // appareil ne porte donc aucune signature de son propriétaire. C'est la forme

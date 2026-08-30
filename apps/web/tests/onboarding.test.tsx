@@ -245,7 +245,7 @@ describe("l'étape de clé de récupération est bloquante", () => {
 
   it("la connexion est un formulaire du produit, plus une redirection", async () => {
     /*
-     * D-12, 25/08/2026 : Keycloak supprimé, Synapse porte l'identité. Les deux tests qui
+     * D-12 : Keycloak supprimé, Synapse porte l'identité. Les deux tests qui
      * vivaient ici gardaient la forme de l'URL de redirection SSO et la barre finale que
      * `sso.client_whitelist` exigeait — il n'y a plus ni redirection ni whitelist.
      */
@@ -314,7 +314,7 @@ describe("reprise de session, connexion, déconnexion", () => {
 
   it("se déconnecter ne navigue nulle part : il n'y a plus de session ailleurs", async () => {
     /*
-     * **Le défaut remonté le 25/08/2026, fermé par soustraction.** `logout()` révoquait le
+     * **Le défaut remonté, fermé par soustraction.** `logout()` révoquait le
      * jeton Matrix, mais le cookie de session Keycloak y survivait : le retour vers
      * `/login/sso/redirect` le présentait à `auth-cookie`, qui rouvrait une session dans la
      * seconde — sur un `device_id` neuf, donc non signé, donc sur l'écran de clé de
@@ -479,14 +479,14 @@ describe("à la reconnexion, la porte demande la clé, elle n'en refait pas une"
    * elle se joue chez Keycloak, dans une fenêtre, et se termine par un
    * `postMessage` de la page de repli du serveur.
    *
-   * Le défaut du 09/08/2026 : rien de tout ça n'existait. L'écran appelait, prenait un 401
+   * Le défaut : rien de tout ça n'existait. L'écran appelait, prenait un 401
    * en pleine figure et affichait « vérifiez votre connexion » — alors que la connexion
    * n'y était pour rien et que la sauvegarde venait d'être remplacée.
    */
   /**
    * Le rappel de ré-authentification, tel que `setupRecoveryKey` l'appelle quand le
    * serveur redemande le mot de passe — c'est-à-dire après un rechargement de page, la
-   * session n'ayant alors plus le mot de passe en mémoire (D-15).
+   * session n'ayant alors plus le mot de passe en mémoire.
    */
   const exigeLeMotDePasse = (
     setupRecoveryKey: ReturnType<typeof fausseSession>["setupRecoveryKey"],
@@ -509,7 +509,7 @@ describe("à la reconnexion, la porte demande la clé, elle n'en refait pas une"
   it("quand le compte exige une reconnexion, le mot de passe est demandé sur place", async () => {
     /*
      * **L'écran servait une page de repli SSO jusqu'au 25/08/2026**, et le SSO a été
-     * supprimé le matin même (D-12) : le chemin « j'ai perdu ma clé » échouait donc sur
+     * supprimé le matin même : le chemin « j'ai perdu ma clé » échouait donc sur
      * un 401 brut. Le serveur demande maintenant un mot de passe, et il se saisit ici —
      * plus de fenêtre à ouvrir, donc plus de pop-up à faire bloquer.
      */
@@ -549,7 +549,7 @@ describe("à la reconnexion, la porte demande la clé, elle n'en refait pas une"
   });
 
   it("hors ligne, un appareil déjà signé n'a plus rien à prouver : tient", async () => {
-    // Mesuré au navigateur le 08/08/2026 : sans réseau, « une sauvegarde est-elle
+    // Mesuré au navigateur : sans réseau, « une sauvegarde est-elle
     // active ? » rendait `true` pour un compte parfaitement configuré, et la porte —
     // qui *remplace* l'app — emportait l'historique promis consultable. `recoveryState()`
     // lit le magasin crypto local : la trace `recuperation-faite` n'a plus lieu d'être.
@@ -566,7 +566,7 @@ describe("le parcours d'accueil, de la clé au premier message", () => {
     const { session } = fausseSession({ recuperation: "creation" });
     monter(session);
 
-    // 1 — la clé. Bloquante : c'est elle qui rend le chiffrement possible (D-08).
+    // 1 — la clé. Bloquante : c'est elle qui rend le chiffrement possible.
     await franchirLaCle();
 
     // 2 — l'identité, dessinée pendant que l'écran se monte.
@@ -696,7 +696,7 @@ describe("le parcours d'accueil, de la clé au premier message", () => {
   });
 
   /*
-   * **Le défaut remonté le 25/08/2026, et la raison pour laquelle `mode` ne suffit pas.**
+   * **Le défaut remonté, et la raison pour laquelle `mode` ne suffit pas.**
    *
    * Une inscription interrompue au dépôt de l'identité laisse la marque posée et repart en
    * `deverrouillage` : la personne recrée sa clé, et le parcours décidait alors sur le seul
@@ -820,7 +820,7 @@ describe("la première conversation, pour que l'application ne s'ouvre pas vide"
 
 describe("l'écran de connexion dit ce que le serveur a fait, pas autre chose", () => {
   /*
-   * **Défaut vécu le 25/08/2026, juste après D-13.** Le serveur tournait encore sur sa
+   * **Défaut vécu, juste après D-13.** Le serveur tournait encore sur sa
    * configuration d'avant et redemandait un code d'invitation ; l'écran affichait « Le
    * serveur n'a pas répondu. Réessayez. » Il avait répondu, et réessayer ne pouvait rien
    * donner. La cause était à la jonction : le 401 d'une UIA n'a pas d'`errcode`, donc il
@@ -845,9 +845,9 @@ describe("l'écran de connexion dit ce que le serveur a fait, pas autre chose", 
 
   it("un mot de passe trop court est refusé avant d'être envoyé", async () => {
     /*
-     * **Mesuré le 25/08/2026 : un compte s'était créé avec le mot de passe « a ».** Le
+     * **Mesuré : un compte s'était créé avec le mot de passe « a ».** Le
      * plancher existait dans le module de changement et dans son écran — c'est-à-dire
-     * partout sauf là où le compte naît. Depuis D-15, ce mot de passe *est* la clé qui
+     * partout sauf là où le compte naît. Depuis, ce mot de passe *est* la clé qui
      * déchiffre l'historique.
      *
      * Le garde opposable est celui de Synapse ; celui-ci rend la faute immédiate et
@@ -869,7 +869,7 @@ describe("l'écran de connexion dit ce que le serveur a fait, pas autre chose", 
     expect(creerCompte).not.toHaveBeenCalled();
   });
 
-  it("aucun code d'invitation n'est demandé (D-13)", async () => {
+  it("aucun code d'invitation n'est demandé", async () => {
     monter(null);
     await waitFor(() => expect(screen.getByText("Créer un compte")).toBeTruthy());
     fireEvent.click(screen.getByText("Créer un compte"));
@@ -901,7 +901,7 @@ describe("l'écran de connexion dit ce que le serveur a fait, pas autre chose", 
   });
 });
 
-describe("la clé de récupération ouvre une session, en dernier recours (D-14)", () => {
+describe("la clé de récupération ouvre une session, en dernier recours", () => {
   /*
    * D-12 a fermé la seule autre issue : ni e-mail ni SSO sur ce déploiement, et le
    * changement de mot de passe exige déjà la clé. Sans cette porte, un mot de passe oublié

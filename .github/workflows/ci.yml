@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # La version de pnpm vient de `packageManager` dans package.json, comme dans
+      # install.sh : deux endroits qui la portent finissent par se desaccorder.
+      - run: corepack enable
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run lint
+
+      # Toujours complet : c'est lui qui tient les jonctions inter-modules au niveau
+      # des types, et c'est le moins cher des deux.
+      - run: pnpm run typecheck
+
+      # `npm run smoke` n'est pas ici : il exige un vrai Synapse. C'est la seconde
+      # porte, et elle se passe a la main contre une pile qui tourne.
+      - run: pnpm test

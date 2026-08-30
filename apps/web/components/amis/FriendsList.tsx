@@ -99,7 +99,7 @@ export function DemandesList({ demandes, onAccepter, onRefuser }: DemandesListPr
               variant="primary"
               size="sm"
               /*
-               * **Aucune surcharge de fond** (revue de conception E-10, 30/08/2026). Le
+               * **Aucune surcharge de fond** (revue de conception E-10). Le
                * commentaire qui vivait ici disait l'inverse de DESIGN.md : la table pose
                * `success` = `accent`, « pas de second vert ». La ligne repeignait donc un
                * bouton primaire de sa propre couleur — sans effet, mais en laissant croire

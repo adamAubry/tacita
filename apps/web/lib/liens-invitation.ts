@@ -6,7 +6,7 @@ import type { Session } from "@tacita/client-core";
  * nom de dossier n'est pas écrit ici : un test de `invite-tokens` vérifie qu'aucun autre
  * module ne le connaît, et c'est la bonne frontière.
  *
- * L'interface existe pour la même raison que `Contacts` (E-04) : les écrans se codent
+ * L'interface existe pour la même raison que `Contacts` : les écrans se codent
  * contre elle, et la substitution en test ne demande aucune réécriture.
  *
  * Ce module ne connaît **aucune** des règles du service — non-énumérabilité, atomicité,
@@ -34,7 +34,7 @@ export interface LienActif {
  *
  * Ce que le porteur fait ensuite dépend du `kind` et vit dans l'écran de réception
  * (M-G) : `friend` → invitation de DM native vers l'émetteur ; `group` → `knock` sur le
- * salon, qu'un membre confirmera (E-13, voie A). Le service n'émet ni l'un ni l'autre —
+ * salon, qu'un membre confirmera (voie A). Le service n'émet ni l'un ni l'autre —
  * c'est la ratification n°1 de `invite-tokens`, et elle n'a pas bougé.
  */
 export interface LienResolu {

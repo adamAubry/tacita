@@ -31,7 +31,7 @@ signature, et une clé 4S tirée au hasard qu'aucune connexion suivante ne pouva
 
 Elle joue le parcours entier contre la pile réelle : créer un compte, créer sa clé, se
 reconnecter **sur un disque neuf** (donc un `device_id` neuf, donc le cas qui cassait), et
-entrer par la porte de secours de D-14. Chacune des trois étapes doit finir sur `prete`.
+entrer par la porte de secours. Chacune des trois étapes doit finir sur `prete`.
 
 ## Connexion sans e-mail
 
@@ -118,7 +118,7 @@ survit au rendu, et que `error_description`, qui vient d'un tiers, est échappé
 ) : deux comptes créés pour l'occasion, aucun salon en commun, et l'un
   trouve l'autre par un fragment de son nom d'affichage. Le test de config atteste que
   `search_all_users: true` est écrit dans le fichier ; il n'atteste pas qu'une recherche
-  aboutisse — c'est exactement l'écart qui a produit E-21, où le réglage par défaut était
+  aboutisse — c'est exactement l'écart où le réglage par défaut était
   conforme à une spec muette pendant que « Ajouter un ami » ne trouvait personne.
   Éprouvé le 21/08/2026 dans les deux sens : avec `search_all_users: false`, les deux
   assertions d'annuaire échouent et seul le chemin du profil (adresse exacte) répond.
@@ -143,7 +143,7 @@ commit ; l'y inclure la casserait pour tout le monde. D'où une config à part
 
 ## L'overlay
 
-`docker-compose.yml` de ce dossier ne contient que des écarts dev/prod, D-07 :
+`docker-compose.yml` de ce dossier ne contient que des écarts dev/prod :
 alias réseau pour résoudre `SERVER_NAME` en interne, confiance dans le certificat
 auto-signé, `SYNAPSE_IP_RANGE_WHITELIST`, et le port de Synapse publié sur la boucle
 locale (l'API d'admin est bloquée au proxy). Aucun artefact de production

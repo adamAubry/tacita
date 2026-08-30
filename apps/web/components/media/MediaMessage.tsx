@@ -1,3 +1,11 @@
+/**
+ * Un média dans la timeline : la tuile, avant le visionneur.
+ *
+ * Déchiffre, fabrique la vignette côté client — le serveur ne peut pas la produire,
+ * il n'a que des octets opaques — et la pose dans un cadre borné par
+ * `LARGEUR_TUILE` / `HAUTEUR_TUILE_MAX`, pour qu'une image très haute ne pousse pas
+ * le reste de la conversation hors de l'écran.
+ */
 "use client";
 
 import type { EncryptedFile } from "@tacita/media-pipeline";
@@ -204,7 +212,7 @@ export function MediaMessage({
    * sans fichier sort de son effet sans rien faire, donc ni `url` ni `erreur` — et le
    * squelette scintillait indéfiniment.
    *
-   * Le cas est apparu le 21/08/2026, quand `thumbnail_file` est devenu facultatif côté
+   * Le cas est apparu, quand `thumbnail_file` est devenu facultatif côté
    * pipeline pour qu'un poster impossible n'emporte plus l'envoi. Le paquet a changé son
    * contrat, ce rendu supposait l'ancien : la jonction n'avait pas de propriétaire
    * (règle 1). Il en a un maintenant, et c'est cette ligne.

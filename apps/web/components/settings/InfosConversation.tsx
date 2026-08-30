@@ -1,3 +1,9 @@
+/**
+ * Les informations d'une conversation : membres, médias partagés, options.
+ *
+ * `TITRES` nomme les panneaux, `AjouterMembre` porte l'ajout. Ce qui est destructeur
+ * — quitter, retirer quelqu'un — passe par une confirmation, jamais par un tap seul.
+ */
 "use client";
 
 import type { Session } from "@tacita/client-core";

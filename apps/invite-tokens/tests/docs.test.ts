@@ -7,7 +7,7 @@ describe("l'ajout par identifiant ne passe pas par ce service", () => {
   /**
    * Ce qui doit rester vrai : **un seul module hors de ce dossier connaît ce service**,
    * et c'est le client de liens du shard. Le reste du dépôt l'ignore, ce qui garantit
-   * que l'ajout par identifiant (natif, D-09) ne peut pas dépendre de lui.
+   * que l'ajout par identifiant (natif) ne peut pas dépendre de lui.
    *
    * La borne était « aucun » jusqu'au 07/08/2026 — elle fermait la porte au client de
    * réception qu'E-13 exige (voie A : résoudre, puis frapper). Elle devient « un seul,

@@ -1,3 +1,11 @@
+/**
+ * Les préférences locales, en IndexedDB — jamais localStorage.
+ *
+ * `lireCle` / `ecrireCle` sont la primitive ; le reste sont des accès nommés (thème,
+ * fond d'écran, refus d'éducation iOS, mode masqué). Asynchrone par nature : au tout
+ * premier rendu, la valeur n'est pas encore là, et un bref passage par le thème par
+ * défaut est attendu.
+ */
 import type { ThemeMode } from "../components/foundation/primitives";
 
 const BASE = "tacita-ui";
@@ -153,7 +161,7 @@ export const ecrireDemandePushFaite = (indexedDB: IDBFactory) =>
 
 /*
  * `recuperation-faite` vivait ici — une trace « cet appareil a déjà mené ce compte au
- * bout de l'étape », posée le 08/08/2026 pour que la porte ne se referme pas hors ligne.
+ * bout de l'étape », posée pour que la porte ne se referme pas hors ligne.
  * Elle est **supprimée** : `recoveryState()` lit désormais le magasin crypto,
  * ce qui répond sans réseau et n'a donc plus rien à mémoriser. Et surtout la trace ne
  * savait rien du `device_id` : après une déconnexion/reconnexion dans le même navigateur,

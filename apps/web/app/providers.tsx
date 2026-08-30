@@ -71,7 +71,7 @@ export function Providers({ children }: { children: ReactNode }) {
           transparents, et le conteneur d'Astryx ne fait que porter les tokens sans
           hauteur propre. En thème clair le blanc du navigateur passait pour le bon fond
           — en sombre, il serait resté blanc derrière tout espace non couvert.
-          Mesuré au navigateur le 07/08/2026 ; jsdom ne peint pas.
+          Mesuré au navigateur ; jsdom ne peint pas.
 
           Ici et pas sur `body` : les tokens sont posés par `Theme` sur son conteneur,
           donc invisibles depuis `body`. `100dvh` et non `100vh` — sur mobile, la barre

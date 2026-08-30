@@ -74,7 +74,7 @@ hors ligne est un bug, pas une dégradation.
   qu'il est branché : un `createSearch` créé à l'ouverture d'un onglet et jeté à sa
   fermeture n'assiste à aucun déchiffrement et laisse l'index vide.
 - **Plafond de 200 000 événements ; les premiers indexés sortent** (DECISIONS
-  D-01). L'éviction suit l'ordre d'indexation locale, jamais la date d'origine
+  le plafond de l'index). L'éviction suit l'ordre d'indexation locale, jamais la date d'origine
   des messages : sinon un rattrapage d'historique — qui insère par définition
   des messages anciens — s'auto-évincerait. `stats().size` contre `max` dit si
   la purge a mordu, et `oldestTs`/`newestTs` restent des dates d'origine, les
@@ -88,9 +88,9 @@ hors ligne est un bug, pas une dégradation.
   déjà indexés ne sont pas migrés : ils sont effacés, et l'index se reconstruit au
   fil des déchiffrements suivants. La recherche ne couvre alors plus l'historique
   antérieur tant qu'il n'est pas reparcouru — `stats()` le dit, comme toujours.
-- **Une rotation de session Megolm ne déclenche rien** (DECISIONS D-05). Ce qui
+- **Une rotation de session Megolm ne déclenche rien** (décision assumée). Ce qui
   a été déchiffré et indexé le reste ; en dehors du cycle de vie des messages
-  ci-dessus, seules la purge D-01 et `wipe()` retirent des entrées.
+  ci-dessus, seules la purge de plafond et `wipe()` retirent des entrées.
 - **Un retrait qui échoue n'est pas retenté.** Si le worker rejette la
   suppression, le document reste trouvable jusqu'au prochain `wipe()`. Ce
   package n'a aucun canal d'erreur ; la reprise se branchera quand le shard UI

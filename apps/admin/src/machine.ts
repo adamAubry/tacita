@@ -1,3 +1,11 @@
+/**
+ * Les vérifications de la machine : ce qui doit être là avant tout le reste.
+ *
+ * Node, Docker, le plugin compose v2, la plateforme, la mémoire et le disque. Les
+ * planchers sont ici (`MEMOIRE_PLANCHER`, `DISQUE_PLANCHER`) parce qu'ils se
+ * constatent avant d'installer quoi que ce soit : la construction du shard est le
+ * moment le plus lourd de l'installation, et elle échoue tard.
+ */
 import {
   attention,
   casse,

@@ -17,7 +17,7 @@ import {
 /**
  * Deux `MatrixClient` sur le même IndexedDB.
  *
- * Question ouverte le 04/08/2026, escaladée, et qui n'avait laissé **aucune trace
+ * Question ouverte, escaladée, et qui n'avait laissé **aucune trace
  * écrite** — ni arbitrage, ni ticket, ni commentaire. Mesurée ici plutôt que débattue.
  *
  * Pourquoi elle compte : `initSession`/`restoreSession` n'ont aucun garde contre une

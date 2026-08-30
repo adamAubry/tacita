@@ -1,3 +1,13 @@
+/**
+ * Le transcodage vidéo dans le navigateur : WebCodecs, démux vers remux.
+ *
+ *  1. `dimensionsCibles` — la taille de sortie, en gardant le rapport d'origine.
+ *  2. `transcoderVideo` — décode, ré-encode aux cibles, ré-empaquette en MP4.
+ *
+ * `EchecTranscodage` porte le motif (`codec-source`, `encodeur`, `autre`) parce que
+ * l'appel suivant en dépend : un codec source non lu ne se réessaie pas, une panne
+ * d'encodeur peut-être.
+ */
 import {
   CODECS_H264,
   ecrireMp4,
@@ -13,7 +23,7 @@ import {
 } from "@tacita/media-pipeline";
 
 /**
- * côté shard — **l'encodage vit ici, le conteneur dans le paquet** (E-10).
+ * côté shard — **l'encodage vit ici, le conteneur dans le paquet**.
  *
  * Le paquet démuxe et muxe des octets ; `WebCodecs` décode et réencode. Aucun élément
  * `<video>`, aucun canvas dans le chemin nominal — c'est tout l'objet de la refonte.
@@ -31,7 +41,7 @@ import {
  *
  * « Ce navigateur ne sait pas encoder » et « ce navigateur ne sait pas **lire** ce
  * format » n'appellent pas la même conduite : le second se règle en changeant d'appareil
- * ou en exportant la vidéo autrement, le premier non. Mesuré le 20/08/2026 : un `.mov`
+ * ou en exportant la vidéo autrement, le premier non. Mesuré : un `.mov`
  * d'iPhone en HEVC échouait sous la phrase « impossible de compresser », qui est fausse —
  * on n'a même pas pu la décoder.
  */
@@ -138,7 +148,7 @@ interface Poster {
  * codée, matrice non appliquée. Sans cette rotation, la vignette d'une vidéo filmée en
  * portrait sortait couchée à côté d'une vidéo qui, elle, se lisait droite.
  *
- * Sens vérifié contre ffmpeg le 21/08/2026 : la valeur rendue par `rotationDeMatrice` est
+ * Sens vérifié contre ffmpeg : la valeur rendue par `rotationDeMatrice` est
  * l'angle **horaire** à appliquer pour l'affichage — `270` reproduit exactement la frame
  * qu'`ffmpeg` sort avec sa rotation automatique. Le repère du canvas ayant l'axe Y vers le
  * bas, `rotate()` tourne déjà dans ce sens : l'angle passe tel quel.
@@ -373,7 +383,7 @@ export async function transcoderVideo(blob: Blob, cibles: VideoTargets): Promise
       }
 
       /*
-       * **La réduction se fait ici, explicitement, et c'est le correctif du 21/08/2026.**
+       * **La réduction se fait ici, explicitement, et c'est le correctif.**
        *
        * La version précédente construisait `new VideoFrame(image, { displayWidth,
        * displayHeight })` en la nommant « scaler natif ». Il n'en existe pas :

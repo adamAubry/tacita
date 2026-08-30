@@ -14,8 +14,8 @@ export interface VideoTargets {
 }
 
 /**
- * D-04 — JPEG pour les images, MP4/H.264 pour les vidéos : lisible partout, et la vidéo
- * n'a pas la contrainte d'interopérabilité qui impose Opus aux vocaux (D-03).
+ * JPEG pour les images, MP4/H.264 pour les vidéos : lisible partout, et la vidéo
+ * n'a pas la contrainte d'interopérabilité qui impose Opus aux vocaux.
  */
 export const PROFILES: Record<NetworkProfile, { image: ImageTargets; video: VideoTargets }> = {
   good: {
@@ -31,7 +31,7 @@ export const PROFILES: Record<NetworkProfile, { image: ImageTargets; video: Vide
 /**
  * Vignette : indépendante du profil réseau, elle est déjà minuscule.
  *
- * **512 px et WebP depuis le 20/08/2026.** 320 px était sous-dimensionné : une vignette
+ * **512 px et WebP.** 320 px était sous-dimensionné : une vignette
  * qui occupe 220 px CSS sur un écran à trois pixels physiques par point en demande 660 —
  * elle était floue sur tout téléphone récent. Le WebP à 0,75 reprend largement le poids
  * que la résolution ajoute, et reste sous celui du JPEG à 320.
@@ -84,7 +84,7 @@ const MARGE_DEBIT = 1.3;
  * se réencode pas.**
  *
  * Ce que le prédicat exige, et pourquoi :
- * - **H.264**, parce que c'est ce que notre conteneur sait décrire (D-04) ;
+ * - **H.264**, parce que c'est ce que notre conteneur sait décrire ;
  * - **hauteur sous le plafond**, parce qu'au-dessus il faut bien réduire ;
  * - **débit sous la cible et sa marge**, même raison ;
  * - **au plus deux pistes** : une vidéo, éventuellement du son. Au-delà — angles

@@ -1,3 +1,10 @@
+/**
+ * L'écran de réglages : une option par ligne, chacune avec son effet en clair.
+ *
+ * `TITRES`, `DETAILS` et `MODES` sont la source du libellé : une option ajoutée sans
+ * son texte ne s'affiche pas à moitié, elle ne compile pas. Chaque réglage existant
+ * doit se justifier — on ne pose pas un labyrinthe d'options.
+ */
 "use client";
 
 import type { Session } from "@tacita/client-core";
@@ -29,7 +36,7 @@ import { routeInfos } from "../../lib/routes";
 /**
  * Les options de. Chacune ouvre une modal, aucune ne navigue.
  *
- * « Appareils » est arrivée le 25/08/2026, juste sous le mot de passe : les
+ * « Appareils » est arrivée, juste sous le mot de passe : les
  * deux sont les gestes qu'on cherche au même moment, quand on soupçonne que quelqu'un
  * d'autre est entré. Changer son mot de passe sans pouvoir fermer les sessions ouvertes
  * ne reprend rien.
@@ -76,7 +83,7 @@ const MODES: { valeur: ThemeMode; libelle: string; effet: string }[] = [
 ];
 
 /**
- * les réglages, **une section de son propre profil** (amendé le 10/08/2026).
+ * les réglages, **une section de son propre profil** (amendé).
  *
  * `/reglages` n'existe plus. L'écran commençait par une carte de profil dont le chevron
  * ramenait au profil — un écran dont le premier élément mène ailleurs est un couloir, et

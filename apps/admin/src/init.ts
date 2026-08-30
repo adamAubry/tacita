@@ -129,7 +129,7 @@ export function planifier(source: string, reponses: Reponses): Plan {
  * demande plus qu'une seule IPv4 depuis que le TURN-TLS a quitté le 443 pour le 5349,
  * donc plus rien ne justifie de le réserver aux déploiements à deux adresses.
  *
- * Ces deux chaînes sont aussi celles qu'exécute `infra/bootstrap.sh` : les désaccorder
+ * Ces deux chaînes sont aussi celles qu'exécute `install.sh` : les désaccorder
  * enverrait l'administrateur relancer une pile différente de celle qu'on lui a montée.
  */
 export const COMPOSE_DEV =

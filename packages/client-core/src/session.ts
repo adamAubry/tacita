@@ -1,3 +1,19 @@
+/**
+ * La session Matrix : l'ouvrir, la restaurer, la fermer — et tout ce qui en dépend.
+ *
+ * Quatre responsabilités, dans l'ordre où on les lit :
+ *
+ *  1. Identifiants — `openSession` (identifiant + mot de passe) et `restoreSession`
+ *     (jeton relu depuis IndexedDB). Le mot de passe ne survit pas à l'appel.
+ *  2. Crypto et récupération — amorçage vodozemac, secret storage dérivé du mot de
+ *     passe, `recoveryState()` en trois cas, `setupRecoveryKey`, `unlockRecovery`.
+ *  3. Persistance — le store du SDK n'écrit que toutes les cinq minutes ; on force
+ *     l'écriture quand la page s'en va, sinon une session courte ne laisse rien.
+ *  4. Lectures — timeline dans l'ordre du flux /sync, liste des appareils.
+ *
+ * Aucun autre paquet n'importe matrix-js-sdk pour la session : tous reçoivent la
+ * `Session` construite ici.
+ */
 import {
   createClient,
   HttpApiEvent,
@@ -28,7 +44,7 @@ export interface SessionConfig {
   /** Homeserver Synapse, derrière le proxy TLS. */
   homeserverUrl: string;
   /**
-   * **identifiant et mot de passe**, réécrit le 25/08/2026 (D-12).
+   * **identifiant et mot de passe**, réécrit.
    *
    * Le module recevait ici un `loginToken` émis par un fournisseur OIDC externe, et se
    * targuait de ne connaître aucun secret utilisateur. Keycloak supprimé, l'identité est
@@ -88,17 +104,17 @@ export interface SetupRecoveryOptions {
   reinitialiser?: boolean;
   /**
    * **le mot de passe, quand le serveur le redemande pour remplacer une
-   * identité** (réécrit le 25/08/2026).
+   * identité** (réécrit).
    *
    * Deux choses ont changé le même jour, et il faut les tenir séparées. **Le premier
    * dépôt d'identité ne demande plus rien** : relu dans le servlet de la v1.155.0, une
-   * mise en place initiale passe sans UIA — E-22 est éteinte, l'inscription ne rencontre
+   * mise en place initiale passe sans UIA est éteinte, l'inscription ne rencontre
    * aucune épreuve. **Le remplacement, lui, en demande une**, et c'est désormais
-   * `m.login.password` puisque Keycloak est parti (D-12).
+   * `m.login.password` puisque Keycloak est parti.
    *
    * Ce rappel n'est appelé que dans ce second cas, et **seulement si le module n'a pas
    * déjà le mot de passe** : une session ouverte par identifiant et mot de passe le porte
-   * en mémoire (D-15), et redemander ce qu'on vient de recevoir serait un geste de plus
+   * en mémoire, et redemander ce qu'on vient de recevoir serait un geste de plus
    * pour rien. Il ne sert donc qu'après un rechargement de page, où la session est
    * restaurée depuis le disque et où plus personne ne connaît le mot de passe.
    *
@@ -111,7 +127,7 @@ export interface SetupRecoveryOptions {
  * Le défi UIA `m.login.password` d'une erreur, s'il y en a un — l'identifiant de session
  * à rejouer avec le mot de passe.
  *
- * **Réécrit le 25/08/2026.** Cette fonction cherchait `m.login.sso`, et c'était juste tant
+ * **Réécrit.** Cette fonction cherchait `m.login.sso`, et c'était juste tant
  * que Keycloak portait l'identité. D-12 l'a supprimé le matin même ; Synapse propose
  * désormais `m.login.password`, que ce client ne reconnaissait pas. Conséquence mesurée :
  * la réinitialisation de clé — le seul recours d'une clé perdue — remontait un 401 brut
@@ -155,7 +171,7 @@ function authMotDePasse(userId: string, motDePasse: string, session: string) {
  *
  * Il vivait à deux endroits qui ne se lisaient pas — le module Synapse et l'écran de
  * changement — et à aucun des deux qui compte : la création de compte n'en avait aucun.
- * Mesuré le 25/08/2026, un compte s'est créé avec le mot de passe « a ». Depuis D-15, ce
+ * Mesuré, un compte s'est créé avec le mot de passe « a ». Depuis, ce
  * mot de passe **est** la clé qui déchiffre tout l'historique.
  *
  * Le garde opposable est celui de Synapse (`password_config.policy`) ; cette constante-ci
@@ -241,7 +257,7 @@ export interface Session {
    *
    * Sans cette liste, une fuite de jeton n'a aucune réponse : les jetons de ce
    * déploiement n'expirent pas, et le changement de mot de passe ne déconnecte
-   * volontairement personne (D-12, pour ne pas faire perdre leur historique aux autres
+   * volontairement personne (pour ne pas faire perdre leur historique aux autres
    * appareils). Voir sans pouvoir agir ne servirait à rien non plus — d'où
    * {@link Session.revoquerAppareils}, qui vient avec.
    */
@@ -251,7 +267,7 @@ export interface Session {
    *
    * Le serveur exige une ré-authentification, et c'est heureux : c'est le geste qu'un
    * intrus retournerait contre le titulaire. Le mot de passe de la session courante est
-   * utilisé s'il est connu (D-15) ; sinon l'appelant le fournit — après un rechargement
+   * utilisé s'il est connu ; sinon l'appelant le fournit — après un rechargement
    * de page, plus personne ne l'a.
    *
    * Lève si le serveur refuse : une révocation qu'on croit faite et qui ne l'est pas est
@@ -299,7 +315,7 @@ const CREDENTIALS_KEY = "current";
  * crypto voisin — clés Megolm comprises — l'est déjà. Chiffrer le seul jeton en
  * laissant les clés à côté présenterait une garantie que le module n'offre pas
  * (interdit n°13). Limite et conditions pour la relever : README.md, à consigner en
- * `DECISIONS.md` (D-06) avant toute implémentation.
+ * `DECISIONS.md` avant toute implémentation.
  *
  * ponytail: troisième copie du motif open/commit IndexedDB (avec outbox et search).
  * Le factoriser ici et l'exporter le jour où C3 et C4 sont tous deux sur main —
@@ -363,7 +379,7 @@ function requireCrypto(client: MatrixClient): CryptoApi {
 type DeviceIsolationMode = Parameters<CryptoApi["setDeviceIsolationMode"]>[0];
 
 /**
- * (D-08) — les clés Megolm ne sont partagées qu'avec les appareils que
+ * — les clés Megolm ne sont partagées qu'avec les appareils que
  * leur propriétaire a signés de son identité cross-signing. Le mode est posé puis
  * verrouillé : toute tentative de le desserrer lève, plutôt que d'échouer en silence.
  *
@@ -401,7 +417,7 @@ async function buildSession(
   config: Omit<SessionConfig, "identifiant" | "motDePasse">,
   saved: CredentialStore,
   /**
-   * D-15 — **le mot de passe du compte, s'il vient d'être saisi**, et rien d'autre n'en
+   * **le mot de passe du compte, s'il vient d'être saisi**, et rien d'autre n'en
    * est fait : il sert de phrase de passe à la clé de récupération (`setupRecoveryKey`).
    *
    * Il vit dans cette fermeture le temps de la session et **n'est jamais écrit** — ni en
@@ -482,7 +498,7 @@ async function buildSession(
    *
    * `IndexedDBStore` du SDK n'écrit son accumulateur de sync qu'une fois toutes les cinq
    * minutes (`WRITE_DELAY_MS`). Tout ce qui est arrivé depuis la dernière écriture n'est
-   * nulle part sur disque : mesuré au navigateur le 08/08/2026, une conversation rouverte
+   * nulle part sur disque : mesuré au navigateur, une conversation rouverte
    * hors ligne après rechargement était vide, alors que les messages venaient d'être lus
    * à l'écran. Une session de moins de cinq minutes ne laissait aucune trace.
    *
@@ -547,7 +563,7 @@ async function buildSession(
        * propriétaire, ce que D-08 exige pour qu'il reçoive et envoie des clés Megolm.
        * C'est une lecture du magasin crypto local — aucun réseau, donc juste hors ligne,
        * là où « une sauvegarde est-elle active ? » rendait `true` à tort et refermait la
-       * porte sur un appareil parfaitement configuré (mesuré au navigateur le 08/08/2026).
+       * porte sur un appareil parfaitement configuré (mesuré au navigateur).
        */
       const appareil = await crypto.getDeviceVerificationStatus(
         credentials.userId,
@@ -560,7 +576,7 @@ async function buildSession(
        * serveur le sait** : l'identité du compte ne vit pas ici.
        *
        * **La question est « ce compte a-t-il une identité cross-signing ? », et surtout
-       * pas « a-t-il une sauvegarde ? »** (corrigé le 25/08/2026). Les deux ne vont pas
+       * pas « a-t-il une sauvegarde ? »** (corrigé). Les deux ne vont pas
        * ensemble : `setupRecoveryKey` provisionne le secret storage *et la sauvegarde*
        * avant de déposer l'identité, et ce dépôt est la seule requête du flux qui puisse
        * échouer sur une UIA. Une inscription interrompue à cet endroit laisse donc un
@@ -602,7 +618,7 @@ async function buildSession(
         setupNewKeyBackup: true,
         /*
          * **`true` dans les deux cas, et c'est ce qui rend l'inscription rejouable**
-         * (corrigé le 25/08/2026).
+         * (corrigé).
          *
          * Relu dans le SDK épinglé (`rust-crypto.js`, v42.0.0) :
          * `isNewSecretStorageKeyNeeded = setupNewSecretStorage || !hasAESKey()`, et
@@ -655,7 +671,7 @@ async function buildSession(
          * une UIA. On tente d'abord sans, puis on rejoue avec la session : c'est le seul
          * ordre qui marche des deux côtés du MSC3967.
          *
-         * **Le 401 arrive aussi à l'inscription** — corrigé le 25/08/2026. Le commentaire
+         * **Le 401 arrive aussi à l'inscription** — corrigé. Le commentaire
          * qui vivait ici affirmait « le 401 n'arrive donc qu'en réinitialisation », et le
          * test qui le prouvait donnait un `envoyer` qui ne lève jamais : une hypothèse
          * validée contre un substitut qui la confirme par construction (règle 3). Contre
@@ -676,7 +692,7 @@ async function buildSession(
             const sessionUia = defiMotDePasse(erreur);
             if (sessionUia === undefined) throw erreur;
 
-            // Le mot de passe de la session courante d'abord (D-15) : le redemander à
+            // Le mot de passe de la session courante d'abord : le redemander à
             // quelqu'un qui vient de le taper serait un geste que rien ne justifie.
             const motDePasse = phraseDePasse ?? (await demanderMotDePasse?.());
             if (!motDePasse) throw erreur;
@@ -713,7 +729,7 @@ async function buildSession(
       recoveryKey = { privateKey, encodedPrivateKey: encodedKey };
 
       /*
-       * **L'identité publique d'abord, la signature ensuite** (corrigé le 25/08/2026,
+       * **L'identité publique d'abord, la signature ensuite** (corrigé,
        * mesuré contre un vrai Synapse).
        *
        * Sans ça, `bootstrapCrossSigning` importe les clés privées du secret storage,
@@ -727,7 +743,7 @@ async function buildSession(
        * téléchargement pour l'utilisateur local au lieu d'attendre qu'un tour de `/sync`
        * l'amène. C'est une course qui ne se voyait pas depuis un écran — quelqu'un qui
        * tape sa clé met plus de temps que le premier sync — et qui devient systématique
-       * dès qu'un appel enchaîne (`connexionParCle`, D-14).
+       * dès qu'un appel enchaîne (`connexionParCle`).
        */
       await crypto.userHasCrossSigningKeys(undefined, true);
 
@@ -856,13 +872,13 @@ async function buildSession(
 
 /**
  * **Relit l'identité de l'utilisateur au serveur, et c'est ce qui rend `recoveryState()`
- * juste** (ajouté le 25/08/2026, mesuré contre un vrai Synapse).
+ * juste** (ajouté, mesuré contre un vrai Synapse).
  *
  * `bootstrapCrossSigning` dépose ou importe l'identité et signe l'appareil ; le magasin
  * crypto local, lui, garde la vue qu'il avait avant. `getDeviceVerificationStatus` — la
  * source de `recoveryState` — répond alors « non signé » sur un appareil qui vient de
  * l'être, et la porte se referme derrière quelqu'un qui vient de tout faire correctement.
- * C'est le défaut remonté le 25/08/2026 : « je me connecte et on me demande ma clé ».
+ * C'est le défaut remonté : « je me connecte et on me demande ma clé ».
  *
  * Le second paramètre `true` force le `/keys/query` au lieu d'attendre qu'un tour de
  * `/sync` l'amène. Le booléen rendu ne nous intéresse pas — c'est l'effet de bord qui est
@@ -911,11 +927,11 @@ export async function initSession(config: SessionConfig): Promise<Session> {
    *
    * Chaque connexion donne un `device_id` neuf, donc un appareil non signé, donc — avant
    * ce jour — l'écran « Entrez votre clé de récupération » à quelqu'un qui venait de
-   * donner son mot de passe. C'est le défaut remonté le 25/08/2026, et ce n'était pas un
+   * donner son mot de passe. C'est le défaut remonté, et ce n'était pas un
    * défaut d'écran : sans la clé, cet appareil ne peut réellement rien déchiffrer ni
-   * rien envoyer (D-08). Le mur était honnête, c'est sa nécessité qui ne l'était pas.
+   * rien envoyer. Le mur était honnête, c'est sa nécessité qui ne l'était pas.
    *
-   * La clé étant dérivée du mot de passe (D-15), le mot de passe qu'on vient d'utiliser
+   * La clé étant dérivée du mot de passe, le mot de passe qu'on vient d'utiliser
    * la redonne. `unlockRecovery` fait le reste — exactement le même chemin que l'écran
    * de saisie, pour ne pas tenir deux déverrouillages en phase.
    */
@@ -924,7 +940,7 @@ export async function initSession(config: SessionConfig): Promise<Session> {
 }
 
 /**
- * D-15 — rejoue la dérivation de la clé de récupération à partir du mot de passe.
+ * rejoue la dérivation de la clé de récupération à partir du mot de passe.
  *
  * Silencieux dans les deux sens : il ne demande rien, et **il ne fait échouer aucune
  * connexion**. Trois cas normaux n'aboutissent pas, et aucun n'est une erreur — un compte
@@ -1072,7 +1088,7 @@ export async function restoreSession(
     /*
      * **valider le jeton avant de rendre la session.**
      *
-     * Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée,
+     * Mesuré au navigateur : jeton révoqué côté serveur, page rechargée,
      * et l'application se rouvrait entièrement — liste des conversations comprise. Les
      * credentials locaux suffisaient à démarrer, et plus rien ne demandait au serveur
      * s'ils valaient encore quelque chose. C'était écrit en commentaire ici comme une
@@ -1120,7 +1136,7 @@ export async function restoreSession(
 /**
  * **un jeton révoqué doit sortir de la session, pas la hanter.**
  *
- * Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée —
+ * Mesuré au navigateur : jeton révoqué côté serveur, page rechargée —
  * l'application se rouvrait normalement et continuait de rendre une session morte. Rien
  * ne levait : `restoreSession` relit des credentials locaux qu'aucun appel n'a encore
  * démentis, et le refus du serveur arrive plus tard, dans la boucle /sync.
@@ -1147,7 +1163,7 @@ export function onSessionInvalidee(session: Session, rappel: () => void): () => 
 /**
  * **créer un compte**, un identifiant et un mot de passe.
  *
- * `registration_requires_token` a été retiré du serveur (D-13) : il n'y a plus de code
+ * `registration_requires_token` a été retiré du serveur : il n'y a plus de code
  * d'invitation à saisir, et donc plus rien à demander hors de l'app. Ce que ça expose est
  * assumé — le client n'a rien à en compenser.
  *
@@ -1175,7 +1191,7 @@ export async function creerCompte(config: SessionConfig): Promise<Session> {
    * Relu dans l'image déployée (`synapse/rest/client/register.py`,
    * `_calculate_registration_flows`, v1.155.0) : sans e-mail ni MSISDN configurés, la
    * liste de base vaut `[[m.login.dummy]]`, et `registration_requires_token` la
-   * **préfixait** d'un jeton. Le garde retiré (D-13), il ne reste que `m.login.dummy` —
+   * **préfixait** d'un jeton. Le garde retiré, il ne reste que `m.login.dummy` —
    * mais la boucle ne le suppose pas : elle lit les flows que le serveur annonce.
    *
    * Une version antérieure ne franchissait qu'une étape et tenait le 401 suivant pour une
@@ -1220,7 +1236,7 @@ export async function creerCompte(config: SessionConfig): Promise<Session> {
 /**
  * Règle 2 — **un défi qu'on ne sait pas franchir n'est pas une panne de réseau.**
  *
- * Trouvé en montant la pile le 25/08/2026, juste après D-13 : le serveur tournait encore
+ * Trouvé en montant la pile, juste après D-13 : le serveur tournait encore
  * sur la configuration d'avant, redemandait `m.login.registration_token`, et l'écran
  * affichait « Le serveur n'a pas répondu. Réessayez. » — il avait répondu, très
  * précisément, et réessayer ne pouvait rien donner. La cause : le 401 d'une UIA ne porte
@@ -1289,7 +1305,7 @@ async function premiereReponse(
 
 
 /**
- * D-12 — **changer son mot de passe, la clé de récupération à l'appui.**
+ * **changer son mot de passe, la clé de récupération à l'appui.**
  *
  * Le garde est **serveur** : `POST /_matrix/client/v3/account/password` est fermé au proxy,
  * et `/_synapse/client/tacita/password` est le seul chemin restant. La vérification faite

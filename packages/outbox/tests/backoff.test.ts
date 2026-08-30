@@ -90,7 +90,7 @@ describe("backoff exponentiel sur rate-limit et erreurs réseau", () => {
 
 describe("une erreur qu'on ne sait pas classer ne boucle pas indéfiniment", () => {
   /**
-   * Mesuré le 20/08/2026 : un téléversement au-dessus du plafond recevait un **413 sans
+   * Mesuré : un téléversement au-dessus du plafond recevait un **413 sans
    * en-tête CORS**, que le navigateur masquait au JavaScript. Le client ne voyait qu'une
    * erreur d'origine, sans statut, donc réessayable — et l'entrée réessayait à l'infini
    * une requête qui ne pouvait pas aboutir. La cause est corrigée côté proxy ; ceci est le

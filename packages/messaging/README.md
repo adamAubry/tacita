@@ -48,7 +48,7 @@ await setRoomNotificationLevel(session, roomId, "mentions");
   seul signal disponible : `getRooms()` rend l'ordre d'insertion du store, et /sync ne
   définit aucun ordre entre salons. L'interdit de tri par `origin_server_ts` reste entier
   là où il porte — **dans** une timeline, où rien n'a changé. La réserve est
-  écrite ici, son motif dans l'escalade E-09.
+  écrite ici.
 - **`@everyone` devient `@room` dans le corps du message.** C'est ce littéral que
   la push rule native `.m.rule.roomnotif` cherche ; `m.mentions.room` est posé en
   parallèle pour `.m.rule.is_room_mention`. Le réaffichage en `@everyone` est du

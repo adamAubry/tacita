@@ -1,3 +1,17 @@
+/**
+ * La file d'envoi persistante : ce qui est composé part, même après un rechargement.
+ *
+ * Le local echo du SDK ne survit pas à un F5 ; cette file vit en IndexedDB.
+ *
+ *  1. `enqueue` — l'entrée est écrite avant toute tentative réseau.
+ *  2. Départ à la reconnexion, en FIFO par salon.
+ *  3. Classement des erreurs par résolubilité, pas par classe HTTP : réessayable
+ *     avec backoff, ou `failed` — qui veut dire « l'utilisateur doit agir sur
+ *     *ce* message ».
+ *  4. Le téléversement est injecté : cette file ne connaît ni média ni chiffrement.
+ *
+ * Un salon non chiffré fait échouer l'entrée (`NOT_ENCRYPTED`) plutôt que d'envoyer.
+ */
 import type { Session } from "@tacita/client-core";
 import { ClientEvent, SyncState } from "matrix-js-sdk";
 
@@ -31,7 +45,7 @@ export const MAX_BACKOFF_MS = 60_000;
  * donc si le serveur est là — et que la même requête échoue six fois de suite sans
  * jamais rendre de statut, l'attente ne résout rien. Elle boucle.
  *
- * Mesuré le 20/08/2026 : un téléversement au-dessus du plafond recevait un 413 **sans
+ * Mesuré : un téléversement au-dessus du plafond recevait un 413 **sans
  * en-tête CORS**, que le navigateur masquait au JavaScript. Le client ne voyait qu'une
  * erreur d'origine, sans statut, donc réessayable — et l'entrée réessayait indéfiniment
  * une requête qui ne pouvait pas aboutir. La cause est corrigée côté proxy ; ce plafond

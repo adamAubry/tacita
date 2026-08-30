@@ -10,7 +10,7 @@ import { ecrireMp4, lireMp4, rotationDeMatrice, type Bytes, type EchantillonVide
  * écrit dans le même dépôt.
  *
  * Aucune globale navigateur n'est nécessaire : c'est ce qui rendait cette dépendance
- * admissible (E-17), et ce test en est la preuve permanente.
+ * admissible, et ce test en est la preuve permanente.
  */
 
 const DESCRIPTION = new Uint8Array([

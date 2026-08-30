@@ -26,13 +26,13 @@ type Etat =
 
 interface ReceptionLienProps {
   token: string;
-  /** Injectés en test : le service est une API HTTP, les contacts une interface (E-04). */
+  /** Injectés en test : le service est une API HTTP, les contacts une interface. */
   liens?: LiensInvitation;
   session?: Session;
 }
 
 /**
- * l'écran qui consomme un lien d'invitation (E-13, voie A).
+ * l'écran qui consomme un lien d'invitation (voie A).
  *
  * Il fait **une** chose et la fait sans rien demander : on a cliqué sur un lien, on a
  * déjà exprimé son intention. Un écran « voulez-vous vraiment ? » ajouterait un geste à

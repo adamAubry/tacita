@@ -133,7 +133,7 @@ describe("/sync est du long-polling HTTP, jamais du WebSocket", () => {
   });
 });
 
-describe("clés Megolm partagées avec les seuls appareils signés (D-08)", () => {
+describe("clés Megolm partagées avec les seuls appareils signés", () => {
   it("le mode d'isolation « appareils signés uniquement » est posé", async () => {
     await initSession(config);
     expect(crypto.isolationMode).toBeInstanceOf(OnlySignedDevicesIsolationMode);
@@ -261,7 +261,7 @@ describe("identifiant et mot de passe, portés par Synapse", () => {
 
   it("le mot de passe traverse le module, il n'y est jamais conservé", () => {
     /*
-     * Réécrit le 25/08/2026 (D-12). L'assertion était `code` sans aucun `password` —
+     * Réécrit. L'assertion était `code` sans aucun `password` —
      * elle ne peut plus tenir, le module portant désormais la connexion. Ce qui reste
      * vrai et qui compte : rien ne le range. `StoredCredentials` est le seul objet écrit
      * en IndexedDB, et il ne porte que le jeton et l'identité d'appareil.
@@ -325,7 +325,7 @@ describe("reprise de session sans réseau", () => {
 
 describe("un jeton refusé ne rouvre pas la session", () => {
   it("un `M_UNKNOWN_TOKEN` à la reprise rend null et efface les credentials", async () => {
-    // Mesuré au navigateur le 08/08/2026 : jeton révoqué côté serveur, page rechargée,
+    // Mesuré au navigateur : jeton révoqué côté serveur, page rechargée,
     // et l'application se rouvrait entièrement — liste des conversations comprise. Le
     // refus n'arrivait que plus tard, dans /sync, où le gestionnaire de sauvegarde du
     // SDK l'avalait sans que rien ne remonte à l'UI.

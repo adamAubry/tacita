@@ -520,7 +520,7 @@ describe("contenu prêt pour la file d'envoi", () => {
 
   /**
    * L'invariant que le PM a exigé en contrepartie de « le média est hors périmètre de
-   * par construction » (04/08/2026). La construction est saine : le pipeline
+   * par construction ». La construction est saine : le pipeline
    * téléverse et rend un contenu, c'est `outbox` qui envoie — donc la garde de salon
    * non chiffré s'applique une fois, au bon endroit. Rien ne la gardait.
    *
@@ -566,7 +566,7 @@ describe("l'unique chemin public du pipeline, et son site d'appel unique", () =>
     // chiffré, sauf le chemin nommé public » ne vaut que tant que ses appelants sont
     // comptés par une machine — une consigne de revue se contourne par distraction.
     //
-    // Deux depuis le 11/08/2026, et l'assertion reste une **égalité** : ce qui compte
+    // Deux, et l'assertion reste une **égalité** : ce qui compte
     // n'est pas le nombre mais la liste, chaque entrée ayant été relue une fois.
     const racine = new URL("../../../", import.meta.url).pathname;
     const ignores = new Set(["node_modules", ".next", ".git", "dist", "tsconfig.tsbuildinfo"]);
@@ -604,7 +604,7 @@ describe("l'unique chemin public du pipeline, et son site d'appel unique", () =>
 
 describe("on ne téléverse pas ce que le serveur refusera", () => {
   /**
-   * Mesuré le 20/08/2026 : une vidéo de onze minutes sort à environ 206 Mo aux cibles
+   * Mesuré : une vidéo de onze minutes sort à environ 206 Mo aux cibles
    * D-04, au-dessus du plafond de 200 Mo du déploiement. Sans ce contrôle, le client
    * téléversait les 206 Mo pour s'entendre refuser à la fin — plusieurs minutes de réseau
    * et de batterie pour un échec connu d'avance.

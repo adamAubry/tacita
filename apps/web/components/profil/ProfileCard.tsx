@@ -1,3 +1,11 @@
+/**
+ * La carte de profil : bandeau, avatar, et le fondu entre les deux.
+ *
+ * L'essentiel du fichier est de la géométrie — `TAILLE_AVATAR`, `MARGE_OMBRE`,
+ * `QUEUE_FONDU`, `ZONE_OPAQUE` — parce que l'avatar chevauche le bandeau et que le
+ * dégradé doit rester opaque exactement sous lui. Ces valeurs se répondent : en
+ * changer une seule décolle l'ombre du cadre.
+ */
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -159,7 +167,7 @@ const RAIL = "var(--spacing-3)";
  *    prend pas de place, et on voit la bannière au travers ;
  * 3. **l'avatar**, posé *dans* la bannière et fondu lui aussi.
  *
- * **Composition sur un rail, et non sur un axe** (10/08/2026). Tout était centré : la
+ * **Composition sur un rail, et non sur un axe**. Tout était centré : la
  * bannière devait s'échapper du centrage par un `justifySelf`, et l'œil n'avait aucun
  * point d'entrée — une colonne symétrique n'a pas de premier élément. L'identité est
  * désormais alignée à gauche sur `RAIL`, ce qui donne à l'écran une arête verticale que

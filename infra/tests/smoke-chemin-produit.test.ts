@@ -20,7 +20,7 @@ const source = readFileSync(
 /** Même convention que `client-core/tests/session.test.ts` : ce qui s'exécute, pas ce qui se documente. */
 const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
-describe(" (D-08) — la fumée à deux personnes passe par le chemin produit", () => {
+describe(" — la fumée à deux personnes passe par le chemin produit", () => {
   it("aucun appel de vérification manuelle ne rend les tests verts à la place du produit", () => {
     expect(code).not.toMatch(/setDeviceVerified/);
     expect(code).not.toMatch(/requestDeviceVerification/);

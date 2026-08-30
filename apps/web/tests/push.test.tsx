@@ -224,7 +224,7 @@ describe("abonnement Web Push, réveil, déchiffrement local, notification", () 
 });
 
 /**
- * Les quatre retours utilisateurs du 24/08/2026, chacun sur sa cause. Ce ne sont pas
+ * Les quatre retours utilisateurs, chacun sur sa cause. Ce ne sont pas
  * quatre symptômes d'un même défaut : la feuille qui revient, le bouton qui n'existe pas,
  * l'activation qui ne fait rien et le push qui n'arrive jamais ont quatre origines
  * distinctes, et une seule d'entre elles était visible depuis un poste de développement.
@@ -677,7 +677,7 @@ describe("le client vise les adresses que le déploiement expose vraiment", () =
   );
 
   /**
-   * Trouvé le 07/08/2026 en montant la pile. Le shard visait une origine publique
+   * Trouvé en montant la pile. Le shard visait une origine publique
    * `https://push.example.org`, qui n'existe dans aucun déploiement : la lecture de la
    * clé partait en 404, et le pusher enregistré pointait vers un hôte injoignable — donc
    * aucune notification n'aurait jamais été délivrée. Rien ne l'attrapait, parce que les

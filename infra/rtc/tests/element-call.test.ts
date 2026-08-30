@@ -28,7 +28,7 @@ describe("Element Call auto-hébergé, épinglé, et sa version consignée", () 
   });
 
   it("le digest servi est exactement celui que le README consigne", () => {
-    // Le point de toute l'escalade E-14 : une version qu'on peut relire. Deux copies,
+    // Le point de tout ceci : une version qu'on peut relire. Deux copies,
     // donc un test — sinon le README vieillit en silence pendant que l'image change.
     const digest = /@(sha256:[0-9a-f]{64})/.exec(IMAGE)?.[1];
     expect(digest).toBeTruthy();
@@ -64,7 +64,7 @@ describe("Element Call auto-hébergé, épinglé, et sa version consignée", () 
   });
 
   it("la pile de base ne sert aucun Element Call", () => {
-    // Même règle que (E-08) : sans SFU derrière, un client d'appel qui se
+    // Même règle que : sans SFU derrière, un client d'appel qui se
     // charge est un appel qui meurt à la connexion. Rien ne vaut mieux que presque.
     expect(base.services["element-call"]).toBeUndefined();
     expect(baseCallConf).not.toMatch(/^\s*(server|location|proxy_pass)\b/m);
@@ -79,7 +79,7 @@ describe("Element Call auto-hébergé, épinglé, et sa version consignée", () 
   });
 
   it("le conteneur d'Element Call reste celui d'amont : rien à écrire, donc rien à casser", () => {
-    // Le défaut du 26/08/2026, et le seul qui ait jamais empêché la pile de démarrer :
+    // Le défaut, et le seul qui ait jamais empêché la pile de démarrer :
     // un `sed` d'entrypoint écrivait dans `/app`, que l'image possède en root alors
     // qu'elle tourne en uid 101. Sortie immédiate, relance toutes les 60 secondes.
     const service = overlay.services["element-call"] as Record<string, unknown>;

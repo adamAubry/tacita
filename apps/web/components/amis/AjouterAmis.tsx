@@ -113,7 +113,7 @@ export function AjouterAmis({ chercher, onPartagerLien, onOuvrirProfil }: Ajoute
 
       <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
         {/* « par identifiant » n'est plus le seul chemin depuis que
-            l'annuaire couvre tout le serveur (E-21) : le libellé le dit,
+            l'annuaire couvre tout le serveur : le libellé le dit,
             sans quoi personne n'essaierait un prénom. le domaine, lui, ne
             se tape plus : `identifiantComplet` le remet. */}
         <TextInput

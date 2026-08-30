@@ -1,3 +1,14 @@
+/**
+ * L'écran de connexion : identifiant, mot de passe, et la porte de secours.
+ *
+ * Trois voies — se connecter, créer un compte, ou entrer par la clé de récupération
+ * quand le mot de passe est perdu. `MESSAGES` tient les échecs : chacun dit ce qui
+ * s'est passé et ce qu'on peut faire, jamais « erreur ».
+ *
+ * Les garde-fous de clavier sont portés par le parent : un identifiant Matrix est en
+ * minuscules, et une majuscule posée par un clavier mobile donne un compte
+ * introuvable sans que personne ne voie ce qui a changé.
+ */
 "use client";
 
 import {
@@ -13,7 +24,7 @@ import { IconeCle } from "../foundation/icons";
 import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitives";
 
 /**
- * **l'écran de connexion**, réécrit le 25/08/2026 (D-12, D-13).
+ * **l'écran de connexion**, réécrit.
  *
  * Il n'existait pas : la connexion partait chez un fournisseur OIDC externe, et cet
  * écran-ci était une phrase d'attente pendant la redirection. Keycloak supprimé, l'identité
@@ -25,16 +36,16 @@ import { Banner, Button, Text, TextInput, VStack } from "../foundation/primitive
  * tenir en phase, et obligé à choisir avant de savoir. La bascule ne perd pas la saisie :
  * quelqu'un qui se trompe de mode a déjà tapé son identifiant.
  *
- * **Deux champs, et deux seulement** (D-13, même jour) : créer un compte demande un
+ * **Deux champs, et deux seulement** (même jour) : créer un compte demande un
  * identifiant et un mot de passe. Le code d'invitation qu'exigeait la première version a
  * été retiré du serveur, donc de l'écran — ce que ça ouvre est assumé et écrit dans
  * C'est une limite assumée ; ce n'est pas au formulaire de la compenser.
  *
- * **Un troisième mode, et c'est une porte de secours** (D-14) : la clé de récupération
+ * **Un troisième mode, et c'est une porte de secours** : la clé de récupération
  * ouvre une session quand le mot de passe est perdu. Elle n'est pas offerte à côté des
  * deux autres — on y arrive par « Mot de passe oublié ? », et l'écran dit ce qu'elle
  * engage. Sans elle, un mot de passe oublié est un compte mort : ce déploiement n'a ni
- * e-mail ni SSO, et le changement de mot de passe exige déjà la clé (D-12).
+ * e-mail ni SSO, et le changement de mot de passe exige déjà la clé.
  *
  * Ce que cet écran ne fait pas, et qui appartient à la porte : décider de ce qui vient
  * après. Il rend une `Session`, `RecoveryGate` s'occupe du reste (clé, parcours d'accueil).
@@ -64,7 +75,7 @@ function classer(erreur: unknown, mode: Mode): Echec {
   const { errcode } = (erreur ?? {}) as { errcode?: string };
   if (errcode === "M_USER_IN_USE") return "pris";
   /*
-   * D-14 — le module refuse d'un seul message pour quatre causes : compte inconnu,
+   * le module refuse d'un seul message pour quatre causes : compte inconnu,
    * désactivé, sans clé, ou clé fausse. Les distinguer donnerait un oracle de comptes à
    * qui interroge cette porte ouverte (même jurisprudence que), et l'écran ne
    * peut donc rien dire de plus honnête que « l'un des deux est faux ».
@@ -189,7 +200,7 @@ export function Connexion({
         <VStack gap={4}>
           {/*
             Mêmes garde-fous de clavier que l'écran de clé, et portés par le parent pour la
-            même raison (jurisprudence E-10, on ne recode pas une primitive). Un identifiant
+            même raison (on ne recode pas une primitive). Un identifiant
             Matrix est en minuscules : une majuscule posée par un clavier mobile donne un
             compte introuvable, sans que personne ne voie ce qui a changé.
           */}

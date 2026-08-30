@@ -1,3 +1,13 @@
+/**
+ * La timeline : la liste des messages, et ce qui s'intercale entre eux.
+ *
+ *  1. `appelsParAncre` — range les entrées du journal d'appels sous le message
+ *     après lequel elles se sont produites, pour qu'un appel s'affiche à sa place.
+ *  2. `Timeline` — regroupement par expéditeur et par jour, séparateurs de date,
+ *     ancre de défilement, chargement du passé quand on remonte.
+ *
+ * L'ordre vient du flux /sync et de rien d'autre.
+ */
 "use client";
 
 import type { CallLogEntry } from "@tacita/calls";

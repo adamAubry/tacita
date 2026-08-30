@@ -4,7 +4,7 @@ Le produit de l'administrateur, comme la PWA est celui de l'utilisateur. Il l'ac
 de « j'ai cloné le dépôt » à « ça tourne ».
 
 ```sh
-sh infra/bootstrap.sh      # sur une Ubuntu nue, une seule fois
+./install.sh      # sur une Ubuntu nue, une seule fois
 pnpm admin init --domaine=chat.ton-domaine.fr --email=toi@ton-domaine.fr
 pnpm admin dns             # les deux enregistrements A à créer, et leur état
 pnpm admin certificat      # émet le certificat, une fois le DNS en place
@@ -24,7 +24,7 @@ tourne immédiatement après `git clone`, sans `pnpm install`. Sa seule exigence
 — et c'est la première chose que `doctor` vérifie, parce qu'Ubuntu 24.04 livre Node 18
 dans apt.
 
-## `infra/bootstrap.sh` — l'assistant d'installation
+## `install.sh` — l'assistant d'installation
 
 Un seul point d'entrée, six étapes, rien à retenir entre elles. Le script **est** le
 parcours ; les commandes `pnpm admin` qu'il enchaîne restent utilisables séparément pour
@@ -71,9 +71,9 @@ pas sous les lignes ✗ qu'il vient d'afficher : il dit ce qui reste et sort en 
 qu'un déploiement automatisé puisse s'y fier.
 
 ```sh
-sh infra/bootstrap.sh
-sh infra/bootstrap.sh --domaine=chat.mon-domaine.fr --email=moi@mon-domaine.fr --oui
-sh infra/bootstrap.sh --dev
+./install.sh
+./install.sh --domaine=chat.mon-domaine.fr --email=moi@mon-domaine.fr --oui
+./install.sh --dev
 ```
 
 La version de pnpm est **lue dans `package.json`**, jamais recopiée ; celle de Node est
@@ -84,7 +84,7 @@ tenue avec `machine.ts` par `infra/tests/bootstrap.test.ts`.
 Un runbook décrit l'état du dépôt au jour où il a été écrit. Celui-ci lit l'état réel.
 La différence n'est pas théorique : au 25/08/2026, `infra/README.md` et
 `docs/LAUNCH_README.md` décrivaient encore longuement Keycloak, le realm `tacita` et
-`kcadm.sh`, alors que D-12 avait supprimé le SSO et qu'aucun service `keycloak` n'existe
+`kcadm.sh`, alors que le SSO a été supprimé et qu'aucun service `keycloak` n'existe
 plus dans `docker-compose.yml`. Un administrateur qui suivait la doc créait un compte
 dans un service absent.
 
@@ -259,7 +259,7 @@ parler sans en casser un.
   prétendre savoir.
 - **`init` n'installe rien.** Il prépare la configuration ; le DNS reste à la charge de
   l'administrateur (`pnpm admin dns` lui donne les enregistrements exacts), le certificat
-  revient à `pnpm admin certificat`, Docker et Node à `infra/bootstrap.sh`.
+  revient à `pnpm admin certificat`, Docker et Node à `install.sh`.
 - **L'adresse publique est déduite des interfaces, jamais demandée à un service tiers.**
   Sur un VPS c'est la bonne ; derrière un NAT il n'y en a aucune, et l'outil le dit plutôt
   que d'appeler un service extérieur pour la découvrir.

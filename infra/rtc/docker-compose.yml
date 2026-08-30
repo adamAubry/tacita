@@ -58,7 +58,7 @@ services:
   # Element Call, le seul client RTC autorisé (interdit n°7), servi par
   # nous. Épinglé par digest comme tout le compose : c'est lui qui rend vraies les
   # valeurs que `packages/calls` écrit dans l'URL du widget — un paramètre relu dans
-  # une version, puis servi par une autre, est une jonction non relue (E-14).
+  # une version, puis servi par une autre, est une jonction non relue.
   element-call:
     image: ghcr.io/element-hq/element-call@sha256:e352de468647777e3780fec45281e2ccc90da69a828f7a3d88700ff9ac04bb0b # v0.23.0, résolu le 2026-08-07
     restart: unless-stopped

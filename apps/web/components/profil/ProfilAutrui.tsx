@@ -1,3 +1,10 @@
+/**
+ * Le profil de quelqu'un d'autre, et les gestes qu'on peut y faire.
+ *
+ * `CONFIRMATIONS` porte, pour chaque action destructrice, le texte qui la fait
+ * confirmer. Une action qui n'y figure pas ne demande rien — c'est la liste qui
+ * décide, pas le bouton.
+ */
 "use client";
 
 import type { Profile } from "@tacita/messaging";

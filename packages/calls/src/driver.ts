@@ -1,3 +1,10 @@
+/**
+ * Le pont d'API widget : ce que l'hôte accorde à Element Call, et rien de plus.
+ *
+ * Traduit les messages du widget en gestes sur la session, et renvoie l'état du
+ * salon vers lui. Une capacité accordée ici doit être tenue : accorder ce qu'on ne
+ * sert pas fige l'appel au lieu de le faire échouer.
+ */
 import type { Session } from "@tacita/client-core";
 import { Direction } from "matrix-js-sdk";
 import {
@@ -42,7 +49,7 @@ export class CallWidgetDriver extends WidgetDriver {
    * gestionnaire, `transport.reply` n'est jamais appelé, et la requête du widget ne
    * reçoit **jamais** de réponse. Écran figé, sans une ligne d'erreur pour l'expliquer.
    *
-   * Observé le 29/08/2026 sur `sendStickyEvent` (MSC4407), l'appelant bloqué sur un
+   * Observé sur `sendStickyEvent` (MSC4407), l'appelant bloqué sur un
    * écran mort. `readStickyEvents`, la moitié visible du même défaut, était la seule à
    * laisser une trace en console — parce que son appelant, lui, l'attrape.
    *

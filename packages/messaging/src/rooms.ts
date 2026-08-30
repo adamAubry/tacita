@@ -1,3 +1,9 @@
+/**
+ * Les salons : création, appartenance, état, droits.
+ *
+ * Les power levels sont lus tels quels, en nombres — aucun rôle nommé n'existe
+ * dans ce produit.
+ */
 import type { Session } from "@tacita/client-core";
 import {
   ConditionKind,
@@ -160,7 +166,7 @@ export function invite(session: Session, roomId: string, userId: string): Promis
 }
 
 /**
- * le sas d'entrée d'un groupe (E-13, voie A).
+ * le sas d'entrée d'un groupe (voie A).
  *
  * Un lien de groupe ne peut pas faire entrer tout seul : son porteur ne peut ni s'inviter
  * (il faut être membre) ni rejoindre un salon en `join_rule: invite`. Le `knock` natif

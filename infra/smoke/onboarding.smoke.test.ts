@@ -8,7 +8,7 @@ import { connexionParCle, creerCompte, initSession, type Session } from "@tacita
 import { HOMESERVER, uniqueLocalpart } from "./harness";
 
 /**
- * **Cible de fumée du parcours d'entrée** — créée le 25/08/2026, après un défaut que
+ * **Cible de fumée du parcours d'entrée** — créée, après un défaut que
  * 1039 tests verts n'ont pas vu : un compte se connectait et tombait sur « Entrez votre
  * clé de récupération ».
  *
@@ -48,7 +48,7 @@ describe("D-13 / l'inscription pose une identité, pas seulement une clé", () =
      * **Le cœur de la cible.** `setupRecoveryKey` provisionne le secret storage *puis*
      * dépose l'identité cross-signing. Un compte qui repart d'ici avec une clé et sans
      * identité est le pire état du produit : il a de quoi ouvrir un magasin vide, et
-     * aucune de ses futures connexions ne pourra chiffrer (D-08).
+     * aucune de ses futures connexions ne pourra chiffrer.
      */
     await expect(session.recoveryState()).resolves.toBe("prete");
   });
@@ -57,7 +57,7 @@ describe("D-13 / l'inscription pose une identité, pas seulement une clé", () =
 describe("se connecter avec son identifiant et son mot de passe suffit", () => {
   it("une deuxième connexion, sur un appareil neuf, entre dans l'application", async () => {
     /*
-     * Le défaut remonté le 25/08/2026 : « j'ai tenté de me connecter et j'ai eu un écran
+     * Le défaut remonté : « j'ai tenté de me connecter et j'ai eu un écran
      * "entrez votre clé de récupération" ». Un appareil neuf n'est pas signé et ne peut
      * pas chiffrer — mais l'utilisateur vient de donner le seul secret que le produit lui
      * demande de retenir, et le produit doit s'en contenter.
@@ -89,7 +89,7 @@ describe("D-14 — la porte de secours ouvre une session, avec la clé seule", (
 describe("« j'ai perdu ma clé » remplace la clé et l'identité", () => {
   it("la réinitialisation aboutit, mot de passe à l'appui", async () => {
     /*
-     * **Le constat critique de l'audit du 25/08/2026.** Remplacer une identité
+     * **Le constat critique de l'audit.** Remplacer une identité
      * cross-signing demande une ré-authentification, et le client ne savait franchir que
      * `m.login.sso` — hérité de Keycloak, supprimé le matin même par D-12. Mesuré ici :
      * `401 flows:[[m.login.password]]`, l'écran de confirmation n'était même pas appelé,
@@ -119,7 +119,7 @@ describe("les appareils se listent et se déconnectent", () => {
   it("la session voit les autres, et les ferme avec le mot de passe", async () => {
     /*
      * Sans ce chemin, une fuite de jeton n'avait aucune réponse : les jetons n'expirent
-     * pas, et le changement de mot de passe ne déconnecte volontairement personne (D-12).
+     * pas, et le changement de mot de passe ne déconnecte volontairement personne.
      */
     const disque = new IDBFactory();
     const session = await initSession({

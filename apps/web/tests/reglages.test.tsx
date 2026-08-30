@@ -131,7 +131,7 @@ const session = () =>
       getUserId: () => "@luca:t",
       getUser: () => ({ displayName: "luca" }),
       getAccessToken: () => "jeton",
-      // le provider écoute le refus de jeton du SDK depuis le 08/08/2026.
+      // le provider écoute le refus de jeton du SDK.
       on: vi.fn(),
       off: vi.fn(),
     },
@@ -271,7 +271,7 @@ describe("limites connues : sobre, et complet sur les sept sujets", () => {
     expect(screen.getByText(/« Délivré » est une extension à nous/)).toBeTruthy();
     expect(screen.getByText(/voit qui parle à qui/i)).toBeTruthy();
     expect(screen.getByText(/recherche porte sur cet appareil/i)).toBeTruthy();
-    // (E-21) : l'annuaire ouvert est une exposition, donc une limite. Elle
+    // : l'annuaire ouvert est une exposition, donc une limite. Elle
     // est une limite assumée ; cet écran est l'endroit où l'utilisateur la lit.
     expect(screen.getByText(/trouvable par tous les comptes de ce serveur/i)).toBeTruthy();
   });
@@ -645,9 +645,9 @@ describe("le sas d'un groupe suit ses liens, et se referme", () => {
 
 describe("voir ses appareils, et pouvoir en fermer un", () => {
   /*
-   * **Ce que l'audit du 25/08/2026 a nommé** : les jetons de ce déploiement n'expirent
-   * pas, le changement de mot de passe ne déconnecte personne (D-12) et la clé ouvre une
-   * session à elle seule (D-14). Sans cet écran, une fuite n'avait aucune réponse — et un
+   * **Ce que l'audit a nommé** : les jetons de ce déploiement n'expirent
+   * pas, le changement de mot de passe ne déconnecte personne et la clé ouvre une
+   * session à elle seule. Sans cet écran, une fuite n'avait aucune réponse — et un
    * produit qui promet la confidentialité doit offrir le geste de la reprendre.
    */
   const deuxAppareils = [

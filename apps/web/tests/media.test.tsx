@@ -118,7 +118,7 @@ describe("pièces jointes : vignettes déchiffrées, tuiles, vocaux", () => {
 
   it("une vidéo sans vignette rend une tuile terminale, jamais un skeleton sans fin", async () => {
     /*
-     * **Le défaut du 21/08/2026, et c'est une jonction (règle 1).** `thumbnail_file` est
+     * **Le défaut, et c'est une jonction (règle 1).** `thumbnail_file` est
      * devenu facultatif côté pipeline pour qu'un poster impossible n'emporte plus l'envoi
      * — ce qui était le bon arbitrage. Ce rendu, lui, supposait toujours la vignette
      * présente : `useBlob` appelé sans fichier sort de son effet sans rien faire, donc ni
@@ -289,7 +289,7 @@ describe("pièces jointes : vignettes déchiffrées, tuiles, vocaux", () => {
   });
 
   /**
-   * E-18 — **la vidéo est proposée partout**, depuis que le chemin rapide existe : une
+   * **la vidéo est proposée partout**, depuis que le chemin rapide existe : une
    * source déjà conforme aux cibles se remuxe, ce qui ne demande aucun encodeur.
    *
    * Ce que ça déplace : l'échec devient un résultat, plus un prédicat. Le test qui vivait
@@ -478,7 +478,7 @@ describe("viewer plein écran : navigation, sauvegarde, fermeture", () => {
 
   it("`Escape` ferme, comme toute modale — le geste n'est pas le seul chemin", () => {
     // Une modale plein écran qu'aucune touche ne referme est un piège au clavier.
-    // Mesuré au navigateur le 08/08/2026 : le viewer ne se fermait qu'au glissement
+    // Mesuré au navigateur : le viewer ne se fermait qu'au glissement
     // vers le bas et au bouton — `Escape` ne faisait rien.
     const { onFermer } = rendre();
     fireEvent.keyDown(document, { key: "Escape" });
@@ -896,7 +896,7 @@ describe("le transcodage ne rejoue plus la vidéo pour la lire", () => {
 
   it("la réduction produit vraiment la taille demandée, elle ne se contente pas de la déclarer", () => {
     /*
-     * **Le défaut du 21/08/2026, tenu par ce test.** La version précédente écrivait
+     * **Le défaut, tenu par ce test.** La version précédente écrivait
      * `new VideoFrame(image, { displayWidth: largeur, displayHeight: hauteur })` et
      * l'appelait « scaler natif ». Il n'en existe pas : ces deux champs sont des
      * métadonnées d'affichage, ils ne rééchantillonnent rien. On remettait donc des images
@@ -937,7 +937,7 @@ describe("le transcodage ne rejoue plus la vidéo pour la lire", () => {
      * rend la frame codée. Sans redressement, la vignette d'une vidéo filmée en portrait
      * sortait couchée à côté d'une vidéo qui, elle, se lisait droite.
      *
-     * Le sens a été vérifié contre ffmpeg le 21/08/2026 — la valeur est l'angle horaire
+     * Le sens a été vérifié contre ffmpeg — la valeur est l'angle horaire
      * d'affichage, et le repère du canvas tourne déjà dans ce sens.
      */
     expect(source).toContain("pinceau.rotate((rotation * Math.PI) / 180)");
@@ -1086,7 +1086,7 @@ describe(" (b) — le viewer ne lit par plages que quand les trois conditions so
  * `Conversation` ne se rend pas en jsdom sans une session complète, et ces trois phrases
  * dépendent d'un worker que jsdom n'a pas. Ce que ces tests tiennent, c'est que chaque
  * situation garde sa phrase, et que le contrôle de taille reste **avant** la mise en file
- * — mesuré le 20/08/2026, où les trois se confondaient en une seule.
+ * — mesuré, où les trois se confondaient en une seule.
  */
 describe("un échec d'envoi dit lequel", () => {
   const ecran = sansCommentaires(lire("components/conversation/Conversation.tsx"));

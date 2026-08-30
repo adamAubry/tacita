@@ -17,3 +17,6 @@ infra/proxy/certs
 # Hors dépôt (voir .gitignore) : simulations Playwright et runbook local.
 e2e
 LAUNCH_README.md
+
+# Le script d'installation : il tourne sur l'hôte, jamais dans une image.
+install.sh

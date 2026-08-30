@@ -9,7 +9,7 @@ import { VStack } from "../foundation/primitives";
  * Il existe parce que ces écrans-là n'ont aucun layout de route au-dessus d'eux : ils ne
  * sont pas des pages, ils remplacent le shell. Sans lui, leur contenu était collé aux
  * quatre bords de la fenêtre et s'étirait sur toute la largeur d'un écran de bureau —
- * mesuré au navigateur le 10/08/2026. Le mettre ici plutôt que dans chaque écran fait
+ * mesuré au navigateur. Le mettre ici plutôt que dans chaque écran fait
  * que le suivant l'aura sans y penser.
  *
  * `marginBlock: auto` et non `justify-content: center` : un contenu plus haut que la

@@ -7,7 +7,7 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
 }
 
 /**
- * La **taille** des clés, et pas seulement leur présence — ajouté le 24/08/2026 après un
+ * La **taille** des clés, et pas seulement leur présence — ajouté après un
  * staging où la passerelle redémarrait en boucle depuis toujours.
  *
  * Le contrôle de présence laissait passer un `.env` resté sur `change-me`. `web-push`

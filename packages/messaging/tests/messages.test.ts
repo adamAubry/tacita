@@ -330,7 +330,7 @@ describe("une modification remplace, elle ne s'ajoute pas à la timeline", () =>
   it("l'événement `m.replace` n'est pas rendu à côté de l'original", () => {
     // Un `m.replace` est lui aussi un `m.room.message`. Le SDK réécrit le contenu de
     // l'original sur place : le garder tous les deux affichait **deux fois** le même
-    // texte. Mesuré au navigateur le 08/08/2026, entre deux sessions réelles — et la
+    // texte. Mesuré au navigateur, entre deux sessions réelles — et la
     // suppression n'en effaçait qu'un, la redaction ne visant que l'original.
     ctx.setTimeline([
       fakeEvent("$original", { body: "corrigé" }),

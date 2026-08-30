@@ -15,7 +15,7 @@ describe("reverse proxy TLS avec routes /_matrix, /livekit/jwt, /livekit/sfu", (
     // `set $synapse_upstream` puis `proxy_pass http://$synapse_upstream` : la variable
     // n'est pas cosmétique. Sans elle nginx résout `synapse` une fois au démarrage et
     // garde l'IP ; Synapse recréé ensuite, toute l'API répond 502 jusqu'au redémarrage
-    // du proxy. Mesuré le 08/08/2026 : conteneur déplacé de .3 à .9, proxy intact, 200.
+    // du proxy. Mesuré : conteneur déplacé de .3 à .9, proxy intact, 200.
     expect(nginxConf).toMatch(
       /location\s+\/_matrix\s*{[^}]*set\s+\$synapse_upstream\s+synapse:8008;[^}]*proxy_pass\s+http:\/\/\$synapse_upstream/s,
     );
@@ -37,7 +37,7 @@ describe("reverse proxy TLS avec routes /_matrix, /livekit/jwt, /livekit/sfu", (
 describe("plus aucune route d'authentification externe", () => {
   it("`/auth` a disparu du proxy avec Keycloak", () => {
     /*
-     * D-12, 25/08/2026. L'assertion porte sur l'absence : une route laissée derrière un
+     * D-12. L'assertion porte sur l'absence : une route laissée derrière un
      * service supprimé rend 502 plutôt que 404, ce qui se lit comme une panne passagère
      * et se cherche du mauvais côté. Et si le nom `keycloak` réapparaissait un jour dans
      * un amont, ce serait un retour en arrière non décidé.
@@ -98,7 +98,7 @@ describe("le certificat de dev couvre le nom que Synapse appelle", () => {
  * Un rejet produit par nginx n'atteint jamais Synapse, donc ne porte aucun en-tête CORS :
  * le navigateur masque le statut au JavaScript et ne rend qu'une erreur d'origine. Le
  * client ne peut alors pas distinguer « refusé pour toujours » de « réseau coupé », et
- * une file d'envoi réessaie en boucle. Mesuré le 20/08/2026, avec un envoi de plus de
+ * une file d'envoi réessaie en boucle. Mesuré, avec un envoi de plus de
  * 200 Mo.
  */
 describe("un 413 reste lisible par le navigateur", () => {
@@ -190,7 +190,7 @@ describe("le préfixe d'une route est retiré là où l'amont sert à la racine"
 /**
  * **Deux nombres qui doivent s'accorder, dans deux dépôts différents.** Le client
  * s'accorde `pollTimeout + BUFFER_PERIOD_MS` avant d'abandonner un `/sync` ; le proxy,
- * lui, a un défaut de 60 s. Mesuré au banc le 29/08/2026 contre le digest du compose :
+ * lui, a un défaut de 60 s. Mesuré au banc contre le digest du compose :
  * un amont qui répond en 90 s se solde par un **504 à 60,1 s**, cinquante secondes avant
  * que celui qui attend n'ait renoncé.
  *

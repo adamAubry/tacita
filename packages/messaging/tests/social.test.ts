@@ -177,7 +177,7 @@ describe("annuaire du homeserver, jamais /search", () => {
 
 describe("un identifiant complet se résout par son profil", () => {
   /**
-   * Mesuré contre un vrai Synapse le 07/08/2026 : l'annuaire rend `results: []` pour un
+   * Mesuré contre un vrai Synapse : l'annuaire rend `results: []` pour un
    * compte qui existe, parce que `search_all_users` est faux par défaut. « Ajouter par
    * identifiant » ne trouvait donc jamais personne — le parcours d'entrée du produit.
    */
@@ -246,7 +246,7 @@ describe("le domaine ne se saisit pas", () => {
   });
 
   it("un nom d'affichage partiel remonte par l'annuaire", async () => {
-    // (E-21, 21/08/2026) : l'annuaire couvre tous les comptes du serveur, donc
+    // : l'annuaire couvre tous les comptes du serveur, donc
     // un fragment de nom aboutit. Avant, ce chemin était muet et seul l'identifiant exact
     // trouvait quelqu'un — c'est le « uniquement de l'exact match » signalé.
     const { session, client } = fakeSession({

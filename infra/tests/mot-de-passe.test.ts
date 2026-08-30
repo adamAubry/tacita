@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 /**
- * D-12 — **le garde du changement de mot de passe tient sur trois fichiers qui ne se
+ * **le garde du changement de mot de passe tient sur trois fichiers qui ne se
  * lisent jamais ensemble**, et retirer n'importe lequel des trois le désarme en silence.
  *
  * 1. `proxy/nginx.conf` ferme `POST /_matrix/client/v3/account/password`. Sans ce bloc,
@@ -161,9 +161,9 @@ describe("D-14 — la clé de récupération ouvre une session quand le mot de p
 
 describe("le plancher de mot de passe est dit au même nombre partout", () => {
   /*
-   * **Mesuré le 25/08/2026 : un compte s'est créé avec le mot de passe « a ».** Le
+   * **Mesuré : un compte s'est créé avec le mot de passe « a ».** Le
    * plancher existait à deux endroits — le module et l'écran de changement — et à aucun
-   * des deux qui compte : rien ne gardait la création. Depuis D-15, ce mot de passe est
+   * des deux qui compte : rien ne gardait la création. Depuis, ce mot de passe est
    * la clé qui déchiffre l'historique.
    *
    * Trois fichiers portent le nombre, dans trois langages, et rien ne les compile

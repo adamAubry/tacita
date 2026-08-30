@@ -19,7 +19,7 @@ export interface Account {
  * Crée un compte et rend un jeton d'accès, par le secret partagé de.
  *
  * Pas par le flux OIDC : il ne fonctionne pas en local (trois causes documentées
- * dans infra/README.md), et l'arbitrage PM du 03/08/2026 a tranché qu'un tronçon
+ * dans infra/README.md), et l'arbitrage PM a tranché qu'un tronçon
  * bloqué ne prend pas en otage la validation de sept modules. Ce que cette cible
  * ne couvre donc **pas** : `initSession()` et le jeton `m.login.token`. Le ticket
  * OIDC les couvrira sous un describe.
