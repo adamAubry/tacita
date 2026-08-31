@@ -132,3 +132,11 @@ describe("REQ-INF-09 — OIDC Keycloak seul fournisseur d'auth", () => {
     expect(compose.services.keycloak.environment.KC_HTTP_RELATIVE_PATH).toBe(prefix);
   });
 });
+
+describe("Durcissement — annuaire utilisateurs désactivé", () => {
+  // Relevé en pentest : laissé au défaut, l'annuaire laisse tout compte énumérer les
+  // autres. Dans un cercle fermé, on se découvre par lien d'invitation (spec 12).
+  it("user_directory.enabled est false", () => {
+    expect(homeserver.user_directory.enabled).toBe(false);
+  });
+});

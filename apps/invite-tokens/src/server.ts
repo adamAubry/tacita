@@ -64,6 +64,13 @@ const clientIp = (req: IncomingMessage): string =>
 export interface ServerOptions extends Deps {
   /** REQ-INV-09 — essais de résolution autorisés par fenêtre, pour une IP comme pour un compte. */
   maxResolvesPerWindow?: number;
+  /**
+   * Écritures (création, révocation) autorisées par fenêtre et par IP. `issue` n'était
+   * pas plafonné : un compte pouvait créer des liens sans fin et gonfler la base
+   * `invite_tokens` (relevé en pentest). Plus large que la résolution — créer un lien
+   * est un geste normal, l'énumérer non.
+   */
+  maxWritesPerWindow?: number;
   windowMs?: number;
   /** REQ-INV-20 — sortie des journaux ; injectable pour que le test puisse l'écouter. */
   log?: (event: Record<string, unknown>) => void;
@@ -71,6 +78,7 @@ export interface ServerOptions extends Deps {
 
 export function createInviteService(options: ServerOptions) {
   const limit = createRateLimit(options.maxResolvesPerWindow ?? 20, options.windowMs ?? 60_000);
+  const writeLimit = createRateLimit(options.maxWritesPerWindow ?? 30, options.windowMs ?? 60_000);
   const deps: Deps = { ...options, limit };
   const log = options.log ?? ((event) => console.info("request", event));
 
@@ -105,6 +113,9 @@ export function createInviteService(options: ServerOptions) {
     if (segments[0] !== "links") return answer("inconnue", 404, { errcode: "TACITA_UNKNOWN" });
 
     if (req.method === "POST" && segments.length === 1) {
+      if (!writeLimit(`ip:${clientIp(req)}`)) {
+        return answer("POST /links", 429, { errcode: "TACITA_RATE_LIMITED" });
+      }
       return void handle("POST /links", async () => [
         201,
         await issue(deps, accessToken(req), (await readBody(req)) as Record<string, unknown>),
@@ -116,6 +127,9 @@ export function createInviteService(options: ServerOptions) {
     }
 
     if (req.method === "DELETE" && segments.length === 2) {
+      if (!writeLimit(`ip:${clientIp(req)}`)) {
+        return answer("DELETE /links/:id", 429, { errcode: "TACITA_RATE_LIMITED" });
+      }
       return void handle("DELETE /links/:id", async () => {
         await revoke(deps, accessToken(req), segments[1]!);
         return [204, null];

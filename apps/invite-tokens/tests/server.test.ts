@@ -150,6 +150,27 @@ describe("REQ-INV-09 — limitation de débit par IP", () => {
     expect(limite("ip:1", 20)).toBe(false);
     expect(limite("ip:1", 1_100)).toBe(true);
   });
+
+  it("la création de liens est plafonnée par IP : issue n'était pas bridé (DoS invite_tokens)", async () => {
+    const serveur = createInviteService({ store: createMemoryStore(), matrix, maxWritesPerWindow: 2 });
+    await new Promise<void>((r) => serveur.listen(0, "127.0.0.1", r));
+    const b = `http://127.0.0.1:${(serveur.address() as AddressInfo).port}`;
+    const poster = () =>
+      fetch(`${b}/links`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer jeton-luca",
+          "content-type": "application/json",
+          "x-forwarded-for": "203.0.113.9",
+        },
+        body: JSON.stringify({ kind: "friend" }),
+      }).then((r) => r.status);
+
+    const statuts = [await poster(), await poster(), await poster()];
+    await new Promise<void>((r) => serveur.close(() => r()));
+
+    expect(statuts).toEqual([201, 201, 429]);
+  });
 });
 
 describe("REQ-INV-20 — aucun identifiant, aucun roomId, aucun token dans les logs", () => {

@@ -118,6 +118,13 @@ media_storage_providers:
 password_config:
   enabled: false
 
+# Cercle fermé : on se découvre par lien d'invitation (spec 12), jamais par recherche.
+# Laissé au défaut Synapse, l'annuaire laisse n'importe quel compte énumérer tous les
+# autres — le contenu est chiffré, mais l'appartenance au cercle fuiterait. Relevé en
+# pentest : un compte sans salon partagé listait les autres via `/user_directory/search`.
+user_directory:
+  enabled: false
+
 # REQ-INF-09 — Synapse bloque par défaut ses propres requêtes sortantes vers les
 # plages privées (protection SSRF : `ip_range_blacklist` contient 172.16.0.0/12).
 # Dès que l'issuer OIDC résout vers une adresse privée — le cas quand ${SERVER_NAME}
