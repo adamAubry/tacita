@@ -2,7 +2,9 @@
 # Certificat auto-signé pour le dev local uniquement. En prod, remplacer par des
 # certs Let's Encrypt (getUserMedia exige un contexte sécurisé — REQ-INF-10).
 set -eu
-mkdir -p "$(dirname "$0")/certs"
+# `CERTS_DIR` : surchargeable pour les tests, jamais par l'admin.
+CERTS="${CERTS_DIR:-$(dirname "$0")/certs}"
+mkdir -p "$CERTS"
 
 # Le README fait lancer ce script juste après `cp .env.example .env`, sans exporter
 # quoi que ce soit : sans cette lecture, `SERVER_NAME` retombait sur `localhost` et le
@@ -32,7 +34,7 @@ ALT="DNS:${NAME}${TURN_DOMAIN:+,DNS:$TURN_DOMAIN}"
 # et le réécrit en `C:/Program Files/Git/CN=…`, ce qui fait échouer openssl. Variable
 # ignorée partout ailleurs — elle ne coûte rien sous Linux ni macOS.
 MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes \
-    -keyout "$(dirname "$0")/certs/privkey.pem" \
-    -out "$(dirname "$0")/certs/fullchain.pem" \
+    -keyout "$CERTS/privkey.pem" \
+    -out "$CERTS/fullchain.pem" \
     -subj "/CN=${NAME}" \
     -addext "subjectAltName=${ALT}"

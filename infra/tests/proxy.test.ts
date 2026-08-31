@@ -1,4 +1,8 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const nginxConf = readFileSync(new URL("../proxy/nginx.conf", import.meta.url), "utf-8");
@@ -79,5 +83,54 @@ describe("REQ-INF-14 — le certificat de dev couvre le nom que Synapse appelle"
   it("subjectAltName reste posé, avec TURN_DOMAIN quand il est défini", () => {
     expect(script).toMatch(/-addext "subjectAltName=/);
     expect(script).toMatch(/\$\{TURN_DOMAIN:\+,DNS:\$TURN_DOMAIN\}/);
+  });
+});
+
+describe("REQ-INF-10 — setup-certs.sh installe le certificat que nginx lit réellement", () => {
+  const chemin = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
+  const bacASable = () => {
+    const base = mkdtempSync(join(tmpdir(), "tacita-certs-"));
+    return { live: join(base, "live"), certs: join(base, "certs") };
+  };
+  const lancer = (env: Record<string, string>) =>
+    execFileSync("sh", [chemin("../proxy/setup-certs.sh")], {
+      env: { ...process.env, ...env },
+      encoding: "utf-8",
+    });
+
+  // certbot écrit sous /etc/letsencrypt/live/<domaine>/, nginx lit proxy/certs/ :
+  // la jonction entre les deux n'existait pas, et c'est le seul endroit où une
+  // install en production échoue en silence — la pile démarre, sur l'auto-signé.
+  // On l'exerce en lançant le script : un `grep` sur son propre texte ne prouve rien ici.
+  it("copie le certificat Let's Encrypt quand certbot en a émis un pour SERVER_NAME", () => {
+    const { live, certs } = bacASable();
+    const domaine = "chat.exemple-test.org";
+    // Fixture : un vrai certificat, produit par le script de dev lui-même. Un .pem
+    // bidon ne prouverait pas que le fichier posé est lisible par un client TLS.
+    mkdirSync(join(live, domaine), { recursive: true });
+    execFileSync("sh", [chemin("../proxy/generate-dev-certs.sh")], {
+      env: { ...process.env, SERVER_NAME: domaine, CERTS_DIR: join(live, domaine) },
+    });
+
+    const sortie = lancer({ SERVER_NAME: domaine, LETSENCRYPT_LIVE: live, CERTS_DIR: certs });
+
+    expect(sortie).toContain("Let's Encrypt");
+    // Octet pour octet : c'est bien le certificat de certbot qui est servi, pas un
+    // auto-signé fraîchement regénéré par la branche de repli.
+    for (const pem of ["fullchain.pem", "privkey.pem"]) {
+      expect(readFileSync(join(certs, pem))).toEqual(readFileSync(join(live, domaine, pem)));
+    }
+    // Le renouvellement est la seconde moitié de la panne : la copie devient périmée
+    // au bout de 90 jours si certbot ne la rejoue pas.
+    expect(sortie).toContain("--deploy-hook");
+  });
+
+  it("retombe sur l'auto-signé quand certbot n'a rien émis pour ce nom", () => {
+    const { live, certs } = bacASable();
+
+    const sortie = lancer({ SERVER_NAME: "localhost", LETSENCRYPT_LIVE: live, CERTS_DIR: certs });
+
+    expect(sortie).toMatch(/auto-sign/);
+    expect(readFileSync(join(certs, "fullchain.pem"), "utf-8")).toContain("BEGIN CERTIFICATE");
   });
 });

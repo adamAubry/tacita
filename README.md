@@ -123,7 +123,7 @@ npm test
 
 cd infra
 cp .env.example .env                       # remplir les secrets
-./proxy/generate-dev-certs.sh
+./proxy/setup-certs.sh
 docker compose -f docker-compose.yml -f smoke/docker-compose.yml up -d
 cd .. && npm run smoke
 ```

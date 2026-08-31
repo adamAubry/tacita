@@ -10,7 +10,7 @@ Hors scope : LiveKit/TURN/well-known (spec 02), le *code* de la passerelle push
 
 ```sh
 cp .env.example .env        # remplir les secrets
-./proxy/generate-dev-certs.sh   # certs auto-signés, dev uniquement
+./proxy/setup-certs.sh      # certbot si présent, sinon auto-signé (voir « Certificats »)
 docker compose up -d
 ```
 
@@ -19,6 +19,48 @@ Création d'un compte (REQ-INF-04 — inscription fermée) :
 ```sh
 docker compose exec synapse register_new_matrix_user \
   -c /data/homeserver.yaml http://localhost:8008
+```
+
+## Certificats — `proxy/setup-certs.sh`
+
+nginx lit `proxy/certs/fullchain.pem` et `proxy/certs/privkey.pem` (`proxy/nginx.conf`),
+et ce répertoire est `.gitignore`. Le script est le **point d'entrée unique** :
+
+- certbot a émis un certificat pour `$SERVER_NAME` → il est copié dans `proxy/certs/` ;
+- sinon → certificat auto-signé (`proxy/generate-dev-certs.sh`), **dev uniquement**.
+
+Une seule commande dans les deux cas, et le script dit laquelle des deux branches il a
+prise. C'est le point : sans lui, une install en production démarre sur l'auto-signé
+**sans erreur**, et le défaut ne se voit qu'au navigateur du premier utilisateur.
+
+### En local
+
+Rien à faire de plus : `localhost` n'est pas certifiable par Let's Encrypt (ni HTTP-01 ni
+DNS-01 ne peuvent le valider), l'auto-signé est le seul chemin — et il suffit, `localhost`
+étant un contexte sécurisé au sens des navigateurs (REQ-INF-10, `getUserMedia`).
+
+### Sur un vrai domaine
+
+`SERVER_NAME` dans `.env` doit être le domaine, **avant** d'émettre : le script cherche
+`/etc/letsencrypt/live/$SERVER_NAME/`, pas autre chose.
+
+```sh
+sudo certbot certonly --standalone -d "$SERVER_NAME"   # 80 libre : le compose ne publie que 443
+sudo -E ./proxy/setup-certs.sh                         # -E conserve SERVER_NAME
+docker compose up -d
+```
+
+`sudo` est nécessaire : certbot garde `/etc/letsencrypt/{live,archive}` en `0700 root`. Le
+script refuse et le dit plutôt que de retomber en silence sur l'auto-signé. Lancé sous
+`sudo`, il rend les copies à `$SUDO_USER` — sinon la réexécution suivante, sans `sudo`,
+échouerait à les écraser.
+
+**Le renouvellement est la seconde moitié du problème.** `certbot renew` ne réécrit que
+`/etc/letsencrypt/` : notre copie devient périmée à 90 jours. À poser une fois, sur l'hôte :
+
+```sh
+certbot renew --deploy-hook '/chemin/vers/infra/proxy/setup-certs.sh \
+  && docker compose -f /chemin/vers/infra/docker-compose.yml restart proxy'
 ```
 
 ## Versions épinglées
