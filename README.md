@@ -18,6 +18,7 @@ reste en découle, y compris les limites — qui sont documentées, jamais masqu
 
 | Vous êtes | Lisez, dans cet ordre |
 |---|---|
+| **Utilisateur, pas contributeur** | [`INSTALLER.md`](INSTALLER.md) — installer l'app et se connecter, rien d'autre |
 | **Développeur qui arrive** | `specs/00-conventions.md`, puis la spec de votre module, puis le `README.md` du package |
 | **Relecteur** | la section « Ce qui est prouvé, ce qui ne l'est pas » ci-dessous, puis le diff |
 | **PM / décideur** | `DECISIONS.md`, puis `specs/ui/ESCALATIONS.md` — les arbitrages et leurs motifs |
@@ -132,6 +133,8 @@ Cette pile **ne monte pas le RTC** : l'overlay `infra/rtc/docker-compose.yml` es
 demande deux IP publiques. Son `.well-known` n'annonce donc aucun focus (REQ-RTC-05,
 décision E-08) : `discoverFocus()` rend `RtcFociMissing`, ce que l'UI sait afficher, au
 lieu d'un 502 en pleine connexion d'appel.
+
+Installer l'app côté utilisateur : [`INSTALLER.md`](INSTALLER.md).
 
 Détail du socle serveur, y compris la vérification de pré-vol à faire avant toute création
 de compte : `infra/README.md`.
