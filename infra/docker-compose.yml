@@ -148,6 +148,20 @@ services:
       # sont internes, ils n'ont rien à gagner à ressortir.
       HOMESERVER_URL: http://synapse:8008
 
+  # REQ-UI-01 — la PWA (apps/web, spec 11). Servie par le proxy sur `location /`.
+  # Aucun `ports:` : comme tous les services applicatifs, elle ne sort que par le proxy TLS.
+  # Le serveur Next ne parle à aucun backend — l'app est client-rendered, le navigateur
+  # joint Synapse & co. à la même origine, par le proxy.
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Inliné au build (NEXT_PUBLIC_*, Dockerfile) : l'app pointe sur son propre
+        # homeserver, servi à la même origine par le proxy.
+        NEXT_PUBLIC_HOMESERVER_URL: https://${SERVER_NAME}
+    restart: unless-stopped
+
   # REQ-INF-10 — seul point d'entrée TLS ; routes /_matrix, /livekit/jwt, /livekit/sfu
   # (backends /livekit/* provisionnés par la spec 02, absents tant qu'elle n'est pas déployée).
   proxy:
@@ -157,6 +171,7 @@ services:
       - synapse
       - keycloak
       - push-gateway
+      - web
     ports:
       - "443:443"
     volumes:

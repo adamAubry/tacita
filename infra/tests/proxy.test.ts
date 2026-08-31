@@ -29,6 +29,17 @@ describe("REQ-INF-10 — reverse proxy TLS avec routes /_matrix, /livekit/jwt, /
     expect(sfuBlock).toMatch(/proxy_set_header\s+Upgrade\s+\$http_upgrade/);
     expect(sfuBlock).toMatch(/proxy_set_header\s+Connection\s+\$connection_upgrade/);
   });
+
+  it("REQ-UI-01 — le catch-all `/` sert la PWA, en dernier pour ne masquer aucune route", () => {
+    expect(nginxConf).toMatch(/location\s+\/\s*{[^}]*proxy_pass\s+http:\/\/\$web_upstream/s);
+    expect(nginxConf).toMatch(/set\s+\$web_upstream\s+web:3000/);
+    // Plus basse priorité : le catch-all doit venir après les routes applicatives, sinon
+    // il capterait `/_matrix`, `/auth`, `/invite/`… avant elles.
+    const catchAll = nginxConf.search(/location\s+\/\s*{/);
+    for (const route of ["/_matrix", "/auth", "/invite/", "/livekit/sfu"]) {
+      expect(nginxConf.indexOf(`location ${route}`), route).toBeLessThan(catchAll);
+    }
+  });
 });
 
 describe("REQ-INF-09 — le callback OIDC est réellement joignable", () => {

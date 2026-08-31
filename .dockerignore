@@ -1,0 +1,13 @@
+# Contexte de build partagé (le compose bâtit web, push-gateway et invite-tokens depuis
+# la racine) : jamais les node_modules de l'hôte (mauvaise plateforme), ni les sorties de
+# build, ni les secrets.
+node_modules
+**/node_modules
+.next
+**/.next
+.git
+*.log
+.env
+**/.env
+!**/.env.example
+infra/proxy/certs

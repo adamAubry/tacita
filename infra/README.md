@@ -14,6 +14,11 @@ cp .env.example .env        # remplir les secrets
 docker compose up -d
 ```
 
+La PWA (`apps/web`, spec 11) est **bâtie et servie par ce compose** : le proxy la sert à
+la racine `https://${SERVER_NAME}/`, tous les backends restant sur leurs préfixes
+(`/_matrix`, `/auth`, `/invite/`…). `NEXT_PUBLIC_HOMESERVER_URL` est inliné au build
+depuis `SERVER_NAME` — changer de domaine impose donc un `docker compose build web`.
+
 Création d'un compte (REQ-INF-04 — inscription fermée) :
 
 ```sh
