@@ -1,9 +1,10 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Dix des onze points sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
-**E-11 est ouvert** — remonté le 06/08/2026 en câblant M-H, il attend le PM. Ce fichier
-garde la question, la décision et son motif : une décision dont on a perdu le motif se
-rediscute tous les six mois.
+**Dix des douze points sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
+**E-11 et E-12 sont ouverts** — E-11 remonté le 06/08/2026 en câblant M-H, E-12 le
+31/08/2026 après un pentest authentifié ; les deux attendent le PM. Ce fichier garde la
+question, la décision et son motif : une décision dont on a perdu le motif se rediscute
+tous les six mois.
 
 Neuf ont été **arbitrés par le PM**. E-09 a été **tranché en périmètre technique et porté à
 sa connaissance** ; la distinction est notée dans sa section, parce qu'elle change qui peut
@@ -26,6 +27,7 @@ contrat gagne.
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 | E-11 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
+| E-12 | Un lien de groupe peut être émis pour un salon que l'émetteur n'a pas rejoint | **Ouvert** — remonté le 31/08/2026 après pentest authentifié | rien tant qu'il n'est pas tranché ; correctif écrit puis reverté (tripwire REQ-INV-15) |
 
 ---
 
@@ -431,6 +433,75 @@ supposent un chemin d'entrée), `specs/05-messaging.md` (`createGroupChat` si vo
 (l'écran de réception), et le test REQ-INV-16 de la spec 12 — son balayage interdit à tout
 module hors du service de connaître la route `/resolve`, ce qui devra s'ouvrir au client
 de réception le jour où il existe.
+
+---
+
+## E-12 — Un lien de groupe peut être émis pour un salon que l'émetteur n'a pas rejoint
+
+**Remonté le 31/08/2026, après un pentest authentifié du service de liens. Ouvert.** Rien
+n'a été contourné : deux autres trouvailles du même pentest sont corrigées (plafond de
+création de liens, annuaire désactivé) ; celle-ci est mise en escalade parce que son
+correctif naturel franchit une frontière de spec.
+
+**La question.** La ratification n°1 de la spec 12 borne le service à des **lectures faites
+au nom de l'appelant** — `whoami`, `ignores`, `accountExists` — et lui refuse tout pouvoir
+Matrix propre. `issue` valide donc l'appelant (`whoami`) mais **ne vérifie pas qu'il est
+membre du `roomId`** qu'il fournit pour un lien de groupe. Vérifié en pentest : un compte
+ordinaire a émis un lien de groupe valide (`201`) pour un `roomId` fabriqué, un salon qu'il
+n'a jamais rejoint. `resolve` rend ensuite `{ kind: "group", issuer: <l'attaquant>, roomId }`
+à tout porteur.
+
+**Ce que ça permet, et ce que ça ne permet pas.** L'accès reste fermé : le porteur ne peut
+pas rejoindre (c'est exactement E-11 — `join_rule: invite`). Aucune entrée non autorisée.
+Ce qui reste est une **primitive d'usurpation** : l'émetteur fabrique une invitation « je
+t'invite dans le salon X » pour un X arbitraire — y compris le groupe privé d'une victime
+dont le `roomId` aurait fuité — avec lui-même en émetteur. Un compte compromis peut aussi
+polluer avec des liens fantômes.
+
+**Pourquoi ce n'est pas un simple correctif de code.** Le correctif naturel — vérifier
+l'appartenance via `GET /joined_rooms` avec le jeton de l'appelant — ajoute une **lecture
+d'état de salon** au service. Le test tripwire de REQ-INV-15 (`links.test.ts`,
+`codeDuService()` interdit `joined_rooms|/state/|/rooms/`) existe précisément pour forcer ce
+geste à être une décision de spec, pas un patch. La ratification n°1 tombe si on l'ignore en
+douce. Escaladé ici (CLAUDE.md), pas tranché dans le code.
+
+**La distinction avec E-11, et la nuance qui change les options.** E-11 est le côté
+**réception** — le porteur ne peut pas rejoindre un `roomId` résolu. E-12 est le côté
+**émission** — l'émetteur peut créer un lien pour un salon dont il n'est pas membre. Surtout :
+le motif qui justifiait la limite de REQ-INV-15 (« le lire supposerait l'état d'un salon dont
+ni le service ni le porteur ne sont membres ») **ne s'applique pas ici**. À l'émission,
+l'appelant lit **son propre** `joined_rooms` — une lecture faisable au nom de l'appelant,
+exactement comme les trois existantes. La feasibilité ne bloque donc pas ; seul le choix de
+surface minimale le fait.
+
+**Les trois voies, et ce qu'elles coûtent.**
+
+**Voie A — vérifier l'appartenance à l'émission.** `GET /_matrix/client/v3/joined_rooms`
+avec le jeton de l'appelant ; refus `403 TACITA_NOT_IN_ROOM` s'il n'est pas membre. Une
+quatrième lecture, au nom de l'appelant, cohérente avec les trois autres. *Coût :* élargit la
+surface Matrix du service d'une lecture, et le test tripwire de REQ-INV-15 s'amende
+consciemment. Ferme l'usurpation. La ratification n°1 tient dans son esprit — le service ne
+détient toujours aucun pouvoir propre, il lit avec le jeton qu'on lui présente.
+
+**Voie B — ne rien vérifier, documenter la limite** (comme REQ-INV-15 documente le côté
+résolution). *Coût :* la primitive d'usurpation reste ; sa borne est les `join_rule: invite`
+qui empêchent tout accès réel. Aligne sur la jurisprudence « le service ne lit aucun état de
+salon », au prix d'un lien qui peut mentir sur sa cible.
+
+**Voie C — défendre côté client émetteur seulement.** L'UI (M-H) n'émet déjà un lien que
+depuis un salon dont l'utilisateur est membre. *Coût :* contournable par un appel direct au
+service, qui est public et authentifié — ne ferme pas la primitive pour qui parle au service
+sans passer par l'app. Une défense d'UI sur un endpoint public n'en est pas une.
+
+**Ce que je recommande, sans le décider :** la voie A. C'est la seule qui ferme réellement
+l'usurpation, elle est faisable à l'émission (contrairement à E-11), et elle ne rend au
+service aucun pouvoir propre — la borne de la ratification n°1 tient. La seule chose qui bouge
+est le test tripwire, et c'est précisément la décision qui est au PM.
+
+**Ce que la décision touche.** `specs/12-invite-tokens.md` (REQ-INV-01 et la ratification n°1
+sur la surface Matrix), le test tripwire de REQ-INV-15 (`apps/invite-tokens/tests/links.test.ts`),
+et `apps/invite-tokens/src/matrix.ts` + `links.ts` si voie A. Le correctif a été écrit puis
+reverté quand le tripwire l'a arrêté ; il est prêt à re-poser si le PM valide.
 
 ---
 
