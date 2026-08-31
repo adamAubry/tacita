@@ -13,6 +13,7 @@
 set -eu
 
 ICI="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+INFRA="$(dirname "$ICI")"
 # Surchargeables pour les tests et les installations non standard
 # (`certbot --config-dir`) ; l'admin n'y touche jamais.
 CERTS="${CERTS_DIR:-$ICI/certs}"
@@ -21,15 +22,13 @@ LETSENCRYPT_LIVE="${LETSENCRYPT_LIVE:-/etc/letsencrypt/live}"
 # Même lecture de .env que generate-dev-certs.sh : le README fait lancer ce script
 # juste après `cp .env.example .env`, sans rien exporter. Une variable déjà
 # présente dans l'environnement l'emporte (cas des tests).
-ENV_FILE="$ICI/../.env"
+ENV_FILE="$INFRA/.env"
 lire_env() {
   [ -f "$ENV_FILE" ] || return 0
   # `[^A-Za-z]*` avale un éventuel BOM UTF-8, `\r` les fins de ligne Windows.
   sed -n "s/^[^A-Za-z]*$1=//p" "$ENV_FILE" | tr -d '\r' | tail -1
 }
 SERVER_NAME="${SERVER_NAME:-$(lire_env SERVER_NAME)}"
-TURN_DOMAIN="${TURN_DOMAIN:-$(lire_env TURN_DOMAIN)}"
-export SERVER_NAME TURN_DOMAIN
 
 NOM="${SERVER_NAME:-localhost}"
 LIVE="$LETSENCRYPT_LIVE/$NOM"
@@ -50,7 +49,6 @@ if [ -d "$LIVE" ]; then
   # On copie le fichier pointé, pas le lien — un lien serait mort dans le conteneur.
   cp -L "$LIVE/fullchain.pem" "$CERTS/fullchain.pem"
   cp -L "$LIVE/privkey.pem" "$CERTS/privkey.pem"
-  chmod 644 "$CERTS/fullchain.pem"
   chmod 600 "$CERTS/privkey.pem"
   # Lancé sous sudo, les copies appartiendraient à root : la prochaine exécution
   # sans sudo échouerait à les écraser, et l'admin servirait un certificat périmé.
@@ -61,7 +59,7 @@ if [ -d "$LIVE" ]; then
   echo "       Expire le : $(openssl x509 -in "$CERTS/fullchain.pem" -noout -enddate | cut -d= -f2)"
   echo "       Le renouvellement certbot n'écrit QUE dans $LIVE : sans deploy-hook,"
   echo "       le proxy servira un certificat périmé au bout de 90 jours. À poser une fois :"
-  echo "         certbot renew --deploy-hook '$ICI/setup-certs.sh && docker compose -f $ICI/../docker-compose.yml restart proxy'"
+  echo "         certbot renew --deploy-hook '$ICI/setup-certs.sh && docker compose -f $INFRA/docker-compose.yml restart proxy'"
 else
   echo "certs: aucun certificat Let's Encrypt pour $NOM sous $LETSENCRYPT_LIVE"
   echo "       -> auto-signé (dev uniquement, le navigateur affichera un avertissement)"
