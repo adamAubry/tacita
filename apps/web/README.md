@@ -4,7 +4,18 @@ PWA Next.js 15 (App Router), composants Astryx. **Aucune logique métier ici** :
 compose les APIs des paquets 04–10. Toute logique découverte en écrivant un écran remonte
 dans le paquet concerné, jamais dans un composant.
 
-État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche) et **M-H** (réglages et infos de conversation) livrés. Restent **M-G** (social) et **M-I** (appels et push).
+État : **M-A** (fondations), **M-B** (onboarding), **M-C** (accueil), **M-D** (conversation), **M-E** (média, hors transcodage — voir `ESCALATIONS` § E-10), **M-F** (recherche), **M-H** (réglages et infos de conversation) et **M-I** (appels et push — voir `ESCALATIONS` § E-12) livrés. Reste **M-G** (social).
+
+## Variables d'environnement
+
+Trois valeurs de déploiement, toutes publiques par nature — elles sortent au premier appel
+réseau du client. Chacune a un défaut d'exemple, et aucune n'est un secret.
+
+| | |
+|---|---|
+| `NEXT_PUBLIC_HOMESERVER_URL` | Synapse derrière le proxy TLS. Sert aussi à lire `/push/config` (clé VAPID, spec 03). |
+| `NEXT_PUBLIC_ELEMENT_CALL_URL` | Déploiement Element Call chargé en iframe (spec 10). |
+| `NEXT_PUBLIC_PUSH_GATEWAY_URL` | URL `notify` de la passerelle, **interne au compose** : c'est Synapse qui l'appelle, jamais le navigateur (`infra/README.md`, REQ-INF-14). |
 
 ```sh
 pnpm --filter web dev      # http://localhost:3000
@@ -53,9 +64,18 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 - **rien n'a été rendu dans un vrai navigateur.** jsdom prouve la logique et la propagation
   des événements ; il ne prouve ni un doigt sur un écran, ni le conflit entre un swipe et le
   défilement, ni la zone morte de Safari iOS (REQ-UI-08/09, module M-D) ;
-- **le service worker n'a jamais tourné.** Ce qui est testé est sa *forme* : liste de
-  précache sans donnée, et une seule branche d'écriture au cache, étroite. Qu'il se comporte
-  ainsi en production reste à vérifier ;
+- **le service worker n'a jamais tourné dans un navigateur.** Son *comportement* est
+  éprouvé — la suite de M-I charge `public/sw.js` dans un bac à sable et fait tout le
+  chemin du réveil push jusqu'à `showNotification`, aperçu déchiffré compris. Ce qui reste
+  non prouvé est l'environnement : un vrai réveil par le service push du navigateur, avec
+  ses délais et son extinction d'onglets ;
+- **aucun appel n'a été passé.** Le shell de M-I est prouvé sur ses quatre chemins (focus
+  absent, paramètres transmis, chargement trop long, décrochage au démontage), tous avec le
+  paquet 10 mocké. Que le widget Element Call se connecte à un vrai SFU demande la pile RTC
+  déployée — et le déploiement Element Call lui-même, qui n'est pas dans le compose ;
+- **la notification riche suppose l'application ouverte** (`ESCALATIONS` § E-12) : sans
+  onglet, le worker ne peut pas déchiffrer et affiche « Nouveau message ». L'écran de
+  réglages le dit ; REQ-UI-18 attend l'arbitrage du PM ;
 - **le flux OIDC complet n'a jamais été exécuté d'un bout à l'autre.** Le retour du
   fournisseur est testé sur son symptôme — un jeton dans l'URL, retiré de l'historique —
   pas contre un vrai Keycloak, ce qui demanderait un navigateur (interdit n°12) ;
@@ -95,5 +115,7 @@ Par la règle des deux portes du dépôt, à dire plutôt qu'à supposer :
 | `components/media/` | M-E : vignettes, viewer, vocal, capture, galeries partagées |
 | `components/recherche/` | M-F : barre à tokens, recherches récentes, résultats, surlignage |
 | `components/settings/` | M-H : réglages, infos de conversation, options, notifications |
+| `components/appel/` | M-I : boutons d'appel, conteneur du widget Element Call, bandeau « en cours » |
+| `components/notifications/` | M-I : invitation à activer le push, pont vers le service worker |
 | `lib/` | adaptateurs vers les paquets 04–10 et préférences d'interface (IndexedDB) |
 | `public/` | manifeste, icônes, service worker |

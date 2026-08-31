@@ -198,8 +198,10 @@ describe("REQ-UIX-31 — layout Settings : carte de profil, puis des options en 
 
     const modal = within(await screen.findByRole("dialog"));
     expect(modal.getAllByText("Mentions uniquement").length).toBeGreaterThan(0);
-    // Aucune promesse d'abonnement push : il appartient à M-I, et rien ici ne l'annonce.
-    expect(modal.queryByText(/abonnement/i)).toBeNull();
+    // L'abonnement global n'appartient pas à M-H, mais il est **livré** par M-I : la
+    // modal le montre au-dessus du par-salon (REQ-UI-18). Tant qu'il n'existait pas,
+    // ce test vérifiait l'inverse — rien ne devait l'annoncer.
+    expect(modal.getByText(/application est fermée/)).toBeTruthy();
   });
 });
 

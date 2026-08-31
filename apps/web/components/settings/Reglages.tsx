@@ -18,6 +18,7 @@ import { RadioList, RadioListItem, Text, type ThemeMode } from "../foundation/pr
 import { useSession } from "../onboarding/SessionProvider";
 import { Confidentialite } from "./Confidentialite";
 import { LimitesConnues } from "./LimitesConnues";
+import { NotificationsGlobales } from "./NotificationsGlobales";
 import { libelleNiveau } from "./NotificationsSalon";
 import { SettingsProfileCard } from "./SettingsProfileCard";
 import { StockageLocal } from "./StockageLocal";
@@ -65,9 +66,8 @@ export function Reglages() {
   const nom = session?.client.getUser(identifiant)?.displayName ?? identifiant.split(":")[0]?.slice(1) ?? "";
 
   /**
-   * REQ-UIX-36 — les conversations dont le niveau n'est pas « tout ». C'est le seul
-   * réglage de notification que M-H tient : l'abonnement push global appartient à M-I,
-   * et rien ne l'annonce ici tant qu'il n'existe pas.
+   * REQ-UIX-36 — les conversations dont le niveau n'est pas « tout ». C'est le réglage
+   * par salon ; l'abonnement global au-dessus vient de M-I (REQ-UI-18).
    */
   const filtrees = useMemo(() => {
     if (!session) return [] as { roomId: string; name: string; niveau: RoomNotificationLevel }[];
@@ -126,6 +126,10 @@ export function Reglages() {
 
         {ouverte === "notifications" && (
           <div style={{ display: "grid", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
+            {/* REQ-UI-18 — l'abonnement global, livré par M-I. C'est aussi ici que se
+                rattrape un refus de permission : nulle part ailleurs on ne peut le voir. */}
+            <NotificationsGlobales session={session} />
+
             <Text type="supporting" color="secondary">
               Les notifications se règlent conversation par conversation, depuis ses
               informations. Voici celles qui ne sont pas au niveau « Tout ».

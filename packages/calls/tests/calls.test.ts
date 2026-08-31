@@ -8,6 +8,7 @@ import { asSession } from "@tacita/client-core/testing";
 
 import {
   activeCall,
+  attachCallWidget,
   buildCallWidget,
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
@@ -124,6 +125,24 @@ describe("REQ-CAL-01 — URL Element Call complète et paramétrée", () => {
   it("met les paramètres dans le fragment, jamais dans la requête HTTP", () => {
     const { url } = buildCallWidget(session, SALON, WIDGET);
     expect(url.slice(0, url.indexOf("#"))).not.toContain("?");
+  });
+
+  it("porte le point d'entrée audio ou vidéo, et la reprise d'un appel en cours", () => {
+    // REQ-UIX-38 : c'est le seul paramètre que l'UI choisit. Le vidéo est le défaut,
+    // parce qu'un appel sans précision est un appel vidéo dans le wireframe.
+    expect(buildCallWidget(session, SALON, WIDGET).params.intent).toBe("start_call");
+    expect(buildCallWidget(session, SALON, { ...WIDGET, media: "audio" }).params.intent).toBe(
+      "start_call_voice",
+    );
+    expect(buildCallWidget(session, SALON, { ...WIDGET, media: "audio", join: true }).params.intent).toBe(
+      "join_existing_voice",
+    );
+  });
+
+  it("n'attend aucune action de préchargement : rien ne la lui enverrait", () => {
+    // `preload=true` fait attendre le widget jusqu'à `io.element.join`. Le shard monte
+    // l'iframe au moment de l'appel : le laisser donnerait un écran qui ne démarre pas.
+    expect(buildCallWidget(session, SALON, WIDGET).params.preload).toBeUndefined();
   });
 });
 
@@ -262,6 +281,29 @@ describe("REQ-CAL-05 — driver widget standard, sans logique RTC maison", () =>
 
     expect(fake.client.encryptAndSendToDevice).toHaveBeenCalledTimes(2);
     expect(fake.client.sendToDevice).not.toHaveBeenCalled();
+  });
+
+  it("accroche l'iframe du shard au driver, et se décroche entièrement", () => {
+    // `ClientWidgetApi` écoute les `postMessage` du widget sur le contexte global, et le
+    // chargement sur l'iframe. Un écran d'appel quitté sans `stop()` laisserait les deux
+    // branchés sur une iframe démontée — un appel qu'on croit fini et qui parle encore.
+    const surGlobal = { ajout: vi.fn(), retrait: vi.fn() };
+    vi.stubGlobal("addEventListener", surGlobal.ajout);
+    vi.stubGlobal("removeEventListener", surGlobal.retrait);
+
+    const iframe = {
+      contentWindow: { postMessage: vi.fn() },
+      addEventListener: vi.fn(),
+    } as unknown as HTMLIFrameElement;
+
+    const widget = buildCallWidget(session, SALON, WIDGET);
+    const detacher = attachCallWidget(iframe, session, SALON, widget);
+
+    expect(surGlobal.ajout).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(iframe.addEventListener).toHaveBeenCalledWith("load", expect.any(Function));
+
+    detacher();
+    expect(surGlobal.retrait).toHaveBeenCalledWith("message", expect.any(Function));
   });
 
   it("fournit le jeton OpenID qui autorise le SFU via lk-jwt", async () => {

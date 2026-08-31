@@ -8,11 +8,28 @@ l'URL et le driver.
 
 ```ts
 const focus = await discoverFocus(homeserverUrl); // lève RtcFociMissingError
-const { url } = buildCallWidget(session, roomId, { elementCallUrl, parentUrl, widgetId });
-const driver = new CallWidgetDriver(session, roomId); // à passer à ClientWidgetApi
+const widget = buildCallWidget(session, roomId, {
+  elementCallUrl,
+  parentUrl,
+  widgetId,
+  media: "audio", // sinon vidéo — le seul paramètre de lancement que l'UI choisit
+  join: false, // `true` pour rejoindre un appel en cours (bandeau REQ-CAL-03)
+});
+const detach = attachCallWidget(iframe, session, roomId, widget); // API widget + driver
 const call = activeCall(session, roomId); // idle → active → ended
 await hangupLocal(session, roomId);
 ```
+
+`attachCallWidget` est le seul membre qui touche un élément du DOM, et il ne l'a pas
+construit : le shard monte l'iframe, ce package lui parle. Sans lui, Element Call en mode
+widget reçoit l'identité par l'URL et attend un client qui ne répond jamais — l'état du
+salon, le jeton OpenID et les clés de média passent tous par l'API widget.
+
+`intent` porte le point d'entrée (`start_call`, `start_call_voice`, `join_existing`,
+`join_existing_voice`, relus dans `UrlParams.ts` d'Element Call le 06/08/2026) ; `skipLobby`
+est déprécié en sa faveur. **`preload` n'est pas envoyé** : il ferait attendre le widget
+jusqu'à l'action `io.element.join`, que personne ne lui envoie — le shard monte l'iframe au
+moment de l'appel, pas en avance.
 
 ## ⚠️ Les littéraux MatrixRTC ne sont pas stables
 

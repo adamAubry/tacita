@@ -1,3 +1,4 @@
+import { BoutonAppelAmi } from "../../../components/appel/BoutonsAppel";
 import { LayoutHeader } from "../../../components/foundation/LayoutHeader";
 import { Placeholder } from "../../../components/foundation/Placeholder";
 
@@ -7,6 +8,9 @@ import { Placeholder } from "../../../components/foundation/Placeholder";
  * La route existe dès maintenant parce que M-H y mène : le bouton « Profil » des
  * informations d'un DM (REQ-UIX-33) doit atterrir quelque part, et une route absente
  * rendrait un 404 là où le wireframe promet un écran.
+ *
+ * L'entrée « Appel audio » des Friends interaction buttons est déjà là (REQ-UIX-39) :
+ * M-I en porte le comportement, M-G lui donnera sa place dans la barre des quatre.
  */
 export default async function PageProfil({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params;
@@ -17,6 +21,7 @@ export default async function PageProfil({ params }: { params: Promise<{ userId:
       <Placeholder
         titre={decodeURIComponent(userId)}
         explication="Le profil, la note et les contenus partagés arrivent avec le module social."
+        action={<BoutonAppelAmi userId={decodeURIComponent(userId)} />}
       />
     </>
   );

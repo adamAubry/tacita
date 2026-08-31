@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 import { Theme, type ThemeMode } from "../components/foundation/primitives";
 import { tacitaTheme } from "../components/foundation/theme";
+import { PontNotifications } from "../components/notifications/PontNotifications";
 import { RecoveryGate } from "../components/onboarding/RecoveryGate";
 import { SessionProvider } from "../components/onboarding/SessionProvider";
 import { ecrireTheme, lireTheme } from "../lib/preferences";
@@ -59,6 +60,9 @@ export function Providers({ children }: { children: ReactNode }) {
         {/* REQ-UI-04 — la porte est **dans** le thème et **autour** de tout le contenu :
             aucune route ne rend quoi que ce soit tant que la clé n'est pas confirmée. */}
         <SessionProvider homeserverUrl={HOMESERVER}>
+          {/* REQ-UI-18 — le service worker réveillé par un push demande ici l'aperçu
+              déchiffré ; il ne rend rien et n'attend aucune route. */}
+          <PontNotifications />
           <RecoveryGate>{children}</RecoveryGate>
         </SessionProvider>
       </Theme>

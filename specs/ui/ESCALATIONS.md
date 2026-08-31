@@ -1,9 +1,9 @@
 # ESCALATIONS.md — Points remontés au PM (Tech Lead Frontend)
 
-**Dix des onze points sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
-**E-11 est ouvert** — remonté le 06/08/2026 en câblant M-H, il attend le PM. Ce fichier
-garde la question, la décision et son motif : une décision dont on a perdu le motif se
-rediscute tous les six mois.
+**Dix des douze points sont tranchés** (E-01 à E-09 le 05/08/2026, E-10 le 06/08/2026).
+**E-11 et E-12 sont ouverts** — remontés le 06/08/2026 en câblant M-H puis M-I, ils
+attendent le PM. Ce fichier garde la question, la décision et son motif : une décision
+dont on a perdu le motif se rediscute tous les six mois.
 
 Neuf ont été **arbitrés par le PM**. E-09 a été **tranché en périmètre technique et porté à
 sa connaissance** ; la distinction est notée dans sa section, parce qu'elle change qui peut
@@ -26,6 +26,7 @@ contrat gagne.
 | E-09 | Ordre de la liste de conversations | **Tranché en périmètre**, PM informé — récence du dernier message | `specs/05-messaging.md` — REQ-MSG-13 et sa réserve |
 | E-10 | Transcodage vidéo et Opus vs liste close de REQ-UI-02 | **Arbitré** — D-03 lie le format ; muxeurs et repli WASM dans `packages/media-pipeline` | `DECISIONS.md` D-03 retitrée et révisée ; `specs/08-media-pipeline.md` — REQ-MED-07 et § Méthode. **REQ-UI-02 inchangée** |
 | E-11 | Un lien de groupe résout un `roomId` que le porteur ne peut pas rejoindre | **Ouvert** — remonté le 06/08/2026 pendant M-H | rien tant qu'il n'est pas tranché ; M-H émet, M-G reçoit |
+| E-12 | Application fermée : la notification ne peut pas être déchiffrée | **Ouvert** — remonté le 06/08/2026 pendant M-I | M-I livre le repli générique et **l'écrit dans les réglages** ; REQ-UI-18 reste à amender ou à confirmer |
 
 ---
 
@@ -431,6 +432,55 @@ supposent un chemin d'entrée), `specs/05-messaging.md` (`createGroupChat` si vo
 (l'écran de réception), et le test REQ-INV-16 de la spec 12 — son balayage interdit à tout
 module hors du service de connaître la route `/resolve`, ce qui devra s'ouvrir au client
 de réception le jour où il existe.
+
+---
+
+## E-12 — Application fermée : la notification ne peut pas être déchiffrée (M-I)
+
+**Ouvert le 06/08/2026, en câblant M-I.** L'UI de M-I est livrée et fonctionne ; c'est la
+promesse de REQ-UI-18 qui demande à être confirmée ou amendée.
+
+**La question.** REQ-UI-18 dit : « réveil SW → payload {event_id, room_id} → récupération et
+**déchiffrement local** → notification affichée (expéditeur + aperçu déchiffrés localement) ».
+Le déchiffrement local est possible — mais **seulement tant qu'un onglet est ouvert**. Les
+clés Megolm vivent dans le magasin crypto du SDK (vodozemac, IndexedDB), ouvert par
+l'application. Un service worker réveillé sans onglet ne peut pas les lire :
+
+- il faudrait y initialiser une seconde instance de `matrix-js-sdk` avec sa crypto Rust, donc
+  **ouvrir le même magasin de clés depuis deux contextes** — l'état du ratchet Megolm n'est pas
+  fait pour ça, et le SDK ne prend pas en charge le contexte worker ;
+- ce serait aussi un client Matrix de plus à réveiller, à authentifier et à arrêter, pour
+  afficher une ligne de texte.
+
+Or le cas nominal du push est précisément **l'application fermée**. Autrement dit, la
+notification riche que REQ-UI-18 décrit est celle qu'on voit le moins.
+
+**Ce que M-I a livré.** Le chemin complet, dans les deux sens : l'onglet ouvert répond au
+worker et la notification porte l'expéditeur et l'aperçu déchiffrés localement ; sans onglet,
+ou sur clés absentes, elle affiche « Nouveau message » sans contenu (REQ-UIX-40, déjà écrite
+pour ce repli). Aucun contenu ne transite par la passerelle, ni n'entre au cache du worker.
+
+**Et la limite est écrite dans le produit**, dans les réglages de notification, au-dessus du
+bouton d'activation : « quand l'application est fermée, la notification affiche « Nouveau
+message » sans expéditeur ni aperçu ». C'est l'interdit n°13 appliqué — la promesse est
+tenue à hauteur de ce qu'elle vaut, ou elle est dite.
+
+**Les deux voies, et ce qu'elles coûtent.**
+
+**Voie A — assumer, et amender REQ-UI-18.** L'exigence se lit alors « expéditeur et aperçu
+déchiffrés localement **quand l'application est ouverte** ; notification générique sinon ».
+*Coût :* rien à construire, la rédaction rejoint ce qui existe. C'est déjà la garantie
+qu'offrent les messageries chiffrées comparables.
+
+**Voie B — faire porter au serveur une partie du contenu.** La seule façon d'avoir un
+expéditeur hors ligne serait que la passerelle en sache quelque chose. *Coût :* le principe
+directeur du dépôt tombe, et REQ-PSH-02 avec lui. Mentionnée pour être écartée, pas pour être
+pesée.
+
+**Ce que je recommande, sans le décider :** la voie A.
+
+**Ce que la décision touche.** `specs/11-ui-shard.md` et `specs/ui/M-I.md` (REQ-UI-18), et la
+phrase des réglages, qui suit la rédaction retenue.
 
 ---
 

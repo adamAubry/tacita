@@ -32,13 +32,15 @@ import { environnementMedia } from "../../lib/media-env";
 import { brancherModeMasque } from "../../lib/mode-masque";
 import { lireFondEcran } from "../../lib/preferences";
 import { videoTranscodable } from "../../lib/transcode-video";
+import { BandeauAppel } from "../appel/BandeauAppel";
+import { BoutonsAppel } from "../appel/BoutonsAppel";
 import { LayoutHeader } from "../foundation/LayoutHeader";
-import { IconeAppel, IconeVideo } from "../foundation/icons";
 import { Button, Icon } from "../foundation/primitives";
 import { MediaPicker } from "../media/MediaPicker";
 import { MediaViewer } from "../media/MediaViewer";
 import { PhotoCapture } from "../media/PhotoCapture";
 import { mediaDe, type Media } from "../media/media";
+import { InvitePush } from "../notifications/InvitePush";
 import { useSession } from "../onboarding/SessionProvider";
 import { Composer } from "./Composer";
 import { ConversationStarter } from "./ConversationStarter";
@@ -303,10 +305,9 @@ export function Conversation({ roomId }: { roomId: string }) {
         titre={salon?.name ?? "Conversation"}
         fin={
           <div style={{ display: "flex", gap: "var(--spacing-1)" }}>
-            {/* M-I porte la logique d'appel ; M-D ne rend que les deux boutons et route
-                vers l'écran d'appel — il ne compose rien lui-même (interdit n°7). */}
-            <Button label="Appel audio" variant="ghost" isIconOnly icon={IconeAppel} />
-            <Button label="Appel vidéo" variant="ghost" isIconOnly icon={IconeVideo} />
+            {/* REQ-UI-19 — M-D fournit l'emplacement, M-I le comportement. Le shard ne
+                compose rien lui-même : l'appel vit dans le widget (interdit n°7). */}
+            <BoutonsAppel roomId={roomId} />
             {/* Le point d'entrée du layout Conversation info (M-H) : sans lui, l'écran
                 des options n'est atteignable par aucun geste. */}
             <Button
@@ -319,6 +320,9 @@ export function Conversation({ roomId }: { roomId: string }) {
           </div>
         }
       />
+
+      {/* REQ-CAL-03 — persistant tant que l'appel dure, dans le salon concerné. */}
+      {session && <BandeauAppel session={session} roomId={roomId} />}
 
       <Timeline
         messages={messages}
@@ -400,6 +404,10 @@ export function Conversation({ roomId }: { roomId: string }) {
           }}
         />
       )}
+
+      {/* REQ-UI-18 — le bon moment : un message reçu est là, donc la notification a un
+          sens démontré. Jamais au premier lancement, où elle n'en aurait aucun. */}
+      <InvitePush declenche={messages.some((message) => !message.moi)} session={session} />
 
       <HoldMenu
         ouvert={holdSur !== undefined}

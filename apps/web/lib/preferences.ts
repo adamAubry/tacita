@@ -80,6 +80,16 @@ export const ecrireRefusEducationIOS = (indexedDB: IDBFactory) =>
   ecrirePreference(indexedDB, "education-ios-refusee", true);
 
 /**
+ * REQ-UI-18 — même règle pour l'invitation à activer les notifications : écartée une
+ * fois, elle ne revient pas d'elle-même. Les réglages restent le chemin de rattrapage.
+ */
+export const lireRefusInvitePush = async (indexedDB: IDBFactory) =>
+  (await lirePreference(indexedDB, "invite-push-refusee")) === true;
+
+export const ecrireRefusInvitePush = (indexedDB: IDBFactory) =>
+  ecrirePreference(indexedDB, "invite-push-refusee", true);
+
+/**
  * REQ-UI-13 / REQ-RCP-07 — le mode masqué. **Un réglage d'appareil**, pas de compte :
  * le rendre synchronisé le poserait en account data, que le serveur lit en clair.
  *

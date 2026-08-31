@@ -63,3 +63,78 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(requete).catch(() => caches.match("/").then((r) => r ?? Response.error())));
   }
 });
+
+/*
+ * REQ-UI-18 / REQ-UIX-40 — le réveil par notification.
+ *
+ * Le payload ne porte que `{event_id, room_id}` (REQ-PSH-02) : ce worker ne reçoit aucun
+ * contenu, et n'a aucun moyen d'en produire seul — les clés Megolm vivent dans le magasin
+ * crypto ouvert par l'onglet. Il demande donc l'aperçu à l'application (`lib/notifications.ts`)
+ * et affiche « Nouveau message » quand personne ne peut répondre.
+ *
+ * Ce chemin **n'écrit rien** : ni cache, ni IndexedDB, ni journal. L'aperçu ne fait que
+ * traverser, du port de message à `showNotification`.
+ */
+const CANAL_PUSH = "tacita:push";
+
+/** Au-delà, l'onglet ne répondra pas : notification générique plutôt que rien du tout. */
+const DELAI_APERCU_MS = 2000;
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data?.json() ?? {};
+  } catch {
+    // Payload illisible : on notifie quand même, sans rien en dire. Le journaliser
+    // reviendrait à écrire un contenu inconnu dans les logs du navigateur.
+  }
+  event.waitUntil(afficherNotification(payload));
+});
+
+async function afficherNotification({ event_id, room_id }) {
+  const apercu = event_id && room_id ? await demanderApercu({ event_id, room_id }) : null;
+
+  await self.registration.showNotification(apercu ? apercu.titre : "Nouveau message", {
+    body: apercu ? apercu.corps : undefined,
+    // Groupées par conversation : dix messages d'une même personne remplacent la
+    // notification précédente au lieu d'empiler dix lignes.
+    tag: room_id ?? "tacita",
+    data: { room_id },
+  });
+}
+
+function demanderApercu(payload) {
+  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    const onglet = clients[0];
+    if (!onglet) return null;
+
+    return new Promise((resolve) => {
+      const canal = new MessageChannel();
+      const minuteur = setTimeout(() => resolve(null), DELAI_APERCU_MS);
+      canal.port1.onmessage = (message) => {
+        clearTimeout(minuteur);
+        resolve(message.data ?? null);
+      };
+      // Le port de réponse est privé : l'aperçu déchiffré ne part pas en diffusion.
+      onglet.postMessage({ type: CANAL_PUSH, ...payload }, [canal.port2]);
+    });
+  });
+}
+
+// REQ-UI-18 — tap → la conversation. Un onglet déjà ouvert est repris plutôt que doublé.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const cible = event.notification.data?.room_id ? `/c/${event.notification.data.room_id}` : "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const onglet = clients[0];
+      if (!onglet) return self.clients.openWindow(cible);
+      // `navigate` n'existe que sur un client contrôlé par ce worker : sans lui, on
+      // ramène au moins l'onglet au premier plan.
+      return Promise.resolve(onglet.navigate ? onglet.navigate(cible) : undefined)
+        .catch(() => undefined)
+        .then(() => onglet.focus());
+    }),
+  );
+});

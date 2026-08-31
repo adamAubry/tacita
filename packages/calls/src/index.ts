@@ -1,6 +1,8 @@
 import type { Session } from "@tacita/client-core";
 import { Direction, RoomStateEvent, type MatrixEvent } from "matrix-js-sdk";
+import { ClientWidgetApi, MatrixWidgetType, Widget } from "matrix-widget-api";
 
+import { CallWidgetDriver } from "./driver";
 import {
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
@@ -10,7 +12,7 @@ import {
   type LivekitFocus,
 } from "./matrixrtc";
 
-export { CallWidgetDriver } from "./driver";
+export { CallWidgetDriver };
 export {
   CALL_MEMBER_EVENT_TYPE,
   callMemberStateKey,
@@ -59,6 +61,14 @@ export interface CallWidgetOptions {
   parentUrl: string;
   /** Identifiant du widget côté client, repris tel quel par le driver. */
   widgetId: string;
+  /**
+   * Le point d'entrée : « appel audio » ou « appel vidéo » (REQ-UIX-38). C'est le seul
+   * paramètre de lancement que l'UI choisit — ce qu'Element Call en fait à l'intérieur
+   * de l'appel lui appartient (E-07).
+   */
+  media?: "audio" | "video";
+  /** Rejoindre un appel déjà en cours (bandeau REQ-CAL-03) plutôt qu'en démarrer un. */
+  join?: boolean;
 }
 
 /**
@@ -93,6 +103,10 @@ export async function discoverFocus(homeserverUrl: string): Promise<LivekitFocus
  *
  * Aucun credential LiveKit n'apparaît ici. L'autorisation SFU se fait plus tard, par
  * l'échange jeton OpenID → `lk-jwt-service` que porte le driver (REQ-CAL-05).
+ *
+ * **`preload` a été retiré en câblant M-I** : il fait attendre le widget jusqu'à l'action
+ * `io.element.join`, que personne ne lui envoie ici — le shard monte l'iframe au moment
+ * de l'appel, pas en avance. Le garder donnait un écran d'appel qui ne démarre jamais.
  */
 export function buildCallWidget(
   session: Session,
@@ -112,16 +126,58 @@ export function buildCallWidget(
     parentUrl: options.parentUrl,
     // Mode widget : Element Call se pilote par l'API widget, pas par sa propre navigation.
     embed: "true",
-    preload: "true",
     hideHeader: "true",
     // Le média reste chiffré par participant : le SFU relaie sans déchiffrer.
     perParticipantE2EE: "true",
+    // REQ-UIX-38 — audio ou vidéo, démarrage ou reprise : les quatre valeurs de `intent`
+    // qu'Element Call accepte (`UrlParams.ts`, relu le 2026-08-06). `skipLobby` est
+    // déprécié en sa faveur ; le reste du comportement est interne au widget (E-07).
+    intent: `${options.join ? "join_existing" : "start_call"}${options.media === "audio" ? "_voice" : ""}`,
   };
 
   return {
     params,
     url: `${options.elementCallUrl.replace(/\/$/, "")}/room#?${new URLSearchParams(params).toString()}`,
   };
+}
+
+/**
+ * REQ-CAL-05 — branche l'iframe montée par le shard (spec 11) sur le driver. Sans ce
+ * raccordement, Element Call en mode widget attend un client qui ne répond pas : il
+ * reçoit l'identité par l'URL, mais tout le reste — état du salon, jeton OpenID, clés de
+ * média — passe par l'API widget.
+ *
+ * L'iframe vient de l'appelant : le paquet ne rend rien, il ne fait que parler à ce qui
+ * est déjà à l'écran. `ClientWidgetApi` a besoin de l'élément lui-même pour écouter son
+ * chargement et cibler ses `postMessage`.
+ *
+ * `waitForIframeLoad` reste au défaut (`true`) : Element Call envoie aussi
+ * `content_loaded`, qui reçoit alors une réponse d'erreur sans conséquence. L'inverse —
+ * attendre une action que le widget n'enverrait pas — laisserait l'appel muet.
+ */
+export function attachCallWidget(
+  iframe: HTMLIFrameElement,
+  session: Session,
+  roomId: string,
+  widget: CallWidget,
+): () => void {
+  // L'API widget filtre les messages entrants sur cet identifiant : le prendre ailleurs
+  // que dans l'URL montée donnerait un widget qui parle sans être entendu.
+  const widgetId = widget.params.widgetId;
+  if (!widgetId) throw new Error("widget sans identifiant : construit hors de buildCallWidget");
+
+  const api = new ClientWidgetApi(
+    new Widget({
+      id: widgetId,
+      creatorUserId: session.client.getUserId() ?? "",
+      type: MatrixWidgetType.Custom,
+      url: widget.url,
+    }),
+    iframe,
+    new CallWidgetDriver(session, roomId),
+  );
+
+  return () => api.stop();
 }
 
 /**

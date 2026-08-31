@@ -20,7 +20,20 @@ export default tseslint.config(
     files: ["apps/web/public/sw.js"],
     languageOptions: {
       globals: Object.fromEntries(
-        ["self", "caches", "fetch", "Response", "URL", "Request"].map((nom) => [nom, "readonly"]),
+        // `MessageChannel` et les minuteurs viennent du réveil push (REQ-UI-18) : le
+        // worker demande l'aperçu déchiffré à l'onglet, avec un délai au bout duquel il
+        // notifie quand même.
+        [
+          "self",
+          "caches",
+          "fetch",
+          "Response",
+          "URL",
+          "Request",
+          "MessageChannel",
+          "setTimeout",
+          "clearTimeout",
+        ].map((nom) => [nom, "readonly"]),
       ),
     },
   },
