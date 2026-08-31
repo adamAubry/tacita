@@ -147,3 +147,19 @@ describe("REQ-PSH-04 — aucun contenu utilisateur dans les logs", () => {
     expect(logs).toContain("410");
   });
 });
+
+describe("Durcissement — un corps surdimensionné est refusé sans épuiser la mémoire", () => {
+  it("répond 400 au lieu de charger un payload > 1 Mo en mémoire", async () => {
+    // Un event_id gonflé à ~2 Mo : bien formé en JSON, mais au-delà du plafond de lecture.
+    const enorme = {
+      notification: { event_id: "$" + "a".repeat(2_000_000), room_id: "!r:t", devices: [] },
+    };
+    const response = await fetch(url("/_matrix/push/v1/notify"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(enorme),
+    });
+    expect(response.status).toBe(400);
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+});

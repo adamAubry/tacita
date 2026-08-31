@@ -65,6 +65,12 @@ export function brancherNotifications(session: Session): () => void {
   if (!worker) return () => {};
 
   const surMessage = (evenement: MessageEvent) => {
+    // L'aperçu déchiffré ne repart que vers notre propre service worker. Les messages de
+    // `navigator.serviceWorker` sont déjà cloisonnés par origine par le navigateur ; ce
+    // garde rend la règle explicite et refuse tout ce qui, un jour, viendrait d'ailleurs.
+    const origine = evenement.origin;
+    if (origine && origine !== globalThis.location?.origin) return;
+
     const donnees = evenement.data as ({ type?: string } & PayloadPush) | null;
     const port = evenement.ports[0];
     if (donnees?.type !== CANAL_PUSH || !port) return;

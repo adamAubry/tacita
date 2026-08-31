@@ -1,9 +1,20 @@
 import { createServer } from "node:http";
 import { notify, type Notification } from "./notify.ts";
 
+// Une notification Synapse (event_id, room_id, liste de pushers) tient largement là-dedans.
+// Sans borne, `JSON.parse` sur un corps illimité serait un déni de service — la passerelle
+// n'a pas de port publié, mais elle reçoit de Synapse, et un Synapse compromis ne mérite
+// pas qu'on lui laisse épuiser la mémoire du process.
+const MAX_BODY = 1_000_000;
+
 async function readBody(req: NodeJS.ReadableStream): Promise<unknown> {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let total = 0;
+  for await (const chunk of req) {
+    total += (chunk as Buffer).length;
+    if (total > MAX_BODY) throw new Error("corps trop volumineux"); // → 400, comme un corps illisible
+    chunks.push(chunk as Buffer);
+  }
   return JSON.parse(Buffer.concat(chunks).toString("utf-8"));
 }
 
